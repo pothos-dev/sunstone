@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] A rail component renders as a fixed-width vertical strip on the far left of the desktop shell, always visible (independent of sidebar open/closed state).
 - [ ] Quick-nav icon opens the existing QuickNav palette; search icon opens the existing SearchPanel. Both still respond to their keyboard shortcuts.

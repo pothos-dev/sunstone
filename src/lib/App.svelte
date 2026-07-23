@@ -18,6 +18,7 @@
   import TagBrowser from '$lib/components/TagBrowser.svelte';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import NavBar from '$lib/components/NavBar.svelte';
+  import ActivityRail from '$lib/components/ActivityRail.svelte';
   import Tile from '$lib/components/Tile.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { treeDnd } from '$lib/state/treeDnd.svelte';
@@ -621,6 +622,12 @@
   data-testid="app-root"
   bind:this={appRoot}
 >
+  <ActivityRail
+    onMenu={() => {}}
+    onQuickNav={() => (quickNavOpen = !quickNavOpen)}
+    onSearch={() => (searchOpen = !searchOpen)}
+  />
+
   <aside
     class="side-bar"
     aria-label="Sidebar"
@@ -914,7 +921,10 @@
 <style>
   .app {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    /* Far-left activity rail (fixed) | collapsible left Sidebar | editor | right
+       Sidebar. The rail sits outside the Sidebar, so it stays visible when the
+       Sidebar collapses to 0. */
+    grid-template-columns: auto auto 1fr auto;
     height: 100vh;
     overflow: hidden;
     color: var(--text);
