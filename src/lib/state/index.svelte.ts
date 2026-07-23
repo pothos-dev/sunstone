@@ -1,5 +1,6 @@
 import { backend } from '$lib/ipc';
 import { findBundleRoot } from '$lib/links';
+import { ensureWasm, type BundleIndex } from '$lib/wasm';
 
 /**
  * Frontend mirror of the Rust Bundle index's existence set.
@@ -32,6 +33,16 @@ class IndexStore {
   #rootCache: { key: Set<string>; value: string } | null = null;
 
   /**
+   * The wasm `BundleIndex` handle (ADR 0006 §4). Step 0 ships the DUMMY handle
+   * with no real set, so it is constructed + `.free()`d alongside the TS path
+   * purely to prove the init/load/free lifecycle stands up in the real app;
+   * family 10 makes it the actual resolution engine and retires the TS set. It
+   * is `null` on SSR or when the wasm load degrades (§5) — the TS path carries
+   * on regardless.
+   */
+  #handle: BundleIndex | null = null;
+
+  /**
    * Best-effort OKF bundle root within the opened tree (`''` = the opened
    * folder itself; see `findBundleRoot`). Bundle-absolute links resolve from
    * this prefix. Recomputed only when the path set is replaced (on `refresh`),
@@ -56,8 +67,17 @@ class IndexStore {
 
   /** (Re)load the existing-path set from the backend index. */
   async refresh(): Promise<void> {
+    // Ensure the wasm module is initialized before building state (ADR 0006
+    // §5). Idempotent + memoized; returns `null` on SSR / load failure, in
+    // which case we simply skip the handle and run the TS path (silent degrade).
+    const wasm = await ensureWasm();
     try {
       const paths = await backend.listConceptPaths();
+      // Swap the handle: free the OLD one before building the new (ADR 0006
+      // §4). Done only once we have a fresh set to swap in, so a backend error
+      // leaves both the previous set AND the previous handle untouched.
+      this.#handle?.free();
+      this.#handle = wasm ? new wasm.BundleIndex(findBundleRoot(paths)) : null;
       this.paths = new Set(paths);
       this.version += 1;
     } catch {
