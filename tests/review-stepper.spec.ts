@@ -26,6 +26,8 @@ async function openReview(page: Page, path: string) {
   await tree.locator(`[data-path="${path}"]`).click();
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
+  // Read is the default; enter editing so the working-tree edit below takes.
+  await page.getByTestId('edit-toggle').click();
 
   // A working-tree edit so the position-0 (working ↔ HEAD) diff is non-empty.
   const content = editor.locator('.cm-content');

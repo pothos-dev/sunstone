@@ -49,6 +49,8 @@ async function openConcept(page: Page) {
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+  // Read is the default; enter editing so the Editor Region is focusable.
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 }

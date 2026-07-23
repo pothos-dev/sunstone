@@ -86,6 +86,11 @@ test('QuickNav from the Explorer: cancel restores the opener row; commit follows
 
   await page.screenshot({ path: 'tests/screenshots/escape-peel.png', fullPage: true });
 
+  // Read is the default; enter editing so the committed Concept below is editable
+  // and focus can FOLLOW into the Editor (a read-only view is not focusable). The
+  // codemirror Concept opened above (via focusFileRow) makes the toggle available.
+  await page.getByTestId('edit-toggle').click();
+
   // Re-open and COMMIT a result → focus FOLLOWS the action into the Editor.
   await page.keyboard.press('Control+k');
   const palette = page.getByTestId('quick-nav');
@@ -137,6 +142,8 @@ test('Properties: Escape peels EXACTLY one layer per press (chip text-edit → c
   await expect(page.getByTestId('properties')).toBeVisible();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+  // Read is the default; enter editing so the Editor takes click focus.
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 
@@ -206,6 +213,8 @@ test('a peeked Region survives an overlay open+cancel and focus returns into the
   await page.getByTestId('tree').locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+  // Read is the default; enter editing so the Editor takes click focus.
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 

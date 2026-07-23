@@ -25,6 +25,10 @@ test('mermaid: invalid source renders a bordered error panel with the raw source
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Obsidian-style hybrid editing');
 
+  // Read is the default; enter editing so clicking the Diagram reveals the raw
+  // fence source and the source can be edited to break the render.
+  await page.getByTestId('edit-toggle').click();
+
   // Bring the mermaid fence into view so CM6 mounts its line DOM + widget.
   await editor.locator('.cm-scroller').evaluate((el) => {
     el.scrollTop = el.scrollHeight;

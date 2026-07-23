@@ -80,6 +80,9 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
   await expect(outline).not.toContainText('shell comment');
 
   // --- Clicking an entry scrolls the editor to that heading's line ---
+  // Read is the default; enter editing so the scroll's cursor marks an active
+  // line (the active-line highlight is an editing-only extension).
+  await page.getByTestId('edit-toggle').click();
   // "Second Section" is `## Second Section` on full-document line 25. The
   // scroll places the cursor at that line, marking it the active line.
   await entries.nth(3).click();

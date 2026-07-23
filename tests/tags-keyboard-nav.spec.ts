@@ -38,7 +38,9 @@ async function rovingCount(page: Page): Promise<number> {
 async function openTags(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] })));
+  // `editorMode: editing` so a Concept opened from a tag leaf is editable and thus
+  // takes focus (read — the default — is not focusable; focus would stay in Tags).
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], editorMode: 'editing' })));
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
   await expandSection(page, 'tags');

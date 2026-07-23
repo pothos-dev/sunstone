@@ -27,10 +27,12 @@ async function twoTiles(page: Page) {
   await page.goto('/');
   let tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
+  // `editorMode: editing` so each tile's editor is focusable — clicking a tile's
+  // editor below must activate it, which read (the default) prevents.
   await page.evaluate(() =>
     window.localStorage.setItem(
       'sunstone:bundleState:/fake/bundle',
-      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] }),
+      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], editorMode: 'editing' }),
     ),
   );
   await page.reload();
@@ -84,7 +86,10 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
     fullPage: true,
   });
 
-  // Editing one tile's frontmatter targets THAT tile's Document (per-tile).
+  // Editing one tile's frontmatter targets THAT tile's Document (per-tile). Click
+  // into tile 1's field first — the Properties toggle above left tile 0 active, so
+  // interacting with tile 1 activates it (a real mousedown, as a user would do).
+  await tile1.getByTestId('scalar-title').click();
   await tile1.getByTestId('scalar-title').fill('Bundle Renamed');
   await tile1.getByTestId('scalar-title').blur();
   await expect

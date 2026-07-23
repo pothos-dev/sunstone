@@ -114,6 +114,9 @@ test('reserved files: no Properties panel, body editing still works', async ({ p
   await expect(editor).toBeVisible();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
+  // Read is the default; enter editing so the body becomes editable.
+  await page.getByTestId('edit-toggle').click();
+
   // The body remains fully editable and autosaves to the backend.
   const content = editor.locator('.cm-content');
   await expect(content).toHaveAttribute('contenteditable', 'true');

@@ -52,6 +52,9 @@ test('Region focus: directional movement, sticky landing, Escape→Editor', asyn
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
 
+  // Read is the default; enter editing so the Editor Region is focusable.
+  await page.getByTestId('edit-toggle').click();
+
   // Reveal the right Sidebar so Outline + Backlinks Regions become visible.
   await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
@@ -171,6 +174,10 @@ test('history is on Ctrl+Alt+arrows; plain Alt+arrows no longer navigates; copy/
   await expect(editor).toContainText('A Bundle is the root folder');
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+
+  // Read is the default; enter editing so the Editor Region is focusable and the
+  // Ctrl+V paste below reaches the editable document.
+  await page.getByTestId('edit-toggle').click();
 
   // Plain Alt+Left must NOT navigate history (it is Region movement now). Focus
   // the editor first so Alt+Left would have triggered a Back before the rebind.
