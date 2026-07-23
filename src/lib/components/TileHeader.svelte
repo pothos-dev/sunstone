@@ -49,11 +49,12 @@
     onExportPdf: () => void;
     /** Toggle live editing on/off for this Concept. */
     onToggleEditing: () => void;
-    /** Whether the (concept-scoped) Properties panel is shown. */
+    /** Whether the Properties panel is shown (global `session.propertiesShown`). */
     propertiesShown: boolean;
     /**
-     * Toggle the Properties panel for the open Concept's frontmatter. Drives the
-     * shared `session.propertiesShown` flag (moved here from the deleted NavBar).
+     * Toggle the Properties panel, which shows the open Concept's frontmatter.
+     * Drives the global `session.propertiesShown` flag (the control moved here
+     * from the deleted NavBar; the flag's scope is unchanged — app-wide).
      */
     onToggleProperties: () => void;
   }
@@ -141,9 +142,9 @@
       </svg>
     </button>
 
-    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline
-         (concept-scoped). Moved here from the deleted NavBar; drives the shared
-         `session.propertiesShown` flag. -->
+    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
+         Moved here from the deleted NavBar; drives the global
+         `session.propertiesShown` flag (app-wide preference). -->
     <button
       type="button"
       class="icon-btn"

@@ -71,7 +71,7 @@ export class Tile {
   /** bundle-relative path of the active Concept, or null if none. */
   activePath = $state<string | null>(null);
   /**
-   * This Tile's tri-state view-mode (Source / Live / Reading). Owned here (not in
+   * This Tile's view-mode (the boolean `editing` vs `read`). Owned here (not in
    * the Tile.svelte component) so it is part of the persisted layout shape and
    * survives a relaunch. A fresh Tile defaults to `DEFAULT_EDITOR_MODE`; a split
    * inherits its source's mode; a restore sets it from the stored layout.
