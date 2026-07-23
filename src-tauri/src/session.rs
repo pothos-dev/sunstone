@@ -16,9 +16,9 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use sunstone_core::app_state::AppState;
-use sunstone_core::config;
-use sunstone_core::watcher::{self, WatcherHandle, FILE_CHANGED_EVENT};
+use sunstone_native::app_state::AppState;
+use sunstone_native::config;
+use sunstone_native::watcher::{self, WatcherHandle, FILE_CHANGED_EVENT};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 
 /// The runtime Bundle session, managed in Tauri state. Commands that need the

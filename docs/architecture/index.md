@@ -5,7 +5,7 @@ Sunstone is four packages: one shared Rust domain crate plus three thin layers o
 ## Concepts
 
 - [Architecture overview](overview.md) - The four packages and how they compose into a desktop app and a web viewer over one shared crate.
-- [sunstone-core](sunstone-core.md) - The host-agnostic Rust crate holding all Bundle logic — the hub both hosts depend on.
+- [sunstone-native](sunstone-native.md) - The host-agnostic Rust crate holding all Bundle logic — the hub both hosts depend on.
 - [Desktop shell (src-tauri)](desktop-shell.md) - The thin Tauri 2 wrapper exposing core over IPC commands; the "rust" package `sunstone ./docs` launches.
 - [sunstone-server](sunstone-server.md) - The axum binary exposing one Bundle over a JSON/SSE API for Sunstone Web.
 - [Web frontend (src/)](web-frontend.md) - The SvelteKit UI that serves both the desktop SPA and the server-rendered web viewer, decoupled by the IPC seam.
@@ -14,6 +14,6 @@ Sunstone is four packages: one shared Rust domain crate plus three thin layers o
 ## Related
 
 - [OKF → Bundle](/okf/bundle.md) - The Bundle these packages operate on, and its git-commit model.
-- [OKF → Linking](/okf/linking.md) - The link/rewrite model sunstone-core implements.
+- [OKF → Linking](/okf/linking.md) - The link/rewrite model sunstone-native implements.
 - [Interface](/interface/index.md) and [Editor](/editor/index.md) - The frontend surfaces built on the web package.
 - [Glossary](/GLOSSARY.md) - Canonical domain terms (Bundle, Concept, …).

@@ -9,6 +9,9 @@ node_modules
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Generated wasm-pack output (built by `build:wasm`, ADR 0006 §1)
+/src/lib/wasm/pkg
+
 # Rust / Tauri build artifacts
 /target
 /src-tauri/target

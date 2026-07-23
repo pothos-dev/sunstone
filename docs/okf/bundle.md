@@ -55,7 +55,7 @@ The link/backlink logic is implemented **twice** — pure Rust and pure TS — k
 
 ### The Bundle is git-committed content
 
-Sunstone leans into the spec's "git repository (recommended)" distribution: the Bundle _is_ the tracked working tree, and the **web write path commits edits straight back into it**. `crates/sunstone-core/src/git.rs` stages bundle-relative paths and either creates a fresh `edit … via web` commit (`commit`) or folds an anchor-relink write into the preceding one (`amend`, `--no-edit`, preserving author + author-date). Author == committer, set via `GIT_*` env so the commit is independent of any repo-level `user.name`. See [Testing](/architecture/testing.md) for the write flow and its test strategy, and `docker/README.md` at the repo root for the read-only web deployment.
+Sunstone leans into the spec's "git repository (recommended)" distribution: the Bundle _is_ the tracked working tree, and the **web write path commits edits straight back into it**. `crates/sunstone-native/src/git.rs` stages bundle-relative paths and either creates a fresh `edit … via web` commit (`commit`) or folds an anchor-relink write into the preceding one (`amend`, `--no-edit`, preserving author + author-date). Author == committer, set via `GIT_*` env so the commit is independent of any repo-level `user.name`. See [Testing](/architecture/testing.md) for the write flow and its test strategy, and `docker/README.md` at the repo root for the read-only web deployment.
 
 ### What is _not_ part of the Bundle
 

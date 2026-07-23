@@ -29,10 +29,17 @@ USER nhp
 
 # Install the Rust toolchain via rustup (into the nhp user's home so it persists
 # alongside the other per-user state). Stable matches the crate's 2021 edition.
+# The wasm32-unknown-unknown target + wasm-pack drive the WASM-shared-core build
+# (ADR-0006): `wasm-pack build --target web` compiles `crates/sunstone-wasm`.
 ENV RUSTUP_HOME=/home/nhp/.rustup \
     CARGO_HOME=/home/nhp/.cargo \
     PATH=/home/nhp/.cargo/bin:${PATH}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable \
+    && rustup target add wasm32-unknown-unknown \
     && rustc --version \
     && cargo --version
+
+# wasm-pack: builds the wasm module + generates the JS/TS bindings (ADR-0006 §1).
+RUN cargo install wasm-pack --locked \
+    && wasm-pack --version

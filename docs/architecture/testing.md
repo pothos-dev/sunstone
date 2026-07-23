@@ -10,7 +10,7 @@ timestamp: 2026-07-23T00:00:00Z
 
 Sunstone has **four green gates** plus **two Playwright suites**. Every change must keep the gates green; behavioural changes to components are proven in Playwright.
 
-The gates and suites map onto the [package architecture](/architecture/index.md): `cargo test` / `cargo check` cover the three Rust crates ([sunstone-core](/architecture/sunstone-core.md), [sunstone-server](/architecture/sunstone-server.md), [desktop shell](/architecture/desktop-shell.md)); `bun test src/lib` and `bun run check` cover the [web frontend](/architecture/web-frontend.md)'s pure logic and types; the two Playwright suites exercise the assembled desktop and web stacks end-to-end.
+The gates and suites map onto the [package architecture](/architecture/index.md): `cargo test` / `cargo check` cover the three Rust crates ([sunstone-native](/architecture/sunstone-native.md), [sunstone-server](/architecture/sunstone-server.md), [desktop shell](/architecture/desktop-shell.md)); `bun test src/lib` and `bun run check` cover the [web frontend](/architecture/web-frontend.md)'s pure logic and types; the two Playwright suites exercise the assembled desktop and web stacks end-to-end.
 
 | What | Command | Proves |
 | --- | --- | --- |
@@ -32,16 +32,16 @@ This covers, among others: path/tree/frontmatter/outline/highlight helpers, the 
 
 ## Rust tests — `cargo test`
 
-The Rust side is a **Cargo workspace** with three members — `crates/sunstone-core`, `crates/sunstone-server`, and `src-tauri`. Run from the repo root:
+The Rust side is a **Cargo workspace** with three members — `crates/sunstone-native`, `crates/sunstone-server`, and `src-tauri`. Run from the repo root:
 
 ```bash
 cargo test                         # every crate
-cargo test -p sunstone-core        # core (bundle/rewrite/git primitives)
+cargo test -p sunstone-native        # core (bundle/rewrite/git primitives)
 cargo test -p sunstone-server      # the axum server (routes, orchestration, auth)
 cargo check                        # typecheck only (faster)
 ```
 
-Git-touching code (`crates/sunstone-core/src/git.rs`) is tested against a **temporary git repo** created in the test — assert on real `git log` / `git show` output, no fixtures on disk.
+Git-touching code (`crates/sunstone-native/src/git.rs`) is tested against a **temporary git repo** created in the test — assert on real `git log` / `git show` output, no fixtures on disk.
 
 ## Playwright — two suites
 

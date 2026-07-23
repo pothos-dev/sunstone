@@ -1,0 +1,16 @@
+[package]
+name = "sunstone-wasm"
+version = "0.14.0"
+description = "Sunstone's WebAssembly entry point over sunstone-shared (ADR 0006)"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde-wasm-bindgen = "0.6.5"
+# The pure leaf crate is the ONLY Sunstone dependency wasm may take.
+sunstone-shared = { path = "../sunstone-shared" }
+tsify = "0.5.6"
+wasm-bindgen = "0.2.126"

@@ -23,7 +23,7 @@ The SvelteKit app (Svelte 5 runes) at the repo root under `src/` is the "web" pa
 | `fake.ts` (+ `fake/*`) | In-memory backend over a seeded fixture Bundle — behaviourally faithful (same path conventions, path-escape rejection, simulated watcher, canned git history). Powers plain-Chromium dev and the desktop Playwright suite. |
 | `index.ts` | **Backend selection:** `backend = __SUNSTONE_WEB__ ? httpBackend : isTauri ? tauriBackend : fakeBackend`. `__SUNSTONE_WEB__` is a Vite `define` constant, so the unused branches are dead-code-eliminated. |
 
-Every method both real backends implement returns one of the [sunstone-core](/architecture/sunstone-core.md) serde shapes, mirrored in `src/lib/types.ts`.
+Every method both real backends implement returns one of the [sunstone-native](/architecture/sunstone-native.md) serde shapes, mirrored in `src/lib/types.ts`.
 
 ## One codebase, two builds
 
@@ -42,11 +42,11 @@ The whole thing pivots on `SUNSTONE_TARGET=web` → the compile-time boolean `__
 - **`src/lib/editor/`** — CodeMirror internals (see the [editor cluster](/editor/index.md)): `cm.ts`, wikilinks, broken-links, anchor-tracking, citations, CriticMarkup, find, formatting, mermaid.
 - **`src/lib/state/`** — Svelte 5 runes state singletons (`.svelte.ts`): `editor`, `workspace`, `document`, `bundle`, `index`, `theme`, `treeActions`, `focus`, and layout/nav helpers.
 - **`src/lib/components/`** — desktop components (`Tile`, `Tree`, `NavBar`, `Outline`, `Backlinks`, `Properties*`, `SearchPanel`, `QuickNav`, `Launcher`, …) — the [interface](/interface/index.md) surfaces.
-- **Pure logic modules** — plain `.ts` with unit tests beside them, per the repo convention that pure logic stays testable: `path.ts`, `treeNav.ts`, `frontmatter.ts`, `outline.ts`, `highlight.ts`, `slug.ts`, `links.ts`, `citations.ts`, `anchorRewrite.ts`, `fuzzy.ts`, and more. These mirror the [sunstone-core](/architecture/sunstone-core.md) Rust logic exactly so both sides agree.
+- **Pure logic modules** — plain `.ts` with unit tests beside them, per the repo convention that pure logic stays testable: `path.ts`, `treeNav.ts`, `frontmatter.ts`, `outline.ts`, `highlight.ts`, `slug.ts`, `links.ts`, `citations.ts`, `anchorRewrite.ts`, `fuzzy.ts`, and more. These mirror the [sunstone-native](/architecture/sunstone-native.md) Rust logic exactly so both sides agree.
 
 ## Relationships
 
 - Talks to a backend only through the [IPC seam](#the-ipc-seam): [desktop shell](/architecture/desktop-shell.md) commands (`tauri.ts`) or [sunstone-server](/architecture/sunstone-server.md) HTTP (`http.ts`).
-- Its pure `.ts` modules mirror [sunstone-core](/architecture/sunstone-core.md); shared types live in `types.ts`.
+- Its pure `.ts` modules mirror [sunstone-native](/architecture/sunstone-native.md); shared types live in `types.ts`.
 - Renders the [interface](/interface/index.md) and [editor](/editor/index.md) surfaces documented elsewhere.
 - Split across the desktop and web Playwright suites in [Testing](/architecture/testing.md); the [overview](/architecture/overview.md) shows how both builds compose.

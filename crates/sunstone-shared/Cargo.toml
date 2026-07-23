@@ -1,0 +1,12 @@
+[package]
+name = "sunstone-shared"
+version = "0.14.0"
+description = "Pure leaf crate of Sunstone algorithms; compiles on both native and wasm32 (ADR 0006)"
+authors = ["you"]
+edition = "2021"
+
+[dependencies]
+# Deliberately limited to serde/serde_yaml so this crate compiles for wasm32.
+# NO native-only deps (ignore/notify/grep-*/dirs) may be added here.
+serde = { workspace = true }
+serde_yaml = { workspace = true }

@@ -16,7 +16,7 @@ timestamp: 2026-07-23
 
 | Build | Store | Backend method |
 | ----- | ----- | -------------- |
-| Desktop (Tauri) | OS config dir — `dirs::config_dir()/sunstone/state.json` (e.g. `~/.config/sunstone/state.json`) | `loadBundleState` / `saveBundleState` (`crates/sunstone-core/src/config.rs`) |
+| Desktop (Tauri) | OS config dir — `dirs::config_dir()/sunstone/state.json` (e.g. `~/.config/sunstone/state.json`) | `loadBundleState` / `saveBundleState` (`crates/sunstone-native/src/config.rs`) |
 | Web | The browser — one `localStorage` key `sunstone:webUI` (`src/lib/web/uiState.ts`) | `saveBundleState` is a **no-op** server-side; state is a client-only concern |
 
 On desktop the store is a single JSON file holding app-level config plus a map keyed by each Bundle's **absolute path** — so every Bundle restores its own state. Window geometry is **owned by Rust** (it manages the window APIs) and round-trips as an opaque `window` field the frontend never inspects.

@@ -1,6 +1,6 @@
 //! Sunstone Web's read-only HTTP server.
 //!
-//! A thin axum binary over `sunstone-core` — the SAME bundle/index logic the
+//! A thin axum binary over `sunstone-native` — the SAME bundle/index logic the
 //! Tauri desktop shell uses. It resolves a Bundle root, builds the index on
 //! startup (reusing `AppState`), and serves three READ-ONLY JSON routes:
 //!
@@ -19,7 +19,7 @@
 //! - `GET /api/events`               → SSE stream of filesystem `FileChange`s
 //!
 //! There is NO write path here. Every `path` crossing the seam is validated by
-//! `sunstone-core` against the Bundle root (bundle-relative, forward-slash);
+//! `sunstone-native` against the Bundle root (bundle-relative, forward-slash);
 //! `..`/escape attempts are rejected with a 400 — this is now a genuine network
 //! boundary, not just an in-process call.
 //!
@@ -51,14 +51,14 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
 
 use auth::AuthedUser;
-use sunstone_core::app_state::AppState;
-use sunstone_core::bundle::{self, TreeNode};
-use sunstone_core::git::CommitIdentity;
-use sunstone_core::index::TagCount;
-use sunstone_core::render::{self, RenderPayload};
-use sunstone_core::rewrite::{AnchorRename, RewriteSummary};
-use sunstone_core::search::{self, SearchHit};
-use sunstone_core::watcher::{self, FileAuthor, FileChange, FileOrigin};
+use sunstone_native::app_state::AppState;
+use sunstone_native::bundle::{self, TreeNode};
+use sunstone_native::git::CommitIdentity;
+use sunstone_native::index::TagCount;
+use sunstone_native::render::{self, RenderPayload};
+use sunstone_native::rewrite::{AnchorRename, RewriteSummary};
+use sunstone_native::search::{self, SearchHit};
+use sunstone_native::watcher::{self, FileAuthor, FileChange, FileOrigin};
 use write::WriteResult;
 
 /// Default HTTP port. Overridable via `SUNSTONE_API_PORT`.
@@ -304,7 +304,7 @@ async fn concept_exists_handler(
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.
 fn read_index(
     state: &ServerState,
-) -> Result<std::sync::RwLockReadGuard<'_, sunstone_core::index::Index>, ApiError> {
+) -> Result<std::sync::RwLockReadGuard<'_, sunstone_native::index::Index>, ApiError> {
     state
         .app
         .read_index()
@@ -560,7 +560,7 @@ impl IntoResponse for WriteError {
 
 // --- Error mapping ----------------------------------------------------------
 
-/// An error crossing the HTTP boundary: a status + a message. `sunstone-core`
+/// An error crossing the HTTP boundary: a status + a message. `sunstone-native`
 /// returns stringly-typed errors; we classify them into 4xx codes so a path
 /// escape is a `400 Bad Request` (a client mistake / attack) while a missing
 /// Concept is a `404 Not Found`.
@@ -578,7 +578,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-/// Map a `sunstone-core` error string to an HTTP status. Path-escape / invalid
+/// Map a `sunstone-native` error string to an HTTP status. Path-escape / invalid
 /// path errors are the caller's fault (a real network boundary now guards
 /// them) → `400`; everything else (a genuinely missing/unreadable file) → `404`.
 fn classify(msg: &str) -> StatusCode {
@@ -592,7 +592,7 @@ fn classify(msg: &str) -> StatusCode {
 // --- Bundle root resolution -------------------------------------------------
 
 /// Resolve the Bundle root: `SUNSTONE_BUNDLE` if set, else the repo `examples/`
-/// dir (a sensible dev default). Canonicalized so `sunstone-core`'s containment
+/// dir (a sensible dev default). Canonicalized so `sunstone-native`'s containment
 /// check (`resolve` confirms the target stays under the canonical root) holds.
 fn resolve_bundle_root() -> PathBuf {
     let explicit = std::env::var("SUNSTONE_BUNDLE")
@@ -718,7 +718,7 @@ mod tests {
             "---\ntype: concept\n---\n# Hello\n\nSee [deep](sub/deep.md).\n",
         )
         .unwrap();
-        let index = sunstone_core::index::Index::build(&root);
+        let index = sunstone_native::index::Index::build(&root);
         let payload = render::render_concept(&root, &index, "note.md").unwrap();
         assert!(payload.html.contains("<h1 id="));
         assert!(payload.html.contains("<p>"));
@@ -733,7 +733,7 @@ mod tests {
     #[test]
     fn render_route_rejects_path_escape_with_400() {
         let root = temp_bundle();
-        let index = sunstone_core::index::Index::build(&root);
+        let index = sunstone_native::index::Index::build(&root);
         let err = render::render_concept(&root, &index, "../secret.md").unwrap_err();
         assert_eq!(classify(&err), StatusCode::BAD_REQUEST);
     }
@@ -773,7 +773,7 @@ mod tests {
             "---\ntype: concept\ntags: [x]\n---\n[to note](/note.md)\n",
         )
         .unwrap();
-        let index = sunstone_core::index::Index::build(&root);
+        let index = sunstone_native::index::Index::build(&root);
 
         assert_eq!(index.backlinks("note.md"), vec!["a.md".to_string()]);
         assert!(index.all_tags().iter().any(|t| t.tag == "x" && t.count == 1));
@@ -797,7 +797,7 @@ mod tests {
             "---\ntype: index\ndescription: B\n---\nbody\n",
         )
         .unwrap();
-        let index = sunstone_core::index::Index::build(&root);
+        let index = sunstone_native::index::Index::build(&root);
 
         // `/api/types` → distinct, sorted frontmatter `type` values.
         assert_eq!(index.all_types(), vec!["concept", "index"]);

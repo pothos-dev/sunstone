@@ -1,15 +1,15 @@
 ---
 type: Package
-title: sunstone-core — the shared domain crate
+title: sunstone-native — the shared domain crate
 description: The host-agnostic Rust crate holding all Bundle logic — filesystem, index, links, rewrite, search, render, git, watcher, config — reused verbatim by both the desktop shell and the web server.
-resource: crates/sunstone-core
+resource: crates/sunstone-native
 tags: [architecture, rust, crate, core, domain]
 timestamp: 2026-07-23T00:00:00Z
 ---
 
-# sunstone-core
+# sunstone-native
 
-`crates/sunstone-core/` is Sunstone's **host-agnostic domain logic** — everything about operating on a [Bundle](/okf/bundle.md) (a folder of markdown [Concepts](/okf/concept.md)) that must behave identically whether the host is the [desktop shell](/architecture/desktop-shell.md) or the [web server](/architecture/sunstone-server.md). Nothing here depends on `tauri`, `axum`, or any UI framework: the crate is pure library logic plus two thin seams to the OS — the filesystem and the `git` binary.
+`crates/sunstone-native/` is Sunstone's **host-agnostic domain logic** — everything about operating on a [Bundle](/okf/bundle.md) (a folder of markdown [Concepts](/okf/concept.md)) that must behave identically whether the host is the [desktop shell](/architecture/desktop-shell.md) or the [web server](/architecture/sunstone-server.md). Nothing here depends on `tauri`, `axum`, or any UI framework: the crate is pure library logic plus two thin seams to the OS — the filesystem and the `git` binary.
 
 This is the hub of the whole system. Both other Rust crates depend on it by path and add only a thin transport layer on top; see the [overview](/architecture/overview.md) for the shape of that relationship.
 

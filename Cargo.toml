@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/sunstone-core", "crates/sunstone-server", "src-tauri"]
+members = [
+  "crates/sunstone-shared",
+  "crates/sunstone-native",
+  "crates/sunstone-wasm",
+  "crates/sunstone-server",
+  "src-tauri",
+]
 
 # Shared dependency versions for all workspace members. Members opt in with
 # `dep = { workspace = true }`. Tauri-only deps stay in `src-tauri/Cargo.toml`.

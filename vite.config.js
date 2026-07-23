@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 import { fileURLToPath } from "node:url";
 
 const host = process.env.TAURI_DEV_HOST;
@@ -57,10 +59,26 @@ function sunstoneWebStubs() {
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [sunstoneWebStubs(), sveltekit()],
+  // `wasm()` + `topLevelAwait()` let a future `import` of the wasm-pack
+  // `--target web` output at `$lib/wasm/pkg` resolve (ADR 0006 §1). The load is
+  // deliberately browser-only (SSR stays native Rust — §1/§5), reached via a
+  // dynamic `import()` behind a `browser` guard, so nothing here is imported
+  // yet. `topLevelAwait` covers the module's `await`-based `init()`.
+  plugins: [sunstoneWebStubs(), wasm(), topLevelAwait(), sveltekit()],
 
   define: {
     __SUNSTONE_WEB__: JSON.stringify(isWeb),
+  },
+
+  // The generated wasm glue is ESM the browser loads at runtime; Vite must not
+  // pre-bundle it (it isn't a node_modules dep) nor try to bundle it into the
+  // SSR graph. The `$lib/wasm/pkg` output doesn't exist until `build:wasm` runs.
+  optimizeDeps: {
+    exclude: ["$lib/wasm/pkg"],
+  },
+  ssr: {
+    // Keep the wasm package out of the server bundle — SSR renders native Rust.
+    external: ["$lib/wasm/pkg"],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

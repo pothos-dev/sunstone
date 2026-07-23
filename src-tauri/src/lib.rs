@@ -4,13 +4,13 @@ mod session;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use sunstone_core::bundle::{self, TreeNode};
-use sunstone_core::config::{self, BundleState, KnownBundle, WindowState};
-use sunstone_core::git::{self, FileAtRev, FileHistory};
-use sunstone_core::index::TagCount;
-use sunstone_core::render::{self, RenderPayload};
-use sunstone_core::rewrite::{self, AnchorRename, RewriteSummary};
-use sunstone_core::search::{self, SearchHit};
+use sunstone_native::bundle::{self, TreeNode};
+use sunstone_native::config::{self, BundleState, KnownBundle, WindowState};
+use sunstone_native::git::{self, FileAtRev, FileHistory};
+use sunstone_native::index::TagCount;
+use sunstone_native::render::{self, RenderPayload};
+use sunstone_native::rewrite::{self, AnchorRename, RewriteSummary};
+use sunstone_native::search::{self, SearchHit};
 use session::Session;
 use tauri::{Manager, State, WindowEvent};
 
@@ -269,7 +269,7 @@ fn file_at_rev(
 /// Render the Concept at `path` (bundle-relative) to server-quality HTML: the
 /// body rendered with CriticMarkup annotations and resolved wikilinks, plus the
 /// parsed frontmatter and heading outline. Same core render the web viewer uses
-/// (`sunstone_core::render`); feeds the desktop "Export as PDF" print path. Links
+/// (`sunstone_native::render`); feeds the desktop "Export as PDF" print path. Links
 /// resolve against the in-memory index; the read lock is held only for the call.
 #[tauri::command]
 fn render_concept(session: State<'_, Arc<Session>>, path: String) -> Result<RenderPayload, String> {

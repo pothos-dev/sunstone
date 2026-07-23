@@ -21,7 +21,7 @@ Both are tolerated when broken: a link whose target does not exist is styled dis
 
 All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-tested, and it is implemented **twice** — once in TypeScript and once in Rust — with the invariant that the two agree byte-for-byte. The frontend's broken-link decoration and the web renderer both trust the Rust [Bundle](/GLOSSARY.md) index precisely because the algorithms are mirrored.
 
-| Concern | TypeScript (pure) | Rust (`sunstone-core`) | Mirrors |
+| Concern | TypeScript (pure) | Rust (`sunstone-native`) | Mirrors |
 |---------|-------------------|------------------------|---------|
 | Markdown link resolution | `src/lib/links.ts` (`resolveLink`) | `paths.rs` (`resolve_internal`), `index/links.rs` | ✅ exact |
 | Wikilink parse + resolve | `src/lib/links.ts` (`resolveWikilink`, `splitWikilinkTarget`) | `wikilink.rs` (`resolve_wikilink`) | ✅ exact |

@@ -1,7 +1,7 @@
 ---
 type: Package
 title: Desktop shell — the Tauri 2 wrapper (src-tauri)
-description: The src-tauri crate — a thin Tauri 2 wrapper that exposes sunstone-core over IPC commands, resolves the CLI-launched Bundle, watches the filesystem, and drives native PDF export.
+description: The src-tauri crate — a thin Tauri 2 wrapper that exposes sunstone-native over IPC commands, resolves the CLI-launched Bundle, watches the filesystem, and drives native PDF export.
 resource: src-tauri
 tags: [architecture, rust, tauri, desktop, ipc]
 timestamp: 2026-07-23T00:00:00Z
@@ -9,13 +9,13 @@ timestamp: 2026-07-23T00:00:00Z
 
 # Desktop shell (`src-tauri`)
 
-`src-tauri/` is the crate `sunstone` (lib name `sunstone_lib`) — the **Tauri 2 desktop shell**. Its Cargo manifest states the design plainly: _"the desktop shell is now a thin Tauri wrapper over [sunstone-core]."_ All domain logic (bundle I/O, index, git, rewrite, search, render, config, watcher) lives in [sunstone-core](/architecture/sunstone-core.md); the shell only wires it to Tauri IPC, windows, the CLI, and platform PDF APIs. It is the "rust" package a `sunstone ./docs` invocation launches.
+`src-tauri/` is the crate `sunstone` (lib name `sunstone_lib`) — the **Tauri 2 desktop shell**. Its Cargo manifest states the design plainly: _"the desktop shell is now a thin Tauri wrapper over [sunstone-native]."_ All domain logic (bundle I/O, index, git, rewrite, search, render, config, watcher) lives in [sunstone-native](/architecture/sunstone-native.md); the shell only wires it to Tauri IPC, windows, the CLI, and platform PDF APIs. It is the "rust" package a `sunstone ./docs` invocation launches.
 
 ## Responsibilities
 
 - Parse the CLI and decide whether to open a Bundle at startup or show the launcher.
 - Own a runtime-swappable `Session` — the seam between launcher mode and an open Bundle.
-- Expose the `#[tauri::command]` functions the [web frontend](/architecture/web-frontend.md) calls through `src/lib/ipc/tauri.ts`, each delegating to sunstone-core.
+- Expose the `#[tauri::command]` functions the [web frontend](/architecture/web-frontend.md) calls through `src/lib/ipc/tauri.ts`, each delegating to sunstone-native.
 - Run the filesystem watcher and emit change events to the frontend.
 - Persist window geometry (Rust-owned) and per-Bundle [view state](/interface/view-state.md).
 - Manage the separate print window and perform platform-native direct PDF export.
@@ -42,7 +42,7 @@ The frontend's real backend (`tauri.ts`) is a thin `invoke(...)` over these; com
 - **Print / PDF** — `open_print_window`, `save_pdf`.
 - **Persisted state** — `load_bundle_state` / `save_bundle_state`.
 
-Each command is glue: it delegates straight to the matching sunstone-core function (`bundle`, `index`, `rewrite`, `search`, `git`, `render`, `config`) and re-exports the core serde type. The shell contributes no domain logic of its own.
+Each command is glue: it delegates straight to the matching sunstone-native function (`bundle`, `index`, `rewrite`, `search`, `git`, `render`, `config`) and re-exports the core serde type. The shell contributes no domain logic of its own.
 
 ## Launch model
 
@@ -61,7 +61,7 @@ The platform PDF deps are `#[target]`-gated in `Cargo.toml`, pinned to match wha
 
 ## Relationships
 
-- Wraps [sunstone-core](/architecture/sunstone-core.md); adds only Tauri transport.
+- Wraps [sunstone-native](/architecture/sunstone-native.md); adds only Tauri transport.
 - Its IPC commands are the desktop half of the [IPC seam](/architecture/web-frontend.md#the-ipc-seam); the [web server](/architecture/sunstone-server.md) is the parallel half over HTTP.
 - Window geometry and session state persist as [view state](/interface/view-state.md), never into the Bundle.
 - The [overview](/architecture/overview.md) shows how the desktop path composes; contrast with the web path.

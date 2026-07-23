@@ -1,5 +1,5 @@
 [package]
-name = "sunstone-core"
+name = "sunstone-native"
 version = "0.14.0"
 description = "Sunstone's reusable domain logic (bundle, index, rewrite, search, watcher)"
 authors = ["you"]

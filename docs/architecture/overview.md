@@ -12,21 +12,21 @@ Sunstone is one codebase that ships two products — a **desktop editor** and a 
 
 | Package | Language | Role |
 | --- | --- | --- |
-| [sunstone-core](/architecture/sunstone-core.md) | Rust | Host-agnostic Bundle logic — the hub everything else depends on. |
+| [sunstone-native](/architecture/sunstone-native.md) | Rust | Host-agnostic Bundle logic — the hub everything else depends on. |
 | [Desktop shell](/architecture/desktop-shell.md) (`src-tauri`) | Rust | Thin Tauri 2 wrapper exposing core over IPC commands. |
 | [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing core over a JSON/SSE API. |
 | [Web frontend](/architecture/web-frontend.md) (`src/`) | SvelteKit | One UI that targets both hosts, decoupled by the IPC seam. |
 
 ## The central idea
 
-All domain behaviour — filesystem, index, links, rewrite, search, render, git, watcher, config — lives **once**, in [sunstone-core](/architecture/sunstone-core.md). The desktop shell and the server are each a thin transport layer over it, and the frontend reaches whichever one is present through a single `Backend` interface. No feature logic is duplicated across hosts.
+All domain behaviour — filesystem, index, links, rewrite, search, render, git, watcher, config — lives **once**, in [sunstone-native](/architecture/sunstone-native.md). The desktop shell and the server are each a thin transport layer over it, and the frontend reaches whichever one is present through a single `Backend` interface. No feature logic is duplicated across hosts.
 
 ```mermaid
 flowchart TD
   FE["Web frontend (src/)<br/>Backend interface"]
   DS["Desktop shell<br/>#tauri::command"]
   SV["sunstone-server<br/>axum /api"]
-  CORE["sunstone-core<br/>bundle · index · rewrite<br/>search · render · git · watcher"]
+  CORE["sunstone-native<br/>bundle · index · rewrite<br/>search · render · git · watcher"]
   FS["Bundle on disk<br/>(markdown + git)"]
 
   FE -->|"tauri.ts: invoke"| DS
@@ -38,12 +38,12 @@ flowchart TD
 
 ## Desktop path
 
-`sunstone ./docs` launches the [desktop shell](/architecture/desktop-shell.md). The frontend is a static SPA (adapter-static) loaded into a Tauri webview; `isTauri` selects the `tauri.ts` backend, whose methods are `invoke(...)` calls to the shell's `#[tauri::command]`s. The shell delegates each to [sunstone-core](/architecture/sunstone-core.md) and runs core's filesystem watcher, emitting change events back over Tauri IPC. Everything is in one process on the user's machine; there is no network and no auth, and the desktop never commits to git.
+`sunstone ./docs` launches the [desktop shell](/architecture/desktop-shell.md). The frontend is a static SPA (adapter-static) loaded into a Tauri webview; `isTauri` selects the `tauri.ts` backend, whose methods are `invoke(...)` calls to the shell's `#[tauri::command]`s. The shell delegates each to [sunstone-native](/architecture/sunstone-native.md) and runs core's filesystem watcher, emitting change events back over Tauri IPC. Everything is in one process on the user's machine; there is no network and no auth, and the desktop never commits to git.
 
 ```mermaid
 flowchart TD
   U["sunstone ./docs"] --> SH["Desktop shell (src-tauri)"]
-  SH --> CORE["sunstone-core"]
+  SH --> CORE["sunstone-native"]
   SH --> WV["Tauri webview"]
   WV --> SPA["Static SPA (adapter-static)"]
   SPA -->|"invoke / listen"| SH
@@ -59,7 +59,7 @@ flowchart TD
   BR["Browser"] -->|"HTTPS"| NODE["SSR Node server<br/>(adapter-node + Auth.js)"]
   NODE -->|"render + hydrate"| BR
   NODE -->|"proxy /api, mint JWT"| SV["sunstone-server (axum)"]
-  SV --> CORE["sunstone-core"]
+  SV --> CORE["sunstone-native"]
   CORE --> GIT["Bundle git repo"]
   SV -->|"SSE /api/events"| NODE
 ```
@@ -68,12 +68,12 @@ Both processes ship as a single Docker image; see `docker/README.md` for the run
 
 ## What crosses each seam
 
-- **Same types both ways.** Whether over Tauri IPC or HTTP, the payloads are the [sunstone-core](/architecture/sunstone-core.md) serde structs (`camelCase`), mirrored in the frontend's `src/lib/types.ts`. The `Backend` interface hides which transport is in play.
+- **Same types both ways.** Whether over Tauri IPC or HTTP, the payloads are the [sunstone-native](/architecture/sunstone-native.md) serde structs (`camelCase`), mirrored in the frontend's `src/lib/types.ts`. The `Backend` interface hides which transport is in play.
 - **Bundle-relative, forward-slash paths** cross every seam; path-escape is rejected in core, so the server's network edge and the desktop's IPC edge share one guard.
 - **Change events** originate in core's watcher and reach the frontend either as a Tauri event (desktop) or an SSE message (web) — the frontend's `onFileChanged` is identical.
 
 ## Relationships
 
-- Each package has its own page: [sunstone-core](/architecture/sunstone-core.md), [desktop shell](/architecture/desktop-shell.md), [sunstone-server](/architecture/sunstone-server.md), [web frontend](/architecture/web-frontend.md).
+- Each package has its own page: [sunstone-native](/architecture/sunstone-native.md), [desktop shell](/architecture/desktop-shell.md), [sunstone-server](/architecture/sunstone-server.md), [web frontend](/architecture/web-frontend.md).
 - The Bundle these packages operate on is defined in [OKF → Bundle](/okf/bundle.md); the link model core implements is [Linking](/okf/linking.md).
 - How the assembled stacks are tested is [Testing](/architecture/testing.md).

@@ -10,6 +10,13 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "test:unit": "bun test src/lib",
+    "build:wasm": "wasm-pack build crates/sunstone-wasm --target web --out-dir ../../src/lib/wasm/pkg",
+    "build:types": "echo '[build:types] Step 0 no-op: the ~5 wasm DTO .d.ts are emitted by tsify via build:wasm (ADR 0006 §6); the ts-rs IPC-DTO export half has no DTOs yet and its cargo-test export wiring lands with the DTO family. Placeholder until then.'",
+    "build:frontend": "bun run build:wasm && bun run build:types",
+    "check:ci": "bun run build:frontend && bun run check",
+    "test:unit:ci": "bun run build:frontend && bun run test:unit",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "bun run build:frontend && playwright test",
     "tauri": "tauri"
   },
   "license": "MIT",
@@ -43,7 +50,9 @@
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.6.0"
   },
   "patchedDependencies": {
     "@atomic-editor/editor@0.4.3": "patches/@atomic-editor%2Feditor@0.4.3.patch"

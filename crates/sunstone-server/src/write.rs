@@ -1,7 +1,7 @@
 //! Write orchestration for the web write path (tickets 05/07/08).
 //!
 //! The server is the sole committer. Each op composes the unchanged, commitless
-//! `sunstone-core` writers (`bundle` / `rewrite`) and then commits via the core
+//! `sunstone-native` writers (`bundle` / `rewrite`) and then commits via the core
 //! `git` primitive — every op **write-then-commits immediately** (there is no
 //! server-side pending Save; the editor's Save *is* the `PUT`).
 //!
@@ -20,10 +20,10 @@
 //! stamped broadcast yields exactly one attributed event, avoiding the duplicate
 //! (stamped + unstamped) delivery the naive reading would produce.
 
-use sunstone_core::app_state::AppState;
-use sunstone_core::bundle;
-use sunstone_core::git::{self, CommitIdentity};
-use sunstone_core::rewrite::{self, AnchorRename, RewriteSummary};
+use sunstone_native::app_state::AppState;
+use sunstone_native::bundle;
+use sunstone_native::git::{self, CommitIdentity};
+use sunstone_native::rewrite::{self, AnchorRename, RewriteSummary};
 
 use axum::http::StatusCode;
 
@@ -295,7 +295,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use sunstone_core::git::{self, FileHistory};
+    use sunstone_native::git::{self, FileHistory};
 
     static COUNTER: AtomicU32 = AtomicU32::new(0);
 
