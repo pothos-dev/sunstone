@@ -29,6 +29,11 @@ import type {
   CriticMarkKind,
   Annotation,
   CitationRef,
+  ResolvedLink,
+  WikilinkTarget,
+  WikilinkParts,
+  AnchorRewrite,
+  AnchorRename,
 } from '$lib/wasm/pkg';
 
 /** The generated wasm DTOs, surfaced for consumers (ADR 0006 §6). */
@@ -41,6 +46,10 @@ export type {
   CriticMarkKind,
   Annotation,
   CitationRef,
+  ResolvedLink,
+  WikilinkTarget,
+  WikilinkParts,
+  AnchorRewrite,
 };
 
 /** The wasm module namespace (`BundleIndex` + the free exports). */
@@ -160,4 +169,66 @@ export function conceptToUrl(path: string): string {
  */
 export function slugify(text: string): string {
   return mod ? mod.slugify(text) : '';
+}
+
+// --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
+//
+// The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE
+// rename command) resolves + rewrites over arbitrary OLD/NEW corpus path-sets
+// with `target != source` — a shape the live `BundleIndex` handle does not
+// expose. These handle-less kernels run the SAME shared Rust source over an
+// explicit path-set, so the fake consumes the single source (no forked TS
+// re-impl). Each degrades to a SAFE no-op until the module is registered; the
+// fake backend only runs after wasm has initialized (bun preload / browser
+// `ensureWasm`).
+
+/**
+ * Resolve a markdown link `href` from `currentPath` against an explicit concept
+ * path-set (the fake's corpus). Degrades to `none`.
+ */
+export function resolveLinkIn(currentPath: string, href: string, paths: string[]): ResolvedLink {
+  return mod ? mod.resolveLinkIn(currentPath, href, paths) : { kind: 'none' };
+}
+
+/**
+ * Resolve a raw `[[target]]` inner text against an explicit concept path-set, or
+ * `null` (broken). Degrades to `null`.
+ */
+export function resolveWikilinkIn(
+  paths: string[],
+  sourcePath: string,
+  rawTarget: string,
+): WikilinkTarget | null {
+  return mod ? (mod.resolveWikilinkIn(paths, sourcePath, rawTarget) ?? null) : null;
+}
+
+/**
+ * Split a raw `[[ ... ]]` inner text into `{ name, alias, anchor }` (single
+ * source `wikilink::parse_target`). `alias`/`anchor` are normalized to `null`
+ * when absent so callers can test them with `!== null`. Degrades to a bare name.
+ */
+export function splitWikilinkTarget(rawTarget: string): WikilinkParts {
+  const p = mod ? mod.splitWikilinkTarget(rawTarget) : null;
+  return {
+    name: p ? p.name : rawTarget,
+    alias: p?.alias ?? null,
+    anchor: p?.anchor ?? null,
+  };
+}
+
+/**
+ * Corpus-wide anchor rewrite (`target != source`): rewrite every inbound link's
+ * `#anchor` in `content` that resolves to `target` and whose slug matches a
+ * rename. Returns `{ content, count }`. Degrades to a no-op (content unchanged).
+ */
+export function rewriteAnchors(
+  source: string,
+  content: string,
+  target: string,
+  renames: AnchorRename[],
+  paths: string[],
+): AnchorRewrite {
+  return mod
+    ? mod.rewriteAnchors(source, content, target, renames, paths)
+    : { content, count: 0 };
 }

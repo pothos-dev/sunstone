@@ -22,10 +22,10 @@ use sunstone_shared::frontmatter::{
 };
 use sunstone_shared::outline::{self, OutlineHeading};
 use sunstone_shared::url;
-use sunstone_shared::wikilink::resolve_wikilink;
+use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
-    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, ResolvedLink, RewriteBody,
-    WikilinkTarget,
+    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, ResolvedLink,
+    RewriteBody, WikilinkTarget,
 };
 
 /// The in-wasm Bundle index handle (ADR 0006 §3/§4). It OWNS the saved concept
@@ -234,4 +234,61 @@ pub fn concept_to_url(path: String) -> String {
 #[wasm_bindgen(js_name = slugify)]
 pub fn slugify(text: String) -> String {
     sunstone_shared::slug::slugify(&text)
+}
+
+// --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
+//
+// The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE
+// rename command) walks ARBITRARY corpus path-sets (old/new) with
+// `target != source` — a shape the live `BundleIndex` handle (bound to its own
+// set, source == target) does not expose. These handle-less exports run the
+// SAME `sunstone_shared` kernels parameterized by an explicit path-set, so the
+// fake consumes the single source instead of a forked TS re-impl.
+
+/// Resolve a markdown link `href` from `current_path` against an explicit
+/// concept path-set (the fake's corpus). The bundle root + membership are
+/// derived from `paths`, so this is the real [`resolve_link`] — for a corpus
+/// with a top-level `.md` the root is `''`, matching the former fake fork.
+#[wasm_bindgen(js_name = resolveLinkIn)]
+pub fn resolve_link_in(current_path: String, href: String, paths: Vec<String>) -> ResolvedLink {
+    let set: HashSet<String> = paths.iter().cloned().collect();
+    let root = find_bundle_root(&paths);
+    resolve_link(&current_path, &href, &root, |p| set.contains(p))
+}
+
+/// Resolve a raw `[[target]]` inner text against an explicit concept path-set
+/// (the fake's old/new corpus), or `null` (broken) — the handle-less twin of the
+/// handle's `resolveWikilink`, over a set the handle does not own.
+#[wasm_bindgen(js_name = resolveWikilinkIn)]
+pub fn resolve_wikilink_in(
+    paths: Vec<String>,
+    source_path: String,
+    raw_target: String,
+) -> Option<WikilinkTarget> {
+    resolve_wikilink(&paths, &source_path, &raw_target).map(|path| WikilinkTarget { path })
+}
+
+/// Split a raw `[[ ... ]]` inner text into `{ name, alias, anchor }` — the fake
+/// move-rewrite's twin of the former TS `splitWikilinkTarget`, single-sourced on
+/// `wikilink::parse_target`.
+#[wasm_bindgen(js_name = splitWikilinkTarget)]
+pub fn split_wikilink_target(raw: String) -> WikilinkParts {
+    wikilink::parse_target_parts(&raw)
+}
+
+/// Corpus-wide anchor rewrite (`target != source`): rewrite every inbound link's
+/// `#anchor` in `body` that resolves to `target` and whose slug matches a rename,
+/// returning `{ content, count }`. The single source for the fake backend's
+/// `rewriteAnchors` command (which the live handle's source == target op cannot
+/// serve).
+#[wasm_bindgen(js_name = rewriteAnchors)]
+pub fn rewrite_anchors(
+    source: String,
+    body: String,
+    target: String,
+    renames: Vec<AnchorRename>,
+    paths: Vec<String>,
+) -> AnchorRewrite {
+    let (content, count) = rewrite_anchors_in(&source, &body, &target, &renames, &paths);
+    AnchorRewrite { content, count }
 }

@@ -15,9 +15,20 @@
 // Reads the shared `FILES` state (imported live from `store`, never copied).
 
 import type { RewriteSummary } from '$lib/types';
-import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './linkResolve';
-import { splitFrontmatter } from '$lib/wasm/exports';
+import {
+  splitFrontmatter,
+  resolveLinkIn,
+  resolveWikilinkIn,
+  splitWikilinkTarget,
+} from '$lib/wasm/exports';
 import { FILES, conceptPaths } from './store';
+
+/**
+ * True for links handled by the OS/browser, not in-app nav (`scheme:` URLs). A
+ * trivial scheme regex inlined at this one call site (ADR 0006 family 10) —
+ * not worth a wasm hop, and not a resurrected `links.ts` module.
+ */
+const isExternalLink = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href);
 
 /**
  * Blank out fenced code blocks (``` / ~~~) and inline code spans (`` ` ``) in a
@@ -71,7 +82,7 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
   WIKILINK_RE.lastIndex = 0;
   while ((m = WIKILINK_RE.exec(masked)) !== null) {
     if (m[1] === '!') continue; // embed, not a link (deferred)
-    const resolved = resolveWikilink(allPaths, sourcePath, m[2]);
+    const resolved = resolveWikilinkIn(allPaths, sourcePath, m[2]);
     if (resolved) targets.push(resolved.path);
   }
   return targets;
@@ -80,6 +91,7 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
 /** Extract outbound internal link targets from a Concept's body, resolved. */
 export function outboundLinks(path: string, content: string): string[] {
   const { body } = splitFrontmatter(content);
+  const paths = conceptPaths();
   const targets = new Set<string>();
   // [text](target) but NOT images ![alt](src): require no `!` before `[`.
   const re = /(!?)\[[^\]]*\]\(([^)]*)\)/g;
@@ -88,7 +100,7 @@ export function outboundLinks(path: string, content: string): string[] {
     if (m[1] === '!') continue; // image, not a Concept link
     // Drop a trailing "title" inside the parens.
     const href = m[2].trim().split(/\s+/)[0];
-    const resolved = resolveLink(path, href);
+    const resolved = resolveLinkIn(path, href, paths);
     if (resolved.kind === 'internal') targets.add(resolved.path);
   }
   // Wikilinks ([[name]]) resolve by name (§1) and also feed backlinks.
@@ -193,7 +205,7 @@ function shortestResolvingSuffix(newPaths: string[], newSource: string, newTarge
   const segs = noExt.split('/');
   for (let take = 1; take <= segs.length; take++) {
     const candidate = segs.slice(segs.length - take).join('/');
-    const resolved = resolveWikilink(newPaths, newSource, candidate);
+    const resolved = resolveWikilinkIn(newPaths, newSource, candidate);
     if (resolved && resolved.path === newTarget) return candidate;
   }
   return noExt;
@@ -231,7 +243,7 @@ function rewriteWikilinksIn(
     const origInner = content.slice(innerStart, innerStart + inner.length);
 
     const { name, alias, anchor } = splitWikilinkTarget(origInner);
-    const resolved = resolveWikilink(oldPaths, oldSource, origInner);
+    const resolved = resolveWikilinkIn(oldPaths, oldSource, origInner);
     if (!resolved || !moves.has(resolved.path)) continue;
     const newTarget = moves.get(resolved.path)!;
 
@@ -299,8 +311,8 @@ function rewriteTarget(
 
   const isAbsolute = pathPart.startsWith('/');
 
-  // Resolve as authored, from the source's ORIGINAL location.
-  const resolved = resolveLink(oldSource, pathPart);
+  // Resolve as authored, from the source's ORIGINAL location (the OLD corpus).
+  const resolved = resolveLinkIn(oldSource, pathPart, conceptPaths());
   if (resolved.kind !== 'internal') return null;
 
   const targetMoved = moves.has(resolved.path);

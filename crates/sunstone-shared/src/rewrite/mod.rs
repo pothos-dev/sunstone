@@ -7,4 +7,4 @@
 pub mod anchors;
 pub mod paths;
 
-pub use anchors::{rewrite_anchors_in, AnchorRename};
+pub use anchors::{rewrite_anchors_in, AnchorRename, AnchorRewrite};

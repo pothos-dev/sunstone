@@ -41,6 +41,20 @@ pub struct AnchorRename {
     pub to: String,
 }
 
+/// The result of a corpus-wide anchor rewrite (`target != source`): the
+/// rewritten `content` plus the `count` of anchors changed. The wasm-boundary
+/// twin of the former fake TS `rewriteAnchorsIn` return — the corpus-wide shape
+/// the live `BundleIndex.rewriteAnchorsIn` (source == target, count-internal)
+/// does not expose (ADR 0006 family 12).
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnchorRewrite {
+    pub content: String,
+    pub count: usize,
+}
+
 /// The new slug for an anchor whose CURRENT slug matches a rename's `from`, or
 /// `None` when no rename applies.
 fn new_anchor_for<'a>(anchor: &str, renames: &'a [AnchorRename]) -> Option<&'a str> {

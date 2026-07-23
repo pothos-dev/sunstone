@@ -23,4 +23,4 @@ pub mod url;
 pub mod wikilink;
 
 pub use links::{find_bundle_root, resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};
-pub use rewrite::{rewrite_anchors_in, AnchorRename};
+pub use rewrite::{rewrite_anchors_in, AnchorRename, AnchorRewrite};

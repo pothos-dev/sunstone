@@ -25,11 +25,10 @@ import {
 import { buildTree, renameInternal, deleteInternal } from './fake/tree';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
-import { rewriteAnchorsIn } from './fake/anchorRewrite';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
 // The index-parse kernels are pure wasm FREE exports (ADR 0006 §11-A); the fake
 // consumes the single shared source rather than a divergent TS twin.
-import { parseFrontmatter, parseFrontmatterKeys } from '$lib/wasm/exports';
+import { parseFrontmatter, parseFrontmatterKeys, rewriteAnchors } from '$lib/wasm/exports';
 
 /**
  * In-memory Backend implementation over a seeded fixture Bundle.
@@ -59,6 +58,27 @@ import { parseFrontmatter, parseFrontmatterKeys } from '$lib/wasm/exports';
 
 /** Subscribers to simulated filesystem changes (see `onFileChanged`). */
 const fileChangeSubscribers = new Set<(change: FileChange) => void>();
+
+/**
+ * Ensure the wasm module is initialized before an index query computes over the
+ * shared kernels (ADR 0006 family 12). The native backend's index is ALWAYS
+ * ready; the fake — the desktop backend — must be too, but its Layer-1 kernels
+ * now live in wasm (link resolution + `parseFrontmatter`). An index query can be
+ * driven (e.g. the Backlinks panel, a direct `__sunstoneBackend` test hook)
+ * before `indexStore.refresh()` has finished its own memoized `ensureWasm()`, so
+ * the fake awaits the SAME init here — otherwise the free-export wrappers degrade
+ * to their empty defaults and the query returns nothing.
+ *
+ * `ensureWasm` (and its `$app/environment` import) is reached by a
+ * `window`-guarded DYNAMIC import so the `bun test` graph — which byte-loads the
+ * module up front via `bunTestSetup.ts` and runs with no `window` — never pulls
+ * the SvelteKit-only `$app` virtual module in (matching `wasm/exports.ts`).
+ */
+async function ensureIndexReady(): Promise<void> {
+  if (typeof window === 'undefined') return; // bun test: the preload registered it.
+  const { ensureWasm } = await import('$lib/wasm');
+  await ensureWasm();
+}
 
 /**
  * Test hook: simulate an EXTERNAL filesystem change (as if another tool edited
@@ -285,7 +305,7 @@ export const fakeBackend: Backend = {
       if (source === target) continue;
       const content = FILES[source];
       if (content === undefined) continue;
-      const { content: rewritten, count } = rewriteAnchorsIn(
+      const { content: rewritten, count } = rewriteAnchors(
         source,
         content,
         target,
@@ -310,6 +330,7 @@ export const fakeBackend: Backend = {
   },
 
   async backlinks(path: string): Promise<string[]> {
+    await ensureIndexReady();
     const sources: string[] = [];
     for (const source of conceptPaths()) {
       if (outboundLinks(source, FILES[source]).includes(path)) {
@@ -320,6 +341,7 @@ export const fakeBackend: Backend = {
   },
 
   async allTags(): Promise<TagCount[]> {
+    await ensureIndexReady();
     const counts = new Map<string, number>();
     for (const path of conceptPaths()) {
       const { tags } = parseFrontmatter(FILES[path]);
@@ -334,6 +356,7 @@ export const fakeBackend: Backend = {
   },
 
   async conceptsByTag(tag: string): Promise<string[]> {
+    await ensureIndexReady();
     const out: string[] = [];
     for (const path of conceptPaths()) {
       const { tags } = parseFrontmatter(FILES[path]);
@@ -343,6 +366,7 @@ export const fakeBackend: Backend = {
   },
 
   async allTypes(): Promise<string[]> {
+    await ensureIndexReady();
     const set = new Set<string>();
     for (const path of conceptPaths()) {
       const { type } = parseFrontmatter(FILES[path]);
@@ -352,6 +376,7 @@ export const fakeBackend: Backend = {
   },
 
   async allKeys(): Promise<string[]> {
+    await ensureIndexReady();
     const set = new Set<string>();
     for (const path of conceptPaths()) {
       for (const key of parseFrontmatterKeys(FILES[path])) set.add(key);
@@ -428,6 +453,7 @@ export const fakeBackend: Backend = {
     if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
     const content = FILES[path];
     if (content === undefined) throw new Error(`no such concept: ${path}`);
+    await ensureIndexReady(); // the fake render derives outline/critic/citations from wasm.
     return renderConceptFake(content);
   },
 

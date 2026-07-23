@@ -15,6 +15,32 @@
 
 use crate::paths::find_byte;
 
+/// The three components of a raw `[[ ... ]]` inner text as a wasm-boundary DTO
+/// (`{ name, alias, anchor }`), where `alias`/`anchor` are `null` when absent —
+/// the fake backend's move-rewrite twin of the former TS `splitWikilinkTarget`.
+/// A boundary projection of [`WikiTarget`] (which stays a plain native struct so
+/// its `Eq` derive keeps serving the resolver tests); [`parse_target_parts`]
+/// bridges the two.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct WikilinkParts {
+    pub name: String,
+    pub alias: Option<String>,
+    pub anchor: Option<String>,
+}
+
+/// Split a raw `[[ ... ]]` inner text into the boundary DTO [`WikilinkParts`] —
+/// the same split as [`parse_target`], projected for the wasm seam.
+pub fn parse_target_parts(raw: &str) -> WikilinkParts {
+    let t = parse_target(raw);
+    WikilinkParts {
+        name: t.name,
+        alias: t.alias,
+        anchor: t.anchor,
+    }
+}
+
 /// The three pieces of a raw `[[ ... ]]` inner text: the name used for file
 /// matching (with any `.md` extension dropped), an optional `|alias` display
 /// text, and an optional `#anchor`. The alias and anchor never participate in
