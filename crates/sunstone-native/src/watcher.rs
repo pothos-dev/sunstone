@@ -176,7 +176,7 @@ fn classify(kind: &EventKind) -> Option<&'static str> {
 /// bundle-relative string. Returns `None` if the path is outside the root.
 fn to_bundle_relative(root: &Path, abs: &Path) -> Option<String> {
     let rel = abs.strip_prefix(root).ok()?;
-    let s = crate::paths::to_rel_string(rel);
+    let s = sunstone_shared::paths::to_rel_string(rel);
     if s.is_empty() {
         None
     } else {

@@ -37,12 +37,15 @@ use crate::app_state::AppState;
 use crate::bundle;
 use crate::index::Index;
 
-mod anchors;
 mod engine;
 mod paths;
 
-pub use anchors::AnchorRename;
+// The anchor-rewrite algorithm + its `AnchorRename` DTO moved to
+// `sunstone-shared` (family 10). Re-export the DTO so native's command surface
+// (`sunstone_native::rewrite::AnchorRename`, consumed by src-tauri /
+// sunstone-server) keeps its shape — one definition, surfaced (ADR 0006 §6).
 pub use engine::{plan_rewrites, RewriteSummary};
+pub use sunstone_shared::AnchorRename;
 
 // ---------------------------------------------------------------------------
 // Move-set construction (single Concept or whole folder) from the index.
@@ -239,7 +242,7 @@ pub fn rewrite_anchors(
     for source in &sources {
         let content = bundle::read_concept(root, source)?;
         let (rewritten, count) =
-            anchors::rewrite_anchors_in(source, &content, target, renames, &all_paths);
+            sunstone_shared::rewrite_anchors_in(source, &content, target, renames, &all_paths);
         if count > 0 {
             summary.links_changed += count;
             summary.files_changed += 1;

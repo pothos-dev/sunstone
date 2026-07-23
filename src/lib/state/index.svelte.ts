@@ -1,89 +1,98 @@
 import { backend } from '$lib/ipc';
-import { findBundleRoot } from '$lib/links';
-import { ensureWasm, type BundleIndex } from '$lib/wasm';
+import { ensureWasm, type BundleIndex, type ResolvedLink } from '$lib/wasm';
+import type { AnchorRename } from '$lib/types';
 
 /**
- * Frontend mirror of the Rust Bundle index's existence set.
+ * The frontend's link-resolution engine (ADR 0006 §3/§4): a thin store over the
+ * one wasm `BundleIndex` handle.
  *
- * CodeMirror decorations are SYNCHRONOUS — the broken-link decoration cannot
- * await a per-link `conceptExists` call while building decorations. So we hold a
- * synchronous `Set` of existing Concept paths here, seeded once from
- * `listConceptPaths()` and refreshed whenever the filesystem changes (the
- * watcher's `file-changed` event) so the styling stays fresh as Concepts are
- * created/removed. The decoration checks membership synchronously via `exists`.
+ * The handle OWNS the saved concept-path set and runs the SAME Rust algorithms
+ * the native backend does — synchronously, in-process — so CodeMirror
+ * decorations resolve against the live, unsaved buffer with a single source of
+ * truth (no TS twin, no IPC round-trip). `refresh()` rebuilds the handle
+ * wholesale (mount / `file-changed` / CRUD), freeing the old one first.
  *
- * Rune-backed so consumers (and a CodeMirror refresh trigger) react to changes.
+ * The handle is `null` on SSR or when the wasm load degrades (§5): every reader
+ * then no-ops (a link resolves to `none`, nothing exists, an anchor rewrite is
+ * a pass-through) so styling silently disappears rather than throwing.
  */
 class IndexStore {
-  /** Existing Concept paths (bundle-relative). The decoration reads this set. */
-  paths = $state<Set<string>>(new Set());
   /**
    * Bumps on every refresh. A monotonically increasing version that the editor
    * layer subscribes to so it can re-run the (otherwise synchronous) broken-link
-   * decoration when the index changes, without diffing the set itself.
+   * decoration + wikilink resolution when the index changes.
    */
   version = $state<number>(0);
 
-  /** Synchronous existence check used by the broken-link decoration. */
-  exists(path: string): boolean {
-    return this.paths.has(path);
-  }
-
-  /** Memoized `findBundleRoot` result, keyed on the current path-set identity. */
-  #rootCache: { key: Set<string>; value: string } | null = null;
-
   /**
-   * The wasm `BundleIndex` handle (ADR 0006 §4). Step 0 ships the DUMMY handle
-   * with no real set, so it is constructed + `.free()`d alongside the TS path
-   * purely to prove the init/load/free lifecycle stands up in the real app;
-   * family 10 makes it the actual resolution engine and retires the TS set. It
-   * is `null` on SSR or when the wasm load degrades (§5) — the TS path carries
-   * on regardless.
+   * The wasm `BundleIndex` handle (ADR 0006 §4). `null` on SSR / degrade — the
+   * readers below treat that as "no index" and no-op.
    */
   #handle: BundleIndex | null = null;
 
-  /**
-   * Best-effort OKF bundle root within the opened tree (`''` = the opened
-   * folder itself; see `findBundleRoot`). Bundle-absolute links resolve from
-   * this prefix. Recomputed only when the path set is replaced (on `refresh`),
-   * since `paths` is swapped wholesale rather than mutated in place.
-   */
+  /** Best-effort OKF bundle root within the opened tree (`''` = opened root). */
   bundleRoot(): string {
-    if (this.#rootCache?.key !== this.paths) {
-      this.#rootCache = { key: this.paths, value: findBundleRoot([...this.paths]) };
-    }
-    return this.#rootCache.value;
+    return this.#handle?.bundleRoot() ?? '';
+  }
+
+  /** Synchronous existence check used by the broken-link decoration. */
+  exists(path: string): boolean {
+    return this.#handle?.exists(path) ?? false;
   }
 
   /**
-   * The full list of existing Concept paths (bundle-relative). The wikilink
-   * resolver (name-based, ADR-0004) needs the whole candidate set, not just a
-   * membership test — it matches a `[[name]]` by basename/suffix across every
-   * concept path. Synchronous, backed by the same cached set `exists` reads.
+   * Every existing Concept path (bundle-relative). The single source of the
+   * membership set — fed to `fuzzy.ts` for quick-nav. `[]` on a null handle.
    */
-  pathList(): string[] {
-    return [...this.paths];
+  conceptPaths(): string[] {
+    return this.#handle?.conceptPaths() ?? [];
   }
 
-  /** (Re)load the existing-path set from the backend index. */
+  /**
+   * Resolve a clicked markdown link `href` inside the Concept at `currentPath`.
+   * The `internal` variant carries `exists`. Degrades to `none` (never throws)
+   * on a null handle, so a decoration reader treats it as "not broken".
+   */
+  resolveLink(currentPath: string, href: string): ResolvedLink {
+    return this.#handle?.resolveLink(currentPath, href) ?? { kind: 'none' };
+  }
+
+  /**
+   * Resolve a raw `[[target]]` inner text to `{ path }`, or `null` (broken).
+   * Name-based (ADR-0004); the candidate set stays in-wasm. `null` on a null
+   * handle.
+   */
+  resolveWikilink(currentPath: string, rawTarget: string): { path: string } | null {
+    return this.#handle?.resolveWikilink(currentPath, rawTarget) ?? null;
+  }
+
+  /**
+   * Rewrite same-file anchors in the live editor `body` after a heading-slug
+   * rename (body-in / body-out). A pass-through (`{ content: body }`) on a null
+   * handle so a save never throws.
+   */
+  rewriteAnchorsIn(sourcePath: string, body: string, renames: AnchorRename[]): { content: string } {
+    return this.#handle?.rewriteAnchorsIn(sourcePath, body, renames) ?? { content: body };
+  }
+
+  /** (Re)build the handle from the backend index (ADR 0006 §4/§5). */
   async refresh(): Promise<void> {
-    // Ensure the wasm module is initialized before building state (ADR 0006
-    // §5). Idempotent + memoized; returns `null` on SSR / load failure, in
-    // which case we simply skip the handle and run the TS path (silent degrade).
+    // Ensure the wasm module is initialized before building state. Idempotent +
+    // memoized; returns `null` on SSR / load failure, in which case we skip the
+    // handle and every reader no-ops (silent degrade).
     const wasm = await ensureWasm();
     try {
       const paths = await backend.listConceptPaths();
       // Swap the handle: free the OLD one before building the new (ADR 0006
-      // §4). Done only once we have a fresh set to swap in, so a backend error
-      // leaves both the previous set AND the previous handle untouched.
+      // §4), only once we have a fresh set — so a backend error leaves the
+      // previous handle untouched.
       this.#handle?.free();
-      this.#handle = wasm ? new wasm.BundleIndex(findBundleRoot(paths)) : null;
-      this.paths = new Set(paths);
+      this.#handle = wasm ? new wasm.BundleIndex(paths) : null;
       this.version += 1;
     } catch {
-      // Index unavailable: leave the previous set in place. Broken-link styling
-      // is best-effort and must never block; a stale set just means a link may
-      // briefly look (un)broken until the next refresh.
+      // Index unavailable: leave the previous handle in place. Broken-link
+      // styling is best-effort and must never block; a stale set just means a
+      // link may briefly look (un)broken until the next refresh.
     }
   }
 }

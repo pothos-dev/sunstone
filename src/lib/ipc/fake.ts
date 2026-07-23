@@ -25,7 +25,7 @@ import {
 import { buildTree, renameInternal, deleteInternal } from './fake/tree';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
-import { rewriteAnchorsIn } from '$lib/anchorRewrite';
+import { rewriteAnchorsIn } from './fake/anchorRewrite';
 import {
   parseFrontmatter,
   parseFrontmatterKeys,

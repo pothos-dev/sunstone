@@ -15,6 +15,4 @@ pub mod paths;
 pub mod render;
 pub mod rewrite;
 pub mod search;
-pub mod slug;
 pub mod watcher;
-pub mod wikilink;

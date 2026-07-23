@@ -1,24 +1,21 @@
 //! Pure leaf crate of Sunstone's frontend-shared algorithms (ADR 0006 §2).
 //!
 //! This crate compiles for **both** the native host and `wasm32`. Its
-//! dependencies are limited to `serde` / `serde_yaml` so nothing native-only
-//! (`ignore`, `notify`, `grep-*`, `dirs`) can leak into the wasm build.
+//! dependencies are limited to `serde` / `serde_yaml` (plus the optional
+//! `tsify` / `wasm-bindgen` derives, gated behind the `wasm` feature so the
+//! native build never pulls them in) — nothing native-only (`ignore`,
+//! `notify`, `grep-*`, `dirs`) can leak into the wasm build.
 //!
-//! Step 0 keeps it essentially empty — the real wikilink / slug / rewrite /
-//! index-frontmatter / index-links / paths logic migrates in later families
-//! (10 / 11 / 13). It exists now only so the pure leaf triad and the build
-//! pipeline can stand up end-to-end.
+//! It is the ONE source of truth for the link family (family 10): wikilink /
+//! slug / link resolution / anchor rewrite / pure paths. `sunstone-native`
+//! depends on it and re-points its call sites here; `sunstone-wasm` wraps it
+//! for the browser frontend.
 
-/// Placeholder marker so the crate has an inspectable, testable surface until
-/// the real algorithms land. Replaced/removed by the family-10 migration.
-pub const PLACEHOLDER: &str = "sunstone-shared: pipeline stand-up (ADR 0006 Step 0)";
+pub mod links;
+pub mod paths;
+pub mod rewrite;
+pub mod slug;
+pub mod wikilink;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn placeholder_is_present() {
-        assert!(PLACEHOLDER.contains("sunstone-shared"));
-    }
-}
+pub use links::{find_bundle_root, resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};
+pub use rewrite::{rewrite_anchors_in, AnchorRename};

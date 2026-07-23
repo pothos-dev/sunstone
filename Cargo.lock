@@ -3964,6 +3964,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sunstone-shared",
 ]
 
 [[package]]
@@ -3987,6 +3988,8 @@ version = "0.14.0"
 dependencies = [
  "serde",
  "serde_yaml",
+ "tsify",
+ "wasm-bindgen",
 ]
 
 [[package]]

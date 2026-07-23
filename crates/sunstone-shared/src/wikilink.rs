@@ -41,7 +41,7 @@ pub struct WikiTarget {
 /// `|` (alias) or first `#` (anchor), or the whole string when neither is
 /// present. Shared by [`parse_target`] and the rename rewriter so the two agree
 /// on exactly where the name ends.
-pub(crate) fn name_end(raw: &str) -> usize {
+pub fn name_end(raw: &str) -> usize {
     match (raw.find('|'), raw.find('#')) {
         (Some(p), Some(h)) => p.min(h),
         (Some(p), None) => p,
@@ -79,7 +79,7 @@ pub fn parse_target(raw: &str) -> WikiTarget {
 }
 
 /// Strip the trailing `.md` (case-insensitive) from a bundle path / basename.
-pub(crate) fn drop_md(s: &str) -> &str {
+pub fn drop_md(s: &str) -> &str {
     if s.len() >= 3 && s[s.len() - 3..].eq_ignore_ascii_case(".md") {
         &s[..s.len() - 3]
     } else {
@@ -88,7 +88,7 @@ pub(crate) fn drop_md(s: &str) -> &str {
 }
 
 /// The basename of a '/'-separated bundle path (the part after the last `/`).
-pub(crate) fn basename(path: &str) -> &str {
+pub fn basename(path: &str) -> &str {
     match path.rfind('/') {
         Some(slash) => &path[slash + 1..],
         None => path,

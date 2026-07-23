@@ -36,9 +36,9 @@ use serde::Serialize;
 use crate::bundle;
 use crate::index::frontmatter::{frontmatter_block, strip_frontmatter};
 use crate::index::Index;
-use crate::paths::{is_external, resolve_internal};
-use crate::slug::slugify;
-use crate::wikilink::{self, parse_target};
+use sunstone_shared::paths::{is_external, resolve_internal};
+use sunstone_shared::slug::slugify;
+use sunstone_shared::wikilink::{self, parse_target};
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the

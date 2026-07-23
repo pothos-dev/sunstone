@@ -1,29 +1,21 @@
 /**
- * Anchor rewriting on heading rename (pure; no DOM, no IPC) — slice
- * slug-anchor-rewrite.
+ * Fake-backend anchor rewriting on heading rename ("Fork B", ADR 0006 family
+ * 12).
  *
- * When a heading's GitHub slug changes, the ANCHOR of every link that (a)
- * resolves to the renamed target and (b) whose current anchor slug matches a
- * rename's old slug is rewritten to the new slug. The link's path / name / alias
- * and every other link are preserved byte-for-byte. Both sides are slugged, so an
- * older literal anchor (`[[p#Deep Section]]`) matches `from: "deep-section"` and
- * is migrated to the canonical slug on the first heading change.
- *
- * MIRRORS the Rust `rewrite/anchors.rs` EXACTLY. Used by BOTH the fake backend
- * (cross-file inbound links, `ipc/fake/links.ts`) and the editor (same-file
- * `[[#slug]]` links rewritten in-buffer, App.svelte), so there is one source of
- * truth for the anchor-swap algorithm on the frontend.
+ * The editor's live-buffer anchor rewrite now goes through the wasm
+ * `BundleIndex` handle (`rewriteAnchorsIn`, source == target). The FAKE backend
+ * twins the NATIVE `rewrite_anchors` command, which rewrites INBOUND anchors
+ * across the whole corpus (`target != source`) — a shape the live handle does
+ * not expose. So the fake keeps this corpus-wide rewriter. Byte-identical to
+ * the former `src/lib/anchorRewrite.ts`; family 12 dedupes it against the
+ * shared source.
  */
 
-import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './links';
-import { slugify } from './slug';
-import type { AnchorRename } from './types';
+import { slugify } from '$lib/slug';
+import type { AnchorRename } from '$lib/types';
+import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './linkResolve';
 
-/**
- * Blank out fenced code blocks (``` / ~~~) and inline code spans, preserving
- * length + newlines so offsets stay aligned. Keeps the wikilink scanner from
- * picking up `[[ … ]]` written inside code (matching the outline scanner).
- */
+/** Blank out fenced code blocks + inline code spans, preserving length. */
 export function maskCode(body: string): string {
   const lines = body.split('\n');
   const fenceRe = /^\s*(`{3,}|~{3,})/;
@@ -128,7 +120,6 @@ function rewriteWikiAnchor(
   const newAnchor = newAnchorFor(anchor, renames);
   if (newAnchor === null) return null;
 
-  // Replace only the anchor text (between the first `#` and the next `|`).
   const h = origInner.indexOf('#');
   if (h === -1) return null;
   const after = origInner.slice(h + 1);
@@ -138,15 +129,7 @@ function rewriteWikiAnchor(
   return rebuilt === origInner ? null : rebuilt;
 }
 
-/**
- * Rewrite every anchor in `content` that points at a renamed heading in
- * `target`. `source` is the Concept `content` lives at (resolution base);
- * `allPaths` is the bundle's concept path set (name-based wikilink resolution).
- * Returns the rewritten content and the number of anchors changed.
- *
- * For same-file rewriting in the open editor buffer, pass `source === target`:
- * `[[#slug]]` resolves to the source (== target) and `[[self#slug]]` likewise.
- */
+/** Rewrite every anchor in `content` pointing at a renamed heading in `target`. */
 export function rewriteAnchorsIn(
   source: string,
   content: string,
@@ -156,7 +139,6 @@ export function rewriteAnchorsIn(
 ): { content: string; count: number } {
   if (renames.length === 0) return { content, count: 0 };
   let count = 0;
-  // Markdown links `[text](inner)` but NOT images.
   const mdRe = /(!?)(\[[^\]]*\]\()([^)]*)(\))/g;
   const withMd = content.replace(mdRe, (whole, bang: string, open: string, inner: string, close: string) => {
     if (bang === '!') return whole;
@@ -166,7 +148,6 @@ export function rewriteAnchorsIn(
     return `${open}${rewritten}${close}`;
   });
 
-  // Wikilinks (mask code first so `[[ … ]]` inside code are ignored).
   const masked = maskCode(withMd);
   let result = '';
   let last = 0;

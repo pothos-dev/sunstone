@@ -10,3 +10,12 @@ edition = "2021"
 # NO native-only deps (ignore/notify/grep-*/dirs) may be added here.
 serde = { workspace = true }
 serde_yaml = { workspace = true }
+# The tsify/wasm-bindgen DTO derives are OPTIONAL and gated behind the `wasm`
+# feature (ADR 0006 §6): the native build (cargo check/test) never compiles
+# them; only `sunstone-wasm` enables the feature for the browser boundary.
+tsify = { version = "0.5.6", optional = true }
+wasm-bindgen = { version = "0.2.126", optional = true }
+
+[features]
+# Enabled by `sunstone-wasm` to emit the tsify `.d.ts` DTOs at the wasm seam.
+wasm = ["dep:tsify", "dep:wasm-bindgen"]

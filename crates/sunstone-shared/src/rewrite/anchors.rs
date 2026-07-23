@@ -3,20 +3,21 @@
 //! `[[Page#new-slug]]` and `[text](/page.md#old-slug)` becomes
 //! `[text](/page.md#new-slug)`.
 //!
-//! This is the sibling of the rename-rewrite engine (`engine.rs`): it uses the
-//! same byte-by-byte scanner (skipping fenced / inline code, embeds, images) but
-//! touches ONLY the anchor of links that (a) resolve to the renamed `target` and
-//! (b) whose current anchor SLUG matches a rename's old slug. The link's path /
-//! name / alias and every other link are left byte-for-byte unchanged.
+//! It uses the same byte-by-byte scanner as the move/rename engine (skipping
+//! fenced / inline code, embeds, images) but touches ONLY the anchor of links
+//! that (a) resolve to the renamed `target` and (b) whose current anchor SLUG
+//! matches a rename's old slug. The link's path / name / alias and every other
+//! link are left byte-for-byte unchanged.
 //!
 //! Because both sides are slugged (`slug::slugify`), an older literal anchor
 //! (`[[p#Deep Section]]`) matches a rename `from: "deep-section"` and is migrated
 //! to the canonical slug on the first heading change.
 //!
-//! Pure module logic (no IO / index) so it is exhaustively unit-testable; the
-//! orchestration in `rewrite.rs` reads/writes files and drives it.
+//! Pure module logic (no IO / index): it is exhaustively unit-testable and
+//! wasm-safe. Native `rewrite.rs` reads/writes files and drives it; the wasm
+//! `BundleIndex` handle drives it live against the open editor buffer.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::paths::{find_byte, is_external, resolve_internal};
 use crate::slug::slugify;
@@ -27,7 +28,13 @@ use super::paths::{split_suffix, utf8_len};
 /// One heading-slug rename: the old slug (`from`) and the new slug (`to`). Sent
 /// from the editor, which tracks each heading's identity across edits and emits a
 /// rename when a heading's slug changes. Matches the TS `{ from, to }`.
-#[derive(Debug, Clone, Deserialize)]
+///
+/// ADR 0006 §6: tsify-canonical — the single definition crossing both the wasm
+/// boundary (from_wasm_abi) and the native IPC seam (re-exported by
+/// `sunstone-native::rewrite`).
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(from_wasm_abi))]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnchorRename {
     pub from: String,
@@ -173,9 +180,6 @@ fn rewrite_wikilink_anchor(
     if anchor.trim().is_empty() {
         return None;
     }
-    // The link must point at the concept whose headings changed. (Pure same-file
-    // anchors resolve to `source`, which the orchestrator excludes from the
-    // rewrite set — those are handled in the open editor buffer.)
     if wikilink::resolve_wikilink(all_paths, source, raw)? != target {
         return None;
     }
@@ -193,9 +197,8 @@ fn rewrite_wikilink_anchor(
 }
 
 /// Rewrite a markdown link's `#anchor` if the link resolves to `target` and its
-/// anchor slug was renamed. Mirrors `engine::rewrite_target`'s parsing of the
-/// `(...)` inner text (leading ws, optional `<...>`, trailing "title"); only the
-/// anchor within the URL's suffix is touched, the path is preserved.
+/// anchor slug was renamed. Only the anchor within the URL's suffix is touched,
+/// the path is preserved.
 fn rewrite_md_anchor(
     source: &str,
     inner: &str,
@@ -219,8 +222,6 @@ fn rewrite_md_anchor(
         ("", url_raw, "")
     };
     if is_external(url_core) || url_core.starts_with('#') {
-        // External links, and pure same-file anchors (handled in the buffer),
-        // are out of scope here.
         return None;
     }
 
@@ -228,7 +229,6 @@ fn rewrite_md_anchor(
     if path_part.is_empty() || !suffix.starts_with('#') {
         return None;
     }
-    // The anchor is the `#...` up to an optional `?query`.
     let anchor_end = suffix[1..]
         .find('?')
         .map(|p| p + 1)
@@ -279,7 +279,6 @@ mod tests {
     #[test]
     fn preserves_alias_when_swapping_anchor() {
         let all = paths(&["a.md", "target.md"]);
-        // Anchor before alias.
         let (out, n) = rewrite_anchors_in(
             "a.md",
             "[[target#old|Label]]",
@@ -293,8 +292,6 @@ mod tests {
 
     #[test]
     fn migrates_literal_anchor_to_slug() {
-        // An older literal anchor `#Deep Section` slugs to `deep-section` and is
-        // rewritten to the canonical new slug.
         let all = paths(&["a.md", "target.md"]);
         let (out, n) = rewrite_anchors_in(
             "a.md",
@@ -336,6 +333,21 @@ mod tests {
     }
 
     #[test]
+    fn rewrites_same_file_anchor_when_source_is_target() {
+        // In the open buffer `[[#slug]]` resolves to the source itself.
+        let all = paths(&["a.md", "target.md"]);
+        let (out, n) = rewrite_anchors_in(
+            "target.md",
+            "jump to [[#old]] and [[target#old]]",
+            "target.md",
+            &renames(&[("old", "new")]),
+            &all,
+        );
+        assert_eq!(out, "jump to [[#new]] and [[target#new]]");
+        assert_eq!(n, 2);
+    }
+
+    #[test]
     fn rewrites_markdown_link_anchor() {
         let all = paths(&["a.md", "target.md"]);
         let (out, n) = rewrite_anchors_in(
@@ -364,6 +376,23 @@ mod tests {
     }
 
     #[test]
+    fn does_not_touch_images_or_external_links() {
+        let all = paths(&["a.md", "target.md"]);
+        let (out, n) = rewrite_anchors_in(
+            "a.md",
+            "![img](/target.md#old) [ext](https://x.dev/target.md#old)",
+            "target.md",
+            &renames(&[("old", "new")]),
+            &all,
+        );
+        assert_eq!(
+            out,
+            "![img](/target.md#old) [ext](https://x.dev/target.md#old)"
+        );
+        assert_eq!(n, 0);
+    }
+
+    #[test]
     fn skips_code_and_embeds() {
         let all = paths(&["a.md", "target.md"]);
         let body = "real [[target#old]]\n```\ncode [[target#old]]\n```\n\
@@ -381,5 +410,13 @@ mod tests {
              inline `[[target#old]]` and embed ![[target#old]]"
         );
         assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn no_renames_is_a_noop() {
+        let all = paths(&["a.md", "target.md"]);
+        let (out, n) = rewrite_anchors_in("a.md", "[[target#old]]", "target.md", &[], &all);
+        assert_eq!(out, "[[target#old]]");
+        assert_eq!(n, 0);
     }
 }

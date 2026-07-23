@@ -20,7 +20,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::paths::md_files;
-use crate::wikilink;
+use sunstone_shared::wikilink;
 
 pub mod frontmatter;
 mod links;

@@ -15,8 +15,6 @@ const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'timestamp
  * paths/types/keys/tags appear in suggestions immediately.
  */
 class SuggestionsStore {
-  /** All bundle-relative Concept paths (quick-nav matches against these). */
-  conceptPaths = $state<string[]>([]);
   /** Existing `type` values across the Bundle. */
   types = $state<string[]>([]);
   /** OKF recommended keys ∪ distinct keys used across the Bundle (deduped). */
@@ -32,12 +30,9 @@ class SuggestionsStore {
    * autocomplete even when the bundle-sourced keys fail to load.
    */
   refresh(): void {
-    void backend
-      .listConceptPaths()
-      .then((p) => {
-        this.conceptPaths = p;
-      })
-      .catch(() => {});
+    // Concept paths are no longer copied here — quick-nav reads the single
+    // source, `indexStore.conceptPaths()` (ADR 0006 family 10/16). This store
+    // now only serves the index-derived type/key/tag suggestion lists.
     void backend
       .allTypes()
       .then((t) => {

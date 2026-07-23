@@ -5,8 +5,9 @@ import { browser } from '$app/environment';
 // the real module only enters via the browser-guarded dynamic `import()` below.
 import type { BundleIndex } from '$lib/wasm/pkg';
 
-/** The dummy handle class (ADR 0006 §3); family 10 gives it the real surface. */
+/** The `BundleIndex` handle class + its generated DTOs (ADR 0006 §3/§6). */
 export type { BundleIndex };
+export type { ResolvedLink, WikilinkTarget, RewriteBody, AnchorRename } from '$lib/wasm/pkg';
 
 /** The wasm module namespace: `BundleIndex` + the free exports (family 10+). */
 type WasmModule = typeof import('$lib/wasm/pkg');

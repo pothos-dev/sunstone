@@ -15,7 +15,7 @@
 // Reads the shared `FILES` state (imported live from `store`, never copied).
 
 import type { RewriteSummary } from '$lib/types';
-import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from '$lib/links';
+import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './linkResolve';
 import { splitFrontmatter } from '$lib/frontmatter';
 import { FILES, conceptPaths } from './store';
 

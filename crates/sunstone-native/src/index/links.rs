@@ -8,7 +8,7 @@
 use std::collections::BTreeSet;
 
 use crate::index::frontmatter::strip_frontmatter;
-use crate::paths::{find_byte, resolve_internal};
+use sunstone_shared::paths::{find_byte, resolve_internal};
 
 /// Extract all internal markdown link targets from a Concept body, resolved to
 /// bundle-relative paths. External (`scheme:`), pure-anchor, and empty links are
@@ -73,7 +73,7 @@ fn extract_href(raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::paths::resolve_internal;
+    use sunstone_shared::paths::resolve_internal;
 
     #[test]
     fn resolves_relative_and_absolute_links() {

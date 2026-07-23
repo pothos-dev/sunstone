@@ -8,7 +8,8 @@ use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::paths::{bundle_walker, to_rel_string};
+use crate::paths::bundle_walker;
+use sunstone_shared::paths::to_rel_string;
 
 /// A node in the Bundle's directory tree. Matches the TS `TreeNode`.
 #[derive(Debug, Serialize)]

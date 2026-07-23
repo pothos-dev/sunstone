@@ -61,7 +61,6 @@
     type EditorMode,
     type CommentEditRequest,
   } from '$lib/editor/cm';
-  import { rewriteAnchorsIn } from '$lib/anchorRewrite';
   import { diffToCriticMarkup } from '$lib/diff/diffToCriticMarkup';
   import { reviewAvailability } from '$lib/editor/review';
   import { reviewStep, maxStep } from '$lib/editor/reviewStepper';
@@ -71,7 +70,6 @@
     frontmatterLineCount,
     type Property,
   } from '$lib/frontmatter';
-  import { resolveLink } from '$lib/links';
   import { findHeadingLine } from '$lib/outline';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
@@ -440,10 +438,7 @@
 
   function handleLinkClick(href: string) {
     const open = tile.activePath ?? '';
-    const target = resolveLink(open, href, {
-      bundleRoot: indexStore.bundleRoot(),
-      exists: (p) => indexStore.exists(p),
-    });
+    const target = indexStore.resolveLink(open, href);
     if (target.kind === 'external') {
       void backend.openExternal(target.href);
     } else if (target.kind === 'internal') {
@@ -471,9 +466,8 @@
     if (!view || tile.activePath !== savedPath) return;
     const renames = pendingAnchorRenames(view);
     if (renames.length === 0) return;
-    const allPaths = indexStore.pathList();
     const body = view.state.doc.toString();
-    const { content: newBody } = rewriteAnchorsIn(savedPath, body, savedPath, renames, allPaths);
+    const { content: newBody } = indexStore.rewriteAnchorsIn(savedPath, body, renames);
     const change = minimalChange(body, newBody);
     if (change) view.dispatch({ changes: change });
     void backend.rewriteAnchors(savedPath, renames).then((summary) => {
@@ -528,13 +522,9 @@
         onCommentEdit: openCommentPopup,
         brokenLinkContext: {
           currentPath: () => tile.activePath ?? '',
-          exists: (p) => indexStore.exists(p),
-          bundleRoot: () => indexStore.bundleRoot(),
         },
         wikiLinkContext: {
           currentPath: () => tile.activePath ?? '',
-          allPaths: () => indexStore.pathList(),
-          exists: (p) => indexStore.exists(p),
           open: handleWikiLinkOpen,
         },
       });

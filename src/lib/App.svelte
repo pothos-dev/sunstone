@@ -94,6 +94,14 @@
     suggestions.refresh();
   });
 
+  // Quick-nav Concept paths: the single source is the wasm handle
+  // (`indexStore.conceptPaths()`); re-read whenever the index version bumps
+  // (ADR 0006 family 10/16 — retires the `suggestions.conceptPaths` copy).
+  const conceptPaths = $derived.by(() => {
+    void indexStore.version;
+    return indexStore.conceptPaths();
+  });
+
   // The Tags Section is hidden entirely when the Bundle carries no tags.
   const tagsPresent = $derived(suggestions.tags.length > 0);
   const expandedCount = $derived(
@@ -879,7 +887,7 @@
 
   <QuickNav
     open={quickNavOpen}
-    paths={suggestions.conceptPaths}
+    paths={conceptPaths}
     tags={suggestions.tags}
     recent={session.recentFiles}
     conceptsForTag={(tag) => backend.conceptsByTag(tag)}

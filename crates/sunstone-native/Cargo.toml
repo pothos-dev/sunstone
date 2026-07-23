@@ -6,6 +6,9 @@ authors = ["you"]
 edition = "2021"
 
 [dependencies]
+# The pure leaf crate: single source of truth for the link/slug/wikilink/anchor/
+# pure-path algorithms (ADR 0006 §2). Native re-points its call sites here.
+sunstone-shared = { path = "../sunstone-shared" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 # Filesystem walking (respects .gitignore, fast) — tree + full-text search

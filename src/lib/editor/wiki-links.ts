@@ -11,7 +11,23 @@ import {
   type WikiLinkResolvedTarget,
   type WikiLinksConfig,
 } from '@atomic-editor/editor';
-import { resolveWikilink, splitWikilinkTarget } from '$lib/links';
+import { indexStore } from '$lib/state/index.svelte';
+
+/**
+ * The `name` and `#anchor` of a raw wikilink inner text (`name|alias#anchor`).
+ * The alias begins at the first `|`; the anchor at the first `#` in the name
+ * part. Resolution itself lives on the wasm handle (`resolveWikilink`); this is
+ * the small display-side split the label + open scroll need. Mirrors the Rust
+ * `wikilink::parse_target` for these two fields.
+ */
+function splitWikilinkParts(raw: string): { name: string; anchor: string | null } {
+  let namePart = raw;
+  const pipe = namePart.indexOf('|');
+  if (pipe !== -1) namePart = namePart.slice(0, pipe);
+  const hash = namePart.indexOf('#');
+  if (hash === -1) return { name: namePart, anchor: null };
+  return { name: namePart.slice(0, hash), anchor: namePart.slice(hash + 1) };
+}
 
 // ---------------------------------------------------------------------------
 // Wikilink rendering (ADR-0004) — `[[name]]` as an OPTIONAL, name-based
@@ -36,14 +52,12 @@ import { resolveWikilink, splitWikilinkTarget } from '$lib/links';
 // that is acceptable for v1 and embeds are out of scope.
 // ---------------------------------------------------------------------------
 
-/** Context the wikilink adapter needs from app state. */
+/** Context the wikilink adapter needs from app state. Resolution + the concept
+ *  set now live on the wasm handle (`indexStore`); only the open Concept path
+ *  and the in-app navigation callback stay app-supplied. */
 export interface WikiLinkContext {
   /** Bundle-relative path of the open Concept (the link's source for resolution). */
   currentPath: () => string;
-  /** All concept `.md` paths (bundle-relative, no leading slash). */
-  allPaths: () => string[];
-  /** Synchronous existence check against the index's cached path set. */
-  exists: (path: string) => boolean;
   /**
    * Open a resolved wikilink: `path` is the bundle-relative target, `anchor` is
    * the `#heading` text (without the `#`), or `null` when absent. The host
@@ -54,10 +68,10 @@ export interface WikiLinkContext {
 
 /** Resolve a raw `[[target]]` to a status + label, or `null` (broken). */
 function resolveTarget(ctx: WikiLinkContext, target: string): WikiLinkResolvedTarget | null {
-  const resolved = resolveWikilink(ctx.allPaths(), ctx.currentPath(), target);
+  const resolved = indexStore.resolveWikilink(ctx.currentPath(), target);
   // Unresolved by the name index, OR resolves to a path absent from the index
   // (same existence check the broken markdown-link decoration uses) → missing.
-  if (!resolved || !ctx.exists(resolved.path)) return null;
+  if (!resolved || !indexStore.exists(resolved.path)) return null;
   return { target, label: labelFor(target, resolved.path), status: 'resolved' };
 }
 
@@ -67,7 +81,7 @@ function resolveTarget(ctx: WikiLinkContext, target: string): WikiLinkResolvedTa
  * (Obsidian shows what was typed); fall back to the resolved file's basename.
  */
 function labelFor(rawTarget: string, path: string): string {
-  const { name } = splitWikilinkTarget(rawTarget);
+  const { name } = splitWikilinkParts(rawTarget);
   const written = name.trim();
   if (written !== '') return written;
   // Pure same-file anchor `[[#heading]]` → name is empty; use the file basename.
@@ -85,8 +99,8 @@ export function wikiLinksExtension(ctx: WikiLinkContext): Extension {
     // `resolve` is async upstream; our resolver is synchronous, so wrap it.
     resolve: (target) => Promise.resolve(resolveTarget(ctx, target)),
     onOpen: (target) => {
-      const { anchor } = splitWikilinkTarget(target);
-      const resolved = resolveWikilink(ctx.allPaths(), ctx.currentPath(), target);
+      const { anchor } = splitWikilinkParts(target);
+      const resolved = indexStore.resolveWikilink(ctx.currentPath(), target);
       if (resolved) ctx.open(resolved.path, anchor && anchor.trim() !== '' ? anchor : null);
     },
     openOnClick: true,
@@ -124,8 +138,8 @@ function computeBrokenAliasWikiLinks(view: EditorView, ctx: WikiLinkContext): De
         (r) => Math.min(r.from, r.to) < linkTo && Math.max(r.from, r.to) > linkFrom,
       );
       if (insideCursor) continue;
-      const resolved = resolveWikilink(ctx.allPaths(), ctx.currentPath(), body);
-      if (resolved && ctx.exists(resolved.path)) continue; // resolves → leave as-is.
+      const resolved = indexStore.resolveWikilink(ctx.currentPath(), body);
+      if (resolved && indexStore.exists(resolved.path)) continue; // resolves → leave as-is.
       // Mark the label range (after `[[…|`, before `]]`) as missing.
       const labelStart = matchStart + 2 + pipe + 1;
       const labelEnd = matchStart + 2 + body.length;
