@@ -28,6 +28,9 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Obsidian-style hybrid editing');
 
+  // Live preview (cursor-line reveal) is the editing mode; read is the default.
+  await page.getByTestId('edit-toggle').click();
+
   // --- Inactive lines render styled ---------------------------------------
   // Heading rendered with the atomic-editor heading class (sized via theme).
   const h1 = editor.locator('.cm-atomic-h1').first();

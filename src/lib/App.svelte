@@ -752,12 +752,9 @@
     <NavBar
       leftSidebarOpen={session.leftSidebarOpen}
       rightSidebarOpen={session.rightSidebarOpen}
-      editorMode={session.editorMode}
-      hasOpenConcept={editor.path !== null}
       propertiesShown={session.propertiesShown}
       onToggleLeft={() => session.setLeftSidebarOpen(!session.leftSidebarOpen)}
       onToggleRight={() => session.setRightSidebarOpen(!session.rightSidebarOpen)}
-      onSetMode={(mode) => session.setEditorMode(mode)}
       onToggleProperties={() => session.setPropertiesShown(!session.propertiesShown)}
     />
     <!-- The editor area: a ROW OF COLUMNS, each a vertical STACK of tiled Tiles,

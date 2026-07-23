@@ -120,17 +120,21 @@
   // and header title can render it.
   let frontmatterProps = $state<Property[]>([]);
 
-  // The tri-state view mode is GLOBAL (session.editorMode), toggled from the
-  // NavBar and applied to EVERY tile at once — it is not a per-Tile setting. This
-  // effect subscribes each Tile's live view to that global mode: whenever it
-  // changes, the view re-renders in the new mode. Freshly (re)built views adopt
-  // it via `initialMode` below. `tile.mode` is kept in sync so the persisted
-  // layout stays self-consistent (all tiles share the global mode).
+  // The editing/read view mode is GLOBAL (session.editorMode), driven by the Edit
+  // toggle in this tile's header and applied to EVERY tile at once — it is not a
+  // per-Tile setting. This effect subscribes each Tile's live view to that global
+  // mode: whenever it changes, the view re-renders in the new mode. Freshly
+  // (re)built views adopt it via `initialMode` below. `tile.mode` is kept in sync
+  // so the persisted layout stays self-consistent (all tiles share the global mode).
   $effect(() => {
     const mode = session.editorMode;
     tile.mode = mode;
     if (view) setEditorMode(view, mode);
   });
+
+  // Whether the editor is in live-editing mode (vs read-only reading), for the
+  // header's Edit toggle. Reflects + drives the shared `session.editorMode`.
+  const editing = $derived(session.editorMode === 'editing');
 
   const currentTileTitle = $derived(tileTitle(tile.activePath, frontmatterProps));
 
@@ -645,6 +649,7 @@
   <TileHeader
     title={currentTileTitle}
     hasOpenConcept={tile.activePath !== null}
+    {editing}
     canGoBack={tile.canGoBack}
     canGoForward={tile.canGoForward}
     {canUndo}
@@ -662,6 +667,7 @@
     onRedo={doRedo}
     onToggleReview={toggleReview}
     onExportPdf={exportPdf}
+    onToggleEditing={() => session.setEditorMode(editing ? 'read' : 'editing')}
   />
 
   {#if tile.error}

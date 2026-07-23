@@ -141,9 +141,10 @@ export type BundleState = {
    */
   propertiesShown?: boolean;
   /**
-   * The editor's tri-state view mode (Source / Live / Reading), restored on
-   * relaunch (persist-editor-mode). Optional so older files tolerate its
-   * absence; the session store defaults it to `DEFAULT_EDITOR_MODE` on read.
+   * The editor's view mode — the boolean `editing`/`read` (editing-boolean-edit-
+   * toggle), restored on relaunch (persist-editor-mode). Optional so older files
+   * tolerate its absence; the session store migrates the legacy tri-state values
+   * ('edit'/'hybrid'/'view') and defaults it to `read` on read.
    */
   editorMode?: EditorMode;
   /**

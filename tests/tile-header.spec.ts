@@ -5,10 +5,11 @@ import { test, expect } from './fixtures';
  * Slice: per-tile-header (single tile).
  *
  * The Tile grows a slim header carrying everything logically per-Tile for the
- * active Concept: the title + close, Split Right / Split Down (wired but inert
- * until tiling), undo/redo over the Tile's Document history, the review-diff
- * toggle, and Export-PDF. The global view-mode toggle (Source / Live / Reading)
- * lives in the NavBar, alongside the sidebar + Properties toggles.
+ * active Concept: the title + close, the Edit toggle (read ⇄ live editing; the
+ * single view-mode control after editing-boolean-edit-toggle), Split Right /
+ * Split Down, undo/redo over the Tile's Document history (shown only while
+ * editing), the review-diff toggle, and Export-PDF. The NavBar keeps only the
+ * global sidebar + Properties toggles.
  *
  * This drives the header controls end-to-end and screenshots the result.
  */
@@ -34,7 +35,7 @@ async function openCodemirror(page: Page) {
   return editor;
 }
 
-test('tile header: title, undo/redo, review + export live in the header', async ({
+test('tile header: Edit toggle, undo/redo, review + export live in the header', async ({
   page,
 }) => {
   await openCodemirror(page);
@@ -45,20 +46,25 @@ test('tile header: title, undo/redo, review + export live in the header', async 
   await expect(header).toBeVisible();
   await expect(page.getByTestId('tile-title')).toHaveText('CodeMirror');
 
-  // The per-Tile controls all live inside the header (not the global NavBar).
-  // The view-mode toggle is GLOBAL and lives in the NavBar, not here.
+  // The per-Tile controls all live inside the header. The single view-mode
+  // control is the Edit toggle here (there is no NavBar segmented control now).
   await expect(header.getByTestId('editor-mode-toggle')).toHaveCount(0);
-  await expect(header.getByTestId('undo')).toBeVisible();
-  await expect(header.getByTestId('redo')).toBeVisible();
+  await expect(header.getByTestId('edit-toggle')).toBeVisible();
   await expect(header.getByTestId('review-toggle')).toBeVisible();
   await expect(header.getByTestId('export-pdf')).toBeVisible();
   await expect(header.getByTestId('split-right')).toBeVisible();
   await expect(header.getByTestId('split-down')).toBeVisible();
   await expect(header.getByTestId('nav-back')).toBeVisible();
 
-  // --- Undo / redo act on the Tile's history (decoupled from Properties) ----
+  // --- Undo / redo appear only while editing (read-only has nothing to undo) --
+  await expect(header.getByTestId('undo')).toHaveCount(0);
+  await expect(header.getByTestId('redo')).toHaveCount(0);
+  await header.getByTestId('edit-toggle').click();
+  await expect(header.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'true');
   const undoBtn = header.getByTestId('undo');
   const redoBtn = header.getByTestId('redo');
+  await expect(undoBtn).toBeVisible();
+  await expect(redoBtn).toBeVisible();
   await expect(undoBtn).toBeDisabled();
   await expect(redoBtn).toBeDisabled();
 
@@ -106,10 +112,10 @@ test('tile header: close affordance is hidden when only one tile is on screen', 
   await expect(page.getByTestId('tile-close')).toHaveCount(0);
 });
 
-test('nav bar: global-only — view-mode + Properties + sidebar toggles, no per-Tile controls', async ({
+test('nav bar: global-only — Properties + sidebar toggles, no per-Tile controls', async ({
   page,
 }) => {
-  const editor = await openCodemirror(page);
+  await openCodemirror(page);
 
   // The global Properties toggle is present and drives the inline panel. It
   // starts OFF (default hidden): no Properties chrome in the tile.
@@ -125,17 +131,12 @@ test('nav bar: global-only — view-mode + Properties + sidebar toggles, no per-
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // The global view-mode toggle lives in the NavBar and drives the active tile.
+  // The view-mode control (Edit toggle) is NOT in the NavBar — it lives per-tile
+  // in the concept header now.
   const navBar = page.locator('nav[aria-label="Global controls"]');
   await expect(navBar).toBeVisible();
-  await expect(navBar.getByTestId('editor-mode-toggle')).toBeVisible();
-  const content = editor.locator('.cm-content');
-  await expect(content).toHaveAttribute('contenteditable', 'true'); // Live default
-  await navBar.getByTestId('editor-mode-view').click();
-  await expect(navBar.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
-  await expect(content).toHaveAttribute('contenteditable', 'false'); // Reading = read-only
-  await navBar.getByTestId('editor-mode-hybrid').click();
-  await expect(content).toHaveAttribute('contenteditable', 'true');
+  await expect(navBar.getByTestId('editor-mode-toggle')).toHaveCount(0);
+  await expect(navBar.getByTestId('edit-toggle')).toHaveCount(0);
 
   // The NavBar does NOT carry the per-Tile controls (they live in the header).
   await expect(navBar.getByTestId('review-toggle')).toHaveCount(0);

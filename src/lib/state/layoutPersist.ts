@@ -17,8 +17,23 @@ import type { EditorMode } from '$lib/editor/cm';
 // Mirrors `DEFAULT_EDITOR_MODE` in cm.ts. Kept as a literal here (with only a
 // TYPE import of `EditorMode`) so this pure, unit-tested module never pulls the
 // heavy CodeMirror module graph into the test runtime.
-const DEFAULT_MODE: EditorMode = 'hybrid';
-const EDITOR_MODES: readonly EditorMode[] = ['edit', 'hybrid', 'view'];
+const DEFAULT_MODE: EditorMode = 'read';
+
+/**
+ * Coerce any persisted mode value to the current boolean `EditorMode`, migrating
+ * the legacy three-way union in the process (editing-boolean-edit-toggle):
+ *   - `editing` / `edit` / `hybrid` → `editing`
+ *   - `read` / `view`               → `read`
+ *   - anything else                 → the default (`read`)
+ * Applied to BOTH the session-level mode (in `session.load`) and every per-tile
+ * `StoredTile.mode` (in `deserializeLayout`), so an old bundle-state file opens
+ * without data loss.
+ */
+export function migrateEditorMode(v: unknown): EditorMode {
+  if (v === 'editing' || v === 'edit' || v === 'hybrid') return 'editing';
+  if (v === 'read' || v === 'view') return 'read';
+  return DEFAULT_MODE;
+}
 
 /** One persisted tile: its Concept path (null = empty), view-mode, and weight. */
 export interface StoredTile {
@@ -53,10 +68,6 @@ interface LiveLayout {
   columns: { weight: number; tiles: { id: string; weight: number }[] }[];
 }
 
-function isEditorMode(v: unknown): v is EditorMode {
-  return typeof v === 'string' && (EDITOR_MODES as readonly string[]).includes(v);
-}
-
 /** A usable weight is a finite positive number; anything else falls back to 1. */
 function coerceWeight(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 1;
@@ -64,7 +75,7 @@ function coerceWeight(v: unknown): number {
 
 /**
  * SERIALIZE the live layout tree to a plain `StoredLayout`. `tileData` resolves a
- * Tile id to its Concept path + view-mode (missing → an empty hybrid tile). The
+ * Tile id to its Concept path + view-mode (missing → an empty `read` tile). The
  * active tile is located by id and stored as a `[columnIndex, tileIndex]` pair
  * (falling back to `[0, 0]` when the active id is absent). Pure.
  */
@@ -102,8 +113,8 @@ export function serializeLayout(
  * falls back to a single empty tile). Structural corruption — a non-object, no
  * columns, or a column with no tiles — yields `null`; cosmetic corruption within
  * an otherwise-valid tile (a bad weight/mode, or a non-string path) is COERCED
- * (weight→1, mode→hybrid, path→null) rather than rejected, so a slightly damaged
- * file still restores. Never throws.
+ * (weight→1, mode→migrated/`read`, path→null) rather than rejected, so a slightly
+ * damaged file still restores. Never throws.
  */
 export function deserializeLayout(raw: unknown): StoredLayout | null {
   if (raw === null || typeof raw !== 'object') return null;
@@ -122,7 +133,7 @@ export function deserializeLayout(raw: unknown): StoredLayout | null {
       const t = rt as Record<string, unknown>;
       tiles.push({
         path: typeof t.path === 'string' ? t.path : null,
-        mode: isEditorMode(t.mode) ? t.mode : DEFAULT_MODE,
+        mode: migrateEditorMode(t.mode),
         weight: coerceWeight(t.weight),
       });
     }

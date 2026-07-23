@@ -28,9 +28,8 @@ test('clicking an external link opens it externally, not in-app', async ({ page 
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('An external link is never treated as broken');
 
-  // Reading mode makes the whole link clickable (parity with the read-mode spec).
-  await page.getByTestId('editor-mode-view').click();
-  await expect(page.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
+  // Read (the default) makes the whole link clickable (parity with the read-mode spec).
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
 
   const link = editor.locator('.cm-atomic-link', { hasText: 'Example' }).first();
   const box = await link.boundingBox();

@@ -2,7 +2,7 @@ import { backend } from '$lib/ipc';
 import { createDebouncer } from '$lib/debounce';
 import { remapPaths } from '$lib/path';
 import { DEFAULT_EDITOR_MODE, type EditorMode } from '$lib/editor/cm';
-import type { StoredLayout } from '$lib/state/layoutPersist';
+import { migrateEditorMode, type StoredLayout } from '$lib/state/layoutPersist';
 import type { BundleState } from '$lib/types';
 import type { RegionId } from '$lib/regionGrid';
 import { flagsToClearOnEnter } from '$lib/transientReveal';
@@ -85,10 +85,11 @@ class SessionStore {
    */
   propertiesShown = $state<boolean>(false);
   /**
-   * Editor view mode (persist-editor-mode). Seeds `buildEditor`'s `initialMode`
-   * on launch and is written through `setEditorMode` when the user toggles the
-   * NavBar control, so the Source / Live / Reading choice survives a relaunch.
-   * Defaults to `DEFAULT_EDITOR_MODE` ('hybrid'/Live) on a fresh/older Bundle.
+   * Editor view mode (persist-editor-mode) — the boolean `editing`/`read` shared
+   * by every tile. Seeds `buildEditor`'s `initialMode` on launch and is written
+   * through `setEditorMode` when the user toggles the per-tile Edit button, so the
+   * choice survives a relaunch. Defaults to `DEFAULT_EDITOR_MODE` (`read`) on a
+   * fresh/older Bundle. Legacy tri-state values migrate on read (see `load`).
    */
   editorMode = $state<EditorMode>(DEFAULT_EDITOR_MODE);
   /**
@@ -162,7 +163,9 @@ class SessionStore {
       this.outlineOpen = state.outlineOpen ?? true;
       // Global Properties toggle defaults to HIDDEN (`false`) when absent.
       this.propertiesShown = state.propertiesShown ?? false;
-      this.editorMode = state.editorMode ?? DEFAULT_EDITOR_MODE;
+      // Migrate the legacy tri-state ('edit'/'hybrid'/'view') to the boolean
+      // 'editing'/'read'; an absent value defaults to 'read'.
+      this.editorMode = migrateEditorMode(state.editorMode);
       // The full tiling layout (null on a fresh/old Bundle — App migrates from
       // `lastOpenConcept` then). Carried as the raw stored value; validation +
       // migration + corrupt-fallback happen in `resolveStoredLayout` at restore.

@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `EditorMode`'s three-way union is collapsed to a boolean `editing` (or equivalent) across the CodeMirror engine, session store, workspace/Tile model, and layout persistence; the `edit`/source branch and its decorations-off early return are removed.
 - [ ] Default state for a freshly opened concept is **read** (non-editing).
