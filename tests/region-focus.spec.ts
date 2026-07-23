@@ -53,7 +53,7 @@ test('Region focus: directional movement, sticky landing, Escape→Editor', asyn
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
 
   // Reveal the right Sidebar so Outline + Backlinks Regions become visible.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
   await expect(page.getByTestId('backlinks')).toBeVisible();
 

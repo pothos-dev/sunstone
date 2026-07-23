@@ -6,6 +6,7 @@ import { migrateEditorMode, type StoredLayout } from '$lib/state/layoutPersist';
 import type { BundleState } from '$lib/types';
 import type { RegionId } from '$lib/regionGrid';
 import { flagsToClearOnEnter } from '$lib/transientReveal';
+import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
 
 /**
  * Per-Bundle session state (slice: config-theme-state-store).
@@ -67,6 +68,16 @@ class SessionStore {
    */
   rightSidebarOpen = $state<boolean>(false);
   /**
+   * Persisted sidebar WIDTHS in CSS pixels (slice: edge-sidebars-delete-navbar).
+   * Each sidebar's border is a drag handle that resizes it; the chosen width is
+   * remembered across sessions here (the collapse flags above still gate whether
+   * the sidebar is shown — collapsing preserves the width for re-expand rather
+   * than persisting 0). Seeded from the stored value (clamped) or the shared
+   * default on a fresh/older Bundle, and written through the setters below.
+   */
+  leftSidebarWidth = $state<number>(DEFAULT_SIDEBAR_WIDTH);
+  rightSidebarWidth = $state<number>(DEFAULT_SIDEBAR_WIDTH);
+  /**
    * Outline section collapse state (outline-section). Defaults to `true`
    * (expanded) so the Outline shows the moment the right Sidebar is first
    * expanded — matching the left-Sidebar Sections' fresh-Bundle default.
@@ -74,7 +85,7 @@ class SessionStore {
   outlineOpen = $state<boolean>(true);
   /**
    * GLOBAL Properties show/hide flag (slice: multi-concept-tiling). A single
-   * app-wide preference driven by the NavBar Properties toggle: when `true`,
+   * app-wide preference driven by the concept-header Properties toggle: when `true`,
    * EVERY visible tile renders its own Concept's frontmatter inline; when
    * `false` (the fresh/older-Bundle DEFAULT), no tile shows any Properties
    * chrome at all (zero height cost). Persisted via `setPropertiesShown` so the
@@ -174,6 +185,10 @@ class SessionStore {
       // The right Sidebar defaults to COLLAPSED (`false`) when absent — a fresh
       // or older Bundle opens with the right Sidebar hidden.
       this.rightSidebarOpen = state.rightSidebarOpen ?? false;
+      // Sidebar widths default to the shared default when absent; a stored value
+      // is clamped on read so a corrupt/out-of-range width can't wedge the layout.
+      this.leftSidebarWidth = clampSidebarWidth(state.leftSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
+      this.rightSidebarWidth = clampSidebarWidth(state.rightSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
       this.#window = state.window;
     } catch {
       // Best-effort: a failed load just means no session to restore.
@@ -283,6 +298,22 @@ class SessionStore {
   setRightSidebarOpen(open: boolean): void {
     if (open === this.rightSidebarOpen) return;
     this.rightSidebarOpen = open;
+    this.#scheduleSave();
+  }
+
+  /** Record the left Sidebar's pixel width (clamped) and schedule a persist. */
+  setLeftSidebarWidth(width: number): void {
+    const next = clampSidebarWidth(width);
+    if (next === this.leftSidebarWidth) return;
+    this.leftSidebarWidth = next;
+    this.#scheduleSave();
+  }
+
+  /** Record the right Sidebar's pixel width (clamped) and schedule a persist. */
+  setRightSidebarWidth(width: number): void {
+    const next = clampSidebarWidth(width);
+    if (next === this.rightSidebarWidth) return;
+    this.rightSidebarWidth = next;
     this.#scheduleSave();
   }
 
@@ -408,6 +439,8 @@ class SessionStore {
       tagsOpen: this.tagsOpen,
       backlinksOpen: this.backlinksOpen,
       rightSidebarOpen: this.rightSidebarOpen,
+      leftSidebarWidth: this.leftSidebarWidth,
+      rightSidebarWidth: this.rightSidebarWidth,
       outlineOpen: this.outlineOpen,
       propertiesShown: this.propertiesShown,
       editorMode: this.editorMode,

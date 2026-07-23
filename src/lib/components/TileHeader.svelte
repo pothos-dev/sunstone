@@ -49,6 +49,13 @@
     onExportPdf: () => void;
     /** Toggle live editing on/off for this Concept. */
     onToggleEditing: () => void;
+    /** Whether the (concept-scoped) Properties panel is shown. */
+    propertiesShown: boolean;
+    /**
+     * Toggle the Properties panel for the open Concept's frontmatter. Drives the
+     * shared `session.propertiesShown` flag (moved here from the deleted NavBar).
+     */
+    onToggleProperties: () => void;
   }
 
   let {
@@ -73,6 +80,8 @@
     onToggleReview,
     onExportPdf,
     onToggleEditing,
+    propertiesShown,
+    onToggleProperties,
   }: Props = $props();
 </script>
 
@@ -129,6 +138,28 @@
         aria-hidden="true"
       >
         <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+      </svg>
+    </button>
+
+    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline
+         (concept-scoped). Moved here from the deleted NavBar; drives the shared
+         `session.propertiesShown` flag. -->
+    <button
+      type="button"
+      class="icon-btn"
+      class:active={propertiesShown}
+      data-testid="properties-toggle"
+      title={propertiesShown ? 'Hide Properties' : 'Show Properties'}
+      aria-label="Properties"
+      aria-pressed={propertiesShown}
+      onclick={onToggleProperties}
+    >
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <!-- sliders glyph: two horizontal rails with knobs (properties/settings). -->
+        <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
+        <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
       </svg>
     </button>
 

@@ -67,7 +67,7 @@ async function clickWikiLink(page: Page, target: string, text: string): Promise<
 
 /** Expand the right Sidebar (idempotent) so Backlinks is interactable. */
 async function expandRightSidebar(page: Page): Promise<void> {
-  const toggle = page.getByTestId('right-sidebar-toggle');
+  const toggle = page.getByTestId('right-sidebar-edge');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
 }
 

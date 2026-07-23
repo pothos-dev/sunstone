@@ -34,7 +34,7 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
   // The right Sidebar starts collapsed; expand it via the nav-bar toggle. We
   // assert collapsed/expanded via the aside's rendered width (the clipped inner
   // is still "visible" to Playwright), not DOM visibility.
-  const rightToggle = page.getByTestId('right-sidebar-toggle');
+  const rightToggle = page.getByTestId('right-sidebar-edge');
   const rightAside = page.getByTestId('right-side-bar');
   await expect(rightToggle).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => (await rightAside.boundingBox())?.width).toBe(0);
@@ -127,7 +127,7 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
 
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
-  await expect(page.getByTestId('right-sidebar-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('right-sidebar-edge')).toHaveAttribute('aria-pressed', 'true');
   // Collapsed Outline: the header is present but its body is not rendered.
   await expect(page.getByTestId('outline-section-header')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByTestId('outline')).toHaveCount(0);

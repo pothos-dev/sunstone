@@ -61,7 +61,7 @@ test('editor grid: Alt+arrow moves across columns/tiles, delegates at edges, sti
   await page.getByTestId('edit-toggle').click();
 
   // Reveal the right Sidebar so the rightmost-edge delegation has a target.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
   await expect(page.getByTestId('backlinks')).toBeVisible();
 

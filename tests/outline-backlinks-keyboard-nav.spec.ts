@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 /** Expand the right Sidebar (idempotent) so Outline + Backlinks are interactable. */
 async function expandRightSidebar(page: Page) {
-  const toggle = page.getByTestId('right-sidebar-toggle');
+  const toggle = page.getByTestId('right-sidebar-edge');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
 }
 

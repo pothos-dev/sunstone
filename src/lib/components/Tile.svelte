@@ -668,6 +668,8 @@
     onToggleReview={toggleReview}
     onExportPdf={exportPdf}
     onToggleEditing={() => session.setEditorMode(editing ? 'read' : 'editing')}
+    propertiesShown={session.propertiesShown}
+    onToggleProperties={() => session.setPropertiesShown(!session.propertiesShown)}
   />
 
   {#if tile.error}

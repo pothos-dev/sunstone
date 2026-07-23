@@ -42,7 +42,7 @@ async function twoTiles(page: Page) {
   await expect(page.getByTestId('editor').first()).toContainText('CodeMirror 6 is the editor core');
 
   // Reveal the right Sidebar so Outline + Backlinks are on screen.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
 
   // Split into a second tile, then open bundle.md in it (the split leaves the new
@@ -71,8 +71,10 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   // Default HIDDEN: no Properties chrome in either tile.
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // Toggle ON: BOTH tiles render their OWN Concept's frontmatter inline.
-  await page.getByTestId('properties-panel-toggle').click();
+  // Toggle ON: BOTH tiles render their OWN Concept's frontmatter inline. The
+  // Properties toggle now lives in EACH tile's header (one per tile), so target
+  // the first — it drives the shared global flag for every tile.
+  await page.getByTestId('properties-toggle').first().click();
   await expect(page.getByTestId('properties')).toHaveCount(2);
   await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
   await expect(tile1.getByTestId('scalar-title')).toHaveValue('Bundle');
@@ -98,7 +100,7 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
 
   // Toggle OFF: NO tile shows any Properties chrome.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').first().click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 });
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (the concept header must already exist as Properties' new home and the mode control must be gone), 02 (both restructure the App shell grid).
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Each sidebar's border is a click target that collapses/expands that sidebar.
 - [ ] Each sidebar's border is draggable to resize; widths persist across sessions (new width state added to the session store + bundle-state config, mirroring the existing `*Open` pattern).

@@ -48,8 +48,8 @@ test('activity rail: icons open QuickNav / SearchPanel and rail survives sidebar
 
   // Collapsing the left Sidebar (via the NavBar toggle) hides the Sidebar but the
   // rail — which lives outside it — stays visible.
-  await page.getByTestId('sidebar-toggle').click();
-  await expect(page.getByTestId('sidebar-toggle')).toHaveAttribute('aria-pressed', 'false');
+  await page.getByTestId('left-sidebar-edge').click();
+  await expect(page.getByTestId('left-sidebar-edge')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('side-bar')).not.toBeVisible();
   await expect(rail).toBeVisible();
 

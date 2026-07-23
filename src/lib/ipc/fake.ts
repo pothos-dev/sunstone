@@ -640,6 +640,10 @@ function loadFakeBundleState(): BundleState {
       // Right Sidebar collapse flag: passed through untouched (undefined when
       // absent, which the session store defaults to `false` on read).
       rightSidebarOpen: parsed.rightSidebarOpen,
+      // Sidebar widths: passed through untouched (undefined when absent, which the
+      // session store defaults + clamps on read).
+      leftSidebarWidth: parsed.leftSidebarWidth,
+      rightSidebarWidth: parsed.rightSidebarWidth,
       // Outline section collapse flag: passed through untouched (undefined when
       // absent, which the session store defaults to `true` on read).
       outlineOpen: parsed.outlineOpen,

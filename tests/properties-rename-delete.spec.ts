@@ -27,7 +27,7 @@ test('properties: rename key commits on blur and persists', async ({ page }) => 
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties is hidden by default now (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await page.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -50,7 +50,7 @@ test('properties: rename reverts on empty and on duplicate', async ({ page }) =>
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties is hidden by default now (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await page.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -75,7 +75,7 @@ test('properties: delete a property persists the removal', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties is hidden by default now (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await page.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -98,7 +98,7 @@ test('properties: deleting the last property drops the frontmatter block', async
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties is hidden by default now (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await page.locator('[data-path="concepts/bundle.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -125,7 +125,7 @@ test('properties: renaming a complex/unknown key preserves the value', async ({
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties is hidden by default now (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await page.locator('[data-path="concepts/complex-frontmatter.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 

@@ -31,7 +31,7 @@ test('unified undo: body then property undo/redo in reverse order', async ({ pag
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
 
   const editor = page.getByTestId('editor');
@@ -76,7 +76,7 @@ test('unified undo: Ctrl+Z works with focus in a Properties input', async ({ pag
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -101,7 +101,7 @@ test('unified undo: switching Concepts resets history', async ({ page }) => {
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -135,7 +135,7 @@ test('unified undo: panel buttons work and disable at stack ends', async ({ page
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
 

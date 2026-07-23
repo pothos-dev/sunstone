@@ -32,7 +32,7 @@ test('right sidebar starts collapsed, expands to reveal Backlinks, and persists'
   // The aside animates its width to 0 and clips its content (which keeps its
   // width and slides out), so we assert the rendered width rather than DOM
   // visibility (the clipped inner is still "visible" to Playwright).
-  const rightToggle = page.getByTestId('right-sidebar-toggle');
+  const rightToggle = page.getByTestId('right-sidebar-edge');
   const rightAside = page.getByTestId('right-side-bar');
   await expect(rightToggle).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => (await rightAside.boundingBox())?.width).toBe(0);
@@ -71,6 +71,6 @@ test('right sidebar starts collapsed, expands to reveal Backlinks, and persists'
   // RELOAD: the right Sidebar stays EXPANDED (Backlinks visible).
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
-  await expect(page.getByTestId('right-sidebar-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('right-sidebar-edge')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('backlinks')).toBeVisible();
 });

@@ -41,10 +41,10 @@ for (const scheme of ['light', 'dark'] as const) {
 
     // Properties is hidden by default (global toggle); switch it on so the
     // frontmatter panel appears in the marketing shot.
-    await page.getByTestId('properties-panel-toggle').click();
+    await page.getByTestId('properties-toggle').click();
 
     // Expand the right Sidebar (starts collapsed) so Backlinks is on screen.
-    const rightToggle = page.getByTestId('right-sidebar-toggle');
+    const rightToggle = page.getByTestId('right-sidebar-edge');
     const rightAside = page.getByTestId('right-side-bar');
     if ((await rightToggle.getAttribute('aria-pressed')) !== 'true') {
       await rightToggle.click();

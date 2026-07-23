@@ -61,6 +61,12 @@ pub struct BundleState {
     /// (outline-section). Defaults to `true` on the frontend — the Outline shows
     /// the moment the right Sidebar is first expanded.
     pub outline_open: Option<bool>,
+    /// Persisted sidebar WIDTHS in CSS pixels (edge-sidebars-delete-navbar). Each
+    /// sidebar's border is a drag handle; the chosen width is remembered here.
+    /// Optional so older files tolerate their absence; the frontend defaults them
+    /// to the shared default (280) and clamps to a sane range on read.
+    pub left_sidebar_width: Option<f64>,
+    pub right_sidebar_width: Option<f64>,
     /// Whether the Properties panel (editor-pane chrome) is expanded
     /// (persist-properties-collapse). Defaults to `true` on the frontend — a
     /// fresh/older Bundle opens with the panel expanded; the header chevron then
@@ -360,14 +366,20 @@ mod tests {
         let state = BundleState {
             properties_shown: Some(true),
             layout: Some(layout.clone()),
+            left_sidebar_width: Some(320.0),
+            right_sidebar_width: Some(240.0),
             ..Default::default()
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("propertiesShown"));
         assert!(json.contains("layout"));
+        assert!(json.contains("leftSidebarWidth"));
+        assert!(json.contains("rightSidebarWidth"));
         let back: BundleState = serde_json::from_str(&json).unwrap();
         assert_eq!(back.properties_shown, Some(true));
         assert_eq!(back.layout, Some(layout));
+        assert_eq!(back.left_sidebar_width, Some(320.0));
+        assert_eq!(back.right_sidebar_width, Some(240.0));
     }
 
     #[test]

@@ -32,7 +32,7 @@ function persisted(page: Page, path: string): Promise<string> {
 async function open(page: Page, path: string) {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await page.locator(`[data-path="${path}"]`).click();
   await expect(page.getByTestId('properties')).toBeVisible();
 }
