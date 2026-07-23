@@ -64,12 +64,8 @@
   import { diffToCriticMarkup } from '$lib/diff/diffToCriticMarkup';
   import { reviewAvailability } from '$lib/editor/review';
   import { reviewStep, maxStep } from '$lib/editor/reviewStepper';
-  import {
-    splitFrontmatter,
-    parseProperties,
-    frontmatterLineCount,
-    type Property,
-  } from '$lib/frontmatter';
+  import { parseProperties, type Property } from '$lib/frontmatter';
+  import { splitFrontmatter, frontmatterLineCount } from '$lib/wasm/exports';
   import { findHeadingLine } from '$lib/outline';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';

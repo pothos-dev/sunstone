@@ -14,11 +14,10 @@
 // outline are populated minimally from the shared helpers.
 
 import type { RenderPayload, OutlineHeading } from '$lib/types';
-import { splitFrontmatter } from '$lib/frontmatter';
+import { splitFrontmatter, parseFrontmatterFields } from '$lib/wasm/exports';
 import { slugifyHeadings } from '$lib/slug';
 import { parseCriticMarks, type CriticMark } from '$lib/editor/criticMarkup';
 import { findCitationRefs } from '$lib/citations';
-import { parseFrontmatterFields } from './frontmatter';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
 export function renderConcept(content: string): RenderPayload {

@@ -11,6 +11,7 @@
 //! depends on it and re-points its call sites here; `sunstone-wasm` wraps it
 //! for the browser frontend.
 
+pub mod frontmatter;
 pub mod links;
 pub mod paths;
 pub mod rewrite;

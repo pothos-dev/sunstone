@@ -16,7 +16,7 @@
 
 import type { RewriteSummary } from '$lib/types';
 import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './linkResolve';
-import { splitFrontmatter } from '$lib/frontmatter';
+import { splitFrontmatter } from '$lib/wasm/exports';
 import { FILES, conceptPaths } from './store';
 
 /**

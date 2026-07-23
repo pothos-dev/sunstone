@@ -1,0 +1,10 @@
+# `bun test` configuration.
+#
+# ADR 0006 §7: the unit suites exercise the pure algorithm kernels that migrated
+# into wasm (family 11+) by byte-loading the SHIPPING `--target web` `pkg/` once,
+# up front — "tested = shipped". The preload instantiates the wasm module
+# synchronously and registers it for the free-export wrappers, so synchronous
+# consumers (property model, outline, fake backend) resolve against real wasm.
+# Requires `bun run build:wasm` first (the gate order guarantees it).
+[test]
+preload = ["./src/lib/wasm/bunTestSetup.ts"]

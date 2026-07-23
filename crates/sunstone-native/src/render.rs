@@ -34,8 +34,9 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::bundle;
-use crate::index::frontmatter::{frontmatter_block, strip_frontmatter};
+use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
+use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
 use sunstone_shared::paths::{is_external, resolve_internal};
 use sunstone_shared::slug::slugify;
 use sunstone_shared::wikilink::{self, parse_target};
@@ -52,15 +53,6 @@ pub struct RenderPayload {
     pub frontmatter: Vec<FrontmatterField>,
     /// Headings in document order (frontmatter + fenced code excluded).
     pub outline: Vec<OutlineHeading>,
-}
-
-/// One frontmatter entry for the read-only Properties view. A scalar has a
-/// single value; a sequence (e.g. `tags`) has several.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FrontmatterField {
-    pub key: String,
-    pub values: Vec<String>,
 }
 
 /// One outline heading: level (1–6), text, and its de-duplicated GitHub slug.
@@ -608,49 +600,7 @@ fn substitute_citation_sentinels(html: &str, repls: &[String]) -> String {
     .into_owned()
 }
 
-// --- Frontmatter + outline --------------------------------------------------
-
-fn frontmatter_fields(content: &str) -> Vec<FrontmatterField> {
-    let Some(block) = frontmatter_block(content) else {
-        return Vec::new();
-    };
-    let value: serde_yaml::Value = match serde_yaml::from_str(block) {
-        Ok(v) => v,
-        Err(_) => return Vec::new(),
-    };
-    let Some(map) = value.as_mapping() else {
-        return Vec::new();
-    };
-    // serde_yaml::Mapping preserves insertion order.
-    map.iter()
-        .filter_map(|(k, v)| {
-            k.as_str().map(|key| FrontmatterField {
-                key: key.to_string(),
-                values: yaml_values(v),
-            })
-        })
-        .collect()
-}
-
-fn yaml_values(v: &serde_yaml::Value) -> Vec<String> {
-    match v {
-        serde_yaml::Value::Sequence(seq) => seq.iter().map(scalar_string).collect(),
-        _ => vec![scalar_string(v)],
-    }
-}
-
-fn scalar_string(v: &serde_yaml::Value) -> String {
-    match v {
-        serde_yaml::Value::String(s) => s.clone(),
-        serde_yaml::Value::Bool(b) => b.to_string(),
-        serde_yaml::Value::Number(n) => n.to_string(),
-        serde_yaml::Value::Null => String::new(),
-        other => serde_yaml::to_string(other)
-            .unwrap_or_default()
-            .trim()
-            .to_string(),
-    }
-}
+// --- Outline ----------------------------------------------------------------
 
 /// De-duplicate heading slugs in document order (`notes`, `notes-1`, …), the
 /// same rule as the desktop `slugifyHeadings`.

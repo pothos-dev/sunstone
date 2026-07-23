@@ -14,7 +14,7 @@
 // Kept dependency-free of Svelte/CodeMirror so the scan is a pure function over
 // a markdown string.
 
-import { frontmatterLineCount, splitFrontmatter } from './frontmatter';
+import { frontmatterLineCount, splitFrontmatter } from '$lib/wasm/exports';
 import { slugify, slugifyHeadings } from './slug';
 
 /** One outline entry: a markdown heading in document order. */

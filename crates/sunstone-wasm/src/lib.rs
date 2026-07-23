@@ -15,6 +15,9 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
+use sunstone_shared::frontmatter::{
+    self, FrontmatterField, IndexFrontmatter, SplitConcept,
+};
 use sunstone_shared::wikilink::resolve_wikilink;
 use sunstone_shared::{
     find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, ResolvedLink, RewriteBody,
@@ -106,4 +109,47 @@ impl BundleIndex {
         );
         RewriteBody { content }
     }
+}
+
+// --- Free frontmatter exports (ADR 0006 §3, family 11) ----------------------
+//
+// Handle-less, per-call kernels (content-in / struct-out). `splitFrontmatter`
+// slices a Concept into verbatim open/yaml/close/body so byte-preservation
+// holds; the parse exports surface the index aggregates the fake backend twins
+// natively. All delegate to the single source in `sunstone_shared::frontmatter`.
+
+/// Split raw Concept markdown into its leading frontmatter block + body
+/// (verbatim slices, so an unchanged document recombines byte-for-byte).
+#[wasm_bindgen(js_name = splitFrontmatter)]
+pub fn split_frontmatter(content: String) -> SplitConcept {
+    frontmatter::split_concept(&content)
+}
+
+/// Number of leading lines the frontmatter block occupies (0 when none) — the
+/// full-document ↔ body-relative line offset the editor applies.
+#[wasm_bindgen(js_name = frontmatterLineCount)]
+pub fn frontmatter_line_count(content: String) -> usize {
+    frontmatter::frontmatter_line_count(&content)
+}
+
+/// The `type` scalar + `tags` flat list from a Concept's frontmatter.
+#[wasm_bindgen(js_name = parseFrontmatter)]
+pub fn parse_frontmatter(content: String) -> IndexFrontmatter {
+    let p = frontmatter::parse_frontmatter(&content);
+    IndexFrontmatter {
+        concept_type: p.concept_type,
+        tags: p.tags,
+    }
+}
+
+/// The distinct top-level frontmatter keys of a Concept.
+#[wasm_bindgen(js_name = parseFrontmatterKeys)]
+pub fn parse_frontmatter_keys(content: String) -> Vec<String> {
+    frontmatter::parse_frontmatter(&content).keys
+}
+
+/// Every top-level frontmatter entry as `key` + value(s), in document order.
+#[wasm_bindgen(js_name = parseFrontmatterFields)]
+pub fn parse_frontmatter_fields(content: String) -> Vec<FrontmatterField> {
+    frontmatter::frontmatter_fields(&content)
 }

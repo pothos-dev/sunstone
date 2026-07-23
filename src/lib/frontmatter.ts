@@ -12,11 +12,15 @@
 // simple values are normalized, not preserved byte-for-byte.
 //
 // Kept dependency-free of the IPC seam: operates purely on raw markdown strings.
-// `splitFrontmatter` / `parseProperties` split a Concept into body + properties;
-// `serializeFrontmatter` / `joinConcept` recombine them.
+// `parseProperties` splits a Concept into properties (via the wasm-free
+// `splitFrontmatter`, ADR 0006 §11-B) and classifies them per ADR 0003;
+// `serializeFrontmatter` / `joinConcept` recombine them with a body.
 
 import { parseDocument, isScalar, isSeq, isMap, isNode, Scalar, type Document } from 'yaml';
 import { basename, stripMd } from './path';
+// `splitFrontmatter` is now a pure wasm FREE export (ADR 0006 §11-B); the
+// property model consumes it on Concept-load. Single source — no TS twin.
+import { splitFrontmatter } from '$lib/wasm/exports';
 
 /** Classification of a top-level frontmatter value (ADR 0003). */
 export type PropertyKind = 'scalar' | 'list' | 'complex';
@@ -46,85 +50,6 @@ export interface Property {
    * byte-for-byte (ADR 0003).
    */
   entry?: string;
-}
-
-/** Result of splitting a Concept into its frontmatter block and body. */
-export interface SplitConcept {
-  /** True when a leading `---\n ... \n---` block is present. */
-  hasFrontmatter: boolean;
-  /** The YAML text BETWEEN the delimiters (no `---` lines). '' when none. */
-  yaml: string;
-  /**
-   * The body, including the line break that follows the closing `---`.
-   * Preserved byte-for-byte. For a Concept with no frontmatter, this is the
-   * whole content.
-   */
-  body: string;
-  /** Exact opening delimiter line incl. trailing newline, e.g. `---\n`. */
-  open: string;
-  /** Exact closing delimiter incl. its trailing newline, e.g. `---\n`. */
-  close: string;
-}
-
-/**
- * Split raw markdown into a leading YAML frontmatter block and the body.
- *
- * A frontmatter block is a `---` line at the very start of the file, the YAML
- * up to the next line that is exactly `---` (or `...`), then the body. The
- * delimiters and body are captured verbatim so an unchanged document recombines
- * byte-for-byte.
- */
-export function splitFrontmatter(content: string): SplitConcept {
-  // The opening fence must be the first line and exactly `---` (optionally with
-  // trailing spaces, tolerated). Allow a leading BOM-free start only.
-  const fenceRe = /^---[ \t]*\r?\n/;
-  const openMatch = fenceRe.exec(content);
-  if (!openMatch) {
-    return { hasFrontmatter: false, yaml: '', body: content, open: '', close: '' };
-  }
-  const open = openMatch[0];
-  const afterOpen = open.length;
-
-  // Find the closing fence: a line that is exactly `---` or `...`. Scan line by
-  // line so the fence is only recognised at the start of its own line.
-  const lines = content.slice(afterOpen).split(/(?<=\n)/);
-  let consumed = afterOpen;
-  let yaml = '';
-  let close = '';
-  let closed = false;
-  for (const line of lines) {
-    const trimmed = line.replace(/\r?\n$/, '').trimEnd();
-    if (trimmed === '---' || trimmed === '...') {
-      close = line;
-      consumed += line.length;
-      closed = true;
-      break;
-    }
-    yaml += line;
-    consumed += line.length;
-  }
-
-  if (!closed) {
-    // No closing fence — treat the whole thing as body (not valid frontmatter).
-    return { hasFrontmatter: false, yaml: '', body: content, open: '', close: '' };
-  }
-
-  const body = content.slice(consumed);
-  return { hasFrontmatter: true, yaml, body, open, close };
-}
-
-/**
- * Number of leading lines the frontmatter block occupies (0 when none). The
- * editor view holds only the BODY (frontmatter is split off, ADR 0003), so this
- * is the offset between a full-document line number (e.g. an Outline entry) and
- * the body-relative line CodeMirror addresses. Inverse of the offset that
- * `scanHeadings` adds.
- */
-export function frontmatterLineCount(content: string): number {
-  const { hasFrontmatter, open, yaml, close } = splitFrontmatter(content);
-  if (!hasFrontmatter) return 0;
-  const newlines = (s: string) => (s.match(/\n/g) ?? []).length;
-  return newlines(open) + newlines(yaml) + newlines(close);
 }
 
 /**

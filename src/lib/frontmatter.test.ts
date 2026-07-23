@@ -3,39 +3,19 @@
 // including verbatim round-tripping of complex entries and key renaming.
 import { describe, expect, test } from 'bun:test';
 import {
-  frontmatterLineCount,
   isTypeMissing,
   joinConcept,
   parseProperties,
   renameProperty,
   scaffoldConcept,
   serializeFrontmatter,
-  splitFrontmatter,
   titleFromFilename,
   type Property,
 } from './frontmatter';
-
-describe('splitFrontmatter', () => {
-  test('no frontmatter: whole content is body', () => {
-    const r = splitFrontmatter('just a body\n');
-    expect(r.hasFrontmatter).toBe(false);
-    expect(r.body).toBe('just a body\n');
-  });
-
-  test('unterminated block is not treated as frontmatter', () => {
-    const r = splitFrontmatter('---\ntype: x\nno close here\n');
-    expect(r.hasFrontmatter).toBe(false);
-  });
-
-  test('captures delimiters and body verbatim', () => {
-    const r = splitFrontmatter('---\ntype: note\n---\nBody\n');
-    expect(r.hasFrontmatter).toBe(true);
-    expect(r.yaml).toBe('type: note\n');
-    expect(r.open).toBe('---\n');
-    expect(r.close).toBe('---\n');
-    expect(r.body).toBe('Body\n');
-  });
-});
+// `splitFrontmatter` migrated to a wasm FREE export (ADR 0006 §11-B); the kept
+// property-model round-trip tests consume it from the shared source. Its own
+// goldens moved to `sunstone-shared` (cargo).
+import { splitFrontmatter } from '$lib/wasm/exports';
 
 describe('parseProperties', () => {
   test('classifies scalars, lists, and missing type', () => {
@@ -110,20 +90,6 @@ describe('serializeFrontmatter / joinConcept round-trip', () => {
     const { body } = splitFrontmatter(content);
     const props = parseProperties(content);
     expect(joinConcept(props, body)).toBe(content);
-  });
-});
-
-describe('frontmatterLineCount', () => {
-  test('counts the leading frontmatter lines, 0 when none', () => {
-    expect(frontmatterLineCount('# just body\nmore\n')).toBe(0);
-    expect(frontmatterLineCount('---\ntype: x\n---\nbody\n')).toBe(3);
-    expect(frontmatterLineCount('---\ntype: x\ntitle: y\n---\nbody\n')).toBe(4);
-  });
-
-  test('is the inverse of the offset scanHeadings adds', () => {
-    // A body H1 on the first body line maps to full-doc line offset+1.
-    const content = '---\ntype: x\n---\n# H1\n';
-    expect(frontmatterLineCount(content)).toBe(3);
   });
 });
 

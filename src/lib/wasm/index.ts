@@ -1,5 +1,7 @@
 import { browser } from '$app/environment';
 
+import { setWasmModule } from './exports';
+
 // Type-only imports of the wasm-pack `--target web` output. These erase at
 // build time, so importing this loader never drags `pkg/` into the SSR graph —
 // the real module only enters via the browser-guarded dynamic `import()` below.
@@ -28,11 +30,15 @@ async function loadWasm(): Promise<WasmModule | null> {
     // wasm-pack `--target web`: the default export is the async `init()` that
     // fetches + instantiates the module; exports are usable synchronously after.
     await mod.default();
+    // Register the module so the synchronous free-export wrappers (`./exports`)
+    // can reach it — the handle-less analogue of building the `BundleIndex`.
+    setWasmModule(mod);
     return mod;
   } catch (err) {
     // Load/instantiate failed: degrade silently to the TS path. Never throw —
     // a null handle keeps decorations styling as a no-op instead of a dead page.
     console.error('[wasm] init failed; degrading to the TS-only path', err);
+    setWasmModule(null);
     return null;
   }
 }

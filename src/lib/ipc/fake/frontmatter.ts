@@ -1,97 +1,11 @@
-// YAML frontmatter parsing for the in-memory fake backend's index.
+// Test-only frontmatter affordance for the in-memory fake backend.
 //
-// The fake's Bundle index must mirror the Rust `index.rs` `parse_frontmatter`:
-// it extracts `type` (a scalar), `tags` (a flat sequence of scalars), and the
-// distinct top-level keys from a Concept's leading `---` block. The Rust side
-// uses a real YAML parser (`serde_yaml`); to stay behaviourally faithful, the
-// fake parses with the same `yaml` package the Properties panel uses, rather
-// than ad-hoc regexes. This makes quoted YAML (`tags: ["a","b"]`, quoted keys,
-// quoted scalars) parse identically to the real backend.
-//
-// Tolerates missing/invalid frontmatter: returns empty results rather than
-// throwing (broken Concepts are never blocked).
-
-import { parse } from 'yaml';
-import { splitFrontmatter } from '$lib/frontmatter';
-import type { FrontmatterField } from '$lib/types';
-
-/** Parse the top-level YAML mapping of a Concept's frontmatter, or null. */
-function parseMapping(content: string): Record<string, unknown> | null {
-  const { hasFrontmatter, yaml } = splitFrontmatter(content);
-  if (!hasFrontmatter) return null;
-  let value: unknown;
-  try {
-    value = parse(yaml);
-  } catch {
-    return null;
-  }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-/** Parse `type` (scalar) and `tags` (flat list) from frontmatter. */
-export function parseFrontmatter(content: string): { type: string | null; tags: string[] } {
-  const map = parseMapping(content);
-  if (map === null) return { type: null, tags: [] };
-
-  // `type`: a non-empty string scalar; anything else (missing, empty, non-scalar)
-  // is treated as absent, matching the Rust `.as_str().filter(|s| !s.is_empty())`.
-  let type: string | null = null;
-  const rawType = map['type'];
-  if (typeof rawType === 'string' && rawType !== '') type = rawType;
-
-  // `tags`: a sequence; keep only its string items (Rust `as_str` filter_map).
-  const tags: string[] = [];
-  const rawTags = map['tags'];
-  if (Array.isArray(rawTags)) {
-    for (const t of rawTags) {
-      if (typeof t === 'string') tags.push(t);
-    }
-  }
-  return { type, tags };
-}
-
-/**
- * Frontmatter entries in document order, as the render payload's read-only
- * Properties view wants them: each top-level key with its value(s) (a scalar →
- * one value, a sequence → several). Mirrors the Rust `frontmatter_fields` in
- * `render.rs`; the `yaml` parse preserves mapping insertion order like
- * `serde_yaml`. Returns `[]` when there is no valid block.
- */
-export function parseFrontmatterFields(content: string): FrontmatterField[] {
-  const map = parseMapping(content);
-  if (map === null) return [];
-  return Object.entries(map).map(([key, value]) => ({ key, values: yamlValues(value) }));
-}
-
-/** A YAML value → its scalar string form(s): a sequence yields several. */
-function yamlValues(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(scalarString) : [scalarString(value)];
-}
-
-/** Stringify a scalar YAML value the way the Rust `scalar_string` does. */
-function scalarString(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  // Nested map / non-flat sequence: a compact readable form (rare in fixtures).
-  return JSON.stringify(value);
-}
-
-/**
- * Distinct top-level frontmatter keys of a Concept (e.g. `type`, `title`,
- * `nested`). Mirrors the Rust `parse_frontmatter` key collection: the string
- * keys of the top-level mapping. Returns `[]` when there is no valid block.
- */
-export function parseFrontmatterKeys(content: string): string[] {
-  const map = parseMapping(content);
-  if (map === null) return [];
-  return Object.keys(map);
-}
+// The index-parse kernels (`parseFrontmatter` / `parseFrontmatterFields` /
+// `parseFrontmatterKeys`) migrated to the shared wasm source in family 11 (ADR
+// 0006 §11-A) — the fake now consumes them via `$lib/wasm/exports`. What stays
+// here is the line-based `stripTagsFromFrontmatter` (ADR 0006 §11-D), a fake
+// stand-in with no Rust twin; its final disposition belongs with the rest of
+// the fake stand-ins in family 12.
 
 /**
  * Remove a `tags:` entry — an inline `[...]` value or a block list of `- item`

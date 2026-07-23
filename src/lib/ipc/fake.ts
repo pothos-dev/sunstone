@@ -26,11 +26,10 @@ import { buildTree, renameInternal, deleteInternal } from './fake/tree';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { rewriteAnchorsIn } from './fake/anchorRewrite';
-import {
-  parseFrontmatter,
-  parseFrontmatterKeys,
-  stripTagsFromFrontmatter,
-} from './fake/frontmatter';
+import { stripTagsFromFrontmatter } from './fake/frontmatter';
+// The index-parse kernels are pure wasm FREE exports (ADR 0006 §11-A); the fake
+// consumes the single shared source rather than a divergent TS twin.
+import { parseFrontmatter, parseFrontmatterKeys } from '$lib/wasm/exports';
 
 /**
  * In-memory Backend implementation over a seeded fixture Bundle.
@@ -46,7 +45,8 @@ import {
  *                 (exported as live bindings, so every module shares one copy)
  *                 plus the path predicates over them;
  *   - `tree`    — TreeNode construction + path-mutating rename/delete;
- *   - `frontmatter` — YAML `type`/`tags`/keys parse (mirrors Rust `index.rs`);
+ *   - `frontmatter` — the test-only `stripTagsFromFrontmatter` affordance (the
+ *                 index-parse kernels are wasm FREE exports, `$lib/wasm/exports`);
  *   - `links`   — outbound-link extraction + the rename/move link-rewrite engine.
  * This module wires them into the watcher-subscriber model and the exported
  * `fakeBackend`.
