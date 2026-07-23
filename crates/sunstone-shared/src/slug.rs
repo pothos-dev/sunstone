@@ -8,8 +8,12 @@
 //!
 //! Algorithm (see the TS module for the rationale): trim, lowercase, then keep
 //! letters/digits/`-`/`_`, turn each whitespace char into `-`, and drop
-//! everything else. No de-duplication here — that is document-order state the
-//! frontend owns; the backend only ever slugs a single anchor string.
+//! everything else. De-duplication ([`slugify_headings`]) is document-order
+//! state: an outline scan computes the whole ordered list at once (family 13
+//! folded the former TS `slugifyHeadings` + `render.rs::build_outline` dedup
+//! here). A single anchor lookup uses the undeduped [`slugify`].
+
+use std::collections::HashMap;
 
 /// GitHub-style slug for a single heading / anchor string (no de-duplication).
 pub fn slugify(text: &str) -> String {
@@ -25,6 +29,29 @@ pub fn slugify(text: &str) -> String {
         // everything else (punctuation, symbols) is dropped
     }
     out
+}
+
+/// Slugs for an ordered list of heading texts, de-duplicated GitHub-style: the
+/// first occurrence of a slug is bare, later ones get `-1`, `-2`, … (so two
+/// `## Notes` become `notes` and `notes-1`). Slug identity depends on prior
+/// occurrences, so this MUST run over the whole ordered list, never per string
+/// (the former TS `slugifyHeadings`).
+pub fn slugify_headings(texts: &[String]) -> Vec<String> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    texts
+        .iter()
+        .map(|t| {
+            let base = slugify(t);
+            let n = counts.entry(base.clone()).or_insert(0);
+            let slug = if *n == 0 {
+                base.clone()
+            } else {
+                format!("{base}-{n}")
+            };
+            *n += 1;
+            slug
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -72,5 +99,35 @@ mod tests {
     fn literal_and_slug_forms_collide() {
         // Backward-compat: an old literal anchor and a modern slug agree.
         assert_eq!(slugify("Deep Section"), slugify("deep-section"));
+    }
+
+    // --- slugify_headings (former TS slugifyHeadings + render.rs build_outline) --
+
+    fn texts(ts: &[&str]) -> Vec<String> {
+        ts.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn dedups_repeated_slugs_in_document_order() {
+        assert_eq!(
+            slugify_headings(&texts(&["Notes", "Notes", "Notes"])),
+            vec!["notes", "notes-1", "notes-2"]
+        );
+    }
+
+    #[test]
+    fn distinct_headings_keep_bare_slugs() {
+        assert_eq!(
+            slugify_headings(&texts(&["One", "Two"])),
+            vec!["one", "two"]
+        );
+    }
+
+    #[test]
+    fn dedup_is_per_base_slug() {
+        assert_eq!(
+            slugify_headings(&texts(&["A B", "a-b", "Other"])),
+            vec!["a-b", "a-b-1", "other"]
+        );
     }
 }

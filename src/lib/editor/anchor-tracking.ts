@@ -24,7 +24,7 @@
 
 import { StateEffect, StateField, type EditorState } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
-import { scanHeadings } from '$lib/outline';
+import { scanHeadings } from '$lib/wasm/exports';
 import type { AnchorRename } from '$lib/types';
 
 /** One tracked heading: its line-start position and its slug at the baseline. */

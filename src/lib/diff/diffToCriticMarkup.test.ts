@@ -5,7 +5,7 @@
 // Every produced review string is asserted to re-parse cleanly via
 // `parseCriticMarks` (well-formed, non-overlapping, additions/deletions only).
 import { describe, expect, test } from 'bun:test';
-import { parseCriticMarks } from '../editor/criticMarkup';
+import { parseCriticMarks } from '$lib/wasm/exports';
 import { diffToCriticMarkup } from './diffToCriticMarkup';
 
 /** Assert the review string re-parses cleanly: every opening delimiter begins a

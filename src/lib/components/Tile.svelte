@@ -65,8 +65,7 @@
   import { reviewAvailability } from '$lib/editor/review';
   import { reviewStep, maxStep } from '$lib/editor/reviewStepper';
   import { parseProperties, type Property } from '$lib/frontmatter';
-  import { splitFrontmatter, frontmatterLineCount } from '$lib/wasm/exports';
-  import { findHeadingLine } from '$lib/outline';
+  import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
   import { region } from '$lib/region';

@@ -36,9 +36,12 @@ use serde::Serialize;
 use crate::bundle;
 use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
+use sunstone_shared::citations::find_citation_refs;
+use sunstone_shared::critic::{parse_critic_marks, CriticMarkKind};
 use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
+use sunstone_shared::outline::{scan_headings, OutlineHeading};
 use sunstone_shared::paths::{is_external, resolve_internal};
-use sunstone_shared::slug::slugify;
+use sunstone_shared::url::concept_url;
 use sunstone_shared::wikilink::{self, parse_target};
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
@@ -51,17 +54,10 @@ pub struct RenderPayload {
     pub html: String,
     /// Frontmatter key → value(s), in document order (for the Properties view).
     pub frontmatter: Vec<FrontmatterField>,
-    /// Headings in document order (frontmatter + fenced code excluded).
+    /// Headings in document order (ATX only; frontmatter + fenced code excluded).
+    /// The shared `OutlineHeading` (ADR 0006 §6): `render.rs` re-points here and
+    /// derives the outline from the pure `scan_headings` scan, not a comrak walk.
     pub outline: Vec<OutlineHeading>,
-}
-
-/// One outline heading: level (1–6), text, and its de-duplicated GitHub slug.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OutlineHeading {
-    pub level: u8,
-    pub text: String,
-    pub slug: String,
 }
 
 /// Render the Concept at `rel_path` (validated against the Bundle root, like the
@@ -91,6 +87,11 @@ pub fn render_body(
     exists: &dyn Fn(&str) -> bool,
 ) -> RenderPayload {
     let frontmatter = frontmatter_fields(content);
+    // Outline enumeration is the SAME pure ATX scan the editor runs over wasm
+    // (ADR 0006 family 13): one algorithm feeds both the editor and this SSR
+    // render, instead of the former comrak node-walk. Scanned on the RAW content
+    // (so the frontmatter offset is applied); ATX-only (setext dropped).
+    let outline = scan_headings(content);
     let body = strip_frontmatter(content);
 
     // 0. Replace CriticMarkup delimiters with sentinel tokens BEFORE comrak,
@@ -126,13 +127,15 @@ pub fn render_body(
     // no XSS). We inject nothing as raw HTML — link markers ride in hrefs.
     let root = parse_document(&arena, &prepared, &options);
 
-    let mut headings: Vec<(u8, String)> = Vec::new();
+    // comrak emits `<hN>` for BOTH ATX and setext headings, but the pure outline
+    // scan is ATX-only, so record each heading's setext-ness in document order to
+    // re-align id injection: a setext `<hN>` is skipped (no id, no outline slug),
+    // every ATX `<hN>` takes the next outline slug (ADR 0006 family 13 sharp edge).
+    let mut heading_is_setext: Vec<bool> = Vec::new();
     for node in root.descendants() {
-        let level = match &node.data.borrow().value {
-            NodeValue::Heading(h) => h.level,
-            _ => continue,
-        };
-        headings.push((level, node_text(node)));
+        if let NodeValue::Heading(h) = &node.data.borrow().value {
+            heading_is_setext.push(h.setext);
+        }
     }
 
     for node in root.descendants() {
@@ -142,13 +145,11 @@ pub fn render_body(
         }
     }
 
-    let outline = build_outline(headings);
-
     let mut buf = Vec::new();
     format_html(root, &options, &mut buf).expect("comrak html formatting");
-    // Add `id="<slug>"` to each heading (in document order, matching the outline
-    // slugs) so the Outline section can scroll the rendered view to a heading.
-    let html = inject_heading_ids(&String::from_utf8_lossy(&buf), &outline);
+    // Add `id="<slug>"` to each ATX heading (in document order, matching the
+    // outline slugs) so the Outline section can scroll the rendered view to it.
+    let html = inject_heading_ids(&String::from_utf8_lossy(&buf), &outline, &heading_is_setext);
     let html = rewrite_marker_hrefs(&html);
     // Finally, substitute the CriticMarkup sentinels comrak carried through
     // (untouched, since they are private-use unicode) with our critic HTML tags.
@@ -163,20 +164,28 @@ pub fn render_body(
     }
 }
 
-/// Add `id="<slug>"` to every heading open tag (`<h1>`…`<h6>`) comrak emitted,
-/// in document order, from the (de-duplicated) `outline` slugs. comrak emits
-/// bare heading tags; headings and the outline are both in document order, so
-/// the k-th `<hN>` gets the k-th outline slug — the anchor the Outline links to.
-fn inject_heading_ids(html: &str, outline: &[OutlineHeading]) -> String {
+/// Add `id="<slug>"` to every ATX heading open tag (`<h1>`…`<h6>`) comrak
+/// emitted, in document order, from the (de-duplicated) `outline` slugs. comrak
+/// emits bare heading tags for BOTH ATX and setext headings; the outline is
+/// ATX-only (ADR 0006 family 13), so `heading_is_setext` (comrak-heading order)
+/// tells us which `<hN>` to skip — a setext heading gets no id and consumes no
+/// outline slug, keeping the k-th ATX `<hN>` aligned with the k-th outline entry.
+fn inject_heading_ids(html: &str, outline: &[OutlineHeading], heading_is_setext: &[bool]) -> String {
     let re = Regex::new(r"<(h[1-6])>").unwrap();
-    let mut idx = 0usize;
+    let mut h_idx = 0usize; // index over ALL comrak headings (ATX + setext)
+    let mut o_idx = 0usize; // index over the ATX-only outline
     re.replace_all(html, |caps: &regex::Captures| {
         let tag = &caps[1];
-        let out = match outline.get(idx) {
+        let is_setext = heading_is_setext.get(h_idx).copied().unwrap_or(false);
+        h_idx += 1;
+        if is_setext {
+            return format!("<{tag}>"); // setext: dropped from the outline
+        }
+        let out = match outline.get(o_idx) {
             Some(h) if !h.slug.is_empty() => format!(r#"<{tag} id="{}">"#, attr_escape(&h.slug)),
             _ => format!("<{tag}>"),
         };
-        idx += 1;
+        o_idx += 1;
         out
     })
     .into_owned()
@@ -332,63 +341,19 @@ const CRITIC_COMMENT_SVG: &str = concat!(
     r#"</svg>"#,
 );
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CriticKind {
-    Addition,
-    Deletion,
-    Substitution,
-    Comment,
-    Highlight,
-}
-
-/// The 3-char opening delimiter at `chars[i..]`, if any, and its mark kind.
-fn critic_open_at(chars: &[char], i: usize) -> Option<CriticKind> {
-    if i + 3 > chars.len() {
-        return None;
-    }
-    match (chars[i], chars[i + 1], chars[i + 2]) {
-        ('{', '+', '+') => Some(CriticKind::Addition),
-        ('{', '-', '-') => Some(CriticKind::Deletion),
-        ('{', '~', '~') => Some(CriticKind::Substitution),
-        ('{', '>', '>') => Some(CriticKind::Comment),
-        ('{', '=', '=') => Some(CriticKind::Highlight),
-        _ => None,
-    }
-}
-
-/// The 3-char closing delimiter for a mark kind.
-fn critic_close(kind: CriticKind) -> [char; 3] {
-    match kind {
-        CriticKind::Addition => ['+', '+', '}'],
-        CriticKind::Deletion => ['-', '-', '}'],
-        CriticKind::Substitution => ['~', '~', '}'],
-        CriticKind::Comment => ['<', '<', '}'],
-        CriticKind::Highlight => ['=', '=', '}'],
-    }
-}
-
-/// Index of the closing `seq` at or after `start`, or `None`.
-fn find_close(chars: &[char], start: usize, seq: [char; 3]) -> Option<usize> {
-    if chars.len() < 3 {
-        return None;
-    }
-    let mut i = start;
-    while i + 3 <= chars.len() {
-        if chars[i] == seq[0] && chars[i + 1] == seq[1] && chars[i + 2] == seq[2] {
-            return Some(i);
-        }
-        i += 1;
-    }
-    None
-}
-
-/// Scan `body` for CriticMarkup marks (non-overlapping, left-to-right, mirroring
-/// `parseCriticMarks`) and rewrite each mark's DELIMITERS to sentinel tokens,
-/// keeping its inner content in the markdown stream. Returns the prepared body
-/// plus the replacement HTML for each sentinel (indexed by the sentinel's id).
+/// Rewrite each CriticMarkup mark's DELIMITERS to sentinel tokens, keeping its
+/// inner content in the markdown stream. The marks come from the SHARED
+/// `parse_critic_marks` (ADR 0006 family 13 — one grammar for the editor and
+/// SSR; the former local `critic_open_at`/`critic_close`/`find_close` scanner is
+/// retired). Returns the prepared body plus the replacement HTML for each
+/// sentinel (indexed by the sentinel's id). Offsets from the shared parse are
+/// UTF-16 units, so the body is walked over its UTF-16 units to slice on them.
 fn critic_to_sentinels(body: &str) -> (String, Vec<String>) {
-    let chars: Vec<char> = body.chars().collect();
-    let n = chars.len();
+    let marks = parse_critic_marks(body);
+    if marks.is_empty() {
+        return (body.to_string(), Vec::new());
+    }
+    let units: Vec<u16> = body.encode_utf16().collect();
     let mut out = String::with_capacity(body.len());
     let mut repls: Vec<String> = Vec::new();
 
@@ -401,60 +366,54 @@ fn critic_to_sentinels(body: &str) -> (String, Vec<String>) {
         out.push(SENT_CLOSE);
     };
 
-    let mut i = 0;
-    while i < n {
-        if let Some(kind) = critic_open_at(&chars, i) {
-            if let Some(close_idx) = find_close(&chars, i + 3, critic_close(kind)) {
-                let content: String = chars[i + 3..close_idx].iter().collect();
-                match kind {
-                    CriticKind::Addition => {
-                        sentinel(&mut out, &mut repls, CRITIC_INS_OPEN);
-                        out.push_str(&content);
-                        sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
-                    }
-                    CriticKind::Deletion => {
-                        sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                        out.push_str(&content);
-                        sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
-                    }
-                    CriticKind::Highlight => {
-                        sentinel(&mut out, &mut repls, CRITIC_MARK_OPEN);
-                        out.push_str(&content);
-                        sentinel(&mut out, &mut repls, CRITIC_MARK_CLOSE);
-                    }
-                    CriticKind::Substitution => {
-                        // The FIRST `~>` splits old/new (as in the TS scanner);
-                        // with none present, render the whole inner as a deletion.
-                        if let Some(pos) = content.find("~>") {
-                            let (deleted, inserted) = (&content[..pos], &content[pos + 2..]);
-                            sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                            out.push_str(deleted);
-                            sentinel(&mut out, &mut repls, CRITIC_SUB_MID);
-                            out.push_str(inserted);
-                            sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
-                        } else {
-                            sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                            out.push_str(&content);
-                            sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
-                        }
-                    }
-                    CriticKind::Comment => {
-                        // The note is plain text (NOT markdown-rendered), escaped
-                        // into a self-contained callout injected whole. Placed at
-                        // the comment's own position: for a bound comment (right
-                        // after a highlight) that is directly after the highlight's
-                        // `</mark>`; for a point comment, at the comment's spot.
-                        sentinel(&mut out, &mut repls, &critic_comment_callout(&content));
-                    }
+    let decode = |a: usize, b: usize| String::from_utf16_lossy(&units[a..b]);
+
+    let mut pos = 0usize;
+    for mark in &marks {
+        // The verbatim text before this mark (kept as markdown for comrak).
+        out.push_str(&decode(pos, mark.from));
+        let content = decode(mark.content_from, mark.content_to);
+        match mark.kind {
+            CriticMarkKind::Addition => {
+                sentinel(&mut out, &mut repls, CRITIC_INS_OPEN);
+                out.push_str(&content);
+                sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
+            }
+            CriticMarkKind::Deletion => {
+                sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
+                out.push_str(&content);
+                sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
+            }
+            CriticMarkKind::Highlight => {
+                sentinel(&mut out, &mut repls, CRITIC_MARK_OPEN);
+                out.push_str(&content);
+                sentinel(&mut out, &mut repls, CRITIC_MARK_CLOSE);
+            }
+            CriticMarkKind::Substitution => {
+                // The FIRST `~>` splits old/new (as in the shared parse); with
+                // none present, render the whole inner as a deletion.
+                if let Some(p) = content.find("~>") {
+                    let (deleted, inserted) = (&content[..p], &content[p + 2..]);
+                    sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
+                    out.push_str(deleted);
+                    sentinel(&mut out, &mut repls, CRITIC_SUB_MID);
+                    out.push_str(inserted);
+                    sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
+                } else {
+                    sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
+                    out.push_str(&content);
+                    sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
                 }
-                i = close_idx + 3;
-                continue;
+            }
+            CriticMarkKind::Comment => {
+                // The note is plain text (NOT markdown-rendered), escaped into a
+                // self-contained callout injected whole, at the comment's spot.
+                sentinel(&mut out, &mut repls, &critic_comment_callout(&content));
             }
         }
-        out.push(chars[i]);
-        i += 1;
+        pos = mark.to;
     }
-
+    out.push_str(&decode(pos, units.len()));
     (out, repls)
 }
 
@@ -517,9 +476,21 @@ fn citation_def_html(num: &str) -> String {
 
 /// Rewrite citation markers in `body` to sentinel tokens, returning the prepared
 /// body plus the replacement HTML for each sentinel id.
+///
+/// Inline REFERENCES come from the SHARED `find_citation_refs` (ADR 0006 family
+/// 13 — one recognition of what a reference is, for the editor and SSR). The
+/// line-start DEFINITIONS (table rows) are not references (the shared scan
+/// excludes them), so they are detected here; the two are disjoint. Offsets from
+/// the shared scan are UTF-16 units, so the body is walked over its UTF-16 units.
 fn citations_to_sentinels(body: &str) -> (String, Vec<String>) {
-    let chars: Vec<char> = body.chars().collect();
-    let n = chars.len();
+    let units: Vec<u16> = body.encode_utf16().collect();
+    let n = units.len();
+    // Inline references keyed by their `[` offset (UTF-16 units).
+    let refs: HashMap<usize, (usize, String)> = find_citation_refs(body)
+        .into_iter()
+        .map(|r| (r.from, (r.to, r.num)))
+        .collect();
+
     let mut out = String::with_capacity(body.len());
     let mut repls: Vec<String> = Vec::new();
 
@@ -531,55 +502,58 @@ fn citations_to_sentinels(body: &str) -> (String, Vec<String>) {
         out.push(CITE_CLOSE);
     };
 
-    let mut i = 0;
+    let decode = |a: usize, b: usize| String::from_utf16_lossy(&units[a..b]);
+    const L_BRACKET: u16 = b'[' as u16;
+    const R_BRACKET: u16 = b']' as u16;
+    const NEWLINE: u16 = b'\n' as u16;
+    let is_digit = |u: u16| (b'0' as u16..=b'9' as u16).contains(&u);
+    let is_ws = |u: u16| char::from_u32(u as u32).is_some_and(|c| c.is_whitespace());
+
+    let mut pos = 0usize;
+    let mut i = 0usize;
     while i < n {
-        if chars[i] == '[' {
-            // Match `[` <digits> `]`.
+        // Inline reference (shared recognition): superscript link.
+        if let Some((to, num)) = refs.get(&i) {
+            out.push_str(&decode(pos, i));
+            sentinel(&mut out, &mut repls, citation_ref_html(num));
+            i = *to;
+            pos = i;
+            continue;
+        }
+        // Line-start `[n]` definition (table row): literal anchored jump target.
+        if units[i] == L_BRACKET {
             let mut j = i + 1;
-            while j < n && chars[j].is_ascii_digit() {
+            while j < n && is_digit(units[j]) {
                 j += 1;
             }
-            if j > i + 1 && j < n && chars[j] == ']' {
-                let num: String = chars[i + 1..j].iter().collect();
-                let before = if i > 0 { Some(chars[i - 1]) } else { None };
-                let after = if j + 1 < n { Some(chars[j + 1]) } else { None };
-
-                // Line-start `[n]` (only whitespace back to the newline) = table row.
+            if j > i + 1 && j < n && units[j] == R_BRACKET {
+                // At line start iff only whitespace back to the newline / start.
                 let mut k = i;
                 let mut at_line_start = true;
                 while k > 0 {
-                    let c = chars[k - 1];
-                    if c == '\n' {
+                    let c = units[k - 1];
+                    if c == NEWLINE {
                         break;
                     }
-                    if !c.is_whitespace() {
+                    if !is_ws(c) {
                         at_line_start = false;
                         break;
                     }
                     k -= 1;
                 }
-
                 if at_line_start {
+                    let num = decode(i + 1, j);
+                    out.push_str(&decode(pos, i));
                     sentinel(&mut out, &mut repls, citation_def_html(&num));
                     i = j + 1;
+                    pos = i;
                     continue;
                 }
-
-                // Reference: follows a word, and no disambiguating trailer.
-                let trailer_ok = !matches!(after, Some(']') | Some('(') | Some(':'));
-                let follows_word = matches!(before, Some(b) if !b.is_whitespace() && b != '[');
-                if trailer_ok && follows_word {
-                    sentinel(&mut out, &mut repls, citation_ref_html(&num));
-                    i = j + 1;
-                    continue;
-                }
-                // Neither: fall through and emit the `[` literally.
             }
         }
-        out.push(chars[i]);
         i += 1;
     }
-
+    out.push_str(&decode(pos, n));
     (out, repls)
 }
 
@@ -598,42 +572,6 @@ fn substitute_citation_sentinels(html: &str, repls: &[String]) -> String {
             .unwrap_or_default()
     })
     .into_owned()
-}
-
-// --- Outline ----------------------------------------------------------------
-
-/// De-duplicate heading slugs in document order (`notes`, `notes-1`, …), the
-/// same rule as the desktop `slugifyHeadings`.
-fn build_outline(headings: Vec<(u8, String)>) -> Vec<OutlineHeading> {
-    let mut counts: HashMap<String, usize> = HashMap::new();
-    headings
-        .into_iter()
-        .map(|(level, text)| {
-            let base = slugify(&text);
-            let n = counts.entry(base.clone()).or_insert(0);
-            let slug = if *n == 0 {
-                base.clone()
-            } else {
-                format!("{base}-{n}")
-            };
-            *n += 1;
-            OutlineHeading { level, text, slug }
-        })
-        .collect()
-}
-
-/// Concatenate the visible text of a node's inline descendants (Text + inline
-/// Code), trimmed. Used to derive a heading's outline text.
-fn node_text<'a>(node: &'a comrak::nodes::AstNode<'a>) -> String {
-    let mut s = String::new();
-    for d in node.descendants() {
-        match &d.data.borrow().value {
-            NodeValue::Text(t) => s.push_str(t),
-            NodeValue::Code(c) => s.push_str(&c.literal),
-            _ => {}
-        }
-    }
-    s.trim().to_string()
 }
 
 // --- Small escaping helpers -------------------------------------------------
@@ -663,40 +601,6 @@ fn attr_escape(s: &str) -> String {
         }
     }
     out
-}
-
-/// Percent-encode a value for a query-string parameter (like encodeURIComponent:
-/// keep unreserved chars, `%XX` everything else, including `/`).
-fn query_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for &b in s.as_bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
-/// A Concept's bundle path → its pretty viewer URL pathname, mirroring the
-/// frontend `conceptToUrl`: drop a trailing `.md` and a trailing `/index`, map
-/// the root `index.md` to `/`, and percent-encode each path segment. So
-/// `providers/index.md` → `/providers` and `research/providers/x.md` →
-/// `/research/providers/x`.
-fn concept_url(path: &str) -> String {
-    let p = if path.len() >= 3 && path[path.len() - 3..].eq_ignore_ascii_case(".md") {
-        &path[..path.len() - 3]
-    } else {
-        path
-    };
-    if p == "index" {
-        return "/".to_string();
-    }
-    let p = p.strip_suffix("/index").unwrap_or(p);
-    let encoded: Vec<String> = p.split('/').map(query_encode).collect();
-    format!("/{}", encoded.join("/"))
 }
 
 /// Decode `%XX` percent-escapes (comrak percent-encodes hrefs, e.g. space →
@@ -741,18 +645,6 @@ mod tests {
         assert!(p.html.contains("<h1 id="));
         assert!(p.html.contains("<p>"));
         assert!(p.html.contains("A paragraph."));
-    }
-
-    #[test]
-    fn concept_url_drops_md_and_index() {
-        assert_eq!(concept_url("index.md"), "/");
-        assert_eq!(concept_url("good.md"), "/good");
-        assert_eq!(concept_url("providers/index.md"), "/providers");
-        assert_eq!(
-            concept_url("research/providers/mistral-ai.md"),
-            "/research/providers/mistral-ai"
-        );
-        assert_eq!(concept_url("a b/c d.md"), "/a%20b/c%20d");
     }
 
     #[test]

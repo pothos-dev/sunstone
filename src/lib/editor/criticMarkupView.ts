@@ -8,12 +8,8 @@ import {
   type Tooltip,
 } from '@codemirror/view';
 import { RangeSet, StateField, type EditorState, type Extension } from '@codemirror/state';
-import {
-  parseCriticMarks,
-  pairAnnotations,
-  changeMarkDecorations,
-  type Annotation,
-} from './criticMarkup';
+import { parseCriticMarks, pairAnnotations, type Annotation } from '$lib/wasm/exports';
+import { changeMarkDecorations } from './criticMarkup';
 
 // ---------------------------------------------------------------------------
 // CriticMarkup annotation rendering (feat/criticmarkup-annotations)

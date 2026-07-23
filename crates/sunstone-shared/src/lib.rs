@@ -11,11 +11,15 @@
 //! depends on it and re-points its call sites here; `sunstone-wasm` wraps it
 //! for the browser frontend.
 
+pub mod citations;
+pub mod critic;
 pub mod frontmatter;
 pub mod links;
+pub mod outline;
 pub mod paths;
 pub mod rewrite;
 pub mod slug;
+pub mod url;
 pub mod wikilink;
 
 pub use links::{find_bundle_root, resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};

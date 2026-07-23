@@ -15,9 +15,13 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
+use sunstone_shared::citations::{self, CitationRef};
+use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
+use sunstone_shared::outline::{self, OutlineHeading};
+use sunstone_shared::url;
 use sunstone_shared::wikilink::resolve_wikilink;
 use sunstone_shared::{
     find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, ResolvedLink, RewriteBody,
@@ -109,6 +113,14 @@ impl BundleIndex {
         );
         RewriteBody { content }
     }
+
+    /// Resolve a pretty URL path (already percent-decoded) to the matching
+    /// Concept bundle path, or `null` (ADR 0006 §3 family 13 — resolves against
+    /// the concept set the handle owns, retiring the TS `collectFilePaths`).
+    #[wasm_bindgen(js_name = urlToConcept)]
+    pub fn url_to_concept(&self, url_path: String) -> Option<String> {
+        url::url_to_concept(&url_path, &self.concept_paths)
+    }
 }
 
 // --- Free frontmatter exports (ADR 0006 §3, family 11) ----------------------
@@ -152,4 +164,74 @@ pub fn parse_frontmatter_keys(content: String) -> Vec<String> {
 #[wasm_bindgen(js_name = parseFrontmatterFields)]
 pub fn parse_frontmatter_fields(content: String) -> Vec<FrontmatterField> {
     frontmatter::frontmatter_fields(&content)
+}
+
+// --- Free render-derived exports (ADR 0006 §3, family 13) -------------------
+//
+// The pure kernels behind the editor's Outline, CriticMarkup decorations and
+// citation superscripts. All return offset-span structs (the CM-decoration
+// seam) or the outline enumeration; the TS view/authoring layers stay thin over
+// them. Native `render.rs` consumes the SAME `sunstone_shared` functions for its
+// SSR render, so there is one algorithm everywhere.
+
+/// Scan raw Concept markdown for its body headings (ATX only), in document
+/// order — the editor Outline + `scrollToOutlineLine` source.
+#[wasm_bindgen(js_name = scanHeadings)]
+pub fn scan_headings(content: String) -> Vec<OutlineHeading> {
+    outline::scan_headings(&content)
+}
+
+/// The full-document line of the first heading whose GitHub slug matches
+/// `anchor`, or `null` (scrolls a `[[target#anchor]]` wikilink to its heading).
+#[wasm_bindgen(js_name = findHeadingLine)]
+pub fn find_heading_line(content: String, anchor: String) -> Option<usize> {
+    outline::find_heading_line(&content, &anchor)
+}
+
+/// Every CriticMarkup mark in the doc, in document order (offset-span structs).
+#[wasm_bindgen(js_name = parseCriticMarks)]
+pub fn parse_critic_marks(doc: String) -> Vec<CriticMark> {
+    critic::parse_critic_marks(&doc)
+}
+
+/// Group CriticMarkup marks into highlight+comment annotations.
+#[wasm_bindgen(js_name = pairAnnotations)]
+pub fn pair_annotations(marks: Vec<CriticMark>) -> Vec<Annotation> {
+    critic::pair_annotations(&marks)
+}
+
+/// The annotation whose overall span contains `pos` (caret between chars), or
+/// `null`.
+#[wasm_bindgen(js_name = annotationAt)]
+pub fn annotation_at(annotations: Vec<Annotation>, pos: usize) -> Option<Annotation> {
+    critic::annotation_at(&annotations, pos)
+}
+
+/// Every inline citation reference (a `[n]` following a word) in `text`.
+#[wasm_bindgen(js_name = findCitationRefs)]
+pub fn find_citation_refs(text: String) -> Vec<CitationRef> {
+    citations::find_citation_refs(&text)
+}
+
+/// The offset of citation `num`'s definition row (line-start `[num]`), or `null`.
+#[wasm_bindgen(js_name = citationDefPos)]
+pub fn citation_def_pos(text: String, num: String) -> Option<usize> {
+    citations::citation_def_pos(&text, &num)
+}
+
+/// A Concept's bundle path → its pretty viewer URL pathname (drops `.md` and a
+/// trailing `/index`; root `index.md` → `/`). Twin of native `render.rs`'s
+/// resolved-link href, now single-sourced in `sunstone_shared`.
+#[wasm_bindgen(js_name = conceptToUrl)]
+pub fn concept_to_url(path: String) -> String {
+    url::concept_url(&path)
+}
+
+/// GitHub-style slug for a single anchor/heading string (no de-duplication).
+/// Surfaced so the fake backend's corpus-wide anchor rewriter matches anchors
+/// against renames with the SAME slug rule the editor/native side uses — the
+/// single source `sunstone_shared::slug::slugify` (family 13 retires `slug.ts`).
+#[wasm_bindgen(js_name = slugify)]
+pub fn slugify(text: String) -> String {
+    sunstone_shared::slug::slugify(&text)
 }

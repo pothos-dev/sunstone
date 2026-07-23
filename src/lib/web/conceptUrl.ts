@@ -1,53 +1,15 @@
-// Concept ↔ pretty-URL mapping for Sunstone Web (pure; no DOM/IPC).
+// A Concept's human title for Sunstone Web (pure; no DOM/IPC).
 //
-// The web viewer addresses a Concept by its LOCATION in the URL path rather than
-// a `?path=` query, dropping the `.md` extension and a trailing `/index`:
-//
-//   index.md                          -> /
-//   providers/index.md                -> /providers
-//   research/providers/mistral-ai.md  -> /research/providers/mistral-ai
-//
-// The reverse (`urlToConcept`) is ambiguous — `/providers` could be the file
-// `providers.md` OR the folder index `providers/index.md` — so it resolves
-// against the set of real file paths (a folder index wins over a same-named
-// leaf), returning `null` when nothing matches.
+// The path↔pretty-URL mapping (`conceptToUrl` / `urlToConcept`) and the tree
+// file-set collector (`collectFilePaths`) migrated to Rust in family 13:
+// `conceptToUrl` is the wasm free export `conceptToUrl` (single-sourced with the
+// native `render.rs` resolved-link href), and `urlToConcept` is the wasm
+// `BundleIndex.urlToConcept` handle method (resolving against the concept set the
+// handle owns, retiring `collectFilePaths`). What stays TS is the title
+// derivation, which reads the `RenderPayload` — no Rust twin (ADR 0006 §3).
 
-import type { TreeNode } from '$lib/types';
 import type { RenderPayload } from './render';
 import { stripMd } from '$lib/path';
-
-/** Collect every FILE path (bundle-relative) in the tree, for URL resolution. */
-export function collectFilePaths(tree: TreeNode, into = new Set<string>()): Set<string> {
-  if (!tree.isDir) into.add(tree.path);
-  for (const c of tree.children ?? []) collectFilePaths(c, into);
-  return into;
-}
-
-/**
- * A Concept's bundle path → its pretty URL pathname. Drops `.md` and a trailing
- * `/index`; the root `index.md` becomes `/`. Each segment is URL-encoded.
- */
-export function conceptToUrl(path: string): string {
-  let p = stripMd(path);
-  if (p === 'index') return '/';
-  if (p.endsWith('/index')) p = p.slice(0, -'/index'.length);
-  return '/' + p.split('/').map(encodeURIComponent).join('/');
-}
-
-/**
- * A pretty URL path (already percent-DECODED — e.g. a SvelteKit route param) →
- * the matching Concept bundle path, or `null` if none exists. A folder index
- * (`<p>/index.md`) is preferred over a same-named leaf (`<p>.md`).
- */
-export function urlToConcept(urlPath: string, files: Set<string>): string | null {
-  const segs = urlPath.split('/').filter(Boolean);
-  if (segs.length === 0) return files.has('index.md') ? 'index.md' : null;
-  const p = segs.join('/');
-  for (const candidate of [`${p}/index.md`, `${p}.md`]) {
-    if (files.has(candidate)) return candidate;
-  }
-  return null;
-}
 
 /**
  * The human title for a Concept, for the document `<title>`: its frontmatter

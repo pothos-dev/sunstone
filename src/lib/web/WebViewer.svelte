@@ -20,7 +20,9 @@
   import WebBacklinks from './WebBacklinks.svelte';
   import { hydrateMermaid } from './webMermaid';
   import { loadUiState, saveUiState, type WebUiState } from './uiState';
-  import { conceptToUrl, conceptTitle } from './conceptUrl';
+  import { conceptTitle } from './conceptUrl';
+  import { conceptToUrl } from '$lib/wasm/exports';
+  import { ensureWasm } from '$lib/wasm';
 
   interface Props {
     /** SSR'd data from `+page.ts`'s `load` (talks to the Rust server). */
@@ -207,6 +209,12 @@
   });
 
   onMount(() => {
+    // The anon read surface does not mount the editor / `indexStore`, so nothing
+    // else initializes wasm here. `conceptToUrl` (client navigation) reads the
+    // wasm free-export holder, so load it once on mount; until it settles the
+    // holder's degrade fallback keeps navigation working (ADR 0006 §5).
+    void ensureWasm();
+
     // Signed-in users get the full App shell instead of this read surface. Done
     // in onMount (post-hydration) so SSR + first render stay the read surface.
     showApp = data.user !== null;

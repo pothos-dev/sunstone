@@ -14,10 +14,15 @@
 // outline are populated minimally from the shared helpers.
 
 import type { RenderPayload, OutlineHeading } from '$lib/types';
-import { splitFrontmatter, parseFrontmatterFields } from '$lib/wasm/exports';
-import { slugifyHeadings } from '$lib/slug';
-import { parseCriticMarks, type CriticMark } from '$lib/editor/criticMarkup';
-import { findCitationRefs } from '$lib/citations';
+import {
+  splitFrontmatter,
+  frontmatterLineCount,
+  parseFrontmatterFields,
+  scanHeadings,
+  parseCriticMarks,
+  findCitationRefs,
+  type CriticMark,
+} from '$lib/wasm/exports';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
 export function renderConcept(content: string): RenderPayload {
@@ -25,24 +30,21 @@ export function renderConcept(content: string): RenderPayload {
   const { body } = splitFrontmatter(content);
   const lines = body.split('\n');
 
-  // De-duplicate heading slugs across the whole document, GitHub-style — the
-  // same rule the Rust outline uses (`slugifyHeadings` mirrors it).
-  const headingTexts: string[] = [];
-  for (const line of lines) {
-    const h = headingMatch(line);
-    if (h) headingTexts.push(h.text);
-  }
-  const slugs = slugifyHeadings(headingTexts);
+  // Headings + de-duplicated slugs come from the SHARED `scanHeadings` (ADR 0006
+  // family 13 — the same ATX scan the editor + native SSR render use; retires the
+  // former local `headingMatch` + `slugifyHeadings`). Map each heading's body
+  // line index (full-document line minus the frontmatter offset) to its entry.
+  const outline: OutlineHeading[] = scanHeadings(content);
+  const offset = frontmatterLineCount(content);
+  const byLine = new Map<number, OutlineHeading>();
+  for (const h of outline) byLine.set(h.line - offset - 1, h);
 
-  const outline: OutlineHeading[] = [];
   const htmlParts: string[] = [];
-  let hi = 0;
-  for (const line of lines) {
-    const h = headingMatch(line);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const h = byLine.get(i);
     if (h) {
-      const slug = slugs[hi++];
-      outline.push({ level: h.level, text: h.text, slug });
-      htmlParts.push(`<h${h.level} id="${slug}">${renderInline(h.text)}</h${h.level}>`);
+      htmlParts.push(`<h${h.level} id="${h.slug}">${renderInline(h.text)}</h${h.level}>`);
       continue;
     }
     if (line.trim() === '') continue;
@@ -52,12 +54,6 @@ export function renderConcept(content: string): RenderPayload {
   }
 
   return { html: htmlParts.join('\n'), frontmatter, outline };
-}
-
-/** An ATX heading line (`#`…`######` + space + text), or null. */
-function headingMatch(line: string): { level: number; text: string } | null {
-  const m = /^(#{1,6})\s+(.*)$/.exec(line);
-  return m ? { level: m[1].length, text: m[2].trim() } : null;
 }
 
 /**

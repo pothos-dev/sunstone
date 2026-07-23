@@ -17,7 +17,7 @@
   // Focused-index rune lives in `$lib/state/listFocusNav`; App drives DOM focus
   // from it and supplies the keydown routing.
 
-  import { scanHeadings, type OutlineHeading } from '$lib/outline';
+  import { scanHeadings, type OutlineHeading } from '$lib/wasm/exports';
   import { outlineNav } from '$lib/state/listFocusNav.svelte';
 
   interface Props {

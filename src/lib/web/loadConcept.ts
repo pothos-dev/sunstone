@@ -1,6 +1,49 @@
 import type { TreeNode } from '$lib/types';
 import type { RenderPayload } from './render';
-import { collectFilePaths, urlToConcept } from './conceptUrl';
+import { ensureWasm } from '$lib/wasm';
+
+/** Every FILE path (bundle-relative) in the tree — the URL-resolution set. */
+function filePaths(tree: TreeNode, into: string[] = []): string[] {
+  if (!tree.isDir) into.push(tree.path);
+  for (const c of tree.children ?? []) filePaths(c, into);
+  return into;
+}
+
+/**
+ * Resolve a decoded pretty URL path to a Concept path against `paths` (a folder
+ * index wins over a same-named leaf). Mirrors the wasm `BundleIndex.urlToConcept`
+ * for the SSR path, where wasm is browser-only (ADR 0006 §1/§5) yet this
+ * universal `load` still runs on the server — the ONLY place this rule is
+ * duplicated, and only when the handle is unavailable.
+ */
+function resolveUrlPathInline(urlPath: string, paths: string[]): string | null {
+  const set = new Set(paths);
+  const segs = urlPath.split('/').filter(Boolean);
+  if (segs.length === 0) return set.has('index.md') ? 'index.md' : null;
+  const p = segs.join('/');
+  for (const candidate of [`${p}/index.md`, `${p}.md`]) {
+    if (set.has(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Resolve a decoded pretty URL path to a Concept path. On the client this goes
+ * through the wasm `BundleIndex.urlToConcept` handle (single source, retiring
+ * `collectFilePaths`); on SSR (wasm browser-only) it falls back to the inline
+ * mirror over the same file set.
+ */
+async function resolveUrlPath(urlPath: string, tree: TreeNode): Promise<string | null> {
+  const paths = filePaths(tree);
+  const wasm = await ensureWasm();
+  if (!wasm) return resolveUrlPathInline(urlPath, paths);
+  const index = new wasm.BundleIndex(paths);
+  try {
+    return index.urlToConcept(urlPath) ?? null;
+  } finally {
+    index.free();
+  }
+}
 
 /** SSR'd data the web `+page` routes hand to the viewer. */
 export interface WebPageData {
@@ -55,7 +98,7 @@ export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promi
     loadUser(fetchFn),
   ]);
 
-  const selected = urlToConcept(urlPath, collectFilePaths(tree));
+  const selected = await resolveUrlPath(urlPath, tree);
   let rendered: RenderPayload | null = null;
   let renderError: string | null = null;
   if (selected) {

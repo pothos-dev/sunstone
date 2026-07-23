@@ -257,12 +257,15 @@ export interface FrontmatterField {
 }
 
 /**
- * One outline heading (document order): level, text, de-duplicated GitHub slug.
- * Matches the Rust `OutlineHeading` (`serde rename_all = "camelCase"`).
+ * One outline heading (document order): level, text, 1-based full-document line,
+ * de-duplicated GitHub slug. Structural mirror of the tsify-canonical shared
+ * `OutlineHeading` (ADR 0006 §6; `serde rename_all = "camelCase"`) — the SSR
+ * `RenderPayload` carries `line` too (it is ignored by the web outline).
  */
 export interface OutlineHeading {
   level: number;
   text: string;
+  line: number;
   slug: string;
 }
 

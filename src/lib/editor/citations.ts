@@ -7,7 +7,7 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { StateEffect, StateField, RangeSetBuilder, type Extension } from '@codemirror/state';
-import { findCitationRefs, citationDefPos } from '$lib/citations';
+import { findCitationRefs, citationDefPos } from '$lib/wasm/exports';
 
 // ---------------------------------------------------------------------------
 // Citation references (slice: citation-superscripts)

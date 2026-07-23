@@ -42,10 +42,8 @@ import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
+import { parseCriticMarks, pairAnnotations, annotationAt } from '$lib/wasm/exports';
 import {
-  parseCriticMarks,
-  pairAnnotations,
-  annotationAt,
   insertHighlightComment,
   removeAnnotation,
   setCommentText,

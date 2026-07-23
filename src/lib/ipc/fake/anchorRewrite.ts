@@ -11,7 +11,7 @@
  * shared source.
  */
 
-import { slugify } from '$lib/slug';
+import { slugify } from '$lib/wasm/exports';
 import type { AnchorRename } from '$lib/types';
 import { resolveLink, isExternalLink, resolveWikilink, splitWikilinkTarget } from './linkResolve';
 
