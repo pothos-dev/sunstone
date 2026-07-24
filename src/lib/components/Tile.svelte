@@ -129,6 +129,23 @@
   // header's Edit toggle. Reflects + drives the shared `session.editorMode`.
   const editing = $derived(session.editorMode === 'editing');
 
+  // WEB (ticket 08 §4): the explicit Save button shows only while editing with
+  // unsaved changes; its presence IS the dirty indicator (no separate dot).
+  // Desktop autosaves, so it never shows there.
+  const showSave = $derived(__SUNSTONE_WEB__ && editing && tile.dirty);
+
+  // Toggle live editing. Turning it OFF resolves a dirty buffer first via the
+  // Tile's leave path: on web that runs the SAME three-way Save/Discard/Cancel
+  // modal as moving a file with a dirty editor (Cancel keeps editing); on
+  // desktop (or a clean buffer) it just flushes and proceeds.
+  async function toggleEditing(): Promise<void> {
+    if (!editing) {
+      session.setEditorMode('editing');
+      return;
+    }
+    if (await tile.requestLeave()) session.setEditorMode('read');
+  }
+
   const currentTileTitle = $derived(tileTitle(tile.activePath, frontmatterProps));
 
   // --- Unified undo/redo over the Tile's single body+frontmatter history -------
@@ -652,7 +669,9 @@
     onRedo={doRedo}
     onToggleReview={toggleReview}
     onExportPdf={exportPdf}
-    onToggleEditing={() => session.setEditorMode(editing ? 'read' : 'editing')}
+    onToggleEditing={toggleEditing}
+    {showSave}
+    onSave={() => void tile.flush()}
     propertiesShown={session.propertiesShown}
     onToggleProperties={() => session.setPropertiesShown(!session.propertiesShown)}
   />

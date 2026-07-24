@@ -13,9 +13,10 @@
   //   1. SSE routing — the SINGLE `onFileChanged` handler (App's own subscription
   //      is web-gated off), routing the active buffer through refresh / clean
   //      reload / dirty conflict / deleted, and refreshing the read-only surfaces.
-  //   2. Explicit Save — a dirty indicator + Save affordance + Cmd/Ctrl+S that
-  //      flush the active Document (one commit); web blur-flush is suppressed in
-  //      Tile, so persistence is explicit-only.
+  //   2. Explicit Save — Cmd/Ctrl+S flushes the active Document (one commit);
+  //      the visible Save button lives in the per-Tile header (shown while
+  //      editing + dirty). Web blur-flush is suppressed in Tile, so persistence
+  //      is explicit-only.
   //   3. Dirty-leave gate — registered on the workspace so a Concept switch / Tile
   //      close over a dirty buffer routes through the three-way leave modal.
   //   4. Structural-op gate — registered on `treeActions` so a rename/move/delete
@@ -58,11 +59,6 @@
   // The lazily-loaded desktop App shell, resolved in `onMount` (client only) so
   // nothing here is import-time heavy.
   let AppComponent = $state<Component | null>(null);
-
-  // --- Active-buffer state, read straight from the `editor` singleton ---------
-  // `editor.path`/`editor.dirty` are reactive getters over the active Tile's
-  // Document, so the indicator + Save affordance track the live buffer.
-  const dirty = $derived(editor.dirty);
 
   function basename(p: string): string {
     const last = p.split('/').pop() ?? p;
@@ -296,20 +292,10 @@
   <div class="web-app-shell" data-testid="web-app-shell">
     <AppComponent initialConcept={selected} {account} />
 
-    <!-- Explicit-Save affordance + dirty indicator (ticket 08 §4). -->
-    <div class="save-bar">
-      {#if dirty}
-        <span class="dirty-dot" data-testid="web-dirty" title="Unsaved changes" aria-label="Unsaved changes"
-        ></span>
-      {/if}
-      <button
-        type="button"
-        class="save-btn"
-        data-testid="web-save"
-        disabled={!dirty}
-        onclick={save}>Save</button
-      >
-    </div>
+    <!-- Explicit Save (ticket 08 §4) lives in the per-Tile header now (between
+         undo/redo and the Edit toggle), shown only while editing + dirty; its
+         presence IS the dirty indicator. Cmd/Ctrl+S (wired in onMount) remains
+         the keyboard path. -->
 
     <WebConcurrencyModals
       {conceptName}
@@ -371,45 +357,5 @@
   .loading {
     padding: 1rem;
     color: var(--text-muted, #777);
-  }
-
-  /* Floating explicit-Save control, top-centre so it clears the sidebars. */
-  .save-bar {
-    position: fixed;
-    top: 0.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-  }
-
-  .dirty-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--accent, #d9622b);
-  }
-
-  .save-btn {
-    padding: 0.25rem 0.7rem;
-    border: 1px solid var(--border, #ccc);
-    border-radius: var(--radius-sm, 6px);
-    background: var(--bg-elevated, #f0f2f6);
-    color: inherit;
-    font: inherit;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.12s ease;
-  }
-
-  .save-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .save-btn:not(:disabled):hover {
-    background: var(--hover, rgba(127, 127, 127, 0.15));
   }
 </style>

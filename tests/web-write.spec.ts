@@ -12,7 +12,7 @@ import { mountShell, openFromTree, cmContent, headCommit, commitCount, typeAtEnd
  * Concept from the tree → edit its CodeMirror buffer → EXPLICIT Save (Cmd/Ctrl+S
  * and the `web-save` button) → the SvelteKit hook mints a JWT from the live
  * session → axum verifies it → `sunstone-server` write-then-commits into the
- * served fixture git repo. We assert the `web-dirty` indicator, then a real
+ * served fixture git repo. We assert the `web-save` affordance, then a real
  * commit authored by the signed-in identity.
  *
  * Persistence is EXPLICIT-ONLY on web: a separate case proves that blurring the
@@ -76,17 +76,17 @@ test('authed Cmd/Ctrl+S edits a Concept and lands a real commit as the signed-in
     await expect(content).toContainText('Original body line');
 
     await typeAtEnd(page, content, `\n\n${marker}`);
-    // Editing marks the buffer dirty: the dot shows and Save enables.
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
-    await expect(page.getByTestId('web-save')).toBeEnabled();
+    // Editing marks the buffer dirty: the header Save button appears (its
+    // presence IS the dirty indicator).
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = headCommit().hash;
     await page.keyboard.press('Control+s');
 
-    // Dirty clears once the flush resolves, and a NEW commit lands, authored by
-    // the signed-in test identity, with the expected subject.
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
-    await expect(page.getByTestId('web-save')).toBeDisabled();
+    // Save clears the dirty state once the flush resolves (the button
+    // disappears), and a NEW commit lands, authored by the signed-in test
+    // identity, with the expected subject.
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
     await expect.poll(() => headCommit().hash, { timeout: 10_000 }).not.toBe(before);
     const head = headCommit();
     expect(head.subject).toBe(`edit ${rel} via web`);
@@ -109,12 +109,12 @@ test('the `web-save` button also persists an explicit commit', async ({ page }) 
     const content = await openFromTree(page, rel);
 
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = headCommit().hash;
     await page.getByTestId('web-save').click();
 
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
     await expect.poll(() => headCommit().hash, { timeout: 10_000 }).not.toBe(before);
     const head = headCommit();
     expect(head.subject).toBe(`edit ${rel} via web`);
@@ -134,7 +134,7 @@ test('web persistence is explicit-only: blurring the editor does NOT commit', as
     const content = await openFromTree(page, TARGET_REL);
 
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = commitCount();
 
@@ -148,7 +148,7 @@ test('web persistence is explicit-only: blurring the editor does NOT commit', as
     // Give any (erroneous) async flush a chance to commit, then prove none did:
     // the buffer stays dirty and the commit count is unchanged.
     await page.waitForTimeout(1500);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
     expect(commitCount()).toBe(before);
     // Nothing was persisted to disk either.
     expect(readFileSync(TARGET_ABS, 'utf8')).not.toContain(marker);

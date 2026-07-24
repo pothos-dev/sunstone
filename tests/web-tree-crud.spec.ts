@@ -163,7 +163,7 @@ test('structural gate: dirty buffer + rename → modal; "Save & continue" commit
 
     // Dirty the active buffer.
     await typeAtEnd(page, content, '\n\nDIRTY_EDIT_BEFORE_RENAME');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = commitCount();
 
@@ -184,7 +184,7 @@ test('structural gate: dirty buffer + rename → modal; "Save & continue" commit
 
     await expect.poll(() => commitCount(), { timeout: 10_000 }).toBe(before + 2);
     expect(headCommit().subject).toBe(`rename ${rel} → ${renamedRel} via web`);
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
   } finally {
     rmSync(abs, { force: true });
     rmSync(renamedAbs, { force: true });
@@ -203,7 +203,7 @@ test('structural gate: "Cancel" aborts the rename — no op, no commit', async (
     const content = await openFromTree(page, rel);
 
     await typeAtEnd(page, content, '\n\nDIRTY_EDIT_KEPT');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = commitCount();
 
@@ -219,7 +219,7 @@ test('structural gate: "Cancel" aborts the rename — no op, no commit', async (
     await page.getByTestId('web-structural-cancel').click();
     await expect(modal).toHaveCount(0);
     await expect(tree.locator(`[data-path="${rel}"]`)).toBeVisible();
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     await page.waitForTimeout(1000);
     expect(commitCount()).toBe(before);

@@ -69,6 +69,16 @@ test('tile header: Edit toggle, undo/redo, review + export live in the header', 
   await expect(undoBtn).toBeDisabled();
   await expect(redoBtn).toBeDisabled();
 
+  // Undo/redo sit to the LEFT of the Edit toggle in the control row (DOM order
+  // == visual order here). The Edit toggle is a text button reading "Edit".
+  await expect(header.getByTestId('edit-toggle')).toHaveText('Edit');
+  const controls = header.locator('[data-testid]');
+  const order = await controls.evaluateAll((els) =>
+    els.map((e) => e.getAttribute('data-testid')),
+  );
+  expect(order.indexOf('undo')).toBeLessThan(order.indexOf('edit-toggle'));
+  expect(order.indexOf('redo')).toBeLessThan(order.indexOf('edit-toggle'));
+
   // Edit a property; the header undo enables. Properties is hidden by default
   // (global toggle) — switch it on so the frontmatter inputs are available.
   await page.getByTestId('properties-toggle').click();

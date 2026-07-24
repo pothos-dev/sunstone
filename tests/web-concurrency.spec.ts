@@ -70,7 +70,7 @@ test('clean buffer: an external change silently reloads + shows the updated noti
     await expect(content).toContainText('EXTERNALLY_RELOADED', { timeout: 15_000 });
     await expect(page.getByTestId('web-conflict-modal')).toHaveCount(0);
     // Reloaded from disk → still clean (no dirty dot).
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
   } finally {
     rmSync(abs, { force: true });
   }
@@ -88,7 +88,7 @@ test('dirty buffer: an external change raises the conflict modal; discard reload
   try {
     // Make the buffer dirty with local edits.
     await typeAtEnd(page, content, '\n\nLOCAL_UNSAVED_EDIT');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     // Second writer changes the SAME active file → blocking conflict modal.
     writeFileSync(abs, scratchBody('Conflict Target', 'THEIR_NEWER_VERSION body.'));
@@ -101,7 +101,7 @@ test('dirty buffer: an external change raises the conflict modal; discard reload
     await expect(content).toContainText('THEIR_NEWER_VERSION');
     await expect(content).not.toContainText('LOCAL_UNSAVED_EDIT');
     // Buffer is clean again → no dirty dot.
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
   } finally {
     rmSync(abs, { force: true });
   }
@@ -116,7 +116,7 @@ test('dirty buffer: "keep my changes" dismisses the conflict and stays dirty', a
   );
   try {
     await typeAtEnd(page, content, '\n\nKEEP_MY_EDIT');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     writeFileSync(abs, scratchBody('Keep Target', 'THEIR_VERSION body.'));
     const modal = page.getByTestId('web-conflict-modal');
@@ -126,7 +126,7 @@ test('dirty buffer: "keep my changes" dismisses the conflict and stays dirty', a
     // still holds the unsaved edit (a later Save would win last-write-wins).
     await page.getByTestId('web-conflict-keep').click();
     await expect(modal).toHaveCount(0);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
     await expect(content).toContainText('KEEP_MY_EDIT');
   } finally {
     rmSync(abs, { force: true });
@@ -146,7 +146,7 @@ test('dirty buffer: an external delete of the active Concept shows the deleted s
     // Dirty the buffer so the delete becomes a recoverable "orphan" (not a
     // silent drop-back to empty, which is the clean-buffer behaviour).
     await typeAtEnd(page, content, '\n\nUNSAVED_BEFORE_DELETE');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     // Second writer deletes the active file on disk → deleted-state banner.
     rmSync(abs, { force: true });

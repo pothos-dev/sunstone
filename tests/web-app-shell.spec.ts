@@ -50,10 +50,10 @@ test('authed user gets the full App shell: CodeMirror editor + interactive tree'
   await enterEdit(page);
   await expect(content).toHaveAttribute('contenteditable', 'true');
 
-  // The explicit-Save affordance is mounted (clean buffer → disabled, no dot).
-  await expect(page.getByTestId('web-save')).toBeVisible();
-  await expect(page.getByTestId('web-save')).toBeDisabled();
-  await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+  // The Save affordance lives in the tile header and shows ONLY while editing
+  // with unsaved changes; a freshly-opened clean buffer has no Save button (and
+  // there is no separate dirty dot).
+  await expect(page.getByTestId('web-save')).toHaveCount(0);
 
   await page.screenshot({ path: 'tests/screenshots/web-app-shell.png', fullPage: true });
 });

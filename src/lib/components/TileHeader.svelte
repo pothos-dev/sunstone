@@ -49,6 +49,11 @@
     onExportPdf: () => void;
     /** Toggle live editing on/off for this Concept. */
     onToggleEditing: () => void;
+    /** WEB only: show the explicit Save button (editing + unsaved changes). On
+     *  desktop this stays false (autosave), so the button never renders. */
+    showSave?: boolean;
+    /** WEB only: commit the active buffer (flush the Document). */
+    onSave?: () => void;
     /** Whether the Properties panel is shown (global `session.propertiesShown`). */
     propertiesShown: boolean;
     /**
@@ -81,6 +86,8 @@
     onToggleReview,
     onExportPdf,
     onToggleEditing,
+    showSave = false,
+    onSave,
     propertiesShown,
     onToggleProperties,
   }: Props = $props();
@@ -113,61 +120,11 @@
   </div>
 
   <div class="tile-controls">
-    <!-- Edit toggle: the single view-mode control (editing-boolean-edit-toggle).
-         Pressed = live editing (rendered with the cursor line shown raw, editable);
-         unpressed = reading (fully rendered, read-only — the default). -->
-    <button
-      type="button"
-      class="icon-btn"
-      class:active={editing}
-      data-testid="edit-toggle"
-      title={editing ? 'Editing — click to switch to reading' : 'Edit — switch to live editing'}
-      aria-label="Edit"
-      aria-pressed={editing}
-      disabled={!hasOpenConcept}
-      onclick={onToggleEditing}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        width="15"
-        height="15"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-      </svg>
-    </button>
-
-    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
-         Moved here from the deleted NavBar; drives the global
-         `session.propertiesShown` flag (app-wide preference). -->
-    <button
-      type="button"
-      class="icon-btn"
-      class:active={propertiesShown}
-      data-testid="properties-toggle"
-      title={propertiesShown ? 'Hide Properties' : 'Show Properties'}
-      aria-label="Properties"
-      aria-pressed={propertiesShown}
-      onclick={onToggleProperties}
-    >
-      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-        <!-- sliders glyph: two horizontal rails with knobs (properties/settings). -->
-        <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
-        <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
-        <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-        <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-      </svg>
-    </button>
-
     <!-- Undo / redo over the Tile's single body+frontmatter history. Shown only
          while editing — reading mode is read-only, so there is nothing to undo.
-         The mousedown-prevent keeps clicking a button from blurring/committing an
-         in-progress frontmatter edit before the command runs. -->
+         They sit to the LEFT of the Edit toggle. The mousedown-prevent keeps
+         clicking a button from blurring/committing an in-progress frontmatter
+         edit before the command runs. -->
     {#if editing}
       <div class="btn-group">
         <button
@@ -192,6 +149,60 @@
         >
       </div>
     {/if}
+
+    <!-- WEB explicit Save (ticket 08 §4): sits between undo/redo and the Edit
+         toggle, shown ONLY while editing with unsaved changes. Its presence IS
+         the dirty indicator (no separate dot). Desktop autosaves → never shown.
+         The mousedown-prevent keeps the click from blurring a frontmatter edit
+         before the flush runs. -->
+    {#if showSave}
+      <button
+        type="button"
+        class="text-btn save-btn"
+        data-testid="web-save"
+        title="Save (Ctrl/Cmd+S)"
+        aria-label="Save"
+        onmousedown={(e) => e.preventDefault()}
+        onclick={onSave}>Save</button
+      >
+    {/if}
+
+    <!-- Edit toggle: the single view-mode control (editing-boolean-edit-toggle).
+         Pressed = live editing (rendered with the cursor line shown raw, editable);
+         unpressed = reading (fully rendered, read-only — the default). -->
+    <button
+      type="button"
+      class="text-btn"
+      class:active={editing}
+      data-testid="edit-toggle"
+      title={editing ? 'Editing — click to switch to reading' : 'Edit — switch to live editing'}
+      aria-label="Edit"
+      aria-pressed={editing}
+      disabled={!hasOpenConcept}
+      onclick={onToggleEditing}>Edit</button
+    >
+
+    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
+         Moved here from the deleted NavBar; drives the global
+         `session.propertiesShown` flag (app-wide preference). -->
+    <button
+      type="button"
+      class="icon-btn"
+      class:active={propertiesShown}
+      data-testid="properties-toggle"
+      title={propertiesShown ? 'Hide Properties' : 'Show Properties'}
+      aria-label="Properties"
+      aria-pressed={propertiesShown}
+      onclick={onToggleProperties}
+    >
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <!-- sliders glyph: two horizontal rails with knobs (properties/settings). -->
+        <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
+        <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+      </svg>
+    </button>
 
     <!-- Review changes (working-tree ↔ HEAD): a read-only diff view. Disabled
          with an explanatory tooltip when the Concept has no reviewable history. -->
@@ -370,5 +381,52 @@
   .icon-btn:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+
+  /* Text buttons (Edit, Save): same height/treatment as the icon buttons but
+     sized to their label. */
+  .text-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.7rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.12s ease;
+  }
+
+  .text-btn:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  .text-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .text-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  /* Save is the primary action while editing dirty — give it the accent fill. */
+  .save-btn {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .save-btn:hover:not(:disabled) {
+    background: var(--accent);
+    opacity: 0.9;
   }
 </style>

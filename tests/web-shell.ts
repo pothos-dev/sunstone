@@ -12,8 +12,9 @@ import { signInAsTestUser } from './web-auth';
  * specs drive the REAL App surface: the interactive `Tree` (`data-testid="tree"`
  * with `[data-path]` file rows), the CodeMirror buffer inside each Tile's editor
  * host (`[data-testid="editor"] .cm-content`), and the explicit-Save affordance
- * (`web-save` / `web-dirty`). Persistence is explicit-only (Cmd/Ctrl+S or the
- * Save button); blur does NOT commit on web.
+ * (`web-save`, shown in the tile header while editing + dirty — its presence is
+ * the dirty indicator). Persistence is explicit-only (Cmd/Ctrl+S or the Save
+ * button); blur does NOT commit on web.
  */
 
 /** The tip commit's subject + author (name / email), from `git log -1`. */

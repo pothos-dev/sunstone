@@ -10,7 +10,7 @@ import { mountShell, openFromTree, cmContent, headCommit, commitCount, typeAtEnd
  * `web-write` happy-path spec does not cover:
  *
  *  1. **Property → Save.** A Properties-panel frontmatter edit stays IN-MEMORY
- *     (marks `web-dirty`, lands NO commit) until an explicit Save folds body +
+ *     (shows `web-save`, lands NO commit) until an explicit Save folds body +
  *     frontmatter into ONE `edit <path> via web` commit. Proves the web-gated
  *     suppression of Tile's eager `flush()` on a property edit.
  *  2. **Nav gating.** A dirty buffer's own in-editor navigations — a wikilink
@@ -29,7 +29,7 @@ function diskContent(rel: string): string {
   return readFileSync(join(WEB_BUNDLE_DIR, rel), 'utf8');
 }
 
-test('a Properties edit stays in-memory (web-dirty, NO commit) until Save folds it into one commit', async ({
+test('a Properties edit stays in-memory (shows Save, NO commit) until Save folds it into one commit', async ({
   page,
 }) => {
   const rel = 'prop-target.md';
@@ -57,10 +57,10 @@ test('a Properties edit stays in-memory (web-dirty, NO commit) until Save folds 
     // every keystroke — blur it (staying in this tile, so no Concept switch).
     await titleInput.blur();
 
-    // The property edit marks the buffer dirty WITHOUT eager-committing: the dot
-    // shows, Save enables, and NO new commit landed (explicit-save only).
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
-    await expect(page.getByTestId('web-save')).toBeEnabled();
+    // The property edit marks the buffer dirty WITHOUT eager-committing: the
+    // header Save button appears (its presence IS the dirty indicator), and NO
+    // new commit landed (explicit-save only).
+    await expect(page.getByTestId('web-save')).toBeVisible();
     await page.waitForTimeout(800);
     expect(commitCount()).toBe(before);
     // The old title is still what is on disk — nothing was persisted yet.
@@ -68,7 +68,7 @@ test('a Properties edit stays in-memory (web-dirty, NO commit) until Save folds 
 
     // Explicit Save folds the frontmatter change into ONE commit.
     await page.getByTestId('web-save').click();
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
     await expect.poll(() => commitCount(), { timeout: 10_000 }).toBe(before + 1);
     const head = headCommit();
     expect(head.subject).toBe(`edit ${rel} via web`);
@@ -101,7 +101,7 @@ test('a dirty wikilink navigation gates on the leave modal: Cancel stays, Save c
 
     // Dirty the buffer, then click the in-editor wikilink to navdst.
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const wikilink = page
       .getByTestId('editor')
@@ -118,7 +118,7 @@ test('a dirty wikilink navigation gates on the leave modal: Cancel stays, Save c
     await page.getByTestId('web-leave-cancel').click();
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     await expect(content).toContainText('Nav Source');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
     expect(commitCount()).toBe(before);
 
     // Click the wikilink again, this time Save & navigate: one commit lands, then
@@ -158,7 +158,7 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
 
     // Dirty B, then press Back — the leave modal must block the history nav.
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = commitCount();
     const back = page.getByTestId('nav-back');
@@ -170,7 +170,7 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     // Cancel keeps us on the dirty B (no nav to A), and lands no commit.
     await expect(content).toContainText('Concept B body');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
     expect(commitCount()).toBe(before);
     expect(diskContent(bRel)).not.toContain(marker);
 
@@ -218,11 +218,11 @@ test('renaming a referenced heading + Save rewrites the inbound anchor on disk, 
     await headingLine.click();
     await page.keyboard.press('End');
     await page.keyboard.type('er');
-    await expect(page.getByTestId('web-dirty')).toBeVisible();
+    await expect(page.getByTestId('web-save')).toBeVisible();
 
     const before = commitCount();
     await page.getByTestId('web-save').click();
-    await expect(page.getByTestId('web-dirty')).toHaveCount(0);
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
 
     // The inbound anchor in the OTHER Concept is rewritten on disk to the new slug.
     await expect
@@ -239,5 +239,51 @@ test('renaming a referenced heading + Save rewrites the inbound anchor on disk, 
   } finally {
     rmSync(targetAbs, { force: true });
     rmSync(sourceAbs, { force: true });
+  }
+});
+
+test('toggling Edit off with a dirty buffer routes through the leave modal (Cancel keeps editing; Save commits + exits)', async ({
+  page,
+}) => {
+  const rel = 'toggle-off-gate.md';
+  const abs = join(WEB_BUNDLE_DIR, rel);
+  const marker = `TOGGLEOFF_${Date.now()}`;
+  writeFileSync(abs, `---\ntype: concept\ntitle: Toggle Off\n---\n\n# Toggle Off\n\nBody.\n`);
+
+  try {
+    await mountShell(page, '/');
+    const content = await openFromTree(page, rel);
+    const editToggle = page.getByTestId('edit-toggle');
+    await expect(editToggle).toHaveAttribute('aria-pressed', 'true');
+
+    // Dirty the buffer → the header Save button appears (the dirty indicator).
+    await typeAtEnd(page, content, `\n\n${marker}`);
+    await expect(page.getByTestId('web-save')).toBeVisible();
+
+    const before = commitCount();
+
+    // Toggling Edit OFF with unsaved changes raises the SAME three-way leave
+    // modal as a dirty navigation. Cancel keeps us editing + dirty; no commit.
+    await editToggle.click();
+    await expect(page.getByTestId('web-leave-modal')).toBeVisible();
+    await page.getByTestId('web-leave-cancel').click();
+    await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
+    await expect(editToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('web-save')).toBeVisible();
+    expect(commitCount()).toBe(before);
+
+    // Toggle again, this time Save & exit: one commit lands and the editor drops
+    // back to read mode (no Save button, edit toggle unpressed).
+    await editToggle.click();
+    await expect(page.getByTestId('web-leave-modal')).toBeVisible();
+    await page.getByTestId('web-leave-save').click();
+    await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
+    await expect(editToggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('web-save')).toHaveCount(0);
+    await expect.poll(() => commitCount(), { timeout: 10_000 }).toBe(before + 1);
+    expect(headCommit().subject).toBe(`edit ${rel} via web`);
+    expect(diskContent(rel)).toContain(marker);
+  } finally {
+    rmSync(abs, { force: true });
   }
 });
