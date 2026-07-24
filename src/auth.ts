@@ -78,6 +78,9 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
       if (session.user) {
         session.user.name = (token.name as string | undefined) ?? session.user.name;
         session.user.email = (token.email as string | undefined) ?? session.user.email;
+        // Carry the OIDC `picture` claim (if any) so the UI can show a real
+        // avatar; falls back to initials when the provider gives none.
+        session.user.image = (token.picture as string | undefined) ?? session.user.image;
       }
       return session;
     },

@@ -74,7 +74,11 @@ test('signing in swaps the read surface for the app shell on the same session', 
   await expect(page.getByTestId('web-app-loading')).toHaveCount(0);
   await expect(page.getByTestId('web-viewer')).toHaveCount(0);
 
-  // The account bar shows the identity + a one-click sign-out button.
+  // The rail's avatar menu surfaces the identity + a sign-out button on click
+  // (the old top-right account bar is gone).
+  await expect(page.getByTestId('user-menu')).toBeVisible();
+  await expect(page.getByTestId('web-user')).toHaveCount(0);
+  await page.getByTestId('user-menu').click();
   await expect(page.getByTestId('web-user')).toHaveText(TEST_AUTH_NAME);
   await expect(page.getByTestId('web-sign-out')).toBeVisible();
 

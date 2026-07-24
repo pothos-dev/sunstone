@@ -57,24 +57,31 @@ export interface WebPageData {
    * The authenticated user (Auth.js session), or `null` when signed out. Read
    * from the Auth.js `/auth/session` endpoint through the same relative `fetch`
    * (SSR or client), so the viewer can show the Edit affordance ONLY to a
-   * signed-in user (ticket 06). Only the display `name` is carried.
+   * signed-in user (ticket 06). The display `name` plus an optional avatar
+   * `image` URL (present only when the OIDC provider returns a `picture`).
    */
-  user: { name: string } | null;
+  user: WebUser | null;
+}
+
+/** The signed-in identity the viewer surfaces (name + optional avatar image). */
+export interface WebUser {
+  name: string;
+  image?: string | null;
 }
 
 /** The subset of the Auth.js session JSON the viewer needs. */
 interface SessionResponse {
-  user?: { name?: string | null } | null;
+  user?: { name?: string | null; image?: string | null } | null;
 }
 
 /** Fetch the current user from Auth.js, or `null` when signed out / on error. */
-async function loadUser(fetchFn: typeof fetch): Promise<{ name: string } | null> {
+async function loadUser(fetchFn: typeof fetch): Promise<WebUser | null> {
   try {
     const res = await fetchFn('/auth/session');
     if (!res.ok) return null;
     const session = (await res.json()) as SessionResponse | null;
     const name = session?.user?.name;
-    return name ? { name } : null;
+    return name ? { name, image: session?.user?.image ?? null } : null;
   } catch {
     return null;
   }

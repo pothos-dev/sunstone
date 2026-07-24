@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TreeNode, TagCount } from '$lib/types';
   import type { RenderPayload } from './render';
+  import type { WebUser } from './loadConcept';
   import type { Component } from 'svelte';
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
@@ -38,7 +39,7 @@
       renderError: string | null;
       /** Authenticated user (Auth.js session), or null when signed out. The
        *  Edit affordance is shown ONLY when this is present (ticket 06). */
-      user: { name: string } | null;
+      user: WebUser | null;
     };
   }
 
@@ -686,24 +687,16 @@
     transition: none;
   }
 
+  /* No border on the aside itself: the adjacent SidebarEdge draws the single
+     1px seam (matching the rail's border). A border here too would double it. */
   .side-bar.left {
     grid-column: 2;
     justify-content: flex-end;
-    border-right: 1px solid var(--border, #e2e2e2);
-  }
-
-  .side-bar.left.collapsed {
-    border-right-width: 0;
   }
 
   .side-bar.right {
     grid-column: 6;
     justify-content: flex-start;
-    border-left: 1px solid var(--border, #e2e2e2);
-  }
-
-  .side-bar.right.collapsed {
-    border-left-width: 0;
   }
 
   /* The inner keeps the FULL persisted width (via --side-w) while the outer

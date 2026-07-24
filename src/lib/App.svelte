@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { backend } from '$lib/ipc';
   import { bundle } from '$lib/state/bundle.svelte';
   import { editor } from '$lib/state/editor.svelte';
@@ -49,9 +49,15 @@
      * shell (which never passes it) behaves byte-identically.
      */
     initialConcept?: string | null;
+    /**
+     * WEB build only: the account affordance (avatar + sign-out menu) rendered
+     * into the activity rail's bottom user slot. The desktop shell never passes
+     * it, so the slot stays empty and desktop behaves byte-identically.
+     */
+    account?: Snippet;
   }
 
-  let { initialConcept = null }: Props = $props();
+  let { initialConcept = null, account }: Props = $props();
 
   // The tiling workspace (row of columns of Tiles) behind the editor facade. App
   // renders its layout + drives split/close/resize/active; the facade stays the
@@ -633,6 +639,7 @@
   <ActivityRail
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
+    user={account}
   />
 
   <aside
@@ -971,7 +978,8 @@
     overflow: hidden;
     display: flex;
     justify-content: flex-end;
-    border-right: 1px solid var(--border);
+    /* No border on the aside itself: the adjacent SidebarEdge draws the single
+       1px seam (matching the rail's border). A border here too would double it. */
     background: var(--bg-elevated);
     transition: width 0.22s ease;
   }
@@ -982,19 +990,8 @@
     transition: none;
   }
 
-  .side-bar.collapsed {
-    border-right-width: 0;
-  }
-
   .right-side-bar {
     justify-content: flex-start;
-    border-right: none;
-    border-left: 1px solid var(--border);
-  }
-
-  .right-side-bar.collapsed {
-    border-left-width: 0;
-    border-right-width: 0;
   }
 
   .side-bar-inner {

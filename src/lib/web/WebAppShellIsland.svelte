@@ -33,12 +33,14 @@
   import type { FileChange } from '$lib/types';
   import { routeFileChange, structuralOpGated, type GatedStructuralOp } from './concurrency';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
+  import UserMenu from './UserMenu.svelte';
+  import type { WebUser } from './loadConcept';
 
   interface Props {
     /** bundle-relative path of the SSR-selected Concept (forward-slash), or null. */
     selected: string | null;
-    /** The authenticated user (for the account bar / sign-out affordance). */
-    user: { name: string } | null;
+    /** The authenticated user (for the rail's avatar / sign-out menu). */
+    user: WebUser | null;
   }
 
   let { selected, user }: Props = $props();
@@ -282,9 +284,17 @@
   });
 </script>
 
+{#snippet account()}
+  <!-- The rail's bottom user slot: an avatar that opens a menu with the display
+       name + Sign out (replaces the old top-right account bar). -->
+  {#if user}
+    <UserMenu {user} onSignOut={signOut} />
+  {/if}
+{/snippet}
+
 {#if AppComponent}
   <div class="web-app-shell" data-testid="web-app-shell">
-    <AppComponent initialConcept={selected} />
+    <AppComponent initialConcept={selected} {account} />
 
     <!-- Explicit-Save affordance + dirty indicator (ticket 08 §4). -->
     <div class="save-bar">
@@ -298,21 +308,6 @@
         data-testid="web-save"
         disabled={!dirty}
         onclick={save}>Save</button
-      >
-    </div>
-
-    <!-- Account bar (web only): the signed-in identity + a one-click sign-out.
-         Top-right so it clears the top-centre Save bar and the sidebars. -->
-    <div class="account-bar">
-      {#if user}
-        <span class="account-name" data-testid="web-user" title={user.name}>{user.name}</span>
-      {/if}
-      <button
-        type="button"
-        class="account-btn"
-        data-testid="web-sign-out"
-        title="Sign out"
-        onclick={signOut}>Sign out</button
       >
     </div>
 
@@ -415,42 +410,6 @@
   }
 
   .save-btn:not(:disabled):hover {
-    background: var(--hover, rgba(127, 127, 127, 0.15));
-  }
-
-  /* Account bar: signed-in identity + sign-out, pinned top-right. */
-  .account-bar {
-    position: fixed;
-    top: 0.5rem;
-    right: 0.6rem;
-    z-index: 30;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .account-name {
-    max-width: 12rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.8rem;
-    color: var(--text-muted, #777);
-  }
-
-  .account-btn {
-    padding: 0.25rem 0.7rem;
-    border: 1px solid var(--border, #ccc);
-    border-radius: var(--radius-sm, 6px);
-    background: var(--bg-elevated, #f0f2f6);
-    color: inherit;
-    font: inherit;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.12s ease;
-  }
-
-  .account-btn:hover {
     background: var(--hover, rgba(127, 127, 127, 0.15));
   }
 </style>
