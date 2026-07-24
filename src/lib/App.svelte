@@ -18,7 +18,6 @@
   import TagBrowser from '$lib/components/TagBrowser.svelte';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import SidebarEdge from '$lib/components/SidebarEdge.svelte';
-  import { COLLAPSED_SIDEBAR_WIDTH } from '$lib/sidebarResize';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import Tile from '$lib/components/Tile.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
@@ -649,7 +648,7 @@
     class:resizing={leftResizing}
     aria-label="Sidebar"
     data-testid="side-bar"
-    style="width: {session.leftSidebarVisible ? session.leftSidebarWidth : COLLAPSED_SIDEBAR_WIDTH}px; --side-w: {session.leftSidebarWidth}px; --expanded-count: {expandedCount}"
+    style="width: {session.leftSidebarVisible ? session.leftSidebarWidth : 0}px; --side-w: {session.leftSidebarWidth}px; --expanded-count: {expandedCount}"
   >
     <div class="side-bar-inner">
     <SidebarSection
@@ -867,7 +866,7 @@
     class:resizing={rightResizing}
     aria-label="Outline & Backlinks"
     data-testid="right-side-bar"
-    style="width: {session.rightSidebarVisible ? session.rightSidebarWidth : COLLAPSED_SIDEBAR_WIDTH}px; --side-w: {session.rightSidebarWidth}px; --expanded-count: {rightExpandedCount}"
+    style="width: {session.rightSidebarVisible ? session.rightSidebarWidth : 0}px; --side-w: {session.rightSidebarWidth}px; --expanded-count: {rightExpandedCount}"
   >
     <div class="side-bar-inner">
       <SidebarSection
@@ -960,7 +959,7 @@
     /* Far-left activity rail (fixed) | collapsible left Sidebar | its resize edge
        | editor | right resize edge | right Sidebar. The rail and both edges sit
        OUTSIDE the collapsing Sidebars, so the edge stays a click target to
-       re-expand a Sidebar collapsed to its thin peek width. */
+       re-expand a Sidebar collapsed to 0 width (the edge border thickens). */
     grid-template-columns: auto auto auto 1fr auto auto;
     height: 100vh;
     overflow: hidden;
@@ -972,9 +971,9 @@
 
   .side-bar {
     /* Width is driven inline from the persisted `leftSidebarWidth` /
-       `rightSidebarWidth` (COLLAPSED_SIDEBAR_WIDTH when collapsed). The inner
-       keeps the FULL width (via `--side-w`) so collapsing slides the content
-       out under the clip rather than reflowing it — the peek shows backdrop. */
+       `rightSidebarWidth` (0 when collapsed). The inner keeps the FULL width
+       (via `--side-w`) so collapsing slides the content out under the clip
+       rather than reflowing it. */
     height: 100vh;
     overflow: hidden;
     display: flex;

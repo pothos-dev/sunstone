@@ -46,13 +46,11 @@ test('activity rail: icons open QuickNav / SearchPanel and rail survives sidebar
   await page.keyboard.press('Escape');
   await expect(palette).toBeHidden();
 
-  // Collapsing the left Sidebar (via the edge) shrinks it to a thin peek sliver
-  // (COLLAPSED_SIDEBAR_WIDTH); the rail — which lives outside it — stays visible.
+  // Collapsing the left Sidebar (via the edge) hides the Sidebar but the
+  // rail — which lives outside it — stays visible.
   await page.getByTestId('left-sidebar-edge').click();
   await expect(page.getByTestId('left-sidebar-edge')).toHaveAttribute('aria-pressed', 'false');
-  await expect
-    .poll(async () => (await page.getByTestId('side-bar').boundingBox())?.width ?? 0)
-    .toBeLessThanOrEqual(14);
+  await expect(page.getByTestId('side-bar')).not.toBeVisible();
   await expect(rail).toBeVisible();
 
   // The rail's icons still work with the Sidebar collapsed.

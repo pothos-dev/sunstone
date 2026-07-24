@@ -14,13 +14,6 @@ export const MIN_SIDEBAR_WIDTH = 180;
 export const MAX_SIDEBAR_WIDTH = 560;
 /** Fresh/older-Bundle default width (matches the old hard-coded CSS). */
 export const DEFAULT_SIDEBAR_WIDTH = 280;
-/**
- * Width a COLLAPSED sidebar keeps: a thin sliver of its backdrop still peeks at
- * the window edge (rather than vanishing to 0), so the border/grab-edge stays
- * discoverable. The fixed-width inner slides out under the clip, so the peek
- * shows only backdrop, not content.
- */
-export const COLLAPSED_SIDEBAR_WIDTH = 10;
 /** Keyboard-resize step (Arrow keys on a focused edge). */
 export const KEYBOARD_RESIZE_STEP = 24;
 /**

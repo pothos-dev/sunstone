@@ -1,18 +1,7 @@
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Locator } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { WEB_BUNDLE_DIR } from './web-bundle';
-
-/**
- * A collapsed Sidebar no longer vanishes to 0 — it keeps a thin peek sliver
- * (COLLAPSED_SIDEBAR_WIDTH = 10px) at the window edge, so it's still "visible".
- * Assert on the rendered WIDTH instead: a peek is ~10px, an expanded one is wide.
- */
-const PEEK_MAX_WIDTH = 14;
-async function expectSidebarCollapsed(locator: Locator): Promise<void> {
-  await expect.poll(async () => (await locator.boundingBox())?.width ?? 0).toBeLessThanOrEqual(PEEK_MAX_WIDTH);
-}
 
 /**
  * A scratch Concept written into the SERVED Bundle to trigger live reload. The
@@ -458,14 +447,14 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   // Clicking the left edge collapses the left Sidebar; clicking again restores it.
   await expect(page.getByTestId('left-side-bar')).toBeVisible();
   await page.getByTestId('left-sidebar-edge').click();
-  await expectSidebarCollapsed(page.getByTestId('left-side-bar'));
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
   await page.getByTestId('left-sidebar-edge').click();
   await expect(page.getByTestId('left-side-bar')).toBeVisible();
 
   // Clicking the right edge collapses the right Sidebar; clicking again restores it.
   await expect(page.getByTestId('right-side-bar')).toBeVisible();
   await page.getByTestId('right-sidebar-edge').click();
-  await expectSidebarCollapsed(page.getByTestId('right-side-bar'));
+  await expect(page.getByTestId('right-side-bar')).not.toBeVisible();
   await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('right-side-bar')).toBeVisible();
 
@@ -511,10 +500,10 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
 
   // Sidebar-collapse also persists.
   await page.getByTestId('left-sidebar-edge').click();
-  await expectSidebarCollapsed(page.getByTestId('left-side-bar'));
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
   await page.reload();
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
-  await expectSidebarCollapsed(page.getByTestId('left-side-bar'));
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
 });
 
 /**

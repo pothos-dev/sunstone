@@ -146,7 +146,7 @@
     bottom: 0;
     width: 1px;
     background: var(--border);
-    transition: background 0.12s ease;
+    transition: background 0.12s ease, width 0.12s ease;
   }
 
   /* Left sidebar's edge sits to its right → hairline on the strip's left.
@@ -157,6 +157,13 @@
 
   .sidebar-edge.right::after {
     right: 0;
+  }
+
+  /* Collapsed: the sidebar itself is gone (0 width), so the border IS the only
+     affordance — thicken it to a 5px bar (grown from the flush edge) so it stays
+     grabbable/visible at the window edge. */
+  .sidebar-edge.collapsed::after {
+    width: 5px;
   }
 
   .sidebar-edge:hover::after {
