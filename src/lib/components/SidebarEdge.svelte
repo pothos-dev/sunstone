@@ -123,9 +123,11 @@
 ></div>
 
 <style>
-  /* A comfortable hit-strip drawn transparent, with a centred hairline via a
-     pseudo so the visible seam stays 1px while the whole strip is grabbable —
-     matching the tiling column dividers. Cursor signals the resize axis. */
+  /* A comfortable hit-strip drawn transparent, with a 1px hairline via a pseudo
+     so the visible seam stays 1px while the whole strip is grabbable. The
+     hairline hugs the SIDEBAR-facing edge of the strip (not centred) so the
+     sidebar's backdrop touches the border with no gap; the rest of the strip
+     extends into the centre as invisible grab area. Cursor signals the axis. */
   .sidebar-edge {
     flex: none;
     align-self: stretch;
@@ -142,11 +144,19 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 50%;
     width: 1px;
-    transform: translateX(-50%);
     background: var(--border);
     transition: background 0.12s ease;
+  }
+
+  /* Left sidebar's edge sits to its right → hairline on the strip's left.
+     Right sidebar's edge sits to its left → hairline on the strip's right. */
+  .sidebar-edge.left::after {
+    left: 0;
+  }
+
+  .sidebar-edge.right::after {
+    right: 0;
   }
 
   .sidebar-edge:hover::after {

@@ -15,7 +15,7 @@
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import SidebarEdge from '$lib/components/SidebarEdge.svelte';
-  import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
+  import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH, COLLAPSED_SIDEBAR_WIDTH } from '$lib/sidebarResize';
   import WebAppShellIsland from './WebAppShellIsland.svelte';
   import WebTree from './WebTree.svelte';
   import WebSearch from './WebSearch.svelte';
@@ -377,7 +377,7 @@
     class:resizing={leftResizing}
     aria-label="Sidebar"
     data-testid="left-side-bar"
-    style="width: {leftSidebarOpen ? leftSidebarWidth : 0}px; --side-w: {leftSidebarWidth}px; --expanded-count: {leftCount}"
+    style="width: {leftSidebarOpen ? leftSidebarWidth : COLLAPSED_SIDEBAR_WIDTH}px; --side-w: {leftSidebarWidth}px; --expanded-count: {leftCount}"
   >
     <div class="side-bar-inner">
       <SidebarSection
@@ -601,7 +601,7 @@
       class:resizing={rightResizing}
       aria-label="Sidebar"
       data-testid="right-side-bar"
-      style="width: {rightSidebarOpen ? rightSidebarWidth : 0}px; --side-w: {rightSidebarWidth}px; --expanded-count: {rightCount}"
+      style="width: {rightSidebarOpen ? rightSidebarWidth : COLLAPSED_SIDEBAR_WIDTH}px; --side-w: {rightSidebarWidth}px; --expanded-count: {rightCount}"
     >
       <div class="side-bar-inner">
         <SidebarSection
@@ -635,7 +635,7 @@
     /* Far-left activity rail (fixed) | left Sidebar | its resize edge | centre |
        right resize edge | right Sidebar. The rail and both edges sit OUTSIDE the
        collapsing Sidebars, so an edge stays a click target to re-expand a Sidebar
-       collapsed to 0 width — mirrors the desktop shell grid. */
+       collapsed to its thin peek width — mirrors the desktop shell grid. */
     display: grid;
     grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
     height: 100vh;
@@ -669,10 +669,11 @@
     background-clip: padding-box;
   }
 
-  /* A Sidebar's OUTER: its width (0 when collapsed) is driven inline from the
-     persisted width; overflow-hidden clips the fixed-width inner so collapsing
-     slides content out under the clip rather than reflowing it (desktop parity).
-     The width transitions unless an edge drag is in progress. */
+  /* A Sidebar's OUTER: its width (COLLAPSED_SIDEBAR_WIDTH when collapsed) is
+     driven inline from the persisted width; overflow-hidden clips the
+     fixed-width inner so collapsing slides content out under the clip rather
+     than reflowing it (desktop parity) — the peek shows only backdrop. The
+     width transitions unless an edge drag is in progress. */
   .side-bar {
     height: 100vh;
     overflow: hidden;

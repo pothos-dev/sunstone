@@ -143,10 +143,13 @@ test('no NavBar: Properties toggle moved to the header; sidebars toggle from the
   const rightEdge = page.getByTestId('right-sidebar-edge');
   await expect(leftEdge).toHaveAttribute('aria-pressed', 'true');
   await expect(rightEdge).toHaveAttribute('aria-pressed', 'false');
-  // Clicking the left edge collapses the left Sidebar.
+  // Clicking the left edge collapses the left Sidebar to a thin peek sliver
+  // (COLLAPSED_SIDEBAR_WIDTH), rather than vanishing to 0.
   await leftEdge.click();
   await expect(leftEdge).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('side-bar')).not.toBeVisible();
+  await expect
+    .poll(async () => (await page.getByTestId('side-bar').boundingBox())?.width ?? 0)
+    .toBeLessThanOrEqual(14);
   // Clicking it again re-expands.
   await leftEdge.click();
   await expect(leftEdge).toHaveAttribute('aria-pressed', 'true');
