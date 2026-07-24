@@ -10,8 +10,11 @@
   // Ctrl+K / Ctrl+Shift+F keybindings flip — so both entry points converge on
   // one code path.
   //
-  // The bottom-pinned avatar/login slot is reserved but EMPTY on desktop; web
-  // fills it in a later ticket.
+  // The bottom-pinned avatar/login slot is reserved but EMPTY on desktop; the
+  // web anon read surface fills it (via the optional `user` snippet) with the
+  // real Auth.js sign-in / sign-out affordance.
+
+  import type { Snippet } from 'svelte';
 
   interface Props {
     /** Open the app menu. A no-op stub today (no menu contents yet). */
@@ -20,9 +23,12 @@
     onQuickNav: () => void;
     /** Toggle the full-text search panel (same flag as Ctrl+Shift+F). */
     onSearch: () => void;
+    /** Optional bottom user slot. Desktop passes none (the slot stays empty);
+     *  the web viewer fills it with a sign-in / sign-out affordance. */
+    user?: Snippet;
   }
 
-  let { onMenu, onQuickNav, onSearch }: Props = $props();
+  let { onMenu, onQuickNav, onSearch, user }: Props = $props();
 </script>
 
 <nav class="activity-rail" aria-label="Activity rail" data-testid="activity-rail">
@@ -71,9 +77,11 @@
     </button>
   </div>
 
-  <!-- Bottom-pinned avatar/login slot: reserved, EMPTY on desktop. Web fills it
-       in a later ticket. -->
-  <div class="rail-user" data-testid="rail-user" aria-hidden="true"></div>
+  <!-- Bottom-pinned avatar/login slot: reserved + EMPTY on desktop (no `user`
+       snippet), filled by the web viewer with a sign-in / sign-out affordance. -->
+  <div class="rail-user" data-testid="rail-user" aria-hidden={!user}>
+    {#if user}{@render user()}{/if}
+  </div>
 </nav>
 
 <style>
