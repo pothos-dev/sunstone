@@ -8,7 +8,7 @@ timestamp: 2026-07-23
 
 # Sidebars and Sections
 
-A **Sidebar** is a [Pane](/GLOSSARY.md) docked to the left or right edge of the [app shell](/interface/app-shell.md), holding a vertical stack of **Sections**. A **Section** is one collapsible item — an always-visible header plus a toggleable body. This is deliberately conventional editor chrome (VSCode-style); the section headers are discoverability affordances, not domain language.
+A **Sidebar** is a [Pane](/GLOSSARY.md) docked to the left or right of the [app shell](/interface/app-shell.md) (inboard of the far-left [Activity Rail](/interface/activity-rail.md)), holding a vertical stack of **Sections**. A **Section** is one collapsible item — an always-visible header plus a toggleable body. This is deliberately conventional editor chrome (VSCode-style); the section headers are discoverability affordances, not domain language.
 
 ## The two Sidebars
 
@@ -27,10 +27,19 @@ The **Accordion** names the behaviour of a Sidebar's stacked Sections sharing th
 
 Collapse is tracked at two granularities, each with its own persisted flag (see [view state](/interface/view-state.md)):
 
-- **Whole Sidebar** — `leftSidebarOpen`, `rightSidebarOpen`. A collapsed Sidebar hides all its Sections and hands the width to the Editor pane. Toggled from the NavBar.
+- **Whole Sidebar** — `leftSidebarOpen`, `rightSidebarOpen`. A collapsed Sidebar hides all its Sections and hands the width to the Editor pane.
 - **Per Section** — `explorerOpen`, `tagsOpen`, `outlineOpen`, `backlinksOpen`. Toggled by the Section header chevron.
 
 A Section is only actually shown when its Sidebar is expanded *and* its own flag is open.
+
+## The Sidebar edge — collapse and resize
+
+There is no nav-bar toggle for the whole Sidebar. Each Sidebar is instead driven by its own **edge** — the inner border, rendered by `SidebarEdge.svelte` over the pure geometry in `sidebarResize.ts`:
+
+- **Click** the edge (no meaningful pointer travel) to collapse/expand the Sidebar; it is keyboard-accessible as a button (Enter/Space toggles).
+- **Drag** the edge past a small threshold (`DRAG_THRESHOLD_PX`) to resize; a click and a drag are told apart purely by how far the pointer travelled. Arrow keys resize a focused edge in `KEYBOARD_RESIZE_STEP` steps.
+
+A Sidebar's width is clamped to `[MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH]` (a corrupt persisted value falls back to `DEFAULT_SIDEBAR_WIDTH`, so a bad store can never wedge the layout) and is remembered as [View state](/interface/view-state.md) — `leftSidebarWidth` / `rightSidebarWidth` on desktop (session store + Rust config), and via `localStorage` on the web anonymous surface (`src/lib/web/uiState.ts`).
 
 ## Transient reveal
 
