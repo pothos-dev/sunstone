@@ -63,9 +63,26 @@ export function cmContent(page: Page): Locator {
 }
 
 /**
+ * Ensure the active Tile is in live-editing mode. Post-layout-rework a Concept
+ * opens in `read` (the editor is NOT `contenteditable`); the per-Tile header's
+ * Edit toggle (`edit-toggle`) flips the shared `session.editorMode` to `editing`
+ * — the SINGLE enter-edit affordance on the App shell. The mode is global +
+ * sticky (it carries across Concept switches), so this is idempotent: it clicks
+ * only when the toggle is not already pressed.
+ */
+export async function enterEdit(page: Page): Promise<void> {
+  const toggle = page.getByTestId('edit-toggle').first();
+  await expect(toggle).toBeEnabled();
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
+    await toggle.click();
+  }
+}
+
+/**
  * Open a Concept from the interactive App tree by clicking its `[data-path]`
- * file row, and resolve once its CodeMirror buffer is present + editable. The
- * file must be a root-level ordinary Concept (folders start collapsed).
+ * file row, enter live-editing mode, and resolve once its CodeMirror buffer is
+ * present + editable. The file must be a root-level ordinary Concept (folders
+ * start collapsed).
  */
 export async function openFromTree(page: Page, rel: string): Promise<Locator> {
   const entry = page.getByTestId('tree').locator(`[data-path="${rel}"]`);
@@ -73,6 +90,9 @@ export async function openFromTree(page: Page, rel: string): Promise<Locator> {
   await entry.click();
   const content = cmContent(page);
   await expect(content).toBeVisible();
+  // A freshly-opened Concept starts in `read`; enter editing so the buffer is
+  // writable for the write/concurrency specs (see `enterEdit`).
+  await enterEdit(page);
   await expect(content).toHaveAttribute('contenteditable', 'true');
   return content;
 }

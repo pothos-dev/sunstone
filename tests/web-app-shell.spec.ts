@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import { signInAsTestUser, signOutTestUser } from './web-auth';
-import { mountShell, cmContent } from './web-shell';
+import { mountShell, cmContent, enterEdit } from './web-shell';
 import { TEST_AUTH_NAME } from './web-bundle';
 
 /**
@@ -42,11 +42,13 @@ test('authed user gets the full App shell: CodeMirror editor + interactive tree'
   expect(await tree.locator('[data-path]').count()).toBeGreaterThan(0);
   await expect(page.getByTestId('tree-concept')).toHaveCount(0);
 
-  // The real CodeMirror editor is present + editable with the opened Concept.
+  // The real CodeMirror editor is present with the opened Concept; entering
+  // edit mode (Concepts open in `read` post-layout-rework) makes it editable.
   const content = cmContent(page);
   await expect(content).toBeVisible();
-  await expect(content).toHaveAttribute('contenteditable', 'true');
   await expect(content).toContainText('Good Concept');
+  await enterEdit(page);
+  await expect(content).toHaveAttribute('contenteditable', 'true');
 
   // The explicit-Save affordance is mounted (clean buffer → disabled, no dot).
   await expect(page.getByTestId('web-save')).toBeVisible();

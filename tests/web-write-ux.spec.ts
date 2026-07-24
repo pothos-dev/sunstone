@@ -43,7 +43,9 @@ test('a Properties edit stays in-memory (web-dirty, NO commit) until Save folds 
     await expect(content).toContainText('Body line');
 
     // Turn the global Properties panel on, then edit the `title` scalar value.
-    await page.getByTestId('properties-panel-toggle').click();
+    // (The Properties toggle lives in the per-Tile header — `properties-toggle` —
+    // after the layout rework moved it out of the old concept strip.)
+    await page.getByTestId('properties-toggle').click();
     const props = page.getByTestId('properties');
     await expect(props).toBeVisible();
     const titleInput = props.getByTestId('scalar-title');
