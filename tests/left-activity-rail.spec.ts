@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * Slice: left-activity-rail.
  *
  * Drives the always-visible far-left activity rail against the fake backend:
- *  - the rail is visible on load and carries the menu / quick-nav / search icons;
+ *  - the rail is visible on load and carries the quick-nav / search icons;
  *  - its quick-nav icon opens the existing QuickNav palette (same overlay flag as
  *    Ctrl+K) and its search icon opens the SearchPanel (same flag as
  *    Ctrl+Shift+F);
@@ -20,7 +20,7 @@ test('activity rail: icons open QuickNav / SearchPanel and rail survives sidebar
 
   const rail = page.getByTestId('activity-rail');
   await expect(rail).toBeVisible();
-  await expect(page.getByTestId('rail-menu')).toBeVisible();
+  await expect(page.getByTestId('rail-menu')).toHaveCount(0);
   await expect(page.getByTestId('rail-quicknav')).toBeVisible();
   await expect(page.getByTestId('rail-search')).toBeVisible();
   // The bottom avatar/login slot is reserved but empty on desktop.

@@ -631,7 +631,6 @@
 
 <div class="app" data-testid="app-root" bind:this={appRoot}>
   <ActivityRail
-    onMenu={() => {}}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
   />

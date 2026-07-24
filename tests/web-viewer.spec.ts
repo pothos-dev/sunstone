@@ -359,11 +359,13 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
   await page.goto('/good');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
 
-  // The far-left activity rail carries menu + quick-nav + search + a user slot.
+  // The far-left activity rail carries quick-nav + search + a bottom theme
+  // toggle + a user slot; the menu stub is gone.
   await expect(page.getByTestId('activity-rail')).toBeVisible();
-  await expect(page.getByTestId('rail-menu')).toBeVisible();
+  await expect(page.getByTestId('rail-menu')).toHaveCount(0);
   await expect(page.getByTestId('rail-quicknav')).toBeVisible();
   await expect(page.getByTestId('rail-search')).toBeVisible();
+  await expect(page.getByTestId('theme-toggle')).toBeVisible();
   await expect(page.getByTestId('rail-user')).toBeVisible();
 
   // The user slot surfaces the REAL Auth.js sign-in (a link into /auth/signin),
@@ -380,15 +382,14 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('search-panel')).toHaveCount(0);
 
-  // The slim concept strip carries history + Properties + export + theme; the
-  // old header collapse toggles are gone (collapse moved to the edges), and the
-  // anon reader has no Edit affordance.
+  // The slim concept strip carries history + Properties + export (theme moved to
+  // the rail); the old header collapse toggles are gone (collapse moved to the
+  // edges), and the anon reader has no Edit affordance.
   await expect(page.getByTestId('concept-strip')).toBeVisible();
   await expect(page.getByTestId('nav-back')).toBeVisible();
   await expect(page.getByTestId('nav-forward')).toBeVisible();
   await expect(page.getByTestId('properties-panel-toggle')).toBeVisible();
   await expect(page.getByTestId('export-pdf')).toBeVisible();
-  await expect(page.getByTestId('theme-toggle')).toBeVisible();
   await expect(page.getByTestId('sidebar-toggle')).toHaveCount(0);
   await expect(page.getByTestId('right-sidebar-toggle')).toHaveCount(0);
   await expect(page.getByTestId('web-edit-toggle')).toHaveCount(0);

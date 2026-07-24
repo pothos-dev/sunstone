@@ -84,11 +84,11 @@
   }
 
   // The read-only "Sunstone Web" viewer, shaped like the desktop shell: a far-left
-  // activity rail (menu stub + quick-nav + search + a bottom user slot wired to
-  // real Auth.js), click/drag SidebarEdge borders around a left Sidebar Accordion
+  // activity rail (quick-nav + search + a bottom theme toggle + a user slot wired
+  // to real Auth.js), click/drag SidebarEdge borders around a left Sidebar Accordion
   // (Explorer + Tags) and a right one (Outline + Backlinks) reusing the desktop
   // `SidebarSection`, a slim concept strip over the centre (history + Properties +
-  // export-PDF + theme), and the rendered Concept in the centre. No write path /
+  // export-PDF), and the rendered Concept in the centre. No write path /
   // editor / CodeMirror on the anon surface. UI state persists (uiState).
 
   // A Concept is addressed by its path in the URL (`/research/providers/mistral-ai`),
@@ -120,7 +120,7 @@
   }
 
   // --- Theme: applied to the app root; mode persisted via uiState. The anon web
-  // surface offers a manual light/dark toggle in the concept strip (the desktop
+  // surface offers a manual light/dark toggle in the activity rail (the desktop
   // shell follows the OS only — the web reader has no other theme entry point). --
   let appRoot = $state<HTMLElement | null>(null);
   $effect(() => {
@@ -311,16 +311,27 @@
   <WebAppShellIsland selected={data.selected} user={data.user} />
 {:else}
 <div class="app" data-testid="web-viewer" bind:this={appRoot}>
-  <!-- Far-left activity rail: menu (stub) + quick-nav + search launcher + a
-       bottom user slot wired to the REAL Auth.js sign-in / sign-out. The
+  <!-- Far-left activity rail: quick-nav + search launcher + a bottom theme
+       toggle and a user slot wired to the REAL Auth.js sign-in / sign-out. The
        quick-nav / search buttons flip the SAME flags as the Ctrl+K /
        Ctrl+Shift+F keybindings, so both entry points converge. The rail lives
        OUTSIDE the collapsing Sidebars, so it stays visible when they collapse. -->
   <ActivityRail
-    onMenu={() => {}}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
   >
+    {#snippet bottom()}
+      <!-- Manual light/dark theme toggle (web reader only), pinned to the rail
+           just above the user slot. -->
+      <button
+        type="button"
+        class="rail-user-btn"
+        data-testid="theme-toggle"
+        title="Toggle light / dark theme"
+        aria-label="Toggle light / dark theme"
+        onclick={toggleTheme}>{theme.resolved === 'dark' ? '☀' : '☾'}</button
+      >
+    {/snippet}
     {#snippet user()}
       <!-- The rail's bottom slot surfaces the REAL auth action. Anon (signed
            out) → a link into Auth.js sign-in (a full reload so the OIDC flow
@@ -429,8 +440,8 @@
     <!-- Slim "concept strip": the web analogue of the desktop concept header
          (web has no tiles/CodeMirror, so it is light). The left group holds the
          per-Concept history + title; the right group the per-Concept controls
-         (Edit for a signed-in user, Properties, export-PDF, theme). Sidebar
-         collapse/resize moved to the edge borders. -->
+         (Edit for a signed-in user, Properties, export-PDF; theme lives in the
+         activity rail). Sidebar collapse/resize moved to the edge borders. -->
     <div class="concept-strip" data-testid="concept-strip">
       <div class="cs-title-group">
         <div class="btn-group">
@@ -516,15 +527,6 @@
             <path d="M8 7.5v4m0 0 1.6-1.6M8 11.5 6.4 9.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
-        <!-- Manual light/dark theme toggle (web reader only). -->
-        <button
-          type="button"
-          class="icon-btn"
-          data-testid="theme-toggle"
-          title="Toggle light / dark theme"
-          aria-label="Toggle light / dark theme"
-          onclick={toggleTheme}>{theme.resolved === 'dark' ? '☀' : '☾'}</button
-        >
       </div>
     </div>
 
