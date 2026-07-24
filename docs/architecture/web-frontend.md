@@ -25,6 +25,19 @@ The SvelteKit app (Svelte 5 runes) at the repo root under `src/` is the "web" pa
 
 Every method both real backends implement returns one of the [sunstone-native](/architecture/sunstone-native.md) serde shapes, mirrored in `src/lib/types.ts`.
 
+## The wasm seam
+
+Pure link/frontmatter/render-derived logic is **not** reimplemented in TypeScript. It lives once in [sunstone-shared](/architecture/sunstone-shared.md), compiled to wasm (`sunstone-wasm`) and called **in-process, synchronously** — the only way CodeMirror decorations can resolve against the live, unsaved buffer without an IPC round-trip ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)). `src/lib/wasm/` is that boundary:
+
+| File | Role |
+| --- | --- |
+| `pkg/` | The gitignored `wasm-pack build --target web` output; produced by `bun run build:wasm` before the check/unit/Playwright gates. |
+| `index.ts` | `ensureWasm()` — the memoized, `browser`-guarded loader that dynamic-`import()`s `pkg/`, runs its async `init()` once, and returns the module (or `null` on SSR / load failure). Failure **degrades** to a no-op, never a dead page. |
+| `exports.ts` | Synchronous wrappers over the **free** (handle-less) wasm exports (`splitFrontmatter`, `scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `slugify`, …); before the module registers they return safe no-op defaults, so callers on the property-model / outline paths never await. |
+| `bunTestSetup.ts` | Preloads the shipping `pkg/` for `bun test`, so the seam is tested against exactly the wasm that ships. |
+
+The stateful `BundleIndex` handle (owns the saved concept-path set; `resolveLink` / `resolveWikilink` / `rewriteAnchorsIn` / `conceptPaths` / `urlToConcept`) is owned by `state/index.svelte.ts` (`indexStore`): built after `ensureWasm()` on mount / `file-changed` / CRUD, `.free()`d on swap, with a `version` rune that re-runs decorations once wasm is ready. SSR imports none of this — `WebViewer` renders native Rust HTML.
+
 ## One codebase, two builds
 
 The whole thing pivots on `SUNSTONE_TARGET=web` → the compile-time boolean `__SUNSTONE_WEB__`:
@@ -39,14 +52,15 @@ The whole thing pivots on `SUNSTONE_TARGET=web` → the compile-time boolean `__
 - **`src/routes/`** — thin SvelteKit routes: `+page`/`[...concept]` catch-all mapping pretty URLs to Concepts; `+layout.ts` gates SSR on `__SUNSTONE_WEB__`. All delegate to `PageShell`.
 - **`src/lib/ipc/`** — the seam (above).
 - **`src/lib/web/`** — the web-specific layer: `WebViewer` (SSR read-only shell) and its sidebar pieces; `WebAppShellIsland` (authenticated users dynamically `import()` the full `App.svelte`, keeping CodeMirror out of SSR, and host the write-concurrency coordinator); `WebEditorIsland` (in-place single-Tile editor); `WebConcurrencyModals` (shared conflict / leave / structural-op UX); plus pure helpers `loadConcept.ts`, `conceptUrl.ts`, `concurrency.ts`, `uiState.ts`.
-- **`src/lib/editor/`** — CodeMirror internals (see the [editor cluster](/editor/index.md)): `cm.ts`, wikilinks, broken-links, anchor-tracking, citations, CriticMarkup, find, formatting, mermaid.
-- **`src/lib/state/`** — Svelte 5 runes state singletons (`.svelte.ts`): `editor`, `workspace`, `document`, `bundle`, `index`, `theme`, `treeActions`, `focus`, and layout/nav helpers.
+- **`src/lib/wasm/`** — the [wasm seam](#the-wasm-seam): the `ensureWasm()` loader, the synchronous free-export wrappers, and the gitignored `pkg/`.
+- **`src/lib/editor/`** — CodeMirror internals (see the [editor cluster](/editor/index.md)): `cm.ts`, wikilinks, broken-links, anchor-tracking, citations, CriticMarkup, find, formatting, mermaid. The parse halves (broken/wiki-link resolution, CriticMarkup/citation scanning) now call the wasm handle/exports; these files are the thin **view/authoring** layer over them.
+- **`src/lib/state/`** — Svelte 5 runes state singletons (`.svelte.ts`): `editor`, `workspace`, `document`, `bundle`, `index` (owns the `BundleIndex` wasm handle), `theme`, `treeActions`, `focus`, and layout/nav helpers.
 - **`src/lib/components/`** — desktop components (`Tile`, `Tree`, `NavBar`, `Outline`, `Backlinks`, `Properties*`, `SearchPanel`, `QuickNav`, `Launcher`, …) — the [interface](/interface/index.md) surfaces.
-- **Pure logic modules** — plain `.ts` with unit tests beside them, per the repo convention that pure logic stays testable: `path.ts`, `treeNav.ts`, `frontmatter.ts`, `outline.ts`, `highlight.ts`, `slug.ts`, `links.ts`, `citations.ts`, `anchorRewrite.ts`, `fuzzy.ts`, and more. These mirror the [sunstone-native](/architecture/sunstone-native.md) Rust logic exactly so both sides agree.
+- **Pure logic modules** — plain `.ts` with unit tests beside them, per the repo convention that pure logic stays testable: `path.ts`, `treeNav.ts`, `fuzzy.ts`, `highlight.ts`, `reserved.ts`, and `frontmatter.ts`'s **property model** (ADR-0003 `parseProperties` / `serializeFrontmatter` / `joinConcept` / `scaffoldConcept`, kept TS by design). The link, slug, outline, citation, anchor-rewrite and frontmatter-parse twins that used to live here were **deleted** — that logic is now [sunstone-shared](/architecture/sunstone-shared.md) via the wasm seam, so the two sides can no longer drift ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)).
 
 ## Relationships
 
 - Talks to a backend only through the [IPC seam](#the-ipc-seam): [desktop shell](/architecture/desktop-shell.md) commands (`tauri.ts`) or [sunstone-server](/architecture/sunstone-server.md) HTTP (`http.ts`).
-- Its pure `.ts` modules mirror [sunstone-native](/architecture/sunstone-native.md); shared types live in `types.ts`.
+- Runs the pure link/frontmatter/render-derived logic in-process through the [wasm seam](#the-wasm-seam) — the same [sunstone-shared](/architecture/sunstone-shared.md) code the native backend runs; shared types live in `types.ts`.
 - Renders the [interface](/interface/index.md) and [editor](/editor/index.md) surfaces documented elsewhere.
 - Split across the desktop and web Playwright suites in [Testing](/architecture/testing.md); the [overview](/architecture/overview.md) shows how both builds compose.

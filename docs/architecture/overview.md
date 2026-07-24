@@ -1,38 +1,50 @@
 ---
 type: Concept
-title: Architecture overview — the four packages and how they interact
-description: How Sunstone's four packages (core, desktop shell, server, web frontend) compose into a desktop app and a web viewer, both over one shared domain crate.
+title: Architecture overview — the packages and how they interact
+description: How Sunstone's packages (a pure leaf crate compiled to native + wasm, the native IO crate, desktop shell, server, web frontend) compose into a desktop app and a web viewer over one shared domain core.
 tags: [architecture, overview, packages, topology]
 timestamp: 2026-07-23T00:00:00Z
 ---
 
 # Architecture overview
 
-Sunstone is one codebase that ships two products — a **desktop editor** and a **read-only web viewer with an authenticated edit path** — over a **single shared domain crate**. Four packages make that work:
+Sunstone is one codebase that ships two products — a **desktop editor** and a **read-only web viewer with an authenticated edit path** — over a **shared Rust domain core**. The packages:
 
 | Package | Language | Role |
 | --- | --- | --- |
-| [sunstone-native](/architecture/sunstone-native.md) | Rust | Host-agnostic Bundle logic — the hub everything else depends on. |
-| [Desktop shell](/architecture/desktop-shell.md) (`src-tauri`) | Rust | Thin Tauri 2 wrapper exposing core over IPC commands. |
-| [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing core over a JSON/SSE API. |
+| [sunstone-shared](/architecture/sunstone-shared.md) | Rust | Pure leaf crate of frontend-shared algorithms — compiled to **both** native and wasm. |
+| [sunstone-native](/architecture/sunstone-native.md) | Rust | Host-agnostic Bundle IO/index/git logic — the native hub, built on `shared`. |
+| `sunstone-wasm` | Rust→wasm | Thin `wasm-bindgen` bridge over `shared`, loaded in-process by the frontend. |
+| [Desktop shell](/architecture/desktop-shell.md) (`src-tauri`) | Rust | Thin Tauri 2 wrapper exposing native over IPC commands. |
+| [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing native over a JSON/SSE API. |
 | [Web frontend](/architecture/web-frontend.md) (`src/`) | SvelteKit | One UI that targets both hosts, decoupled by the IPC seam. |
 
 ## The central idea
 
-All domain behaviour — filesystem, index, links, rewrite, search, render, git, watcher, config — lives **once**, in [sunstone-native](/architecture/sunstone-native.md). The desktop shell and the server are each a thin transport layer over it, and the frontend reaches whichever one is present through a single `Backend` interface. No feature logic is duplicated across hosts.
+Domain behaviour lives **once** and is reused rather than reimplemented, along two axes:
+
+- **IO / backend logic** — filesystem, index, search, render, git, watcher, config — lives in [sunstone-native](/architecture/sunstone-native.md). The desktop shell and the server are each a thin transport layer over it.
+- **Pure algorithms** — link resolution, wikilink/slug, anchor rewrite, frontmatter parse, outline/CriticMarkup/citation scanners — live in [sunstone-shared](/architecture/sunstone-shared.md), compiled to **both** native (so `sunstone-native` calls them directly) and **wasm** (so the frontend runs the *same* code in-process, synchronously, against the live editor buffer — [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)). No TS twin of that logic remains.
+
+The frontend reaches whichever backend is present through a single `Backend` interface, and reaches the pure logic through the loaded wasm module. No feature logic is duplicated across hosts.
 
 ```mermaid
 flowchart TD
   FE["Web frontend (src/)<br/>Backend interface"]
+  WASM["sunstone-wasm<br/>(in-process)"]
   DS["Desktop shell<br/>#tauri::command"]
   SV["sunstone-server<br/>axum /api"]
-  CORE["sunstone-native<br/>bundle · index · rewrite<br/>search · render · git · watcher"]
+  CORE["sunstone-native<br/>bundle · index · search<br/>render · git · watcher"]
+  SHARED["sunstone-shared<br/>links · slug · rewrite<br/>frontmatter · outline · critic"]
   FS["Bundle on disk<br/>(markdown + git)"]
 
   FE -->|"tauri.ts: invoke"| DS
   FE -->|"http.ts: fetch /api"| SV
+  FE -->|"ensureWasm(): call"| WASM
   DS --> CORE
   SV --> CORE
+  CORE --> SHARED
+  WASM --> SHARED
   CORE --> FS
 ```
 
@@ -71,9 +83,10 @@ Both processes ship as a single Docker image; see `docker/README.md` for the run
 - **Same types both ways.** Whether over Tauri IPC or HTTP, the payloads are the [sunstone-native](/architecture/sunstone-native.md) serde structs (`camelCase`), mirrored in the frontend's `src/lib/types.ts`. The `Backend` interface hides which transport is in play.
 - **Bundle-relative, forward-slash paths** cross every seam; path-escape is rejected in core, so the server's network edge and the desktop's IPC edge share one guard.
 - **Change events** originate in core's watcher and reach the frontend either as a Tauri event (desktop) or an SSE message (web) — the frontend's `onFileChanged` is identical.
+- **In-process wasm, no transport.** The pure-logic seam is not a backend at all: after a one-time async `ensureWasm()`, the frontend calls [sunstone-shared](/architecture/sunstone-shared.md) (compiled to wasm) synchronously, in the browser, so CodeMirror decorations resolve against the live buffer without an IPC round-trip. SSR renders native Rust and never loads the wasm.
 
 ## Relationships
 
-- Each package has its own page: [sunstone-native](/architecture/sunstone-native.md), [desktop shell](/architecture/desktop-shell.md), [sunstone-server](/architecture/sunstone-server.md), [web frontend](/architecture/web-frontend.md).
-- The Bundle these packages operate on is defined in [OKF → Bundle](/okf/bundle.md); the link model core implements is [Linking](/okf/linking.md).
+- Each package has its own page: [sunstone-shared](/architecture/sunstone-shared.md), [sunstone-native](/architecture/sunstone-native.md), [desktop shell](/architecture/desktop-shell.md), [sunstone-server](/architecture/sunstone-server.md), [web frontend](/architecture/web-frontend.md).
+- The Bundle these packages operate on is defined in [OKF → Bundle](/okf/bundle.md); the link model core implements is [Linking](/okf/linking.md); the shared-crate/wasm rationale is [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md).
 - How the assembled stacks are tested is [Testing](/architecture/testing.md).

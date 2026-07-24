@@ -1,11 +1,12 @@
 # Architecture — packages and how they interact
 
-Sunstone is four packages: one shared Rust domain crate plus three thin layers over it (a Tauri desktop shell, an HTTP server, and a SvelteKit frontend that targets both). Start with the overview, then read each package.
+Sunstone is a shared Rust domain core plus thin layers over it: a pure leaf crate compiled to both native and wasm, the native IO crate built on it, a Tauri desktop shell, an HTTP server, and a SvelteKit frontend that targets both hosts. Start with the overview, then read each package.
 
 ## Concepts
 
-- [Architecture overview](overview.md) - The four packages and how they compose into a desktop app and a web viewer over one shared crate.
-- [sunstone-native](sunstone-native.md) - The host-agnostic Rust crate holding all Bundle logic — the hub both hosts depend on.
+- [Architecture overview](overview.md) - The packages and how they compose into a desktop app and a web viewer over one shared core.
+- [sunstone-shared](sunstone-shared.md) - The pure leaf crate of frontend-shared algorithms, compiled to both native and wasm (with the `sunstone-wasm` bridge) — the single source of link/frontmatter/render-derived logic.
+- [sunstone-native](sunstone-native.md) - The host-agnostic Rust crate holding all Bundle IO/index/git logic — the native hub both hosts depend on.
 - [Desktop shell (src-tauri)](desktop-shell.md) - The thin Tauri 2 wrapper exposing core over IPC commands; the "rust" package `sunstone ./docs` launches.
 - [sunstone-server](sunstone-server.md) - The axum binary exposing one Bundle over a JSON/SSE API for Sunstone Web.
 - [Web frontend (src/)](web-frontend.md) - The SvelteKit UI that serves both the desktop SPA and the server-rendered web viewer, decoupled by the IPC seam.

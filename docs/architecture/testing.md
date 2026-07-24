@@ -10,7 +10,7 @@ timestamp: 2026-07-23T00:00:00Z
 
 Sunstone has **four green gates** plus **two Playwright suites**. Every change must keep the gates green; behavioural changes to components are proven in Playwright.
 
-The gates and suites map onto the [package architecture](/architecture/index.md): `cargo test` / `cargo check` cover the three Rust crates ([sunstone-native](/architecture/sunstone-native.md), [sunstone-server](/architecture/sunstone-server.md), [desktop shell](/architecture/desktop-shell.md)); `bun test src/lib` and `bun run check` cover the [web frontend](/architecture/web-frontend.md)'s pure logic and types; the two Playwright suites exercise the assembled desktop and web stacks end-to-end.
+The gates and suites map onto the [package architecture](/architecture/index.md): `cargo test` / `cargo check` cover the Rust crates ([sunstone-shared](/architecture/sunstone-shared.md), [sunstone-native](/architecture/sunstone-native.md), `sunstone-wasm`, [sunstone-server](/architecture/sunstone-server.md), [desktop shell](/architecture/desktop-shell.md)); `bun test src/lib` and `bun run check` cover the [web frontend](/architecture/web-frontend.md)'s pure logic and types; the two Playwright suites exercise the assembled desktop and web stacks end-to-end. `cargo test` is the single behavioural gate for the pure `sunstone-shared` algorithms — there is no TS twin to mirror them ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)).
 
 | What | Command | Proves |
 | --- | --- | --- |
@@ -28,20 +28,32 @@ bun test src/lib                       # all frontend unit tests
 bun test src/lib/ipc/http.test.ts      # a single file
 ```
 
-This covers, among others: path/tree/frontmatter/outline/highlight helpers, the `fake` backend's own modules (`src/lib/ipc/fake/*.test.ts`), and `http.ts` SSE-payload parsing (`src/lib/ipc/http.test.ts`).
+This covers, among others: path/tree helpers and the `frontmatter.ts` property model, the `fake` backend's own modules (`src/lib/ipc/fake/*.test.ts`), `http.ts` SSE-payload parsing (`src/lib/ipc/http.test.ts`), and the **wasm seam** — the JS↔wasm marshalling contract and `BundleIndex` `.free()` lifecycle, byte-loading the shipping `--target web` `pkg/` (tested = shipped, [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md) §7). The pure algorithms themselves are *not* re-tested here — their goldens are `cargo test`.
+
+### Build the wasm before the frontend gates
+
+`bun test src/lib` and `bun run check` need `src/lib/wasm/pkg` on disk. Build it first (or run the `:ci` scripts that chain it in):
+
+```bash
+bun run build:wasm     # wasm-pack build --target web → src/lib/wasm/pkg (gitignored)
+bun run build:frontend # build:wasm + build:types
+bun run check:ci       # build:frontend, then check
+bun run test:unit:ci   # build:frontend, then bun test src/lib
+```
 
 ## Rust tests — `cargo test`
 
-The Rust side is a **Cargo workspace** with three members — `crates/sunstone-native`, `crates/sunstone-server`, and `src-tauri`. Run from the repo root:
+The Rust side is a **Cargo workspace** with five members — `crates/sunstone-shared`, `crates/sunstone-native`, `crates/sunstone-wasm`, `crates/sunstone-server`, and `src-tauri`. Run from the repo root:
 
 ```bash
 cargo test                         # every crate
-cargo test -p sunstone-native        # core (bundle/rewrite/git primitives)
+cargo test -p sunstone-shared      # the pure algorithm goldens (link/frontmatter/outline/…)
+cargo test -p sunstone-native      # native IO/index (bundle/rewrite/git primitives)
 cargo test -p sunstone-server      # the axum server (routes, orchestration, auth)
-cargo check                        # typecheck only (faster)
+cargo check                        # typecheck only — includes the wasm crate's native compile
 ```
 
-Git-touching code (`crates/sunstone-native/src/git.rs`) is tested against a **temporary git repo** created in the test — assert on real `git log` / `git show` output, no fixtures on disk.
+`cargo test -p sunstone-shared` is the behavioural gate for the pure algorithms the browser runs via wasm; `cargo check` compiles `sunstone-wasm` on the native host (proving the toolchain, since its exports are inert off `wasm32`). Git-touching code (`crates/sunstone-native/src/git.rs`) is tested against a **temporary git repo** created in the test — assert on real `git log` / `git show` output, no fixtures on disk.
 
 ## Playwright — two suites
 
