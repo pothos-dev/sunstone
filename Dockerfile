@@ -43,11 +43,34 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release -p sunstone-server \
  && cp target/release/sunstone-server /usr/local/bin/sunstone-server
 
+# Browser wasm module: the frontend's `vite build` imports the wasm-pack
+# `--target web` output at `$lib/wasm/pkg` as a hard dependency (ADR 0006 §1),
+# so it MUST exist before the web-build stage runs. Build it HERE — this stage
+# already has the Rust toolchain and the workspace crate sources — and hand the
+# `pkg/` to the web stage via COPY. `--out-dir` is absolute so it lands OUTSIDE
+# the (non-persisted) /app/target cache mount and survives the layer.
+RUN rustup target add wasm32-unknown-unknown
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install wasm-pack --locked --version 0.15.0
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    wasm-pack build crates/sunstone-wasm --target web --out-dir /app/wasm-pkg
+
 # ---------------------------------------------------------------------------
-# Stage 2 — Frontend: build the SvelteKit adapter-node output with bun.
+# Stage 2 — Frontend: build the SvelteKit adapter-node output.
+#
+# Base on the real Node image (matching the runtime's node:22-bookworm) and add
+# bun purely as the fast package manager. `bun run build` shells out to vite,
+# whose `#!/usr/bin/env node` shebang must resolve to REAL Node: under bun's own
+# runtime (oven/bun ships a `node` shim) the `vite-plugin-top-level-await`
+# config-load path throws `virtualModule.require is not a function`. Real Node
+# runs vite exactly as it does on a dev host, so the build matches local.
 # ---------------------------------------------------------------------------
-FROM oven/bun:1 AS web-build
+FROM node:22-bookworm AS web-build
 WORKDIR /app
+
+# bun is a single self-contained binary; copy it from the official image.
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 
 # Install ALL deps (build needs vite/svelte-kit/adapters). The patch in
 # patches/ is applied by bun during install, so copy it before installing.
@@ -59,6 +82,12 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # Frontend sources (node_modules is excluded via .dockerignore, so the layer
 # above is not clobbered).
 COPY . .
+
+# The wasm-pack output built in the Rust stage. `vite build` resolves
+# `$lib/wasm/pkg` from here; without it the build fails at load-fallback. Copied
+# AFTER `COPY . .` so it is not clobbered (the host tree never carries pkg/ — it
+# is a gitignored build output).
+COPY --from=rust-build /app/wasm-pkg ./src/lib/wasm/pkg
 
 # SUNSTONE_TARGET=web selects adapter-node (see svelte.config.js); output -> build/.
 RUN SUNSTONE_TARGET=web bun run build
