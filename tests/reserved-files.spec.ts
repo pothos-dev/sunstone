@@ -30,7 +30,7 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   await expect(tree).toBeVisible();
   // Turn Properties ON globally, so "reserved files hide Properties" is a real
   // assertion (a reserved file must hide it even when it would otherwise show).
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
 
   // --- Reserved files are NOT ordinary leaves anywhere ---
   await expect(tree.locator('[data-path="index.md"]')).toHaveCount(0);
@@ -105,7 +105,7 @@ test('reserved files: no Properties panel, body editing still works', async ({ p
   await expect(page.getByTestId('tree')).toBeVisible();
   // Properties ON globally so the reserved-file hide + the normal-Concept show
   // at the end are both real assertions.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
 
   // Open the root log.md via its affordance — body only, no Properties panel
   // (slice: hide-properties-for-reserved-files).
@@ -113,6 +113,9 @@ test('reserved files: no Properties panel, body editing still works', async ({ p
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
   await expect(page.getByTestId('properties')).toHaveCount(0);
+
+  // Read is the default; enter editing so the body becomes editable.
+  await page.getByTestId('edit-toggle').click();
 
   // The body remains fully editable and autosaves to the backend.
   const content = editor.locator('.cm-content');
@@ -155,7 +158,7 @@ test('reserved files: right-click a folder offers to create the missing one', as
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
   // Properties ON globally so the created reserved file's "no Properties" is real.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
 
   // concepts/ has index.md but NOT log.md -> only "Create log.md" is offered.
   await openRowMenu(page, 'concepts');

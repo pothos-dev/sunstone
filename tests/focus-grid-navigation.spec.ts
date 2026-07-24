@@ -56,8 +56,12 @@ test('editor grid: Alt+arrow moves across columns/tiles, delegates at edges, sti
   await tree.locator(`[data-path="${CM}"]`).click();
   await expect(page.getByTestId('editor')).toContainText(NEEDLE);
 
+  // Enter editing so the editor takes click focus (read is the default; a
+  // read-only view is not click-focusable, which the grid nav below relies on).
+  await page.getByTestId('edit-toggle').click();
+
   // Reveal the right Sidebar so the rightmost-edge delegation has a target.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
   await expect(page.getByTestId('backlinks')).toBeVisible();
 

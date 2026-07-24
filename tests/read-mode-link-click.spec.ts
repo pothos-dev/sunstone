@@ -16,9 +16,8 @@ test('read mode: clicking link TEXT (not the icon) follows the link', async ({ p
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('A Bundle is the root folder');
 
-  // Switch to Reading (view) mode.
-  await page.getByTestId('editor-mode-view').click();
-  await expect(page.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
+  // Read is the default mode — the whole link is clickable here.
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
 
   const link = editor.locator('.cm-atomic-link', { hasText: 'CodeMirror' }).first();
   const box = await link.boundingBox();

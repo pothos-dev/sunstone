@@ -133,6 +133,14 @@ export type BundleState = {
    */
   outlineOpen?: boolean;
   /**
+   * Persisted sidebar WIDTHS in CSS pixels (slice: edge-sidebars-delete-navbar).
+   * Optional and tolerated when missing; the session store defaults each to the
+   * shared default (280) and clamps to a sane range on read. Independent of the
+   * collapse flags above — collapsing preserves the width rather than storing 0.
+   */
+  leftSidebarWidth?: number;
+  rightSidebarWidth?: number;
+  /**
    * GLOBAL Properties show/hide flag (slice: multi-concept-tiling). When `true`,
    * every visible tile renders its Concept's frontmatter inline; when `false`
    * (the default on read) no tile shows any Properties chrome. Persisted so the
@@ -141,9 +149,10 @@ export type BundleState = {
    */
   propertiesShown?: boolean;
   /**
-   * The editor's tri-state view mode (Source / Live / Reading), restored on
-   * relaunch (persist-editor-mode). Optional so older files tolerate its
-   * absence; the session store defaults it to `DEFAULT_EDITOR_MODE` on read.
+   * The editor's view mode — the boolean `editing`/`read` (editing-boolean-edit-
+   * toggle), restored on relaunch (persist-editor-mode). Optional so older files
+   * tolerate its absence; the session store migrates the legacy tri-state values
+   * ('edit'/'hybrid'/'view') and defaults it to `read` on read.
    */
   editorMode?: EditorMode;
   /**

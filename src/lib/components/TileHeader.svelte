@@ -2,23 +2,24 @@
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
   //   - the Concept title + a close affordance (clears the Tile to empty state),
+  //   - the Edit toggle (read ⇄ live editing), the single view-mode control
+  //     (editing-boolean-edit-toggle),
   //   - Split Right (new Column) / Split Down (new TileSlot in this Column) affordances,
-  //   - undo / redo over the active Tile's Document history,
+  //   - undo / redo over the active Tile's Document history (shown only while editing),
   //   - the review-diff toggle (working-tree ↔ HEAD),
   //   - Export as PDF.
   //
-  // The tri-state view-mode toggle (Source / Live / Reading) is GLOBAL — it lives
-  // in the NavBar (app chrome), not here — since it applies to every tile at once.
-  //
-  // Presentational and thin: it owns no state. All logic (undo/redo, review,
-  // export, close, split) lives in App.svelte and is passed in as callbacks +
-  // reactive flags, mirroring how the NavBar (global chrome) works.
+  // Presentational and thin: it owns no state. All logic (edit toggle, undo/redo,
+  // review, export, close, split) lives in App.svelte / Tile.svelte and is passed
+  // in as callbacks + reactive flags.
 
   interface Props {
     /** The active Concept's derived header label ('' when the Tile is empty). */
     title: string;
     /** Whether a Concept is open (gates the per-Concept controls). */
     hasOpenConcept: boolean;
+    /** Whether the editor is in live-editing mode (vs read-only reading). */
+    editing: boolean;
     /** Whether more than one tile is on screen (gates the Close affordance —
      *  closing the sole tile would just clear it to empty state). */
     multipleTiles: boolean;
@@ -46,11 +47,22 @@
     onRedo: () => void;
     onToggleReview: () => void;
     onExportPdf: () => void;
+    /** Toggle live editing on/off for this Concept. */
+    onToggleEditing: () => void;
+    /** Whether the Properties panel is shown (global `session.propertiesShown`). */
+    propertiesShown: boolean;
+    /**
+     * Toggle the Properties panel, which shows the open Concept's frontmatter.
+     * Drives the global `session.propertiesShown` flag (the control moved here
+     * from the deleted NavBar; the flag's scope is unchanged — app-wide).
+     */
+    onToggleProperties: () => void;
   }
 
   let {
     title,
     hasOpenConcept,
+    editing,
     multipleTiles,
     canGoBack,
     canGoForward,
@@ -68,6 +80,9 @@
     onRedo,
     onToggleReview,
     onExportPdf,
+    onToggleEditing,
+    propertiesShown,
+    onToggleProperties,
   }: Props = $props();
 </script>
 
@@ -98,32 +113,85 @@
   </div>
 
   <div class="tile-controls">
-    <!-- Undo / redo over the Tile's single body+frontmatter history. Decoupled
-         from the Properties panel (they rode there by historical accident). The
-         mousedown-prevent keeps clicking a button from blurring/committing an
+    <!-- Edit toggle: the single view-mode control (editing-boolean-edit-toggle).
+         Pressed = live editing (rendered with the cursor line shown raw, editable);
+         unpressed = reading (fully rendered, read-only — the default). -->
+    <button
+      type="button"
+      class="icon-btn"
+      class:active={editing}
+      data-testid="edit-toggle"
+      title={editing ? 'Editing — click to switch to reading' : 'Edit — switch to live editing'}
+      aria-label="Edit"
+      aria-pressed={editing}
+      disabled={!hasOpenConcept}
+      onclick={onToggleEditing}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="15"
+        height="15"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+      </svg>
+    </button>
+
+    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
+         Moved here from the deleted NavBar; drives the global
+         `session.propertiesShown` flag (app-wide preference). -->
+    <button
+      type="button"
+      class="icon-btn"
+      class:active={propertiesShown}
+      data-testid="properties-toggle"
+      title={propertiesShown ? 'Hide Properties' : 'Show Properties'}
+      aria-label="Properties"
+      aria-pressed={propertiesShown}
+      onclick={onToggleProperties}
+    >
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <!-- sliders glyph: two horizontal rails with knobs (properties/settings). -->
+        <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
+        <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+        <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+      </svg>
+    </button>
+
+    <!-- Undo / redo over the Tile's single body+frontmatter history. Shown only
+         while editing — reading mode is read-only, so there is nothing to undo.
+         The mousedown-prevent keeps clicking a button from blurring/committing an
          in-progress frontmatter edit before the command runs. -->
-    <div class="btn-group">
-      <button
-        type="button"
-        class="icon-btn"
-        data-testid="undo"
-        title="Undo (Ctrl+Z)"
-        aria-label="Undo"
-        disabled={!canUndo}
-        onmousedown={(e) => e.preventDefault()}
-        onclick={onUndo}>↶</button
-      >
-      <button
-        type="button"
-        class="icon-btn"
-        data-testid="redo"
-        title="Redo (Ctrl+Shift+Z)"
-        aria-label="Redo"
-        disabled={!canRedo}
-        onmousedown={(e) => e.preventDefault()}
-        onclick={onRedo}>↷</button
-      >
-    </div>
+    {#if editing}
+      <div class="btn-group">
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="undo"
+          title="Undo (Ctrl+Z)"
+          aria-label="Undo"
+          disabled={!canUndo}
+          onmousedown={(e) => e.preventDefault()}
+          onclick={onUndo}>↶</button
+        >
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="redo"
+          title="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
+          disabled={!canRedo}
+          onmousedown={(e) => e.preventDefault()}
+          onclick={onRedo}>↷</button
+        >
+      </div>
+    {/if}
 
     <!-- Review changes (working-tree ↔ HEAD): a read-only diff view. Disabled
          with an explanatory tooltip when the Concept has no reviewable history. -->

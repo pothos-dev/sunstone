@@ -18,9 +18,17 @@ Concept; that is now just the one-Tile case.
 - A **Column** is a vertical stack of **Tiles**; the Editor pane is a row of
   Columns.
 - A **Tile** is one editor cell, showing a single open **Concept** with its own
-  view-mode, scroll position and navigation history.
+  view-mode (the `editing`/`read` boolean — default `read`), scroll position and
+  navigation history, topped by its own **Concept header** (the per-Tile control
+  bar — see [Activity Rail and Concept header](/interface/activity-rail.md)).
 - Columns and the Tiles within them are **independently resizable** via
   draggable dividers, and rows need not align across Columns.
+
+The **Concept header** carries every concept-scoped control — back/forward, the
+**Edit** toggle (which flips the Tile between `read` and `editing`), the
+Properties toggle, undo/redo (only while editing), review, export-PDF, split and
+close. There is no global nav bar; app-global controls live on the
+[Activity Rail](/interface/activity-rail.md) instead.
 
 `Split Right` / `Split Down` are the actions that create a new Column / Tile;
 "split" is never the noun (the Column and Tile are the nouns).

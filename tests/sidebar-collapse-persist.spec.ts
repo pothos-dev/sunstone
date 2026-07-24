@@ -32,7 +32,7 @@ test('sidebar + section collapse state persists across reload', async ({ page })
   // and the Explorer is expanded, but the Tags Section starts COLLAPSED (its
   // per-field default). Backlinks now lives in the right Sidebar
   // (right-sidebar-move-backlinks), so it is no longer here.
-  const sidebarToggle = page.getByTestId('sidebar-toggle');
+  const sidebarToggle = page.getByTestId('left-sidebar-edge');
   await expect(sidebarToggle).toHaveAttribute('aria-pressed', 'true');
 
   const explorerSection = page.getByTestId('explorer-section');
@@ -75,7 +75,7 @@ test('sidebar + section collapse state persists across reload', async ({ page })
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 
-  await expect(page.getByTestId('sidebar-toggle')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('left-sidebar-edge')).toHaveAttribute('aria-pressed', 'false');
   await expect(
     page.getByTestId('tags-section').locator('[aria-expanded]').first(),
   ).toHaveAttribute('aria-expanded', 'true');
@@ -108,7 +108,7 @@ test('global Properties show/hide flag persists across reload', async ({ page })
 
   // Turn it ON via the NavBar toggle — a non-default state whose restoration
   // proves persistence.
-  const toggle = page.getByTestId('properties-panel-toggle');
+  const toggle = page.getByTestId('properties-toggle');
   await toggle.click();
   await expect(page.getByTestId('properties')).toBeVisible();
 
@@ -127,4 +127,64 @@ test('global Properties show/hide flag persists across reload', async ({ page })
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
   await expect(page.getByTestId('properties')).toBeVisible();
+});
+
+/**
+ * Slice: edge-sidebars-delete-navbar.
+ *
+ * Each sidebar's border is a drag handle that resizes it, and the chosen width
+ * is persisted per-Bundle. Dragging the left edge right widens the left Sidebar;
+ * the new width survives a reload.
+ */
+test('sidebar width: dragging the edge resizes and the width persists across reload', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.getByTestId('tree')).toBeVisible();
+
+  // Clean slate so the default 280px width applies deterministically.
+  await page.evaluate(() =>
+    window.localStorage.setItem(
+      'sunstone:bundleState:/fake/bundle',
+      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] }),
+    ),
+  );
+  await page.reload();
+  await expect(page.getByTestId('tree')).toBeVisible();
+
+  // The aside's rendered width is the persisted content width plus its 1px
+  // border, so assert with a small tolerance.
+  const aside = page.getByTestId('side-bar');
+  const startWidth = (await aside.boundingBox())?.width ?? 0;
+  expect(Math.abs(startWidth - 280)).toBeLessThan(3);
+
+  // Drag the left edge 80px to the right → the left Sidebar widens by ~80px.
+  const edge = page.getByTestId('left-sidebar-edge');
+  const box = (await edge.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => (await aside.boundingBox())?.width)
+    .toBeGreaterThan(startWidth + 70);
+
+  // The debounced save flushes the new width (280 + 80 = 360) to localStorage.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem('sunstone:bundleState:/fake/bundle');
+        if (!raw) return null;
+        return (JSON.parse(raw) as { leftSidebarWidth?: number }).leftSidebarWidth ?? null;
+      }),
+    )
+    .toBe(360);
+
+  // RELOAD: the widened Sidebar comes back at its persisted width.
+  await page.reload();
+  await expect(page.getByTestId('tree')).toBeVisible();
+  await expect
+    .poll(async () => (await page.getByTestId('side-bar').boundingBox())?.width)
+    .toBeGreaterThan(startWidth + 70);
 });

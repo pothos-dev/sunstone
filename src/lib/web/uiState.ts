@@ -24,6 +24,9 @@ export interface WebUiState {
   /** Whole-Sidebar collapse flags. */
   leftSidebarOpen: boolean;
   rightSidebarOpen: boolean;
+  /** Sidebar content widths in px (drag-resized; clamped on read by the caller). */
+  leftSidebarWidth: number;
+  rightSidebarWidth: number;
   /** Properties panel expanded flag. */
   propertiesOpen: boolean;
 }

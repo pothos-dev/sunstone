@@ -34,7 +34,7 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
   // The right Sidebar starts collapsed; expand it via the nav-bar toggle. We
   // assert collapsed/expanded via the aside's rendered width (the clipped inner
   // is still "visible" to Playwright), not DOM visibility.
-  const rightToggle = page.getByTestId('right-sidebar-toggle');
+  const rightToggle = page.getByTestId('right-sidebar-edge');
   const rightAside = page.getByTestId('right-side-bar');
   await expect(rightToggle).toHaveAttribute('aria-pressed', 'false');
   await expect.poll(async () => (await rightAside.boundingBox())?.width).toBe(0);
@@ -80,6 +80,9 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
   await expect(outline).not.toContainText('shell comment');
 
   // --- Clicking an entry scrolls the editor to that heading's line ---
+  // Read is the default; enter editing so the scroll's cursor marks an active
+  // line (the active-line highlight is an editing-only extension).
+  await page.getByTestId('edit-toggle').click();
   // "Second Section" is `## Second Section` on full-document line 25. The
   // scroll places the cursor at that line, marking it the active line.
   await entries.nth(3).click();
@@ -127,7 +130,7 @@ test('outline lists headings, skips frontmatter/code, scrolls on click, and pers
 
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
-  await expect(page.getByTestId('right-sidebar-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('right-sidebar-edge')).toHaveAttribute('aria-pressed', 'true');
   // Collapsed Outline: the header is present but its body is not rendered.
   await expect(page.getByTestId('outline-section-header')).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByTestId('outline')).toHaveCount(0);

@@ -28,7 +28,7 @@ test('properties panel: typed inputs, scalar persist, tag chips', async ({ page 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
   // Properties is hidden by default (global toggle); switch it on.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
 
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
 
@@ -82,7 +82,7 @@ test('properties panel: the global toggle shows/hides the inline frontmatter', a
   await expect(page.getByTestId('scalar-type')).toHaveCount(0);
 
   // Toggle ON (NavBar): the panel renders its frontmatter inline.
-  const toggle = page.getByTestId('properties-panel-toggle');
+  const toggle = page.getByTestId('properties-toggle');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('properties')).toBeVisible();
@@ -102,7 +102,7 @@ test('properties panel: complex frontmatter round-trips byte-for-byte', async ({
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await tree.locator('[data-path="concepts/complex-frontmatter.md"]').click();
 
   const properties = page.getByTestId('properties');

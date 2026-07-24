@@ -294,38 +294,175 @@ test('desktop parity: dark theme, collapsible tree/index, accordion sidebars', a
 });
 
 /**
- * Round-2 polish: the Concept header (collapse-left / back / forward /
- * Properties toggle / collapse-right), collapsible Properties, and localStorage
- * persistence of UI state across reloads. Saves the DARK-mode parity shot to
- * tests/screenshots/web-parity-dark.png.
+ * Quick-nav command palette (slice: web-quick-nav-palette, rebuilt on the
+ * reconciled anon surface). Ctrl/Cmd+K (and the rail's quick-nav icon) opens a
+ * fuzzy palette over Concept paths + tags; typing filters, and selecting a
+ * result navigates via SvelteKit client-side routing (no full page reload).
+ * Saves tests/screenshots/web-quicknav.png.
  */
-test('polish: toolbar collapse/nav, Properties collapse, and persistence', async ({ page }) => {
+test('quick-nav: Ctrl+K opens a fuzzy palette that navigates client-side', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('web-viewer')).toBeVisible();
+  // Gate on hydration: the Tags Section renders from its onMount fetch, which
+  // runs in the same hydration cycle as the viewer's key listeners.
+  await expect(page.getByTestId('tag-browser')).toBeVisible();
+
+  // Ctrl+K opens the palette; with an empty query it browses all Concepts.
+  await page.keyboard.press('Control+k');
+  await expect(page.getByTestId('quick-nav')).toBeVisible();
+  await expect(page.getByTestId('quick-nav-item').first()).toBeVisible();
+
+  // A marker on `window` that a full page reload would wipe — proves the
+  // subsequent navigation is client-side (SvelteKit routing), not a reload.
+  await page.evaluate(() => ((window as unknown as Record<string, unknown>).__noReload = true));
+
+  // Typing filters to the matching Concept (fuzzy over paths).
+  await page.getByTestId('quick-nav-input').fill('good');
+  const goodItem = page.locator('[data-testid="quick-nav-item"][data-path="good.md"]');
+  await expect(goodItem).toBeVisible();
+
+  await page.screenshot({ path: 'tests/screenshots/web-quicknav.png', fullPage: true });
+
+  // Selecting it navigates (URL + render) and closes the palette — no reload.
+  await goodItem.click();
+  await expect(page).toHaveURL(/\/good$/);
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+  await expect(page.getByTestId('quick-nav')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__noReload)).toBe(
+    true,
+  );
+
+  // The rail's quick-nav icon opens the same palette; a tag match is offered.
+  await page.getByTestId('rail-quicknav').click();
+  await expect(page.getByTestId('quick-nav')).toBeVisible();
+  await page.getByTestId('quick-nav-input').fill('web');
+  await expect(page.locator('[data-testid="quick-nav-tag"][data-tag="web"]')).toBeVisible();
+
+  // Escape closes it.
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('quick-nav')).toHaveCount(0);
+});
+
+/**
+ * Layout parity (rebuilt on main's auth-aware WebViewer): the anon read surface
+ * adopts the desktop chrome — a far-left ActivityRail (menu stub + quick-nav +
+ * search + a bottom user slot wired to the REAL Auth.js sign-in), SidebarEdge
+ * click/drag borders, and a slim concept strip (history + Properties + export +
+ * theme). Asserts the rail launches search, the user slot surfaces the real
+ * sign-in affordance (NOT an inert WebUserMenu scaffold), the anon reader has no
+ * Edit button, the theme toggle flips, and dragging the left edge resizes +
+ * persists the Sidebar width. Saves tests/screenshots/web-layout-parity.png.
+ */
+test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resize persists', async ({
+  page,
+}) => {
+  await page.goto('/good');
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+
+  // The far-left activity rail carries menu + quick-nav + search + a user slot.
+  await expect(page.getByTestId('activity-rail')).toBeVisible();
+  await expect(page.getByTestId('rail-menu')).toBeVisible();
+  await expect(page.getByTestId('rail-quicknav')).toBeVisible();
+  await expect(page.getByTestId('rail-search')).toBeVisible();
+  await expect(page.getByTestId('rail-user')).toBeVisible();
+
+  // The user slot surfaces the REAL Auth.js sign-in (a link into /auth/signin),
+  // signed out — NOT an inert placeholder / WebUserMenu scaffold.
+  const signIn = page.getByTestId('web-sign-in');
+  await expect(signIn).toBeVisible();
+  await expect(signIn).toHaveAttribute('href', '/auth/signin');
+  await expect(page.getByTestId('user-menu')).toHaveCount(0);
+  await expect(page.getByTestId('web-sign-out')).toHaveCount(0);
+
+  // The rail's search icon opens the existing WebSearch modal; Escape closes it.
+  await page.getByTestId('rail-search').click();
+  await expect(page.getByTestId('search-panel')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('search-panel')).toHaveCount(0);
+
+  // The slim concept strip carries history + Properties + export + theme; the
+  // old header collapse toggles are gone (collapse moved to the edges), and the
+  // anon reader has no Edit affordance.
+  await expect(page.getByTestId('concept-strip')).toBeVisible();
+  await expect(page.getByTestId('nav-back')).toBeVisible();
+  await expect(page.getByTestId('nav-forward')).toBeVisible();
+  await expect(page.getByTestId('properties-panel-toggle')).toBeVisible();
+  await expect(page.getByTestId('export-pdf')).toBeVisible();
+  await expect(page.getByTestId('theme-toggle')).toBeVisible();
+  await expect(page.getByTestId('sidebar-toggle')).toHaveCount(0);
+  await expect(page.getByTestId('right-sidebar-toggle')).toHaveCount(0);
+  await expect(page.getByTestId('web-edit-toggle')).toHaveCount(0);
+
+  // The theme toggle flips light / dark on the app root.
+  const root = page.getByTestId('web-viewer');
+  const before = await root.getAttribute('data-theme');
+  await page.getByTestId('theme-toggle').click();
+  const after = await root.getAttribute('data-theme');
+  expect(after).not.toBe(before);
+
+  await page.screenshot({ path: 'tests/screenshots/web-layout-parity.png', fullPage: true });
+
+  // Dragging the left edge resizes the left Sidebar; the width persists on reload.
+  const aside = page.getByTestId('left-side-bar');
+  const startWidth = (await aside.boundingBox())?.width ?? 0;
+  const edge = page.getByTestId('left-sidebar-edge');
+  const box = (await edge.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 80, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await aside.boundingBox())?.width).toBeGreaterThan(startWidth + 70);
+
+  // The width round-trips through localStorage (sunstone:webUI).
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = window.localStorage.getItem('sunstone:webUI');
+        if (!raw) return null;
+        return (JSON.parse(raw) as { leftSidebarWidth?: number }).leftSidebarWidth ?? null;
+      }),
+    )
+    .toBeGreaterThan(startWidth + 70);
+
+  await page.reload();
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+  await expect
+    .poll(async () => (await page.getByTestId('left-side-bar').boundingBox())?.width)
+    .toBeGreaterThan(startWidth + 70);
+});
+
+/**
+ * Round-2 polish (rebuilt on the reconciled surface): edge-click sidebar
+ * collapse (left + right borders), collapsible Properties, back/forward strip
+ * nav, and localStorage persistence of UI state across reloads. Saves the
+ * DARK-mode parity shot to tests/screenshots/web-parity-dark.png.
+ */
+test('polish: edge collapse/strip-nav, Properties collapse, and persistence', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/good');
   await expect(page.getByTestId('web-viewer')).toHaveAttribute('data-theme', 'dark');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
 
-  // Collapse-left button hides the left Sidebar; toggling restores it.
-  await expect(page.getByTestId('web-tree')).toBeVisible();
-  await page.getByTestId('sidebar-toggle').click();
-  await expect(page.getByTestId('web-tree')).not.toBeVisible();
-  await page.getByTestId('sidebar-toggle').click();
-  await expect(page.getByTestId('web-tree')).toBeVisible();
+  // Clicking the left edge collapses the left Sidebar; clicking again restores it.
+  await expect(page.getByTestId('left-side-bar')).toBeVisible();
+  await page.getByTestId('left-sidebar-edge').click();
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
+  await page.getByTestId('left-sidebar-edge').click();
+  await expect(page.getByTestId('left-side-bar')).toBeVisible();
 
-  // Collapse-right button hides the right Sidebar; toggling restores it.
-  await expect(page.getByTestId('outline')).toBeVisible();
-  await page.getByTestId('right-sidebar-toggle').click();
-  await expect(page.getByTestId('outline')).not.toBeVisible();
-  await page.getByTestId('right-sidebar-toggle').click();
-  await expect(page.getByTestId('outline')).toBeVisible();
+  // Clicking the right edge collapses the right Sidebar; clicking again restores it.
+  await expect(page.getByTestId('right-side-bar')).toBeVisible();
+  await page.getByTestId('right-sidebar-edge').click();
+  await expect(page.getByTestId('right-side-bar')).not.toBeVisible();
+  await page.getByTestId('right-sidebar-edge').click();
+  await expect(page.getByTestId('right-side-bar')).toBeVisible();
 
   // Properties collapses (body removed) and re-expands.
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.getByTestId('properties-panel-toggle').click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // Screenshot the DARK parity view (toolbar on centre tile, both Sidebars,
-  // thin scrollbars) with Properties re-expanded.
+  // Screenshot the DARK parity view with Properties re-expanded.
   await page.getByTestId('properties-panel-toggle').click();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.screenshot({ path: 'tests/screenshots/web-parity-dark.png', fullPage: true });
@@ -361,10 +498,11 @@ test('polish: toolbar collapse/nav, Properties collapse, and persistence', async
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   // Sidebar-collapse also persists.
-  await page.getByTestId('sidebar-toggle').click();
-  await expect(page.getByTestId('web-tree')).not.toBeVisible();
+  await page.getByTestId('left-sidebar-edge').click();
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
   await page.reload();
-  await expect(page.getByTestId('web-tree')).not.toBeVisible();
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+  await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
 });
 
 /**

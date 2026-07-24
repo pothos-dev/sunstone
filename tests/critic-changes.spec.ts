@@ -87,7 +87,7 @@ test('addition, deletion and substitution render as red/green track-change spans
   }
 });
 
-test('hybrid: caret inside a mark reveals raw markup; moving away collapses it', async ({
+test('editing: caret inside a mark reveals raw markup; moving away collapses it', async ({
   page,
 }) => {
   const editor = await openConcept(
@@ -95,6 +95,8 @@ test('hybrid: caret inside a mark reveals raw markup; moving away collapses it',
     'critic-reveal.md',
     `${fm('Reveal')}# Reveal\n\nThe {++added++} word.\n`,
   );
+  // Cursor-reveal is an editing-mode behaviour; read is the default.
+  await page.getByTestId('edit-toggle').click();
   const add = editor.locator('.cm-critic-add').first();
   await expect(add).toHaveText('added');
   await expect(editor).not.toContainText('{++');
@@ -116,7 +118,7 @@ test('view mode: clicking a mark never reveals the raw markup', async ({ page })
     'critic-view.md',
     `${fm('View')}# View\n\nThe {--gone--} word.\n`,
   );
-  await page.getByTestId('editor-mode-view').click();
+  // Read is the default mode.
 
   const del = editor.locator('.cm-critic-del').first();
   await expect(del).toHaveText('gone');

@@ -49,6 +49,10 @@ test('Ctrl+F opens the find panel above the editor, finds and navigates', async 
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
 
+  // Read is the default; enter editing so the editor takes/keeps focus (Esc below
+  // refocuses .cm-content, which a read-only view cannot hold).
+  await page.getByTestId('edit-toggle').click();
+
   // --- Ctrl+F opens the panel and focuses the find field ---
   await page.keyboard.press('Control+f');
   const panel = page.getByTestId('find-panel');
@@ -113,6 +117,9 @@ test('Replace (single) and Replace-all edit the body and persist via autosave', 
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
 
+  // Read is the default; enter editing so Replace can edit the body.
+  await page.getByTestId('edit-toggle').click();
+
   // --- Replace single: the body says "Sunstone layers OKF-aware extensions";
   // replace that single body occurrence of "Sunstone" with "Sunstone". ---
   await page.keyboard.press('Control+f');
@@ -165,6 +172,9 @@ test('a replace is undoable through CM history', async ({ page }) => {
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+
+  // Read is the default; enter editing so Replace edits the body and Ctrl+Z runs.
+  await page.getByTestId('edit-toggle').click();
 
   await page.keyboard.press('Control+f');
   await expect(page.getByTestId('find-panel')).toBeVisible();

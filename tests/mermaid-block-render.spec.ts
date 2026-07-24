@@ -29,6 +29,10 @@ test('mermaid: a mermaid fence renders as an SVG diagram; cursor reveals raw', a
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Obsidian-style hybrid editing');
 
+  // Enter editing (read is the default) — the cursor-reveal below is an
+  // editing-only behaviour; the diagram renders the same in both modes.
+  await page.getByTestId('edit-toggle').click();
+
   // --- A non-mermaid fenced block is unaffected (still a code block) --------
   // The ```ts block (near the top of the doc) renders with the atomic-editor
   // fenced-code class, proving mermaid handling didn't swallow ordinary code
@@ -74,8 +78,7 @@ test('mermaid: reading mode always renders the diagram', async ({ page }) => {
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
 
-  // Switch to Reading (view) mode.
-  await page.getByTestId('editor-mode-view').click();
+  // Read is the default mode.
 
   await editor.locator('.cm-scroller').evaluate((el) => {
     el.scrollTop = el.scrollHeight;

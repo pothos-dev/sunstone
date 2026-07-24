@@ -122,7 +122,7 @@ export interface BuildEditorOptions {
    * state with a fresh history (unified-undo: history never crosses Concepts).
    */
   path?: string | null;
-  /** The view mode to build the editor in (default `hybrid`). */
+  /** The view mode to build the editor in (default `read`). */
   initialMode?: EditorMode;
   /**
    * Called with the new FULL Concept markdown (`serialize(frontmatter) + body`)
@@ -213,16 +213,20 @@ function defaultLinkClick(url: string): void {
 }
 
 /**
- * The editor's three view modes (Obsidian parity):
- *   - `edit`   — source mode: raw markdown, no live-preview decorations.
- *   - `hybrid` — live preview (ADR-0001, the default): inactive lines render
- *                styled and the cursor line shows raw markup.
- *   - `view`   — reading mode: every line renders, no raw markup, read-only.
+ * The editor's two view modes — a boolean `editing`, kept as a string union so
+ * it round-trips through the persisted `Option<String>` bundle-state config:
+ *   - `editing` — live preview (ADR-0001): inactive lines render styled and the
+ *                 cursor line shows raw markup; the document is editable.
+ *   - `read`    — reading mode (the default): every line renders, no raw markup,
+ *                 read-only.
+ * (The old three-way `edit`/`hybrid`/`view` collapsed here: `edit`+`hybrid` →
+ * `editing`, `view` → `read`. Legacy persisted values migrate on read; see
+ * `migrateEditorMode` in `layoutPersist.ts`.)
  */
-export type EditorMode = 'edit' | 'hybrid' | 'view';
+export type EditorMode = 'editing' | 'read';
 
 /** The default mode for a freshly-built view when none is specified. */
-export const DEFAULT_EDITOR_MODE: EditorMode = 'hybrid';
+export const DEFAULT_EDITOR_MODE: EditorMode = 'read';
 
 /**
  * The STATIC live-preview foundation present in EVERY mode: the GFM parser
@@ -240,13 +244,12 @@ function livePreviewBase(): Extension[] {
 
 /**
  * The MODE-DEPENDENT extension slice, held in a Compartment so the host can
- * switch modes at runtime (`setEditorMode`) without rebuilding the view:
- *   - which decoration/widget extensions apply (none in `edit`);
- *   - whether inline preview renders every line (`view`, via atomic-editor's
- *     patched `alwaysRender`) or reveals the cursor line (`hybrid`);
- *   - the read-only / editable gating (`view` is read-only).
- * The active-line highlight is included for the editable modes only — reading
- * view has no editing caret to anchor it.
+ * toggle editing at runtime (`setEditorMode`) without rebuilding the view:
+ *   - whether inline preview renders every line (`read`, via atomic-editor's
+ *     patched `alwaysRender`) or reveals the cursor line (`editing`);
+ *   - the read-only / editable gating (`read` is read-only).
+ * The active-line highlight is included for `editing` only — reading view has no
+ * editing caret to anchor it.
  */
 function modeExtensions(
   mode: EditorMode,
@@ -254,31 +257,23 @@ function modeExtensions(
   theme: ResolvedTheme,
   onCommentEdit?: OnCommentEdit,
 ): Extension[] {
-  // EDIT (source): no live-preview decorations — raw markup stays visible.
-  if (mode === 'edit') {
-    return [highlightActiveLine(), EditorState.readOnly.of(false), EditorView.editable.of(true)];
-  }
-  const reading = mode === 'view';
+  const reading = mode === 'read';
   return [
     tables({ onLinkClick }),
     imageBlocks(),
-    // Render ` ```mermaid ` fences as Diagrams (ADR-0005). Active in hybrid and
-    // view only — `edit` returned early above, so source mode shows the raw
-    // fence. `reading` (view): always rendered; hybrid: cursor inside reveals raw.
+    // Render ` ```mermaid ` fences as Diagrams (ADR-0005). `reading` (read):
+    // always rendered; `editing`: cursor inside reveals the raw fence.
     // `theme` bakes the diagram colours; a flip reconfigures this Compartment.
     mermaidBlocks(reading, theme),
     inlinePreview({ onLinkClick, alwaysRender: reading }),
     // Citation references: inline `[n]` following a word render as superscript
     // links that jump to the `[n] …` row of the citation table (citation-
-    // superscripts). Non-`edit` only (source mode keeps raw `[n]`); `reading`
-    // always renders, hybrid reveals the token under the cursor. Placed after
-    // inlinePreview so the replace decoration overrides the stray reference-link
-    // syntax colour on the middle number.
+    // superscripts). `reading` always renders; `editing` reveals the token under
+    // the cursor. Placed after inlinePreview so the replace decoration overrides
+    // the stray reference-link syntax colour on the middle number.
     citations(reading),
     // CriticMarkup annotations (highlight background, hidden delimiters/comment,
-    // gutter icon + hover note). Non-`edit` modes only — `edit` returned early
-    // above so source mode keeps raw `{==...==}` visible, consistent with how
-    // edit mode shows raw markup. Cursor-inside reveals raw markup for editing.
+    // gutter icon + hover note). Cursor-inside reveals raw markup for editing.
     criticMarkupAnnotations(reading, onCommentEdit),
     ...(reading ? [] : [highlightActiveLine()]),
     // `editable` controls the DOM `contenteditable`; `readOnly` blocks edits at
@@ -719,13 +714,13 @@ const viewMermaidTheme = new WeakMap<EditorView, ResolvedTheme>();
  * Build a READ-ONLY review buffer (review-toggle: working-tree ↔ HEAD).
  *
  * `reviewText` is the in-memory CriticMarkup diff (ticket 03's `diffToCriticMarkup`
- * of `HEAD` vs the working tree). It is rendered in reading (`view`) mode so
+ * of `HEAD` vs the working tree). It is rendered in reading (`read`) mode so
  * ticket 01's add/del marks show WITHOUT any cursor-reveal of raw markup, and
  * the buffer is read-only. Crucially it is wired with NO `onChange`/`onBlur`, so
  * the review text can NEVER reach `editor.edit` / autosave — it lives only in
  * this view and is discarded when the view is destroyed on exit. Pre-existing
  * highlight/comment annotations in the text still render (they are the same
- * CriticMarkup decorations, active in every non-`edit` mode).
+ * CriticMarkup decorations).
  */
 export function buildReviewEditor(parent: HTMLElement, reviewText: string): EditorView {
   return buildEditor({
@@ -733,9 +728,9 @@ export function buildReviewEditor(parent: HTMLElement, reviewText: string): Edit
     doc: reviewText,
     frontmatter: [],
     // No `path` and no `onChange`/`onBlur`: this buffer is in-memory only and
-    // must never autosave. `view` mode = read-only + marks visible + no reveal.
+    // must never autosave. `read` mode = read-only + marks visible + no reveal.
     path: null,
-    initialMode: 'view',
+    initialMode: 'read',
   });
 }
 
@@ -823,7 +818,7 @@ export function setEditorConcept(
     const wikiCompartment = viewWikiCompartment.get(view) ?? new Compartment();
     viewWikiCompartment.set(view, wikiCompartment);
     // Likewise reuse the mode Compartment and carry the current mode across the
-    // switch, so the new Concept opens in the same edit/hybrid/view mode.
+    // switch, so the new Concept opens in the same editing/read mode.
     const livePreviewCompartment = viewLivePreviewCompartment.get(view) ?? new Compartment();
     viewLivePreviewCompartment.set(view, livePreviewCompartment);
     const mode = viewMode.get(view) ?? DEFAULT_EDITOR_MODE;
@@ -914,16 +909,13 @@ export function reconfigureWikiLinks(view: EditorView): void {
  * mode Compartment with the new theme — a full rebuild of the mode slice that
  * re-runs every diagram's `toDOM`, re-rendering it in the new scheme. App.svelte
  * calls this from the `$effect` mirroring `theme.resolved`. No-op when the theme
- * is unchanged or in `edit` mode (no diagrams) / before the compartment exists.
+ * is unchanged or before the compartment exists.
  */
 export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme): void {
   const compartment = viewLivePreviewCompartment.get(view);
   if (!compartment || viewMermaidTheme.get(view) === resolved) return;
   viewMermaidTheme.set(view, resolved);
   const mode = getEditorMode(view);
-  // `edit` mode has no diagrams; just remember the theme for when a render mode
-  // is next active (a mode switch rebuilds the slice with this remembered theme).
-  if (mode === 'edit') return;
   const onLinkClick = viewOptions.get(view)?.onLinkClick ?? defaultLinkClick;
   const onCommentEdit = viewOptions.get(view)?.onCommentEdit;
   view.dispatch({
@@ -931,15 +923,15 @@ export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme)
   });
 }
 
-/** The view's current mode (`hybrid` if the view predates mode tracking). */
+/** The view's current mode (`read` if the view predates mode tracking). */
 export function getEditorMode(view: EditorView): EditorMode {
   return viewMode.get(view) ?? DEFAULT_EDITOR_MODE;
 }
 
 /**
- * Switch the view between `edit` / `hybrid` / `view` by reconfiguring the
- * mode Compartment — no view rebuild, so the document, history and selection
- * are preserved. The mode is remembered (WeakMap) so it carries across Concept
+ * Switch the view between `editing` / `read` by reconfiguring the mode
+ * Compartment — no view rebuild, so the document, history and selection are
+ * preserved. The mode is remembered (WeakMap) so it carries across Concept
  * switches. No-op if the mode is unchanged or the view has no compartment.
  */
 export function setEditorMode(view: EditorView, mode: EditorMode): void {

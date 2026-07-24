@@ -77,6 +77,9 @@ test('authoring: Ctrl+Alt+m wraps a selection into a collapsed highlight+comment
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Highlightme is the word');
 
+  // The keyboard annotate command needs an editable buffer; read is the default.
+  await page.getByTestId('edit-toggle').click();
+
   // Select the leading word "Highlightme" with the keyboard: click into the
   // paragraph line, go to its start, then extend the selection over the word.
   const para = editor.locator('.cm-line', { hasText: 'Highlightme' }).first();
@@ -140,6 +143,9 @@ test('right-click menu: "Add comment" opens the popup; saving wraps the annotati
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Highlightme is the word');
+
+  // Keyboard selection needs an editable buffer; read is the default.
+  await page.getByTestId('edit-toggle').click();
 
   // Select "Highlightme" with the keyboard (same deterministic approach as the
   // authoring test), then open the annotate menu WITHOUT disturbing the
@@ -232,8 +238,7 @@ test('reading mode: selecting text and annotating writes the note (preferred flo
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Highlightme is the word');
 
-  // Switch to Reading (view) mode — the editor is read-only here.
-  await page.getByTestId('editor-mode-view').click();
+  // Read is the default mode — the editor is read-only here.
 
   // Select the word "Highlightme" via a native DOM selection (CodeMirror does not
   // sync the non-editable selection into state, so the app maps it via posAtDOM).
@@ -285,12 +290,12 @@ test('reading mode: clicking a marked span never reveals the raw markup', async 
 
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
-  await page.getByTestId('editor-mode-view').click();
+  // Read is the default mode.
 
   const highlight = editor.locator('.cm-critic-highlight').first();
   await expect(highlight).toHaveText('quick');
 
-  // Clicking inside the marked span (hybrid would reveal `{==`/`{>>` here) must
+  // Clicking inside the marked span (editing would reveal `{==`/`{>>` here) must
   // keep the annotation collapsed in reading mode.
   await highlight.click();
   await expect(editor).not.toContainText('{==');
@@ -323,7 +328,9 @@ test('multi-line note: markup stays hidden and the save popup closes', async ({ 
 
   // Authoring a fresh multi-line note: the dispatch must not throw, so the popup
   // closes on Save (the bug was a plugin-provided line-crossing replace aborting
-  // the dispatch, leaving the dialog stuck open).
+  // the dispatch, leaving the dialog stuck open). Keyboard selection needs an
+  // editable buffer, so enter editing (read is the default).
+  await page.getByTestId('edit-toggle').click();
   const para = editor.locator('.cm-line', { hasText: 'fox' }).first();
   await para.click();
   await page.keyboard.press('End');

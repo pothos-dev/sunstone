@@ -49,6 +49,8 @@ async function openConcept(page: Page) {
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+  // Read is the default; enter editing so the Editor Region is focusable.
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 }
@@ -93,7 +95,7 @@ test('a manually-expanded Section stays open after focus leaves', async ({ page 
 
   // Manually expand the right Sidebar (the persisted `expanded` state). Outline
   // + Backlinks Sections default to open within it.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('right-side-bar')).not.toHaveClass(/collapsed/);
   await expect(page.getByTestId('backlinks')).toBeVisible();
 
@@ -198,7 +200,7 @@ test('Properties shown by the global toggle: Alt-in lands focus, Escape returns,
   // Turn Properties ON globally — its panel renders inline in the tile and the
   // 'properties' Region becomes present + visible. Re-focus the Editor after the
   // toggle click so the next Alt+Up is a real cross-Region move.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').click();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.getByTestId('editor').locator('.cm-content').click();
   await expectActive(page, 'editor');

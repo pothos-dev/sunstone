@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * reveals Backlinks, whose own Section defaults to expanded.
  */
 async function expandRightSidebar(page: import('@playwright/test').Page) {
-  const toggle = page.getByTestId('right-sidebar-toggle');
+  const toggle = page.getByTestId('right-sidebar-edge');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
 }
 

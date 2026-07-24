@@ -17,7 +17,8 @@
   import Outline from '$lib/components/Outline.svelte';
   import TagBrowser from '$lib/components/TagBrowser.svelte';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
-  import NavBar from '$lib/components/NavBar.svelte';
+  import SidebarEdge from '$lib/components/SidebarEdge.svelte';
+  import ActivityRail from '$lib/components/ActivityRail.svelte';
   import Tile from '$lib/components/Tile.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { treeDnd } from '$lib/state/treeDnd.svelte';
@@ -82,6 +83,11 @@
   const tileCount = $derived(
     workspace.layout.columns.reduce((n, col) => n + col.tiles.length, 0),
   );
+
+  // While a sidebar edge is being dragged we suppress its width transition so it
+  // tracks the pointer instantly (the transition otherwise lags every frame).
+  let leftResizing = $state(false);
+  let rightResizing = $state(false);
 
   // Quick-nav palette (Ctrl+K) + full-text search (Ctrl+Shift+F) overlays.
   let quickNavOpen = $state(false);
@@ -623,17 +629,20 @@
   });
 </script>
 
-<div
-  class="app"
-  class:sidebar-collapsed={!session.leftSidebarVisible}
-  data-testid="app-root"
-  bind:this={appRoot}
->
+<div class="app" data-testid="app-root" bind:this={appRoot}>
+  <ActivityRail
+    onMenu={() => {}}
+    onQuickNav={() => (quickNavOpen = !quickNavOpen)}
+    onSearch={() => (searchOpen = !searchOpen)}
+  />
+
   <aside
     class="side-bar"
+    class:collapsed={!session.leftSidebarVisible}
+    class:resizing={leftResizing}
     aria-label="Sidebar"
     data-testid="side-bar"
-    style="--expanded-count: {expandedCount}"
+    style="width: {session.leftSidebarVisible ? session.leftSidebarWidth : 0}px; --side-w: {session.leftSidebarWidth}px; --expanded-count: {expandedCount}"
   >
     <div class="side-bar-inner">
     <SidebarSection
@@ -756,18 +765,20 @@
     </div>
   </aside>
 
+  <!-- The left Sidebar's border: click to collapse/expand, drag to resize. -->
+  <SidebarEdge
+    side="left"
+    open={session.leftSidebarOpen}
+    width={session.leftSidebarWidth}
+    label="sidebar"
+    testid="left-sidebar-edge"
+    onToggle={() => session.setLeftSidebarOpen(!session.leftSidebarOpen)}
+    onResize={(w) => session.setLeftSidebarWidth(w)}
+    onResizeStart={() => (leftResizing = true)}
+    onResizeEnd={() => (leftResizing = false)}
+  />
+
   <main class="editor-tile" aria-label="Concept">
-    <NavBar
-      leftSidebarOpen={session.leftSidebarOpen}
-      rightSidebarOpen={session.rightSidebarOpen}
-      editorMode={session.editorMode}
-      hasOpenConcept={editor.path !== null}
-      propertiesShown={session.propertiesShown}
-      onToggleLeft={() => session.setLeftSidebarOpen(!session.leftSidebarOpen)}
-      onToggleRight={() => session.setRightSidebarOpen(!session.rightSidebarOpen)}
-      onSetMode={(mode) => session.setEditorMode(mode)}
-      onToggleProperties={() => session.setPropertiesShown(!session.propertiesShown)}
-    />
     <!-- The editor area: a ROW OF COLUMNS, each a vertical STACK of tiled Tiles,
          with draggable dividers between columns and between tiles. It is the
          single 'editor' Region; the active Tile is where focus lands on entry.
@@ -830,12 +841,26 @@
     </div>
   </main>
 
+  <!-- The right Sidebar's border: click to collapse/expand, drag to resize. -->
+  <SidebarEdge
+    side="right"
+    open={session.rightSidebarOpen}
+    width={session.rightSidebarWidth}
+    label="Outline & Backlinks"
+    testid="right-sidebar-edge"
+    onToggle={() => session.setRightSidebarOpen(!session.rightSidebarOpen)}
+    onResize={(w) => session.setRightSidebarWidth(w)}
+    onResizeStart={() => (rightResizing = true)}
+    onResizeEnd={() => (rightResizing = false)}
+  />
+
   <aside
     class="side-bar right-side-bar"
     class:collapsed={!session.rightSidebarVisible}
+    class:resizing={rightResizing}
     aria-label="Outline & Backlinks"
     data-testid="right-side-bar"
-    style="--expanded-count: {rightExpandedCount}"
+    style="width: {session.rightSidebarVisible ? session.rightSidebarWidth : 0}px; --side-w: {session.rightSidebarWidth}px; --expanded-count: {rightExpandedCount}"
   >
     <div class="side-bar-inner">
       <SidebarSection
@@ -925,7 +950,11 @@
 <style>
   .app {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    /* Far-left activity rail (fixed) | collapsible left Sidebar | its resize edge
+       | editor | right resize edge | right Sidebar. The rail and both edges sit
+       OUTSIDE the collapsing Sidebars, so the edge stays a click target to
+       re-expand a Sidebar that has collapsed to 0 width. */
+    grid-template-columns: auto auto auto 1fr auto auto;
     height: 100vh;
     overflow: hidden;
     color: var(--text);
@@ -935,7 +964,10 @@
   }
 
   .side-bar {
-    width: 280px;
+    /* Width is driven inline from the persisted `leftSidebarWidth` /
+       `rightSidebarWidth` (0 when collapsed). The inner keeps the FULL width
+       (via `--side-w`) so collapsing slides the content out under the clip
+       rather than reflowing it. */
     height: 100vh;
     overflow: hidden;
     display: flex;
@@ -945,8 +977,13 @@
     transition: width 0.22s ease;
   }
 
-  .app.sidebar-collapsed .side-bar {
-    width: 0;
+  /* Suppress the transition while dragging the edge so the width tracks the
+     pointer instantly. */
+  .side-bar.resizing {
+    transition: none;
+  }
+
+  .side-bar.collapsed {
     border-right-width: 0;
   }
 
@@ -957,13 +994,13 @@
   }
 
   .right-side-bar.collapsed {
-    width: 0;
     border-left-width: 0;
+    border-right-width: 0;
   }
 
   .side-bar-inner {
     flex: none;
-    width: 280px;
+    width: var(--side-w, 280px);
     height: 100vh;
     display: flex;
     flex-direction: column;

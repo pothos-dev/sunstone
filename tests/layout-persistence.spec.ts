@@ -60,14 +60,18 @@ test('layout persistence: a 2-column stacked layout + global mode + active tile 
   await tree.locator(`[data-path="${LIVE}"]`).click();
   await expect(page.getByTestId('tile').nth(2).getByTestId('editor')).toContainText(LIVE_NEEDLE);
 
-  // The view-mode is GLOBAL: set Reading (view) once in the NavBar; it applies to
-  // EVERY tile at once (all three go read-only).
-  await page.getByTestId('editor-mode-view').click();
-  await expect(page.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
+  // The view-mode is GLOBAL: toggle Editing on once (any tile's Edit toggle); it
+  // applies to EVERY tile at once (all three become editable). Read is the
+  // default, so editing is the non-trivial choice whose restoration we assert.
+  await page.getByTestId('tile').nth(0).getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('tile').nth(0).getByTestId('edit-toggle')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   for (const i of [0, 1, 2]) {
     await expect(page.getByTestId('tile').nth(i).locator('.cm-content')).toHaveAttribute(
       'contenteditable',
-      'false',
+      'true',
     );
   }
 
@@ -116,13 +120,16 @@ test('layout persistence: a 2-column stacked layout + global mode + active tile 
   await expect(page.getByTestId('tile').nth(1).getByTestId('editor')).toContainText(BUNDLE_NEEDLE);
   await expect(page.getByTestId('tile').nth(2).getByTestId('editor')).toContainText(LIVE_NEEDLE);
 
-  // The global mode (Reading) is restored and applies to every tile: the NavBar
-  // toggle shows it, and all three tiles come back read-only.
-  await expect(page.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
+  // The global mode (Editing) is restored and applies to every tile: each tile's
+  // Edit toggle shows it, and all three tiles come back editable.
+  await expect(page.getByTestId('tile').nth(0).getByTestId('edit-toggle')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   for (const i of [0, 1, 2]) {
     await expect(page.getByTestId('tile').nth(i).locator('.cm-content')).toHaveAttribute(
       'contenteditable',
-      'false',
+      'true',
     );
   }
 
@@ -154,6 +161,7 @@ test('layout persistence: an OLD single-Concept session migrates to one tile', a
   await expect(page.getByTestId('column-divider')).toHaveCount(0);
   await expect(page.getByTestId('tile-divider')).toHaveCount(0);
   await expect(page.getByTestId('editor')).toContainText(CM_NEEDLE);
-  await expect(page.getByTestId('editor-mode-view')).toHaveAttribute('aria-pressed', 'true');
+  // The legacy 'view' mode migrates to 'read' (Edit toggle off, read-only).
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.cm-content')).toHaveAttribute('contenteditable', 'false');
 });

@@ -27,10 +27,12 @@ async function twoTiles(page: Page) {
   await page.goto('/');
   let tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
+  // `editorMode: editing` so each tile's editor is focusable — clicking a tile's
+  // editor below must activate it, which read (the default) prevents.
   await page.evaluate(() =>
     window.localStorage.setItem(
       'sunstone:bundleState:/fake/bundle',
-      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] }),
+      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], editorMode: 'editing' }),
     ),
   );
   await page.reload();
@@ -42,7 +44,7 @@ async function twoTiles(page: Page) {
   await expect(page.getByTestId('editor').first()).toContainText('CodeMirror 6 is the editor core');
 
   // Reveal the right Sidebar so Outline + Backlinks are on screen.
-  await page.getByTestId('right-sidebar-toggle').click();
+  await page.getByTestId('right-sidebar-edge').click();
   await expect(page.getByTestId('outline')).toBeVisible();
 
   // Split into a second tile, then open bundle.md in it (the split leaves the new
@@ -71,8 +73,10 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   // Default HIDDEN: no Properties chrome in either tile.
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // Toggle ON: BOTH tiles render their OWN Concept's frontmatter inline.
-  await page.getByTestId('properties-panel-toggle').click();
+  // Toggle ON: BOTH tiles render their OWN Concept's frontmatter inline. The
+  // Properties toggle now lives in EACH tile's header (one per tile), so target
+  // the first — it drives the shared global flag for every tile.
+  await page.getByTestId('properties-toggle').first().click();
   await expect(page.getByTestId('properties')).toHaveCount(2);
   await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
   await expect(tile1.getByTestId('scalar-title')).toHaveValue('Bundle');
@@ -82,7 +86,10 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
     fullPage: true,
   });
 
-  // Editing one tile's frontmatter targets THAT tile's Document (per-tile).
+  // Editing one tile's frontmatter targets THAT tile's Document (per-tile). Click
+  // into tile 1's field first — the Properties toggle above left tile 0 active, so
+  // interacting with tile 1 activates it (a real mousedown, as a user would do).
+  await tile1.getByTestId('scalar-title').click();
   await tile1.getByTestId('scalar-title').fill('Bundle Renamed');
   await tile1.getByTestId('scalar-title').blur();
   await expect
@@ -98,7 +105,7 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
 
   // Toggle OFF: NO tile shows any Properties chrome.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('properties-toggle').first().click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 });
 

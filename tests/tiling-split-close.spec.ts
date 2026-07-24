@@ -20,6 +20,9 @@ async function openCodemirror(page: import('@playwright/test').Page) {
   await expect(tree).toBeVisible();
   await tree.locator(`[data-path="${CM}"]`).click();
   await expect(page.getByTestId('editor')).toContainText(NEEDLE);
+  // Read is the default; enter editing (global mode) so the shared-doc edit below
+  // takes and split tiles inherit an editable view.
+  await page.getByTestId('edit-toggle').click();
 }
 
 test('tiling: split right + down, resize a divider, shared-doc sync, close to neighbour then single', async ({

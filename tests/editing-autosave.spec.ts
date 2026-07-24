@@ -25,7 +25,8 @@ test('editing + autosave: typing persists via the backend', async ({ page }) => 
   // rendered text (the on-disk source still has the markers — see autosave).
   await expect(editor).toContainText('A Bundle is the root folder');
 
-  // Editor is now EDITABLE (slice 1 had this false).
+  // Enter editing (read is the default): the editor becomes EDITABLE.
+  await page.getByTestId('edit-toggle').click();
   const content = editor.locator('.cm-content');
   await expect(content).toHaveAttribute('contenteditable', 'true');
 

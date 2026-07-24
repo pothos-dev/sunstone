@@ -40,7 +40,9 @@ async function freshLoad(page: Page) {
   // Seed a deterministic tree state: `concepts/` + `concepts/editor/` expanded.
   // All folders open COLLAPSED by default; seeding the expanded set keeps these
   // keyboard-nav assertions focused on movement rather than the collapse default.
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] })));
+  // `editorMode: editing` so a Concept opened below is editable and thus takes
+  // focus (read — the default — is not focusable; focus would never leave the tree).
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], editorMode: 'editing' })));
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 }

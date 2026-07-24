@@ -29,16 +29,17 @@ The desktop `BundleState` (session store `src/lib/state/session.svelte.ts`) carr
 - `expandedFolders` — expanded Explorer tree folders.
 - `recentFiles` — most-recent-first, deduped, capped at 15; feeds the quick-nav palette.
 - `leftSidebarOpen`, `rightSidebarOpen` — whole-Sidebar collapse.
+- `leftSidebarWidth`, `rightSidebarWidth` — each Sidebar's dragged width (clamped on read; set from the [Sidebar edge](/interface/sidebars.md)).
 - `explorerOpen`, `tagsOpen`, `outlineOpen`, `backlinksOpen` — per-Section collapse.
 - `propertiesShown` — the global Properties show/hide toggle.
-- `editorMode` — the tri-state view mode (Source / Live / Reading).
-- `layout` — the full tiling workspace ([Columns of Tiles](/editor/editor-layout.md)), round-tripped as opaque JSON.
+- `editorMode` — the boolean view mode, `editing` vs `read` (the shared default for a Tile; each Tile also remembers its own mode inside `layout`).
+- `layout` — the full tiling workspace ([Columns of Tiles](/editor/editor-layout.md), each with its per-Tile view mode), round-tripped as opaque JSON.
 - `window` — window size/position, owned by Rust.
 
 ## How it round-trips
 
 - **Extend-only schema.** Every field is optional and `#[serde(default)]` on the Rust side; adding a field only requires defaulting it on read, and old/new binaries tolerate each other's files. A missing or corrupt store loads as defaults — losing View state is harmless, so a parse error never propagates to the UI.
-- **Defaults on read.** The session store fills absent fields: the left Sidebar and most Sections default to **open**, but **Tags**, the **right Sidebar** and **Properties** default to **collapsed/hidden**. `editorMode` defaults to Live.
+- **Defaults on read.** The session store fills absent fields: the left Sidebar and most Sections default to **open**, but **Tags**, the **right Sidebar** and **Properties** default to **collapsed/hidden**. `editorMode` defaults to `read`, and each Sidebar width defaults to `DEFAULT_SIDEBAR_WIDTH`.
 - **Debounced writes.** UI changes schedule a single coalesced save (250 ms debounce) through `saveBundleState`; passing back the loaded `window` value carries the Rust-owned geometry through untouched.
 - **Restore gate.** Persistence is held until the full restore (load + seed defaults + reopen the last Concept) completes, so a transient startup value can't overwrite just-loaded state.
 - **Transient flags excluded.** The ephemeral reveal flags (`*Revealed`, see [Sidebars → transient reveal](/interface/sidebars.md)) are deliberately kept out of the snapshot — a keyboard visit never becomes a persisted preference.

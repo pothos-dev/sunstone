@@ -20,9 +20,9 @@ test('walking skeleton: tree renders and a Concept opens', async ({ page }) => {
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
 
-  // The editor became editable in the editing-autosave-watcher slice (that
-  // slice's spec asserts editability + autosave); here we just confirm a
-  // Concept renders.
+  // Read is the default; the Edit toggle switches to an editable buffer (the
+  // editing-boolean-edit-toggle slice). Enter editing, then confirm editability.
+  await page.getByTestId('edit-toggle').click();
   const editable = await editor.locator('.cm-content').getAttribute('contenteditable');
   expect(editable).toBe('true');
 

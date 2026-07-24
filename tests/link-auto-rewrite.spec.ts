@@ -71,7 +71,7 @@ async function openRowMenu(page: Page, path: string): Promise<void> {
  * (right-sidebar-move-backlinks).
  */
 async function expandRightSidebar(page: Page): Promise<void> {
-  const toggle = page.getByTestId('right-sidebar-toggle');
+  const toggle = page.getByTestId('right-sidebar-edge');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
 }
 

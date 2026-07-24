@@ -34,6 +34,8 @@ async function openFixture(page: Page, path: string) {
   await tree.locator(`[data-path="${path}"]`).click();
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
+  // Read is the default; enter editing so the working-tree edits below take.
+  await page.getByTestId('edit-toggle').click();
   return editor;
 }
 

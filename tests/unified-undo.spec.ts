@@ -31,12 +31,15 @@ test('unified undo: body then property undo/redo in reverse order', async ({ pag
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
 
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+
+  // Read is the default; enter editing so the body is editable and undo/redo run.
+  await page.getByTestId('edit-toggle').click();
 
   // 1) BODY edit: type a marker at the end of the document.
   const content = editor.locator('.cm-content');
@@ -76,9 +79,12 @@ test('unified undo: Ctrl+Z works with focus in a Properties input', async ({ pag
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
+
+  // Read is the default; enter editing so the edit registers in the CM history.
+  await page.getByTestId('edit-toggle').click();
 
   // Make a frontmatter edit, then commit it.
   const titleInput = page.getByTestId('scalar-title');
@@ -101,9 +107,12 @@ test('unified undo: switching Concepts resets history', async ({ page }) => {
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
+
+  // Read is the default; enter editing (global mode, survives the switch below).
+  await page.getByTestId('edit-toggle').click();
 
   // Edit a property on the FIRST Concept.
   const titleInput = page.getByTestId('scalar-title');
@@ -135,9 +144,12 @@ test('unified undo: panel buttons work and disable at stack ends', async ({ page
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click(); // Properties hidden by default
+  await page.getByTestId('properties-toggle').click(); // Properties hidden by default
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   await expect(page.getByTestId('properties')).toBeVisible();
+
+  // Read is the default; enter editing so the undo/redo panel buttons render.
+  await page.getByTestId('edit-toggle').click();
 
   const undoBtn = page.getByTestId('undo');
   const redoBtn = page.getByTestId('redo');

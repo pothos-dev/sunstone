@@ -16,7 +16,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 /** Expand the right Sidebar (idempotent) so Outline + Backlinks are interactable. */
 async function expandRightSidebar(page: Page) {
-  const toggle = page.getByTestId('right-sidebar-toggle');
+  const toggle = page.getByTestId('right-sidebar-edge');
   if ((await toggle.getAttribute('aria-pressed')) === 'false') await toggle.click();
 }
 
@@ -62,6 +62,10 @@ test('Outline keyboard nav: arrow/jk move + clamp, roving tabindex, Enter scroll
   await page.getByTestId('tree').locator('[data-path="concepts/outline-demo.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('Intro prose under the top-level heading');
+
+  // Read is the default; enter editing so the Editor is focusable (Enter below
+  // scrolls AND focuses it) and the scroll's cursor marks an active line.
+  await page.getByTestId('edit-toggle').click();
 
   const outline = page.getByTestId('outline');
   const entries = outline.getByTestId('outline-entry');
@@ -116,6 +120,9 @@ test('Backlinks keyboard nav: arrow/jk move + clamp, roving tabindex, Enter open
   await page.getByTestId('tree').locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+
+  // Read is the default; enter editing so the Editor Region is focusable.
+  await page.getByTestId('edit-toggle').click();
 
   const backlinks = page.getByTestId('backlinks');
   const entries = backlinks.getByTestId('backlink');
@@ -176,6 +183,8 @@ test('mouse click still works in both Regions', async ({ page }) => {
   await page.getByTestId('tree').locator('[data-path="concepts/outline-demo.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('Intro prose under the top-level heading');
+  // Read is the default; enter editing so the scroll's cursor marks an active line.
+  await page.getByTestId('edit-toggle').click();
   const outlineEntries = page.getByTestId('outline').getByTestId('outline-entry');
   await outlineEntries.nth(3).click();
   await expect(editor.locator('.cm-activeLine')).toHaveText('Second Section');

@@ -12,9 +12,13 @@
   import { ordinaryChildren, reservedChildren } from '$lib/treeNav';
   import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
+  import ActivityRail from '$lib/components/ActivityRail.svelte';
+  import SidebarEdge from '$lib/components/SidebarEdge.svelte';
+  import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
   import WebAppShellIsland from './WebAppShellIsland.svelte';
   import WebTree from './WebTree.svelte';
   import WebSearch from './WebSearch.svelte';
+  import WebQuickNav from './WebQuickNav.svelte';
   import WebTags from './WebTags.svelte';
   import WebOutline from './WebOutline.svelte';
   import WebBacklinks from './WebBacklinks.svelte';
@@ -79,11 +83,13 @@
     else islandApi?.requestDone();
   }
 
-  // The read-only "Sunstone Web" viewer, shaped like the desktop shell: a
-  // toolbar over the CENTER tile (sidebar toggles + back/forward + theme), left
-  // Sidebar Accordion (Explorer + Tags) and right Sidebar Accordion (Outline +
-  // Backlinks) reusing the desktop `SidebarSection`, and the rendered Concept in
-  // the centre. No write path / editor / CodeMirror. UI state persists (uiState).
+  // The read-only "Sunstone Web" viewer, shaped like the desktop shell: a far-left
+  // activity rail (menu stub + quick-nav + search + a bottom user slot wired to
+  // real Auth.js), click/drag SidebarEdge borders around a left Sidebar Accordion
+  // (Explorer + Tags) and a right one (Outline + Backlinks) reusing the desktop
+  // `SidebarSection`, a slim concept strip over the centre (history + Properties +
+  // export-PDF + theme), and the rendered Concept in the centre. No write path /
+  // editor / CodeMirror on the anon surface. UI state persists (uiState).
 
   // A Concept is addressed by its path in the URL (`/research/providers/mistral-ai`),
   // not a `?path=` query — `conceptToUrl` drops `.md` and a trailing `/index`.
@@ -113,18 +119,35 @@
     if (typeof history !== 'undefined') history.forward();
   }
 
-  // --- Theme: applied to the app root; mode persisted via uiState. ---
+  // --- Theme: applied to the app root; mode persisted via uiState. The anon web
+  // surface offers a manual light/dark toggle in the concept strip (the desktop
+  // shell follows the OS only — the web reader has no other theme entry point). --
   let appRoot = $state<HTMLElement | null>(null);
   $effect(() => {
     const resolved = theme.resolved;
     if (appRoot) appRoot.setAttribute('data-theme', resolved);
   });
+  function toggleTheme() {
+    theme.mode = theme.resolved === 'dark' ? 'light' : 'dark';
+  }
+
+  // Sign out via the Auth.js client helper (same round-trip as the App shell's
+  // account bar). Only reachable in the edge case where a signed-in user renders
+  // this read surface before `showApp` flips; lazy-imported so the auth client
+  // stays out of the SSR + initial client graph.
+  async function signOut(): Promise<void> {
+    const { signOut: doSignOut } = await import('@auth/sveltekit/client');
+    await doSignOut({ callbackUrl: '/' });
+  }
 
   // --- Search (Ctrl+Shift+F) ---
   let searchOpen = $state(false);
   function openSearchHit(path: string) {
     open(path);
   }
+
+  // --- Quick-nav palette (Ctrl/Cmd+K) ---
+  let quickNavOpen = $state(false);
 
   // --- Index-version signal for Backlinks + Tags (bumped on live-reload) ---
   let indexVersion = $state(0);
@@ -165,13 +188,19 @@
   let rightSidebarOpen = $state(true);
   let propertiesOpen = $state(true);
 
+  // Sidebar content widths (px), drag-resized via the shared SidebarEdge and
+  // persisted to localStorage (the web backend is read-only — no server-side
+  // bundle state). Seeded to the default so the SSR render matches the first
+  // client render; onMount then applies the persisted (clamped) widths.
+  let leftSidebarWidth = $state(DEFAULT_SIDEBAR_WIDTH);
+  let rightSidebarWidth = $state(DEFAULT_SIDEBAR_WIDTH);
+  // While an edge is dragged, suppress the width transition so it tracks the
+  // pointer instantly (transient — never persisted).
+  let leftResizing = $state(false);
+  let rightResizing = $state(false);
+
   const leftCount = $derived((explorerOpen ? 1 : 0) + (tagsPresent && tagsOpen ? 1 : 0));
   const rightCount = $derived((outlineOpen ? 1 : 0) + (backlinksOpen ? 1 : 0));
-
-  // Grid columns collapse a Sidebar to 0 width (the aside stays mounted + clipped
-  // so its toggle can re-expand it). The right Sidebar exists only with a Concept.
-  const leftCols = $derived(leftSidebarOpen ? 'minmax(200px, 260px)' : '0px');
-  const rightCols = $derived(data.rendered && rightSidebarOpen ? 'minmax(13rem, 16rem)' : '0px');
 
   // --- Outline scroll-to-heading ---
   function scrollToHeading(slug: string) {
@@ -199,6 +228,8 @@
       backlinksOpen,
       leftSidebarOpen,
       rightSidebarOpen,
+      leftSidebarWidth,
+      rightSidebarWidth,
       propertiesOpen,
     };
   }
@@ -228,6 +259,10 @@
     if (typeof ui.backlinksOpen === 'boolean') backlinksOpen = ui.backlinksOpen;
     if (typeof ui.leftSidebarOpen === 'boolean') leftSidebarOpen = ui.leftSidebarOpen;
     if (typeof ui.rightSidebarOpen === 'boolean') rightSidebarOpen = ui.rightSidebarOpen;
+    if (typeof ui.leftSidebarWidth === 'number')
+      leftSidebarWidth = clampSidebarWidth(ui.leftSidebarWidth);
+    if (typeof ui.rightSidebarWidth === 'number')
+      rightSidebarWidth = clampSidebarWidth(ui.rightSidebarWidth);
     if (typeof ui.propertiesOpen === 'boolean') propertiesOpen = ui.propertiesOpen;
     if (Array.isArray(ui.expandedFolders)) {
       expandedFolders = new Set(ui.expandedFolders);
@@ -241,11 +276,20 @@
       void invalidateAll();
     });
 
-    // Ctrl/Cmd+Shift+F toggles the Search modal (capture phase).
+    // Ctrl/Cmd+Shift+F toggles Search; Ctrl/Cmd+K toggles the quick-nav palette
+    // (both capture phase, converging on the same flags the rail buttons flip).
     const onKeydown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         searchOpen = !searchOpen;
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key.toLowerCase() === 'k'
+      ) {
+        e.preventDefault();
+        quickNavOpen = !quickNavOpen;
       }
     };
     window.addEventListener('keydown', onKeydown, true);
@@ -267,13 +311,63 @@
   <WebAppShellIsland selected={data.selected} user={data.user} />
 {:else}
 <div class="app" data-testid="web-viewer" bind:this={appRoot}>
-  <div class="app-body" style="grid-template-columns: {leftCols} minmax(0, 1fr) {rightCols}">
-    <aside
-      class="side-bar left"
-      class:collapsed={!leftSidebarOpen}
-      aria-label="Sidebar"
-      style="--expanded-count: {leftCount}"
-    >
+  <!-- Far-left activity rail: menu (stub) + quick-nav + search launcher + a
+       bottom user slot wired to the REAL Auth.js sign-in / sign-out. The
+       quick-nav / search buttons flip the SAME flags as the Ctrl+K /
+       Ctrl+Shift+F keybindings, so both entry points converge. The rail lives
+       OUTSIDE the collapsing Sidebars, so it stays visible when they collapse. -->
+  <ActivityRail
+    onMenu={() => {}}
+    onQuickNav={() => (quickNavOpen = !quickNavOpen)}
+    onSearch={() => (searchOpen = !searchOpen)}
+  >
+    {#snippet user()}
+      <!-- The rail's bottom slot surfaces the REAL auth action. Anon (signed
+           out) → a link into Auth.js sign-in (a full reload so the OIDC flow
+           runs and re-lands with a session → the full App shell). If a signed-in
+           user somehow renders this read surface, offer sign-out (mirrors the
+           App shell's account bar). Web-only (dead-code-stripped on desktop). -->
+      {#if __SUNSTONE_WEB__ && data.user === null}
+        <a
+          class="rail-user-btn"
+          data-testid="web-sign-in"
+          href="/auth/signin"
+          data-sveltekit-reload
+          title="Sign in to edit"
+          aria-label="Sign in"
+        >
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <circle cx="8" cy="5.5" r="2.75" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <path d="M2.75 13.5a5.25 5.25 0 0 1 10.5 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </a>
+      {:else if data.user}
+        <button
+          type="button"
+          class="rail-user-btn"
+          data-testid="web-sign-out"
+          title={`Sign out (${data.user.name})`}
+          aria-label="Sign out"
+          onclick={signOut}
+        >
+          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+            <path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            <path d="M9 5l3 3-3 3M12 8H6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      {/if}
+    {/snippet}
+  </ActivityRail>
+
+  <aside
+    class="side-bar left"
+    class:collapsed={!leftSidebarOpen}
+    class:resizing={leftResizing}
+    aria-label="Sidebar"
+    data-testid="left-side-bar"
+    style="width: {leftSidebarOpen ? leftSidebarWidth : 0}px; --side-w: {leftSidebarWidth}px; --expanded-count: {leftCount}"
+  >
+    <div class="side-bar-inner">
       <SidebarSection
         title="Explorer"
         testid="explorer-section"
@@ -315,206 +409,198 @@
           <WebTags {tags} version={indexVersion} selected={data.selected} onopen={open} />
         </SidebarSection>
       {/if}
-    </aside>
+    </div>
+  </aside>
 
-    <div class="center">
-      <!-- Concept header: mirrors the desktop TileHeader ("Concept header"). The
-           left group holds the sidebar toggle, per-Concept history, and the
-           Concept title; the right group the per-Concept controls (Properties
-           show/hide, export, right-Sidebar). Theme follows the OS — no manual
-           toggle, matching the desktop shell. -->
-      <header class="tile-header" aria-label="Concept header">
-        <div class="tile-title-group">
+  <!-- The left Sidebar's border: click to collapse/expand, drag to resize. -->
+  <SidebarEdge
+    side="left"
+    open={leftSidebarOpen}
+    width={leftSidebarWidth}
+    label="sidebar"
+    testid="left-sidebar-edge"
+    onToggle={() => (leftSidebarOpen = !leftSidebarOpen)}
+    onResize={(w) => (leftSidebarWidth = w)}
+    onResizeStart={() => (leftResizing = true)}
+    onResizeEnd={() => (leftResizing = false)}
+  />
+
+  <div class="center">
+    <!-- Slim "concept strip": the web analogue of the desktop concept header
+         (web has no tiles/CodeMirror, so it is light). The left group holds the
+         per-Concept history + title; the right group the per-Concept controls
+         (Edit for a signed-in user, Properties, export-PDF, theme). Sidebar
+         collapse/resize moved to the edge borders. -->
+    <div class="concept-strip" data-testid="concept-strip">
+      <div class="cs-title-group">
+        <div class="btn-group">
           <button
             type="button"
             class="icon-btn"
-            data-testid="sidebar-toggle"
-            title={leftSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-label={leftSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-pressed={leftSidebarOpen}
-            onclick={() => (leftSidebarOpen = !leftSidebarOpen)}
+            data-testid="nav-back"
+            title="Back"
+            aria-label="Back"
+            onclick={goBack}>←</button
           >
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-              <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
-              <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.2" />
-              <rect x="1.5" y="2.5" width="4.5" height="11" rx="1.5" fill="currentColor" opacity={leftSidebarOpen ? 0.5 : 0} stroke="none" />
-            </svg>
-          </button>
-          <!-- Per-Concept navigation history (matches the desktop TileHeader). -->
-          <div class="btn-group">
-            <button
-              type="button"
-              class="icon-btn"
-              data-testid="nav-back"
-              title="Back"
-              aria-label="Back"
-              onclick={goBack}>←</button
-            >
-            <button
-              type="button"
-              class="icon-btn"
-              data-testid="nav-forward"
-              title="Forward"
-              aria-label="Forward"
-              onclick={goForward}>→</button
-            >
-          </div>
-          {#if data.selected}
-            <span class="tile-title" data-testid="tile-title" title={data.selected}>{pageTitle}</span>
-          {/if}
+          <button
+            type="button"
+            class="icon-btn"
+            data-testid="nav-forward"
+            title="Forward"
+            aria-label="Forward"
+            onclick={goForward}>→</button
+          >
         </div>
-
-        <div class="tile-controls">
-          <!-- Sign-in affordance (web only): the anon read surface has no way to
-               INITIATE the OIDC flow, so offer a link to the Auth.js sign-in
-               page. Shown only on the web build when signed out; desktop-inert
-               (dead-code-stripped via the compile-time `__SUNSTONE_WEB__`). -->
-          {#if __SUNSTONE_WEB__ && data.user === null}
-            <a
-              class="icon-btn text-btn sign-in"
-              data-testid="web-sign-in"
-              href="/auth/signin"
-              data-sveltekit-reload
-              title="Sign in to edit"
-              aria-label="Sign in">Sign in</a
-            >
-          {/if}
-          <!-- Edit toggle (ticket 06): shown ONLY to an authenticated user with
-               a Concept open. "Edit" enters the island; while editing the label
-               is Save (dirty) / Done (clean) and its click flushes-then-exits. -->
-          {#if canEdit}
-            <button
-              type="button"
-              class="icon-btn text-btn edit-toggle"
-              class:active={editing}
-              data-testid="web-edit-toggle"
-              title={editing ? 'Return to the rendered view' : 'Edit this Concept'}
-              aria-label={editing ? 'Finish editing' : 'Edit this Concept'}
-              aria-pressed={editing}
-              onclick={onToggleEdit}>{editing ? editToggleLabel(islandDirty) : 'Edit'}</button
-            >
-          {/if}
-          <!-- Properties show/hide (mirrors the desktop NavBar sliders toggle):
-               flips the read-only Properties panel in the centre. -->
-          <button
-            type="button"
-            class="icon-btn"
-            class:active={propertiesOpen}
-            data-testid="properties-panel-toggle"
-            title={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-            aria-label={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-            aria-pressed={propertiesOpen}
-            disabled={!data.rendered}
-            onclick={() => (propertiesOpen = !propertiesOpen)}
-          >
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-              <!-- sliders glyph: two horizontal rails with knobs (properties). -->
-              <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
-              <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
-              <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-              <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-            </svg>
-          </button>
-          <!-- Export the open Concept as PDF: open a chrome-free print TAB
-               (`/?print=<path>`) that renders just the Concept body and hands
-               straight to the browser's native print → Save-as-PDF preview (its
-               built-in print/download controls are the inspect-before-save UI,
-               so we add none). The tab's <title> pre-fills the PDF file name. -->
-          <button
-            type="button"
-            class="icon-btn"
-            data-testid="export-pdf"
-            title="Export as PDF"
-            aria-label="Export as PDF"
-            disabled={!data.rendered}
-            onclick={() => data.selected && window.open(`/?print=${encodeURIComponent(data.selected)}`, '_blank')}
-          >
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-              <path
-                d="M4 2.5h5l3 3v8a0 0 0 0 1 0 0H4a0 0 0 0 1 0 0z"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.2"
-                stroke-linejoin="round"
-              />
-              <path d="M9 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-              <path d="M8 7.5v4m0 0 1.6-1.6M8 11.5 6.4 9.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="icon-btn"
-            data-testid="right-sidebar-toggle"
-            title={rightSidebarOpen ? 'Collapse Outline & Backlinks' : 'Expand Outline & Backlinks'}
-            aria-label={rightSidebarOpen ? 'Collapse Outline & Backlinks' : 'Expand Outline & Backlinks'}
-            aria-pressed={rightSidebarOpen}
-            disabled={!data.rendered}
-            onclick={() => (rightSidebarOpen = !rightSidebarOpen)}
-          >
-            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-              <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
-              <line x1="10" y1="2.5" x2="10" y2="13.5" stroke="currentColor" stroke-width="1.2" />
-              <rect x="10" y="2.5" width="4.5" height="11" rx="1.5" fill="currentColor" opacity={rightSidebarOpen ? 0.5 : 0} stroke="none" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      <main class="reader" class:editing aria-label="Concept">
-        {#if editing}
-          <!-- CENTER swapped in place for the client-only editor island. -->
-          {#if IslandComponent && data.selected}
-            <IslandComponent
-              path={data.selected}
-              onExit={() => endEdit(true)}
-              onDirty={(d: boolean) => (islandDirty = d)}
-              onReady={(a: WebEditorApi) => (islandApi = a)}
-            />
-          {:else}
-            <p class="status" data-testid="reader-empty">Loading editor…</p>
-          {/if}
-        {:else if data.renderError}
-          <p class="status error" data-testid="reader-error">
-            Cannot render {data.selected}: {data.renderError}
-          </p>
-        {:else if data.rendered === null}
-          <p class="status" data-testid="reader-empty">Select a Concept to read it.</p>
-        {:else}
-          {#if data.rendered.frontmatter.length > 0 && propertiesOpen}
-            <!-- Read-only Properties (frontmatter); shown/hidden via the Concept
-                 header's Properties toggle (mirrors the desktop global toggle). -->
-            <dl class="properties" data-testid="properties">
-              {#each data.rendered.frontmatter as field (field.key)}
-                <dt>{field.key}</dt>
-                <dd>
-                  {#if field.values.length > 1}
-                    <ul class="prop-list">
-                      {#each field.values as v, i (i)}<li>{v}</li>{/each}
-                    </ul>
-                  {:else}
-                    {field.values[0] ?? ''}
-                  {/if}
-                </dd>
-              {/each}
-            </dl>
-          {/if}
-
-          <!-- Server-rendered body HTML. Links resolve to viewer nav / broken
-               markers in Rust; SvelteKit intercepts the in-Bundle anchors. -->
-          <article class="rendered" data-testid="rendered" bind:this={articleEl}>
-            {@html data.rendered.html}
-          </article>
+        {#if data.selected}
+          <span class="tile-title" data-testid="tile-title" title={data.selected}>{pageTitle}</span>
         {/if}
-      </main>
+      </div>
+
+      <div class="cs-controls">
+        <!-- Edit toggle (ticket 06): shown ONLY to an authenticated user with a
+             Concept open (inert for the anonymous reader). "Edit" enters the
+             island; while editing the label is Save (dirty) / Done (clean). -->
+        {#if canEdit}
+          <button
+            type="button"
+            class="icon-btn text-btn edit-toggle"
+            class:active={editing}
+            data-testid="web-edit-toggle"
+            title={editing ? 'Return to the rendered view' : 'Edit this Concept'}
+            aria-label={editing ? 'Finish editing' : 'Edit this Concept'}
+            aria-pressed={editing}
+            onclick={onToggleEdit}>{editing ? editToggleLabel(islandDirty) : 'Edit'}</button
+          >
+        {/if}
+        <!-- Properties show/hide: flips the read-only Properties panel in the centre. -->
+        <button
+          type="button"
+          class="icon-btn"
+          class:active={propertiesOpen}
+          data-testid="properties-panel-toggle"
+          title={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
+          aria-label={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
+          aria-pressed={propertiesOpen}
+          disabled={!data.rendered}
+          onclick={() => (propertiesOpen = !propertiesOpen)}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <!-- sliders glyph: two horizontal rails with knobs (properties). -->
+            <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
+            <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
+            <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+            <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
+        <!-- Export the open Concept as PDF: open a chrome-free print TAB
+             (`/?print=<path>`) that renders just the Concept body and hands
+             straight to the browser's native print → Save-as-PDF preview. -->
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="export-pdf"
+          title="Export as PDF"
+          aria-label="Export as PDF"
+          disabled={!data.rendered}
+          onclick={() => data.selected && window.open(`/?print=${encodeURIComponent(data.selected)}`, '_blank')}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path
+              d="M4 2.5h5l3 3v8a0 0 0 0 1 0 0H4a0 0 0 0 1 0 0z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linejoin="round"
+            />
+            <path d="M9 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            <path d="M8 7.5v4m0 0 1.6-1.6M8 11.5 6.4 9.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <!-- Manual light/dark theme toggle (web reader only). -->
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="theme-toggle"
+          title="Toggle light / dark theme"
+          aria-label="Toggle light / dark theme"
+          onclick={toggleTheme}>{theme.resolved === 'dark' ? '☀' : '☾'}</button
+        >
+      </div>
     </div>
 
-    {#if data.rendered}
-      <aside
-        class="side-bar right"
-        class:collapsed={!rightSidebarOpen}
-        aria-label="Sidebar"
-        style="--expanded-count: {rightCount}"
-      >
+    <main class="reader" class:editing aria-label="Concept">
+      {#if editing}
+        <!-- CENTER swapped in place for the client-only editor island. -->
+        {#if IslandComponent && data.selected}
+          <IslandComponent
+            path={data.selected}
+            onExit={() => endEdit(true)}
+            onDirty={(d: boolean) => (islandDirty = d)}
+            onReady={(a: WebEditorApi) => (islandApi = a)}
+          />
+        {:else}
+          <p class="status" data-testid="reader-empty">Loading editor…</p>
+        {/if}
+      {:else if data.renderError}
+        <p class="status error" data-testid="reader-error">
+          Cannot render {data.selected}: {data.renderError}
+        </p>
+      {:else if data.rendered === null}
+        <p class="status" data-testid="reader-empty">Select a Concept to read it.</p>
+      {:else}
+        {#if data.rendered.frontmatter.length > 0 && propertiesOpen}
+          <!-- Read-only Properties (frontmatter); shown/hidden via the concept
+               strip's Properties toggle (mirrors the desktop global toggle). -->
+          <dl class="properties" data-testid="properties">
+            {#each data.rendered.frontmatter as field (field.key)}
+              <dt>{field.key}</dt>
+              <dd>
+                {#if field.values.length > 1}
+                  <ul class="prop-list">
+                    {#each field.values as v, i (i)}<li>{v}</li>{/each}
+                  </ul>
+                {:else}
+                  {field.values[0] ?? ''}
+                {/if}
+              </dd>
+            {/each}
+          </dl>
+        {/if}
+
+        <!-- Server-rendered body HTML. Links resolve to viewer nav / broken
+             markers in Rust; SvelteKit intercepts the in-Bundle anchors. -->
+        <article class="rendered" data-testid="rendered" bind:this={articleEl}>
+          {@html data.rendered.html}
+        </article>
+      {/if}
+    </main>
+  </div>
+
+  {#if data.rendered}
+    <!-- The right Sidebar's border: click to collapse/expand, drag to resize.
+         Only present alongside a rendered Concept (no Outline/Backlinks without
+         one). -->
+    <SidebarEdge
+      side="right"
+      open={rightSidebarOpen}
+      width={rightSidebarWidth}
+      label="Outline & Backlinks"
+      testid="right-sidebar-edge"
+      onToggle={() => (rightSidebarOpen = !rightSidebarOpen)}
+      onResize={(w) => (rightSidebarWidth = w)}
+      onResizeStart={() => (rightResizing = true)}
+      onResizeEnd={() => (rightResizing = false)}
+    />
+
+    <aside
+      class="side-bar right"
+      class:collapsed={!rightSidebarOpen}
+      class:resizing={rightResizing}
+      aria-label="Sidebar"
+      data-testid="right-side-bar"
+      style="width: {rightSidebarOpen ? rightSidebarWidth : 0}px; --side-w: {rightSidebarWidth}px; --expanded-count: {rightCount}"
+    >
+      <div class="side-bar-inner">
         <SidebarSection
           title="Outline"
           testid="outline-section"
@@ -531,19 +617,26 @@
         >
           <WebBacklinks path={data.selected} version={indexVersion} onopen={open} />
         </SidebarSection>
-      </aside>
-    {/if}
-  </div>
+      </div>
+    </aside>
+  {/if}
 </div>
 
 <WebSearch open={searchOpen} onopen={openSearchHit} onclose={() => (searchOpen = false)} />
+
+<WebQuickNav open={quickNavOpen} onopen={open} onclose={() => (quickNavOpen = false)} />
 {/if}
 
 <style>
   .app {
-    display: flex;
-    flex-direction: column;
+    /* Far-left activity rail (fixed) | left Sidebar | its resize edge | centre |
+       right resize edge | right Sidebar. The rail and both edges sit OUTSIDE the
+       collapsing Sidebars, so an edge stays a click target to re-expand a Sidebar
+       collapsed to 0 width — mirrors the desktop shell grid. */
+    display: grid;
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
     height: 100vh;
+    overflow: hidden;
     font-family: var(--font-ui, system-ui, sans-serif);
     color: var(--text, #222);
     background: var(--bg, #fff);
@@ -573,46 +666,62 @@
     background-clip: padding-box;
   }
 
-  .app-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: grid;
+  /* A Sidebar's OUTER: its width (0 when collapsed) is driven inline from the
+     persisted width; overflow-hidden clips the fixed-width inner so collapsing
+     slides content out under the clip rather than reflowing it (desktop parity).
+     The width transitions unless an edge drag is in progress. */
+  .side-bar {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    background: var(--bg-elevated, #f9fafc);
+    transition: width 0.22s ease;
   }
 
-  .side-bar {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    min-width: 0;
-    overflow: hidden;
-    background: var(--bg-elevated, #f9fafc);
-    /* Desktop parity: the desktop sidebar steps its base down to 0.9rem
-       (App.svelte `.side-bar-inner`). Without this the web sidebar rode the
-       16px root and rendered larger than the desktop chrome. */
-    font-size: 0.9rem;
-    /* Distribute the two Sections top/bottom (desktop parity: space-between). A
-       lone Section stays flush to the top. */
-    justify-content: space-between;
+  /* Suppress the transition while dragging the edge so the width tracks the
+     pointer instantly. */
+  .side-bar.resizing {
+    transition: none;
   }
 
   .side-bar.left {
-    grid-column: 1;
+    grid-column: 2;
+    justify-content: flex-end;
     border-right: 1px solid var(--border, #e2e2e2);
   }
 
+  .side-bar.left.collapsed {
+    border-right-width: 0;
+  }
+
   .side-bar.right {
-    grid-column: 3;
+    grid-column: 6;
+    justify-content: flex-start;
     border-left: 1px solid var(--border, #e2e2e2);
   }
 
-  /* A collapsed Sidebar is fully hidden (its grid track is also 0px). The
-     component stays mounted so its toggle can re-expand it instantly. */
-  .side-bar.collapsed {
-    display: none;
+  .side-bar.right.collapsed {
+    border-left-width: 0;
+  }
+
+  /* The inner keeps the FULL persisted width (via --side-w) while the outer
+     clips it during collapse. Distributes the two Sections top/bottom
+     (space-between); a lone Section stays flush to the top. Desktop parity: the
+     desktop sidebar steps its base down to 0.9rem (App.svelte `.side-bar-inner`). */
+  .side-bar-inner {
+    flex: none;
+    width: var(--side-w, 280px);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    min-height: 0;
+    font-size: 0.9rem;
   }
 
   .center {
-    grid-column: 2;
+    grid-column: 4;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -620,9 +729,9 @@
     overflow: hidden;
   }
 
-  /* Concept header (mirrors the desktop TileHeader): the title group at the
-     start, the per-Concept controls at the end. */
-  .tile-header {
+  /* Slim concept strip: the per-Concept history + title at the start, the
+     per-Concept controls at the end. */
+  .concept-strip {
     flex: none;
     display: flex;
     align-items: center;
@@ -633,7 +742,7 @@
     background: var(--bg-elevated, #f9fafc);
   }
 
-  .tile-title-group {
+  .cs-title-group {
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -650,7 +759,7 @@
     color: var(--text, #222);
   }
 
-  .tile-controls {
+  .cs-controls {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -694,6 +803,47 @@
     cursor: default;
   }
 
+  /* Text-labelled chrome buttons (Edit): widen past the square icon-btn footprint. */
+  .text-btn {
+    width: auto;
+    padding-inline: 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .edit-toggle.active {
+    background: var(--accent-soft, rgba(217, 98, 43, 0.2));
+    border-color: var(--accent, #d9622b);
+    color: var(--tag-text, inherit);
+  }
+
+  /* Rail user slot affordance (sign-in / sign-out), sized to the rail button. */
+  .rail-user-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: none;
+    color: var(--text-muted, #777);
+    cursor: pointer;
+    opacity: 0.85;
+    transition: background 0.12s ease, opacity 0.12s ease;
+  }
+
+  .rail-user-btn:hover {
+    background: var(--hover, rgba(127, 127, 127, 0.15));
+    opacity: 1;
+  }
+
+  .rail-user-btn:focus-visible {
+    outline: 2px solid var(--accent-ring, var(--accent, #d9622b));
+    outline-offset: -2px;
+    opacity: 1;
+  }
+
   .root-reserved {
     display: flex;
     align-items: center;
@@ -727,8 +877,7 @@
   .tree {
     padding: 0.25rem 0.35rem;
     /* Match the desktop explorer tree, which hard-pins 14px (App.svelte
-       `.tree-tile`). Both tree components reset with `font: inherit`, so the
-       row/label size is decided here. */
+       `.tree-tile`). Both tree components reset with `font: inherit`. */
     font-size: 14px;
   }
 
@@ -751,28 +900,8 @@
     position: relative;
   }
 
-  /* Text-labelled chrome buttons (Edit / Sign in): widen past the square
-     icon-btn footprint to fit their word label. */
-  .text-btn {
-    width: auto;
-    padding-inline: 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
-  /* Sign-in link, shaped like the edit toggle (anon web chrome). */
-  .sign-in {
-    text-decoration: none;
-  }
-
-  .edit-toggle.active {
-    background: var(--accent-soft, rgba(217, 98, 43, 0.2));
-    border-color: var(--accent, #d9622b);
-    color: var(--tag-text, inherit);
-  }
-
   /* Read-only Properties: a metadata grid (frontmatter key → value), shown/hidden
-     via the Concept header's Properties toggle (desktop parity). */
+     via the concept strip's Properties toggle (desktop parity). */
   .properties {
     display: grid;
     grid-template-columns: max-content 1fr;

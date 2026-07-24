@@ -72,6 +72,9 @@ async function openCodemirror(page: Page) {
   //   0 type | 1 title | 2 description | 3 tags(list) | 4 timestamp
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
+  // Read is the default; enter editing so the Editor takes click focus (the grid
+  // nav below moves in from an editor-focused baseline).
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await expect.poll(() => activeRegion(page)).toBe('editor');
   return editor;
@@ -269,6 +272,8 @@ test('grid: read-only raw-YAML cells are navigable but not editable', async ({ p
   await expect(page.getByTestId('raw-nested')).toHaveAttribute('readonly', '');
 
   const editor = page.getByTestId('editor');
+  // Read is the default; enter editing so the Editor takes click focus.
+  await page.getByTestId('edit-toggle').click();
   await editor.locator('.cm-content').click();
   await page.keyboard.press('Alt+ArrowUp');
   await expect.poll(() => activeCell(page)).toEqual({ row: 0, col: 0 });

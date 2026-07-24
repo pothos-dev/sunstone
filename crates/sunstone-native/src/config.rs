@@ -61,15 +61,24 @@ pub struct BundleState {
     /// (outline-section). Defaults to `true` on the frontend — the Outline shows
     /// the moment the right Sidebar is first expanded.
     pub outline_open: Option<bool>,
+    /// Persisted sidebar WIDTHS in CSS pixels (edge-sidebars-delete-navbar). Each
+    /// sidebar's border is a drag handle; the chosen width is remembered here.
+    /// Optional so older files tolerate their absence; the frontend defaults them
+    /// to the shared default (280) and clamps to a sane range on read.
+    pub left_sidebar_width: Option<f64>,
+    pub right_sidebar_width: Option<f64>,
     /// Whether the Properties panel (editor-pane chrome) is expanded
     /// (persist-properties-collapse). Defaults to `true` on the frontend — a
     /// fresh/older Bundle opens with the panel expanded; the header chevron then
     /// persists the user's sticky choice across Concept switches and relaunches.
     pub properties_open: Option<bool>,
-    /// The editor's tri-state view mode ("edit" / "hybrid" / "view"), restored on
-    /// relaunch (persist-editor-mode). Optional so older files tolerate its
-    /// absence; the frontend defaults it to "hybrid" (Live) on read. Carried as an
-    /// opaque string here — the frontend owns the `EditorMode` union.
+    /// The editor's view mode — the boolean "editing" / "read"
+    /// (editing-boolean-edit-toggle), restored on relaunch (persist-editor-mode).
+    /// Optional so older files tolerate its absence; the frontend defaults it to
+    /// "read" on read and MIGRATES the legacy tri-state values ("edit" / "hybrid" /
+    /// "view"). Carried as an opaque string here — the frontend owns the
+    /// `EditorMode` union, so old values round-trip untouched until the frontend
+    /// rewrites them.
     pub editor_mode: Option<String>,
     /// GLOBAL Properties show/hide flag (multi-concept-tiling). When present +
     /// true, every visible tile renders its Concept's frontmatter inline. Optional
@@ -357,14 +366,20 @@ mod tests {
         let state = BundleState {
             properties_shown: Some(true),
             layout: Some(layout.clone()),
+            left_sidebar_width: Some(320.0),
+            right_sidebar_width: Some(240.0),
             ..Default::default()
         };
         let json = serde_json::to_string(&state).unwrap();
         assert!(json.contains("propertiesShown"));
         assert!(json.contains("layout"));
+        assert!(json.contains("leftSidebarWidth"));
+        assert!(json.contains("rightSidebarWidth"));
         let back: BundleState = serde_json::from_str(&json).unwrap();
         assert_eq!(back.properties_shown, Some(true));
         assert_eq!(back.layout, Some(layout));
+        assert_eq!(back.left_sidebar_width, Some(320.0));
+        assert_eq!(back.right_sidebar_width, Some(240.0));
     }
 
     #[test]

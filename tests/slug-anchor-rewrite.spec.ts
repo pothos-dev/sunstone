@@ -106,6 +106,9 @@ test('renaming a heading rewrites inbound + same-file anchors to the new slug', 
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('RW Target');
 
+  // Read is the default; enter editing so the heading can be renamed in the buffer.
+  await page.getByTestId('edit-toggle').click();
+
   // Rename the heading `## Deep Section` -> `## Deep Sectioner` (slug becomes
   // `deep-sectioner`) by appending to it in the editor.
   const headingLine = editor.locator('.cm-line', { hasText: 'Deep Section' }).first();
@@ -151,6 +154,9 @@ test('deleting a heading leaves inbound anchors broken, not repointed', async ({
   await tree.locator('[data-path="del-target.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('Del Target');
+
+  // Read is the default; enter editing so the heading text can be deleted.
+  await page.getByTestId('edit-toggle').click();
 
   // Delete the `## Deep Section` heading's text (its identity is dropped).
   const headingLine = editor.locator('.cm-line', { hasText: 'Deep Section' }).first();

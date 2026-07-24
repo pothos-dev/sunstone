@@ -46,6 +46,10 @@ async function openAndSelectWord(page: Page, path: string): Promise<void> {
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Highlightme is the word');
 
+  // Read is the default; enter editing so the keyboard selection + formatting
+  // context menu (both editable-only) are available.
+  await page.getByTestId('edit-toggle').click();
+
   const para = editor.locator('.cm-line', { hasText: 'Highlightme' }).first();
   await para.click();
   await page.keyboard.press('Home');
@@ -124,6 +128,9 @@ test('formatting menu: label reads "Edit link" when the caret is inside a link',
   await expect(editor).toBeVisible();
   await expect(editor).toContainText('Highlightme');
 
+  // Read is the default; enter editing so the formatting context menu is offered.
+  await page.getByTestId('edit-toggle').click();
+
   // Place the caret at the start of the link line (inside the link span).
   const para = editor.locator('.cm-line', { hasText: 'Highlightme' }).first();
   await para.click();
@@ -173,6 +180,10 @@ test.describe('clipboard', () => {
     const editor = page.getByTestId('editor');
     await expect(editor).toBeVisible();
     await expect(editor).toContainText('Before after.');
+
+    // Read is the default; enter editing so the formatting context menu is
+    // offered and Paste can insert into the body.
+    await page.getByTestId('edit-toggle').click();
 
     // Seed the clipboard, then park the caret at the start of the text line.
     await page.evaluate(() => navigator.clipboard.writeText('PASTED '));

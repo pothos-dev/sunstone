@@ -26,23 +26,28 @@ OKF-specific link and frontmatter extensions.
   write our own. (Wikilinks are later supported as an *optional secondary* format, re-enabling
   this extension; see [ADR-0004](0004-wikilinks-optional-secondary-name-based.md).)
 
-## Update: tri-state view mode (Obsidian parity)
+## Update: boolean `editing` view mode + Edit toggle
 
-Hybrid live preview is now the **default** of a three-way mode toggle in the editor header
-(Source / Live / Read), matching Obsidian's Source / Live Preview / Reading view:
+The view mode is a **boolean** — `editing` vs `read` — surfaced as a single **Edit** toggle in
+the [Concept header](/interface/activity-rail.md) (per Tile). A Concept **opens in `read`**;
+pressing Edit switches to `editing`. There is no raw-source mode.
 
-- **`edit` (Source)** — the live-preview decoration extensions (`inlinePreview`, `imageBlocks`,
-  `tables`) are dropped; raw markdown stays visible on every line. Editable. The GFM parser and
-  syntax colouring stay loaded (they are mode-independent).
-- **`hybrid` (Live)** — the original behaviour: inactive lines render, the cursor line reveals
-  raw markup. Editable.
-- **`view` (Read)** — every line renders with no raw markup, and the document is read-only.
+- **`editing`** — Obsidian-style live preview: inactive lines render, the cursor line reveals
+  raw markup. Editable; undo/redo are available (and shown in the Concept header only here).
+- **`read`** — every line renders with no raw markup, and the document is read-only.
 
 The mode-dependent extensions (decorations + `readOnly`/`editable` facets) live in a CodeMirror
 `Compartment`, so `setEditorMode` switches modes by reconfiguring it in place — no view rebuild,
 so the document, history and selection survive the switch. The mode is remembered per view and
 carries across Concept switches. See `src/lib/editor/cm.ts` (`EditorMode`, `modeExtensions`,
 `setEditorMode`).
+
+This **supersedes an earlier tri-state design** (a Source / Live / Read toggle mirroring
+Obsidian's three modes, in a since-deleted global nav bar). The `edit`/Source mode was dropped
+and Live/Read collapsed to the `editing`/`read` boolean; the default flipped from Live to
+`read`. Legacy persisted values migrate — `edit`/`hybrid` → `editing`, `view` → `read` — in
+`layoutPersist.ts` (`migrateEditorMode`), covering both the session mode and every per-Tile
+mode.
 
 Reading view requires telling `inlinePreview` to render *every* line regardless of cursor
 position. Upstream atomic-editor hardcodes the "reveal the active line" rule, so we extend our

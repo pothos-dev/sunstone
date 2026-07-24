@@ -13,13 +13,13 @@ other code block.
 
 - **Block-replace reveal (chosen)** — a `Decoration.replace({ block: true })` spans the whole
   fence; the diagram shows when the cursor is outside, and the raw source is revealed when the
-  cursor enters (hybrid), is always raw in `edit`, and always rendered in `view`. We must own
+  cursor enters it while `editing`, and is always rendered in `read`. We must own
   this because mermaid fences are **multi-line** and atomic-editor's `inlinePreview` only hides
   fence *markers* (`CodeMark`/`CodeInfo`), not the fence *body* — so the image trick ("widget
   below + let `inlinePreview` hide the one-line source") would leave the raw body visible under
   the diagram.
 - **Widget-below, source always visible** — what `imageBlocks` effectively does for one-line
-  images. Rejected: clutters hybrid/view with raw mermaid text under every diagram, defeating
+  images. Rejected: clutters both view modes with raw mermaid text under every diagram, defeating
   the hybrid-preview premise (see [ADR-0001](0001-codemirror-hybrid-live-preview.md)).
 - **Patching `inlinePreview` to render fenced bodies as widgets** — invasive change to the
   vendored dependency for a single block type; a sibling field keeps the surface small and
@@ -40,7 +40,7 @@ other code block.
   the initial budgeted parse still render).
 - **Editing affordance.** Because a `block: true` replace has no clickable source, the widget
   carries a hover hint and a double-click handler that dispatch a selection into the fence to lift
-  the replacement; the global `edit` mode toggle is the always-available fallback.
+  the replacement; entering `editing` via the Edit toggle is the always-available fallback.
 - **Correctness/cost.** `WidgetType.eq()` keyed on `(source + resolvedTheme)` lets CodeMirror
   reuse DOM so unrelated edits don't re-render diagrams; a module-level `source→SVG` cache and a
   per-render generation token (discarding stale async results) keep rendering cheap and race-free.

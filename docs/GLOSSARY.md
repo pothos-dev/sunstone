@@ -49,7 +49,9 @@ structured-`Property[]` model.
 **Live preview**:
 Obsidian-style hybrid editing — markdown source is the source of truth, but inactive lines
 render styled while the cursor line shows raw markup. Implemented via CodeMirror 6 decorations;
-see the [CodeMirror integration](/editor/codemirror.md).
+see the [CodeMirror integration](/editor/codemirror.md). It is the **`editing`** view mode; a
+Tile's view mode is a boolean (`editing` vs read-only `read`, default `read`), toggled by
+**Edit** in the **Concept header** — see [ADR-0001](/adr/0001-codemirror-hybrid-live-preview.md).
 
 **Diagram**:
 The rendered output of a ` ```mermaid ` fenced code block. In source it is an ordinary fenced
@@ -69,8 +71,27 @@ the three-Pane layout.
 **Sidebar**:
 A Pane docked to the left or right edge, holding a vertical stack of **Sections**. Both a left
 and a right Sidebar exist. The left holds **Explorer** and **Tags**; the right holds **Outline**
-and **Backlinks** and starts collapsed. See [Sidebars and Sections](/interface/sidebars.md).
+and **Backlinks** and starts collapsed. A Sidebar is collapsed/expanded by clicking its inner
+border and resized by dragging it (the **Sidebar edge**); its width is remembered as View state.
+See [Sidebars and Sections](/interface/sidebars.md).
 _Avoid_: "side panel" (use Sidebar).
+
+**Activity Rail**:
+The thin, always-visible icon strip on the far-left edge of the app shell, outside the left
+**Sidebar** (so it stays visible when the Sidebar is collapsed). Holds application-global
+controls — a menu, **Quick nav**, **Search**, and a bottom user/avatar slot (login/logout, web
+only) — none of which are scoped to the open Concept. See
+[Activity Rail and Concept header](/interface/activity-rail.md).
+_Avoid_: "toolbar", "nav bar" (there is no global nav/tool bar; the Rail and the per-Tile
+**Concept header** replaced it).
+
+**Concept header**:
+The per-**Tile** control bar above each open Concept, carrying the controls scoped to that
+Concept/Tile: back/forward, the **Edit** toggle, the **Properties** toggle, undo/redo (shown
+only while editing), review, export-PDF, split, and close. A single open Concept therefore
+shows just its Concept header — there is no second global bar above it. See
+[Activity Rail and Concept header](/interface/activity-rail.md).
+_Avoid_: "nav bar", "toolbar" (removed), "title bar".
 
 **Section**:
 One collapsible item in a Sidebar — an always-visible header plus a toggleable body. The current
@@ -130,6 +151,12 @@ The in-Concept, editor-local find/replace panel (`Ctrl+F`) docked above the Edit
 to the open Concept's body only (frontmatter lives outside the document — see ADR 0003 — and is
 edited via the Properties Section, not Find). Always means the single-Concept operation.
 _Avoid_: calling this "search" (reserved for the cross-Bundle **Search**).
+
+**Quick nav**:
+The fuzzy command palette (`Ctrl`/`Cmd`+`K`, or the **Activity Rail** icon) for jumping to a
+Concept by path or tag. Opened from the Rail; navigates the active **Tile** to the chosen
+Concept. Distinct from **Search** (full-text over bodies) — Quick nav matches names/paths/tags.
+_Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
 
 ## Relationships
 
