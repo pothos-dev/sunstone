@@ -19,6 +19,26 @@ const desktopShellStub = fileURLToPath(
 );
 
 /**
+ * Restrict a plugin to the CLIENT environment (Vite 6 Environment API). The
+ * wasm module is browser-only (ADR 0006 §1: SSR renders native Rust, and
+ * `$lib/wasm/pkg` is `ssr.external`), so `vite-plugin-wasm` /
+ * `vite-plugin-top-level-await` must never transform the SSR server bundle —
+ * doing so wraps SvelteKit's own generated `internal.js` in the plugin's
+ * top-level-await (`__tla`) deferral, which assigns the SSR `options` object
+ * (`env_public_prefix`, …) inside a `.then()` that resolves AFTER `Server.init`
+ * reads it synchronously, crashing the web server at boot
+ * (`Cannot destructure property 'env_public_prefix' of 'this.#options'`).
+ * Scoping to `client` keeps wasm working in the browser (desktop SPA + web
+ * client are both the `client` environment) while leaving SSR untouched.
+ *
+ * @param {import('vite').Plugin} plugin
+ * @returns {import('vite').Plugin}
+ */
+function clientOnly(plugin) {
+  return { ...plugin, applyToEnvironment: (env) => env.name === "client" };
+}
+
+/**
  * WEB build only: keep `@tauri-apps/api` (and the heavy desktop `App.svelte`)
  * out of the bundle by resolving their imports to inert stubs. This is how the
  * web bundle guarantees the IPC-seam rule (no `@tauri-apps/api` on the web) and
@@ -64,7 +84,7 @@ export default defineConfig(async () => ({
   // deliberately browser-only (SSR stays native Rust — §1/§5), reached via a
   // dynamic `import()` behind a `browser` guard, so nothing here is imported
   // yet. `topLevelAwait` covers the module's `await`-based `init()`.
-  plugins: [sunstoneWebStubs(), wasm(), topLevelAwait(), sveltekit()],
+  plugins: [sunstoneWebStubs(), clientOnly(wasm()), clientOnly(topLevelAwait()), sveltekit()],
 
   define: {
     __SUNSTONE_WEB__: JSON.stringify(isWeb),
