@@ -38,12 +38,18 @@ export const refreshBrokenLinks = StateEffect.define<null>();
 
 const brokenLinkMark = Decoration.mark({ class: 'cm-broken-link' });
 
-/** Distinct styling for broken internal links: dashed, red. Clickable still. */
+/** Distinct styling for broken internal links: dashed, red. Clickable still.
+ *  The label text lives in a nested highlight span inside `.cm-broken-link`, so
+ *  colour the descendant spans too (with `!important`) — otherwise the link
+ *  colour from `atomicLinkTheme` / the base-text highlight would win on the
+ *  inner span and the broken link would read as a normal one. */
 export const brokenLinkTheme = EditorView.theme({
-  '.cm-broken-link': {
-    color: 'var(--danger)',
-    textDecoration: 'underline dashed var(--danger)',
+  '.cm-broken-link, .cm-broken-link span': {
+    color: 'var(--danger) !important',
     textUnderlineOffset: '2px',
+  },
+  '.cm-broken-link': {
+    textDecoration: 'underline dashed var(--danger)',
   },
 });
 

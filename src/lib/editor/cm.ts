@@ -110,6 +110,23 @@ export { openSearch } from './find';
  */
 const programmatic = Annotation.define<boolean>();
 
+/**
+ * Force every atomic-editor link label to the link accent colour.
+ *
+ * A link label rendered inside a list item picks up the base-text highlight tag
+ * ON TOP of the link tag; the two class rules have equal specificity, so the
+ * (later-emitted) base-text rule wins the cascade and the label renders in the
+ * body colour — only the accent underline survives. Links then look inconsistent
+ * between paragraphs (accent label) and lists (body-coloured label). Colouring
+ * the label spans directly (higher specificity than the single-class highlight
+ * rule) makes every resolved link read the same. Broken / unresolved links
+ * re-assert `--danger` on their own label spans with `!important`
+ * (`brokenLinkTheme`, `wikiLinkTheme`), so they still win over this.
+ */
+const atomicLinkTheme = EditorView.theme({
+  '.cm-atomic-link span': { color: 'var(--atomic-editor-link)' },
+});
+
 export interface BuildEditorOptions {
   parent: HTMLElement;
   /** The markdown BODY (no frontmatter) to seed the document with. */
@@ -627,6 +644,10 @@ function editorExtensions(
     // App.svelte via `openSearch`; the keymap supplies in-panel bindings.
     ...findExtensions(),
     findPanelTheme,
+    // Consistent accent colour for every resolved link label (see the theme's
+    // note). Added BEFORE the broken/wikilink themes so their `!important`
+    // danger colour still wins for unresolved links.
+    atomicLinkTheme,
     // Broken-link styling (only when the index context is provided). Placed
     // after the live-preview extensions so its mark class layers on top of
     // atomic-editor's `.cm-atomic-link` decoration.

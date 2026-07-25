@@ -172,11 +172,20 @@ function brokenAliasWikiLinkOverlay(ctx: WikiLinkContext): Extension {
   );
 }
 
-/** Distinct styling for broken/unresolved wikilinks — matches `.cm-broken-link`. */
+/** Distinct styling for broken/unresolved wikilinks — matches `.cm-broken-link`.
+ *  Colour the descendant label spans too (with `!important`) so the danger red
+ *  wins over `atomicLinkTheme` / the base-text highlight on the inner span. */
 export const wikiLinkTheme = EditorView.theme({
-  '.cm-atomic-wiki-link-missing, .cm-atomic-wiki-link-unresolved': {
-    color: 'var(--danger)',
-    textDecoration: 'underline dashed var(--danger)',
+  [[
+    '.cm-atomic-wiki-link-missing',
+    '.cm-atomic-wiki-link-missing span',
+    '.cm-atomic-wiki-link-unresolved',
+    '.cm-atomic-wiki-link-unresolved span',
+  ].join(', ')]: {
+    color: 'var(--danger) !important',
     textUnderlineOffset: '2px',
+  },
+  '.cm-atomic-wiki-link-missing, .cm-atomic-wiki-link-unresolved': {
+    textDecoration: 'underline dashed var(--danger)',
   },
 });
