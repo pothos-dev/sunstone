@@ -179,7 +179,20 @@
       aria-label="Edit"
       aria-pressed={editing}
       disabled={!hasOpenConcept}
-      onclick={onToggleEditing}>Edit</button
+      onclick={onToggleEditing}
+    >
+      <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+        <!-- pen/pencil glyph: a diagonal body with a nib and its cross-stroke. -->
+        <path
+          d="M10.5 2.7 13.3 5.5 5.6 13.2 2.5 13.5 2.8 10.4z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linejoin="round"
+        />
+        <line x1="9.2" y1="4" x2="12" y2="6.8" stroke="currentColor" stroke-width="1.2" />
+      </svg>
+      Edit</button
     >
 
     <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
@@ -391,6 +404,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 0.3rem;
     height: 1.7rem;
     padding: 0 0.6rem;
     border: 1px solid var(--border);
