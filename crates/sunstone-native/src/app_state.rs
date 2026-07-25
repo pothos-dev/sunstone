@@ -54,21 +54,22 @@ impl AppState {
     }
 
     /// True if `path` (absolute) was written by Sunstone within the suppression
-    /// window. Consumes the entry on a positive match so a *subsequent* genuine
-    /// external edit is not also swallowed, and prunes stale entries.
+    /// window, and prunes stale entries.
+    ///
+    /// The entry is kept (NOT consumed) until the window expires: a single write
+    /// emits *several* fs events for one path (e.g. `Modify(Data)` then
+    /// `Modify(Metadata)`, plus the git commit's own touches), so consuming on the
+    /// first match would let the later events leak through as an unstamped
+    /// "changed on disk" echo for our own write. The `SELF_WRITE_WINDOW` is the
+    /// sole gate; a genuine external edit landing inside it is the accepted
+    /// (narrow) trade-off.
     pub fn is_recent_self_write(&self, path: &Path) -> bool {
         let Ok(mut map) = self.self_writes.lock() else {
             return false;
         };
         let now = Instant::now();
         map.retain(|_, &mut t| now.duration_since(t) < SELF_WRITE_WINDOW);
-        if let Some(&t) = map.get(path) {
-            if now.duration_since(t) < SELF_WRITE_WINDOW {
-                map.remove(path);
-                return true;
-            }
-        }
-        false
+        map.contains_key(path)
     }
 }
 
@@ -91,14 +92,15 @@ mod tests {
     }
 
     #[test]
-    fn recent_self_write_matches_once_then_is_consumed() {
+    fn recent_self_write_stays_matched_within_the_window() {
         let state = temp_state();
         let p = PathBuf::from("/bundle/a.md");
         state.note_self_write(p.clone());
-        // First check sees our own write; the entry is consumed...
+        // A single write emits several fs events for one path; every one of them
+        // must be recognized as ours within the window, not just the first.
         assert!(state.is_recent_self_write(&p));
-        // ...so a subsequent genuine external edit to the same path is not swallowed.
-        assert!(!state.is_recent_self_write(&p));
+        assert!(state.is_recent_self_write(&p));
+        assert!(state.is_recent_self_write(&p));
     }
 
     #[test]
