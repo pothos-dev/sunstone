@@ -317,7 +317,9 @@
        stay on one line, so single-tile layout is unchanged. */
     flex-wrap: wrap;
     flex: none;
-    padding: 0.3rem 0.6rem;
+    /* No horizontal padding: the controls sit flush to the tile edges (aligned
+       with the sidebar seams) rather than floating with a weird inset. */
+    padding: 0.3rem 0;
     border-bottom: 1px solid var(--border);
     background: var(--bg-elevated);
   }
