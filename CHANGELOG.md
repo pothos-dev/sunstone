@@ -4,6 +4,20 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-07-25
+
+### Added
+
+- **Sunstone on the web** — Sunstone now runs as a hosted web app: sign in to
+  open your Bundle in the browser and edit it with the full editor, saving your
+  changes explicitly.
+
+### Changed
+
+- **Redesigned interface** — a new Activity Rail holds global controls (Quick
+  nav, Search, theme), per-Concept controls move into a per-Tile header, editing
+  is a single Edit toggle, and the sidebars are resizable and collapsible.
+
 ## [0.17.0] - 2026-07-22
 
 ### Changed
