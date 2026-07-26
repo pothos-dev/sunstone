@@ -363,6 +363,19 @@ surgery and no stale material to clean up. The server writes
 variable from its own environment, so no git or ssh child inherits the key
 material.
 
+**How far that removal reaches.** Only as far as the server's own descendants —
+which is the part that matters, since they are the ones running `git` and `ssh`.
+Two copies survive it by construction: PID 1 (the entrypoint, which received the
+variable from Docker) and anything Docker itself shows (`docker inspect`, as noted
+above — `env_file` is not a secrets manager). The SSR node process *used* to be a
+third, because it is a **sibling** started by the entrypoint rather than a child of
+the server, so `remove_var` could never reach it; the entrypoint now starts it
+under `env -u SUNSTONE_GIT_SSH_KEY` so the internet-facing process does not carry
+push credentials it never reads. Do not read this as "the key is gone after boot"
+— inside the container it is still recoverable from `/proc/1/environ`, and
+`/proc/<pid>/environ` reflects a process's **initial** environment, so it cannot be
+used to verify `remove_var` either way.
+
 **`/srv/ssh` is deliberately not a volume.** The key is rewritten from the
 environment on every boot, and `known_hosts` is either written from
 `SUNSTONE_GIT_KNOWN_HOSTS` (strict host-key checking) or re-trusted on first

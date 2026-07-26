@@ -50,7 +50,16 @@ sunstone-server &
 pids+=("$!")
 
 echo "sunstone-web: starting SSR web server (node build) on ${HOST}:${PORT}"
-node build &
+# `env -u SUNSTONE_GIT_SSH_KEY`: the deploy key is the Rust server's business
+# alone. It reads the variable at boot and calls remove_var so no git or ssh
+# child of *its own* inherits the material — but node is a SIBLING started by
+# this script, so that removal cannot reach it. Without this, the
+# internet-facing SSR process (and anything that dumps its environment on
+# crash) would carry push credentials for the container's whole life, for a
+# variable it never reads. This does not make the key secret — PID 1 still
+# holds it and `docker inspect` still shows it — it closes the one copy that is
+# both useless and exposed.
+env -u SUNSTONE_GIT_SSH_KEY node build &
 pids+=("$!")
 
 # Block until either child exits, then bring the other down and propagate the
