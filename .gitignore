@@ -6,6 +6,10 @@ node_modules
 .env
 .env.*
 !.env.example
+
+# Filled-in env_file for docker-compose.wiki.yml — holds AUTH_SECRET, the OIDC
+# client secret and the base64 deploy key. Only wiki.env.example is committed.
+wiki.env
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
@@ -33,3 +37,8 @@ vite.config.ts.timestamp-*
 
 # Wayfinder planning scratch (local-only; the plan's deliverable is the ADR)
 /.scratch
+
+# Registered git worktrees live here (`git worktree list`). They are separate
+# checkouts of this same repo, so they must never be committable by it — an
+# `add -A` would otherwise pull in whatever old state they hold.
+/.claude/worktrees

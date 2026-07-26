@@ -10,6 +10,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  SyncNotice,
 } from '$lib/types';
 
 /**
@@ -87,6 +88,20 @@ export interface Backend {
    * suppressed and never delivered here. Returns an unsubscribe function.
    */
   onFileChanged(cb: (change: FileChange) => void): () => void;
+
+  /**
+   * Subscribe to divergence notices from the server's git sync loop (git-sync
+   * spec §10.2-10.3): a conflicting web version forked beside the canonical
+   * file, or a web deletion dropped because origin modified the file. Returns an
+   * unsubscribe function.
+   *
+   * Only the git-synced `sunstone-server` deployment ever emits these: `http.ts`
+   * listens for the named `sync` event on the SAME `/api/events` connection
+   * `onFileChanged` uses, and `tauri.ts` is a deliberate NO-OP (the desktop runs
+   * no sync loop, so no notice can ever arrive). Inbound content changes are NOT
+   * reported here — they ride the ordinary `onFileChanged` watcher path.
+   */
+  onSyncNotice(cb: (notice: SyncNotice) => void): () => void;
 
   // --- Tree CRUD (slice: tree-crud) ---
   // Structural filesystem operations driven from the document tree. All paths

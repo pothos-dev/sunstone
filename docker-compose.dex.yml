@@ -68,10 +68,15 @@ services:
       # --- Rust API (internal to the container) ---
       SUNSTONE_API_PORT: 8787
       SUNSTONE_API_INTERNAL: http://localhost:8787
-      SUNSTONE_BUNDLE: /srv/bundle
+      # --- git-local shape: a branch and no origin. The bundle root is
+      # repo-relative (/srv/repo), so SUNSTONE_BUNDLE is deliberately NOT set
+      # here — Saves commit locally and nothing is ever pushed.
+      SUNSTONE_GIT_BRANCH: main
       # Seed a container-local, writable git copy from the docs/ baked into the
-      # image at /bundle-src (see Dockerfile). Edits/Saves commit HERE, in an
-      # isolated in-container repo — never back to the host docs/.
+      # image at /bundle-src (see Dockerfile). The server copies it into
+      # /srv/repo, then `git init`s and seed-commits. /srv/repo is plain
+      # container filesystem here — this dev stack is deliberately ephemeral and
+      # reseeds on recreate; add a named volume if you want history to survive.
       SUNSTONE_BUNDLE_SEED_FROM: /bundle-src
       # --- OIDC (generic provider in src/auth.ts) ---
       SUNSTONE_OIDC_ISSUER: http://dex.docker.localhost

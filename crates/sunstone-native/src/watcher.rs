@@ -112,6 +112,25 @@ where
             continue;
         };
 
+        // `bundle_walker` already sets `hidden(true)` (`paths.rs:22`), so the
+        // tree, the index and search never see a dot-prefixed path. The watcher
+        // filtering *nothing* is therefore a defect against the walker's own
+        // contract, not a new feature: it lets paths in through the back door
+        // that no traversal would ever have produced.
+        //
+        // Honouring the contract here is what makes an in-tree `.git` viable
+        // (a rebase touches hundreds of `.git/objects/**` paths), and it is also
+        // what keeps the boot writability probe's `.sunstone-write-probe`
+        // create-then-remove from leaking an SSE event.
+        //
+        // Deliberately NOT full walker parity (hidden *plus* the Bundle's
+        // `.gitignore`): that needs a cached matcher and invalidation when
+        // `.gitignore` changes, for no gain here. The residual drift on
+        // gitignored `.md` files is pre-existing and out of scope.
+        if has_hidden_component(&rel) {
+            continue;
+        }
+
         // Keep the index current for EVERY change, including Sunstone's own
         // autosave writes — the index must reflect on-disk truth regardless of
         // who wrote it. (Only the *frontend event* is suppressed for self
@@ -172,6 +191,14 @@ fn classify(kind: &EventKind) -> Option<&'static str> {
     }
 }
 
+/// Whether any component of a bundle-relative, '/'-separated path is
+/// dot-prefixed — the walker's `hidden(true)` rule expressed over the string the
+/// watcher already has. Matches a hidden leaf (`.sunstone-write-probe`) and
+/// anything *below* a hidden directory (`.git/objects/x`), at any depth.
+fn has_hidden_component(rel: &str) -> bool {
+    rel.split('/').any(|part| part.starts_with('.'))
+}
+
 /// Convert an absolute path under the Bundle root into a '/'-separated
 /// bundle-relative string. Returns `None` if the path is outside the root.
 fn to_bundle_relative(root: &Path, abs: &Path) -> Option<String> {
@@ -200,6 +227,8 @@ mod tests {
     use super::*;
     use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind};
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
 
     #[test]
     fn classify_maps_the_three_ui_kinds() {
@@ -238,6 +267,80 @@ mod tests {
         assert_eq!(
             to_bundle_relative(&root, &PathBuf::from("/elsewhere/x.md")),
             None
+        );
+    }
+
+    // --- The hidden-component filter (Spec 2 §6) ----------------------------
+
+    #[test]
+    fn hidden_component_matches_leaf_and_any_ancestor() {
+        assert!(has_hidden_component(".git/objects/x"));
+        assert!(has_hidden_component(".sunstone-write-probe"));
+        assert!(has_hidden_component("notes/.drafts/a.md"));
+        assert!(has_hidden_component("notes/.a.md.swp"));
+        assert!(!has_hidden_component("notes/foo.md"));
+        assert!(!has_hidden_component("a/b/c.md"));
+        // A dot that is not the first character of a component is not hidden.
+        assert!(!has_hidden_component("release-1.2/notes.md"));
+    }
+
+    static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    /// A temp Bundle root + an `AppState` over it (the index starts empty).
+    fn temp_state() -> (PathBuf, Arc<AppState>) {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir()
+            .join(format!("sunstone-watcher-{}-{}", std::process::id(), n));
+        std::fs::create_dir_all(&dir).unwrap();
+        let root = dir.canonicalize().unwrap();
+        (root.clone(), Arc::new(AppState::new(root)))
+    }
+
+    /// Write `rel` under `root` (creating parents) and feed a `Create` event for
+    /// it to `handle_event`, returning how many `FileChange`s reached the sink.
+    fn created(root: &Path, state: &AppState, rel: &str) -> usize {
+        let abs = root.join(rel);
+        std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
+        std::fs::write(&abs, "# hi\n").unwrap();
+        let seen = Mutex::new(0usize);
+        let sink = |_change: FileChange| {
+            *seen.lock().unwrap() += 1;
+        };
+        handle_event(
+            state,
+            root,
+            &sink,
+            notify::Event::new(EventKind::Create(CreateKind::File)).add_path(abs),
+        );
+        let count = *seen.lock().unwrap();
+        count
+    }
+
+    #[test]
+    fn hidden_paths_reach_neither_the_index_nor_the_sink() {
+        let (root, state) = temp_state();
+
+        // `.git/objects/x` — the case that makes an in-tree `.git` viable.
+        assert_eq!(created(&root, &state, ".git/objects/x"), 0);
+        // The boot writability probe (§4.6) must not leak an SSE event either.
+        assert_eq!(created(&root, &state, ".sunstone-write-probe"), 0);
+        // A `.md` file under a hidden directory would otherwise be *indexed*,
+        // so this is what makes the index half of the assertion load-bearing.
+        assert_eq!(created(&root, &state, ".git/stray.md"), 0);
+
+        assert!(
+            state.read_index().unwrap().concept_paths().is_empty(),
+            "no hidden path may reach the index"
+        );
+    }
+
+    #[test]
+    fn an_ordinary_concept_still_indexes_and_reaches_the_sink() {
+        let (root, state) = temp_state();
+        assert_eq!(created(&root, &state, "notes/foo.md"), 1);
+        assert_eq!(
+            state.read_index().unwrap().concept_paths(),
+            vec!["notes/foo.md".to_string()]
         );
     }
 }

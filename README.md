@@ -41,7 +41,7 @@ Sunstone's frontmatter model (the typed-concept `type` / `title` / `tags`
 fields, reserved files, and bundle structure) conforms to the OKF spec:
 
 - Upstream spec: <https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md>
-- Vendored copy in this repo: [`docs/okf-spec.md`](docs/okf-spec.md)
+- Vendored copy in this repo: [`docs/okf/spec.md`](docs/okf/spec.md)
 
 ## Features
 
@@ -109,14 +109,16 @@ bunx playwright test # run the end-to-end suite
 ### Web deployment
 
 Sunstone can also be served as a server-rendered web viewer over a Bundle,
-packaged as a single Docker image. Sunstone supports an authenticated write path,
-but this Docker deployment runs it **read-only** (no write secret, unauthenticated
-reads). See [`docker/README.md`](docker/README.md)
-for the `docker compose` run and the **internal-network / unauthenticated-reads** caveat, how to
-back the served Bundle with a **git repo** (sidecar / hook sync patterns, with a
-tested live-reload verdict), and how to **publish the image to Docker Hub** and
-install it on a remote from the registry. This is separate from the desktop
-release flow.
+packaged as a single Docker image. Sunstone supports an authenticated write path;
+the **base** Docker deployment runs it **read-only** (no write secret,
+unauthenticated reads), and a git-synced stack runs it writable and continuously
+reconciled with a git remote. See [`docker/README.md`](docker/README.md) for the
+`docker compose` run and the **internal-network / unauthenticated-reads** caveat,
+the **three deployment shapes** (plain / git-local / git-synced) with the
+normative environment reference, how to back the served Bundle with a **git repo**
+(the server clones your origin and syncs it itself — no sidecar), and how to
+**publish the image to Docker Hub** and install it on a remote from the registry.
+This is separate from the desktop release flow.
 
 ## License
 

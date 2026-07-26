@@ -13,17 +13,28 @@ import { test, expect } from './fixtures';
  *  - Esc and toggling off both return to normal editing at the working tree;
  *  - the toggle is DISABLED with an explanatory tooltip for a Concept with no
  *    reviewable history (an untracked, runtime-created file);
- *  - a pre-existing highlight/comment annotation still renders in review view.
+ *  - a pre-existing highlight/comment annotation still renders in review view;
+ *  - the whole path is UNCHANGED by the git-sync seam addition (`onSyncNotice`),
+ *    which is a deliberate no-op on the desktop (last test).
  *
  * The fake's `fileAtRev(path, 'HEAD')` returns the COMMITTED snapshot of the
  * fixture; the working tree is the live editor buffer, so an edit made in the
  * test produces a stable, non-empty diff.
  */
 
+type SyncNotice =
+  | { kind: 'forked'; path: string; fork: string }
+  | { kind: 'deletionDropped'; path: string };
+
 type FakeWindow = Window & {
   __sunstoneFake: {
     simulateExternalChange: (kind: string, path: string, content?: string) => void;
+    /** git-sync spec §10.3: drive a sync notice through the fake's seam method. */
+    simulateSyncNotice: (notice: SyncNotice) => void;
     files: Record<string, string>;
+  };
+  __sunstoneBackend: {
+    onSyncNotice: (cb: (notice: SyncNotice) => void) => () => void;
   };
 };
 
@@ -163,4 +174,71 @@ test('the toggle is disabled with a tooltip for a Concept with no reviewable his
   const reviewToggle = page.getByTestId('review-toggle');
   await expect(reviewToggle).toBeDisabled();
   await expect(reviewToggle).toHaveAttribute('title', /untracked/i);
+});
+
+test('the git-sync seam addition leaves the desktop review path untouched', async ({ page }) => {
+  // REGRESSION GUARD for git-sync spec §10.3/§12: the `Backend` interface gained
+  // `onSyncNotice`, implemented as a deliberate NO-OP in `tauri.ts` (the desktop
+  // runs no sync loop) and emitter-backed in `fake.ts`. Nothing about the desktop
+  // history / review-diff path may move because of it. Two halves:
+  //   1. the seam method exists on the SELECTED backend and its unsubscribe is
+  //      callable (and idempotent) — a broken no-op would throw at island mount;
+  //   2. driving BOTH notice kinds renders NO notice UI on the desktop shell
+  //      (§10.4 is editor-island-only, i.e. web-only) and does not disturb an
+  //      active review view: the diff, the stepper and the read-only buffer all
+  //      still behave exactly as the tests above assert.
+  const editor = await openFixture(page, 'concepts/codemirror.md');
+
+  const seam = await page.evaluate(() => {
+    const backend = (window as unknown as FakeWindow).__sunstoneBackend;
+    const unsubscribe = backend.onSyncNotice(() => {});
+    const shapes = [typeof backend.onSyncNotice, typeof unsubscribe];
+    // Unsubscribing twice is what a re-mounted island does; it must not throw.
+    unsubscribe();
+    unsubscribe();
+    return shapes;
+  });
+  expect(seam).toEqual(['function', 'function']);
+
+  // A working-tree edit so the working ↔ HEAD diff is non-empty, then review on.
+  const content = editor.locator('.cm-content');
+  await content.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type('\n\nA paragraph added while the sync seam exists.');
+
+  const reviewToggle = page.getByTestId('review-toggle');
+  await expect(reviewToggle).toBeEnabled();
+  await reviewToggle.click();
+  const review = page.getByTestId('review-editor');
+  await expect(review).toBeVisible();
+  await expect(review.locator('.cm-critic-add').first()).toBeVisible();
+  await expect(page.getByTestId('review-stepper-label')).toHaveText('Working tree ↔ HEAD');
+
+  // Drive both notice kinds through the fake's emitter WHILE review is open.
+  await page.evaluate(() => {
+    const fake = (window as unknown as FakeWindow).__sunstoneFake;
+    fake.simulateSyncNotice({
+      kind: 'forked',
+      path: 'concepts/codemirror.md',
+      fork: 'concepts/codemirror-20260726T101500Z.md',
+    });
+    fake.simulateSyncNotice({ kind: 'deletionDropped', path: 'concepts/bundle.md' });
+  });
+
+  // The desktop shell has NO sync-notice surface (§10.4: editor islands only).
+  await expect(page.getByTestId('web-sync-notices')).toHaveCount(0);
+  await expect(page.getByTestId('web-sync-notice')).toHaveCount(0);
+  // ...and the review view is unaffected: still visible, still read-only, still
+  // showing the diff, and the stepper still walks history.
+  await expect(review).toBeVisible();
+  await expect(review.locator('.cm-content')).toHaveAttribute('contenteditable', 'false');
+  await expect(review).toContainText('A paragraph added while the sync seam exists.');
+  await page.getByTestId('review-older').click();
+  await expect(page.getByTestId('review-stepper-label')).toHaveText('HEAD ↔ HEAD~1');
+
+  // Exiting still restores normal editing with the working-tree edit intact.
+  await reviewToggle.click();
+  await expect(page.getByTestId('review-editor')).toHaveCount(0);
+  await expect(editor.locator('.cm-content')).toHaveAttribute('contenteditable', 'true');
+  await expect(editor).toContainText('A paragraph added while the sync seam exists.');
 });

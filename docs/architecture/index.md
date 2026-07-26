@@ -8,7 +8,7 @@ Sunstone is a shared Rust domain core plus thin layers over it: a pure leaf crat
 - [sunstone-shared](sunstone-shared.md) - The pure leaf crate of frontend-shared algorithms, compiled to both native and wasm (with the `sunstone-wasm` bridge) — the single source of link/frontmatter/render-derived logic.
 - [sunstone-native](sunstone-native.md) - The host-agnostic Rust crate holding all Bundle IO/index/git logic — the native hub both hosts depend on.
 - [Desktop shell (src-tauri)](desktop-shell.md) - The thin Tauri 2 wrapper exposing core over IPC commands; the "rust" package `sunstone ./docs` launches.
-- [sunstone-server](sunstone-server.md) - The axum binary exposing one Bundle over a JSON/SSE API for Sunstone Web.
+- [sunstone-server](sunstone-server.md) - The axum binary exposing one Bundle over a JSON/SSE API for Sunstone Web, and the owner of the git sync loop.
 - [Web frontend (src/)](web-frontend.md) - The SvelteKit UI that serves both the desktop SPA and the server-rendered web viewer, decoupled by the IPC seam.
 - [Testing](testing.md) - The four green gates and two Playwright suites, and which package owns which test.
 

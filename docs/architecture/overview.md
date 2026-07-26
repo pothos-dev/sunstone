@@ -8,7 +8,7 @@ timestamp: 2026-07-23T00:00:00Z
 
 # Architecture overview
 
-Sunstone is one codebase that ships two products — a **desktop editor** and a **read-only web viewer with an authenticated edit path** — over a **shared Rust domain core**. The packages:
+Sunstone is one codebase that ships two products — a **desktop editor** and a **web viewer with an authenticated, optionally git-synced edit path** — over a **shared Rust domain core**. The packages:
 
 | Package | Language | Role |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ Sunstone is one codebase that ships two products — a **desktop editor** and a 
 | [sunstone-native](/architecture/sunstone-native.md) | Rust | Host-agnostic Bundle IO/index/git logic — the native hub, built on `shared`. |
 | `sunstone-wasm` | Rust→wasm | Thin `wasm-bindgen` bridge over `shared`, loaded in-process by the frontend. |
 | [Desktop shell](/architecture/desktop-shell.md) (`src-tauri`) | Rust | Thin Tauri 2 wrapper exposing native over IPC commands. |
-| [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing native over a JSON/SSE API. |
+| [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing native over a JSON/SSE API — and, in the git-synced deployment shape, the owner of the **git sync loop**. |
 | [Web frontend](/architecture/web-frontend.md) (`src/`) | SvelteKit | One UI that targets both hosts, decoupled by the IPC seam. |
 
 ## The central idea
@@ -64,7 +64,7 @@ flowchart TD
 
 ## Web path
 
-Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/api`. Reads are open; on a write the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/api/events`).
+Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/api`. Reads are open; on a write — and on the two gated history reads, `/api/history` and `/api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/api/events`).
 
 ```mermaid
 flowchart TD
@@ -73,10 +73,15 @@ flowchart TD
   NODE -->|"proxy /api, mint JWT"| SV["sunstone-server (axum)"]
   SV --> CORE["sunstone-native"]
   CORE --> GIT["Bundle git repo"]
+  LOOP["sync loop (git-synced only)<br/>fetch · rebase · push"] --> CORE
+  SV -.->|"spawns · shares the write lock"| LOOP
+  LOOP -->|"git over ssh"| ORIGIN["origin (bare repo / forge)"]
   SV -->|"SSE /api/events"| NODE
 ```
 
-Both processes ship as a single Docker image; see `docker/README.md` for the run and the internal-network / open-reads caveat.
+A web deployment takes one of **three shapes**, derived from the *presence* of `SUNSTONE_GIT_*` configuration rather than any mode flag: **plain** (a folder, no git, Save writes the file), **git-local** (commits stay in the container) and **git-synced** (the server clones an origin on boot and runs the sync loop, so web edits and external `git push`es reconcile continuously). Only git-synced spawns the loop, and only it exposes the operator route `/api/sync-status`. The loop takes the same in-process write lock the write path takes, and its in-place rewrites reach browsers through the ordinary watcher → SSE path; the two outcomes users must know about — a conflicting edit forked beside the original, or a web deletion dropped — arrive as a named `sync` event on that same connection. See [ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md), and the [Glossary](/GLOSSARY.md) for the shape vocabulary.
+
+Both processes ship as a single Docker image, running non-root; see `docker/README.md` for the three stacks, the normative env/volume table, and the internal-network / open-reads caveat.
 
 ## What crosses each seam
 
@@ -88,5 +93,5 @@ Both processes ship as a single Docker image; see `docker/README.md` for the run
 ## Relationships
 
 - Each package has its own page: [sunstone-shared](/architecture/sunstone-shared.md), [sunstone-native](/architecture/sunstone-native.md), [desktop shell](/architecture/desktop-shell.md), [sunstone-server](/architecture/sunstone-server.md), [web frontend](/architecture/web-frontend.md).
-- The Bundle these packages operate on is defined in [OKF → Bundle](/okf/bundle.md); the link model core implements is [Linking](/okf/linking.md); the shared-crate/wasm rationale is [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md).
+- The Bundle these packages operate on is defined in [OKF → Bundle](/okf/bundle.md); the link model core implements is [Linking](/okf/linking.md); the shared-crate/wasm rationale is [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md) and the git-sync ownership rationale is [ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md).
 - How the assembled stacks are tested is [Testing](/architecture/testing.md).

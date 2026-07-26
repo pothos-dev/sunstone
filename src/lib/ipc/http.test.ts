@@ -1,5 +1,5 @@
 import { test, expect, afterEach } from 'bun:test';
-import { parseFileChange, httpWriteError, httpBackend, CLIENT_ID } from './http';
+import { parseFileChange, parseSyncNotice, httpWriteError, httpBackend, CLIENT_ID } from './http';
 
 // Pure parsing of an SSE `data:` payload into a `FileChange` (the `EventSource`
 // bridge in `onFileChanged` only forwards a non-null result to the callback).
@@ -182,6 +182,130 @@ test('allKeys GETs /api/keys and returns the string array', async () => {
   );
   await expect(httpBackend.allKeys()).resolves.toEqual(['description', 'tags', 'title', 'type']);
   expect(get().url).toBe('/api/keys');
+});
+
+// --- gated git read routes (git-sync spec §11) ------------------------------
+// `/api/history` + `/api/file-at-rev` are session-gated in `hooks.server.ts`, so
+// the seam has to distinguish "you cannot have history here" (an unavailable
+// capability → `gitMissing`, which just disables the review-diff toggle) from a
+// real error. Per the seam's contract, ONLY a path escape (400) rejects; every
+// other failure — 401, 404 (a server predating these routes), 500, 503, a
+// network throw — is an unavailable capability. A rejection instead would leave
+// the review toggle stuck on "Checking git history…" forever.
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+test('fileHistory GETs /api/history and passes the FileHistory through', async () => {
+  const commits = [
+    {
+      hash: 'abc1234',
+      subject: 'edit notes/foo.md via web',
+      author: 'Ada',
+      date: '2026-07-26T10:15:00+00:00',
+      relativeDate: '3 minutes ago',
+    },
+  ];
+  const get = stubFetch(jsonResponse({ status: 'ok', commits }));
+  await expect(httpBackend.fileHistory('notes/foo.md')).resolves.toEqual({
+    status: 'ok',
+    commits,
+  });
+  expect(get().url).toBe('/api/history?path=notes%2Ffoo.md');
+});
+
+test('fileHistory passes a git-backed unavailable status through untouched', async () => {
+  for (const status of ['notARepo', 'untracked', 'noHistory', 'gitMissing'] as const) {
+    stubFetch(jsonResponse({ status }));
+    await expect(httpBackend.fileHistory('notes/foo.md')).resolves.toEqual({ status });
+  }
+});
+
+test('fileHistory maps every non-400 failure to gitMissing (fail-safe)', async () => {
+  // 401 not signed in / 404 a server predating these routes / 500 / 503 no auth.
+  for (const status of [401, 404, 500, 503]) {
+    stubFetch(new Response('nope', { status }));
+    await expect(httpBackend.fileHistory('notes/foo.md')).resolves.toEqual({
+      status: 'gitMissing',
+    });
+  }
+});
+
+test('a network-level throw yields gitMissing, not a rejection', async () => {
+  globalThis.fetch = (() =>
+    Promise.reject(new Error('connection refused'))) as unknown as typeof fetch;
+  await expect(httpBackend.fileHistory('notes/foo.md')).resolves.toEqual({
+    status: 'gitMissing',
+  });
+  await expect(httpBackend.fileAtRev('notes/foo.md', 'HEAD')).resolves.toEqual({
+    status: 'gitMissing',
+  });
+});
+
+test('fileAtRev GETs /api/file-at-rev with path + rev and returns the content', async () => {
+  const get = stubFetch(jsonResponse({ status: 'ok', content: '# hi' }));
+  await expect(httpBackend.fileAtRev('notes/foo.md', 'HEAD~1')).resolves.toEqual({
+    status: 'ok',
+    content: '# hi',
+  });
+  expect(get().url).toBe('/api/file-at-rev?path=notes%2Ffoo.md&rev=HEAD~1');
+});
+
+test('fileAtRev maps every non-400 failure to gitMissing', async () => {
+  for (const status of [401, 404, 500, 503]) {
+    stubFetch(new Response('nope', { status }));
+    await expect(httpBackend.fileAtRev('notes/foo.md', 'HEAD')).resolves.toEqual({
+      status: 'gitMissing',
+    });
+  }
+});
+
+test('a gated git read STILL rejects on a path escape (400) — the one case', async () => {
+  stubFetch(new Response('path escapes the bundle: ../x', { status: 400 }));
+  await expect(httpBackend.fileHistory('../x')).rejects.toThrow('path escapes the bundle');
+
+  stubFetch(new Response('path escapes the bundle: ../x', { status: 400 }));
+  await expect(httpBackend.fileAtRev('../x', 'HEAD')).rejects.toThrow('path escapes the bundle');
+});
+
+// --- sync notices: the named `sync` SSE event (git-sync spec §10.2-10.3) -----
+
+test('parses both sync notice kinds', () => {
+  expect(
+    parseSyncNotice(
+      '{"kind":"forked","path":"notes/foo.md","fork":"notes/foo-20260726T101500Z.md"}',
+    ),
+  ).toEqual({
+    kind: 'forked',
+    path: 'notes/foo.md',
+    fork: 'notes/foo-20260726T101500Z.md',
+  });
+  expect(parseSyncNotice('{"kind":"deletionDropped","path":"notes/foo.md"}')).toEqual({
+    kind: 'deletionDropped',
+    path: 'notes/foo.md',
+  });
+});
+
+test('rejects a malformed or incomplete sync notice', () => {
+  expect(parseSyncNotice('not json')).toBeNull();
+  expect(parseSyncNotice('')).toBeNull();
+  // Unknown kind, missing path, or a fork notice with nothing to name.
+  expect(parseSyncNotice('{"kind":"rebased","path":"a.md"}')).toBeNull();
+  expect(parseSyncNotice('{"kind":"deletionDropped"}')).toBeNull();
+  expect(parseSyncNotice('{"kind":"forked","path":"a.md"}')).toBeNull();
+  expect(parseSyncNotice('{"kind":"forked","path":"a.md","fork":7}')).toBeNull();
+});
+
+test('a sync notice carries no author (the payload is impersonal)', () => {
+  const notice = parseSyncNotice(
+    '{"kind":"forked","path":"a.md","fork":"a-1.md","author":{"name":"Ada"}}',
+  );
+  expect(notice).toEqual({ kind: 'forked', path: 'a.md', fork: 'a-1.md' });
+  expect(Object.keys(notice!)).toEqual(['kind', 'path', 'fork']);
 });
 
 // --- view-state persistence via localStorage --------------------------------

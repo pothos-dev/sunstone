@@ -45,9 +45,10 @@
   import { backend } from '$lib/ipc';
   import { indexStore } from '$lib/state/index.svelte';
   import type { Tile, Workspace } from '$lib/state/workspace.svelte';
-  import type { FileChange } from '$lib/types';
+  import type { FileChange, SyncNotice } from '$lib/types';
   import { routeFileChange, structuralOpGated } from './concurrency';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
+  import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
 
   interface Props {
     /** bundle-relative path of the Concept to edit (mount-time; forward-slash). */
@@ -120,6 +121,20 @@
     }, 4000);
     return () => clearTimeout(t);
   });
+
+  // --- Git sync-loop divergence notices (git-sync spec §10.4) ----------------
+  // NO timeout, deliberately: unlike "Updated on disk" (a transient fact), these
+  // carry a filename to remember, so each stays until it is dismissed. Queued
+  // rather than latest-wins so a second notice cannot swallow the first's path.
+  let syncNotices = $state<PendingSyncNotice[]>([]);
+  let syncSeq = 0;
+
+  function showSyncNotice(notice: SyncNotice): void {
+    syncNotices = [...syncNotices, { id: ++syncSeq, notice }];
+  }
+  function dismissSyncNotice(id: number): void {
+    syncNotices = syncNotices.filter((n) => n.id !== id);
+  }
 
   // Route a genuine (non-echo — the http seam already drops our own) SSE change.
   function handleChange(change: FileChange): void {
@@ -257,6 +272,10 @@
     // SSE routing for the active buffer (own echoes already dropped by the seam).
     unsubscribe = backend.onFileChanged(handleChange);
 
+    // Sync notices ride the SAME connection (a named `sync` event); the desktop
+    // seam is a no-op, so this only ever fires on a git-synced server.
+    const unsubscribeSync = backend.onSyncNotice(showSyncNotice);
+
     // Tab close / reload guard — armed only while the buffer is dirty (§4).
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (tile?.dirty) {
@@ -269,6 +288,7 @@
     return () => {
       disposed = true;
       unsubscribe?.();
+      unsubscribeSync();
       window.removeEventListener('beforeunload', onBeforeUnload);
       if (conflictBurst) clearTimeout(conflictBurst);
     };
@@ -300,10 +320,12 @@
 <WebConcurrencyModals
   {conceptName}
   {updated}
+  {syncNotices}
   {deleted}
   {conflict}
   {leave}
   {structural}
+  onDismissSyncNotice={dismissSyncNotice}
   onConflictDiscard={conflictDiscard}
   onConflictKeep={conflictKeep}
   onDeletedRecreate={deletedRecreate}

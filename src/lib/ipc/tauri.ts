@@ -84,6 +84,16 @@ export const tauriBackend: Backend = {
     };
   },
 
+  /**
+   * Deliberate NO-OP (git-sync spec §10.3): sync notices come from the server's
+   * git sync loop, and the desktop runs no loop — there is no producer to listen
+   * to, so nothing can ever arrive. Implemented only for seam parity, returning
+   * an unsubscribe that does nothing.
+   */
+  onSyncNotice(): () => void {
+    return () => {};
+  },
+
   createConcept(path: string): Promise<void> {
     return invoke<void>('create_concept', { path });
   },

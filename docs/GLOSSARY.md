@@ -3,7 +3,7 @@ type: Reference
 title: Sunstone Glossary
 description: The canonical domain language for Sunstone — the terms to use and the synonyms to avoid.
 tags: [glossary, domain, ubiquitous-language]
-timestamp: 2026-07-22
+timestamp: 2026-07-26
 ---
 
 # Glossary
@@ -58,6 +58,46 @@ The rendered output of a ` ```mermaid ` fenced code block. In source it is an or
 code block (so it is excluded from the **Outline**, like all fenced code); under **Live preview**
 it renders as a diagram on inactive lines and reveals its raw source when the cursor enters it.
 _Avoid_: "chart", "graph" (use **Diagram**; reserve "graph" for the link/backlink sense).
+
+### Deployment shapes
+
+These three name how a **Sunstone Web** deployment relates to git. The shape is derived from the
+**presence** of `SUNSTONE_GIT_*` configuration, never from a flag — see
+[ADR-0007](/adr/0007-server-owns-the-git-sync-loop.md) and, for the normative variable/volume
+table, `docker/README.md`.
+_Avoid_: "mode on/off", "git mode", `SUNSTONE_GIT_MODE` — that variable was never shipped; name
+the shape instead.
+
+**plain**:
+No `SUNSTONE_GIT_*` variable at all. The Bundle is whatever `SUNSTONE_BUNDLE` points at, and a
+Save writes the file and **runs no git** — no commit, and no history (the read side short-circuits
+too, so a Bundle bind-mounted inside some other repo can never serve *that* repo's log). The
+shape of the read-only viewer.
+
+**git-local**:
+`SUNSTONE_GIT_BRANCH` set, no origin. The Bundle lives in a container-local clone and every Save
+**commits** there, authored by the signed-in user — but nothing is pushed anywhere. The shape of
+the Dex dev stack.
+
+**git-synced**:
+Branch plus `SUNSTONE_GIT_ORIGIN` plus a deploy key. The server clones origin on boot, commits
+every Save, and runs the **Sync loop**. The shape of a collaborative wiki.
+
+**Sync loop**:
+The server-owned `fetch → rebase → push` cycle that runs only in the **git-synced** shape. A Save
+kicks it immediately (so outbound latency is not the poll interval); external pushes are
+discovered within `SUNSTONE_GIT_SYNC_INTERVAL_SECS`. It is offline-tolerant: an unreachable origin
+leaves the wiki serving and editing, with commits queueing locally. See
+[sunstone-server](/architecture/sunstone-server.md).
+_Avoid_: "sidecar", "git-sync" (the sidecar recipes it replaced are deleted).
+
+**Fork** (of a Concept):
+The `foo-<ts>.md` file the Sync loop writes beside `foo.md` when a web edit and an origin edit
+conflict: origin keeps the canonical name, the web bytes land in the fork verbatim. A fork is an
+ordinary **Concept** — findable in the tree, **Search** and **Quick nav** — and inbound links keep
+pointing at the canonical file. `<ts>` is the conflicting edit's author date,
+`YYYYMMDDThhmmssZ`.
+_Avoid_: "conflict copy", "conflict file".
 
 ### UI chrome
 
@@ -173,6 +213,9 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
   Regions cut across Panes and Sections (see term). Each Region has at most one **Focused item**.
 - In the **Explorer**, the **Focused item** (keyboard position) is independent of the open
   **Concept** (what the Editor shows); they coincide only until you arrow away.
+- A Sunstone Web deployment is exactly one of the three **deployment shapes** — **plain**,
+  **git-local**, **git-synced** — and only the last runs the **Sync loop**, which is the only
+  thing that ever writes a **Fork**.
 
 ## Example dialogue
 
@@ -187,6 +230,12 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
 ## Flagged ambiguities
 
 - "docs folder" / "vault" / "workspace" all referred to the opened root — resolved to **Bundle**.
+- A git-backed deployment was briefly described as "**mode** on / off", after a proposed
+  `SUNSTONE_GIT_MODE=off|on` variable. That variable **never shipped** — git is gated on the
+  presence of any `SUNSTONE_GIT_*` configuration instead. Resolved to the three **deployment
+  shapes** (**plain** / **git-local** / **git-synced**), which name the deployment rather than an
+  env value and so survive the variable's deletion. _Avoid_: "mode on/off", "git mode",
+  `SUNSTONE_GIT_MODE`. See [ADR-0007](/adr/0007-server-owns-the-git-sync-loop.md).
 - "side panel" / "panel" / "pane" / "accordion section" were used loosely for the collapsible
   sidebar items — resolved to **Section**, inside a **Sidebar**, with **Accordion** naming only
   the height-sharing behaviour. "Panel" is avoided (VSCode bottom-dock collision).

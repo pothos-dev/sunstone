@@ -1,3 +1,18 @@
+<script module lang="ts">
+  import type { SyncNotice } from '$lib/types';
+
+  /**
+   * One pending git sync-loop notice (git-sync spec §10.2), keyed by a monotonic
+   * id minted by the island so a dismissal targets exactly one entry. Unlike the
+   * auto-dismissing "Updated on disk" notice, these stay until dismissed: the
+   * whole payload of a `forked` notice is a filename to remember.
+   */
+  export interface PendingSyncNotice {
+    id: number;
+    notice: SyncNotice;
+  }
+</script>
+
 <script lang="ts">
   // Presentational-only surface for the web write concurrency UX (ticket 08):
   // the non-blocking "updated" notice, the deleted-state banner, and the three
@@ -14,12 +29,18 @@
     leavePromptText,
     structuralPromptText,
   } from './concurrency';
+  import { syncNoticeText } from './syncNotice';
 
   interface Props {
     /** Short name (basename, no `.md`) of the active Concept, for modal copy. */
     conceptName: string;
     /** Non-blocking "updated by X" notice (clean external reload). */
     updated: { author: string | null; id: number } | null;
+    /**
+     * Pending git sync-loop divergence notices (git-sync spec §10.4) — a fork
+     * created, or a web deletion dropped. DISMISSIBLE, never auto-dismissed.
+     */
+    syncNotices: PendingSyncNotice[];
     /** Deleted-state banner: the active Concept was removed remotely (dirty). */
     deleted: { author: string | null } | null;
     /** Blocking conflict dialog: dirty buffer, active Concept changed remotely. */
@@ -28,6 +49,9 @@
     leave: unknown | null;
     /** Three-way structural-op modal: rename/move/delete while dirty. */
     structural: { op: GatedStructuralOp; target: string } | null;
+
+    /** Dismiss one sync notice by its `PendingSyncNotice.id`. */
+    onDismissSyncNotice: (id: number) => void;
 
     onConflictDiscard: () => void;
     onConflictKeep: () => void;
@@ -44,10 +68,12 @@
   let {
     conceptName,
     updated,
+    syncNotices,
     deleted,
     conflict,
     leave,
     structural,
+    onDismissSyncNotice,
     onConflictDiscard,
     onConflictKeep,
     onDeletedRecreate,
@@ -64,6 +90,29 @@
 {#if updated}
   <div class="notice" data-testid="web-updated-notice" role="status">
     {updatedNoticeText(updated.author)}
+  </div>
+{/if}
+
+<!-- Git sync-loop divergence notices (git-sync spec §10.4): the SAME notice slot
+     as "Updated on disk", but DISMISSIBLE — the 4s auto-dismiss is right for a
+     transient fact and wrong for a message whose payload is a filename to
+     remember. One dismiss affordance serves both kinds. The fork path is plain
+     text, NOT a link (naming it is enough to reach it via Ctrl+K). -->
+{#if syncNotices.length > 0}
+  <div class="sync-notices" data-testid="web-sync-notices">
+    {#each syncNotices as pending (pending.id)}
+      <div class="notice sync" data-testid="web-sync-notice" role="status">
+        <span class="sync-msg">{syncNoticeText(pending.notice)}</span>
+        <button
+          type="button"
+          class="sync-dismiss"
+          data-testid="web-sync-notice-dismiss"
+          aria-label="Dismiss notice"
+          title="Dismiss"
+          onclick={() => onDismissSyncNotice(pending.id)}>×</button
+        >
+      </div>
+    {/each}
   </div>
 {/if}
 
@@ -151,6 +200,47 @@
     color: var(--text-muted, #555);
     font-size: 0.8rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Dismissible sync notices — stacked under the "updated" pill's slot (same
+     top-right corner, offset so both can be visible at once). */
+  .sync-notices {
+    position: fixed;
+    top: 2.5rem;
+    right: 0.8rem;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    max-width: min(30rem, calc(100vw - 1.6rem));
+  }
+
+  .notice.sync {
+    position: static;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    color: var(--text, #222);
+  }
+
+  .sync-msg {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The single dismiss affordance, shared by both notice kinds. */
+  .sync-dismiss {
+    flex: none;
+    padding: 0 0.25rem;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: none;
+    color: var(--text-muted, #555);
+    font: inherit;
+    font-size: 0.95rem;
+    line-height: 1.1;
+    cursor: pointer;
   }
 
   /* Deleted-state banner — a fixed strip above the (orphaned) editor buffer. */

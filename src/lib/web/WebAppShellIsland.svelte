@@ -22,6 +22,8 @@
   //   4. Structural-op gate — registered on `treeActions` so a rename/move/delete
   //      over a dirty buffer routes through the three-way structural modal.
   //   5. `beforeunload` guard — armed only while the active buffer is dirty.
+  //   6. Sync notices — the server sync loop's two divergence events (a fork
+  //      created / a web deletion dropped), rendered as DISMISSIBLE notices.
   import { onMount } from 'svelte';
   import type { Component } from 'svelte';
   import { backend } from '$lib/ipc';
@@ -31,9 +33,10 @@
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { setDirtyLeaveGate } from '$lib/state/workspace.svelte';
   import type { Document } from '$lib/state/document.svelte';
-  import type { FileChange } from '$lib/types';
+  import type { FileChange, SyncNotice } from '$lib/types';
   import { routeFileChange, structuralOpGated, type GatedStructuralOp } from './concurrency';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
+  import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
   import UserMenu from './UserMenu.svelte';
   import type { WebUser } from './loadConcept';
 
@@ -111,6 +114,20 @@
     }, 4000);
     return () => clearTimeout(t);
   });
+
+  // --- Git sync-loop divergence notices (git-sync spec §10.4) ----------------
+  // (6) Sync notices: DISMISSIBLE, never auto-dismissed — unlike "Updated on
+  // disk" (a transient fact) each carries a filename to remember. Queued rather
+  // than latest-wins so a second notice cannot swallow the first's path.
+  let syncNotices = $state<PendingSyncNotice[]>([]);
+  let syncSeq = 0;
+
+  function showSyncNotice(notice: SyncNotice): void {
+    syncNotices = [...syncNotices, { id: ++syncSeq, notice }];
+  }
+  function dismissSyncNotice(id: number): void {
+    syncNotices = syncNotices.filter((n) => n.id !== id);
+  }
 
   // Route a genuine (non-echo — the http seam already drops our own) SSE change.
   function handleChange(change: FileChange): void {
@@ -229,6 +246,10 @@
     // (1) SSE routing — the SINGLE file-change handler on web.
     const unsubscribe = backend.onFileChanged(handleChange);
 
+    // (6) Sync notices ride the SAME `/api/events` connection (a named `sync`
+    //     event); only a git-synced server ever emits one.
+    const unsubscribeSync = backend.onSyncNotice(showSyncNotice);
+
     // (3) Dirty-leave gate: a Concept switch / Tile close over a dirty buffer
     //     routes through the three-way leave modal, whose choice resolves here.
     setDirtyLeaveGate(
@@ -271,6 +292,7 @@
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribeSync();
       setDirtyLeaveGate(null);
       treeActions.beforeStructuralOp = null;
       window.removeEventListener('keydown', onKeydown, true);
@@ -300,10 +322,12 @@
     <WebConcurrencyModals
       {conceptName}
       {updated}
+      {syncNotices}
       {deleted}
       {conflict}
       {leave}
       {structural}
+      onDismissSyncNotice={dismissSyncNotice}
       onConflictDiscard={conflictDiscard}
       onConflictKeep={conflictKeep}
       onDeletedRecreate={deletedRecreate}

@@ -4,9 +4,12 @@
 #
 # Runs BOTH processes that make up the web deployment in one container:
 #
-#   1. sunstone-server — the Rust API over the mounted Bundle (read-only here:
-#      no SUNSTONE_JWT_SECRET is set, so its write routes all 401).
-#      (binds 0.0.0.0:${SUNSTONE_API_PORT}, reads ${SUNSTONE_BUNDLE}).
+#   1. sunstone-server — the Rust API over the Bundle. Writable iff
+#      SUNSTONE_JWT_SECRET is set (the dex and wiki stacks set it; the two plain
+#      stacks do not, so there every write route 401s).
+#      (binds 0.0.0.0:${SUNSTONE_API_PORT}; the Bundle root is the server's to
+#      resolve — ${SUNSTONE_BUNDLE} in the plain shape, /srv/repo/<subdir> in a
+#      git shape.)
 #   2. node build      — the SvelteKit adapter-node SSR server (binds
 #      ${HOST}:${PORT}); its `/api/*` proxy + SSR loads reach the API at
 #      ${SUNSTONE_API_INTERNAL} (http://localhost:${SUNSTONE_API_PORT}).
@@ -15,6 +18,12 @@
 # `wait -n`, exits as soon as EITHER child dies — so a crash of the API or the
 # web server tears the whole container down (and Docker/compose can restart it)
 # instead of leaving a half-dead container serving errors.
+#
+# That is its WHOLE job. Bundle resolution, the optional seed copy
+# (SUNSTONE_BUNDLE_SEED_FROM), `git init`/clone and the sync loop all belong to
+# sunstone-server: in a git shape only the server knows the bundle root
+# (/srv/repo/<subdir>), so a shell step reading SUNSTONE_BUNDLE would write to
+# the wrong place. Do not reintroduce one here.
 
 set -euo pipefail
 
@@ -25,32 +34,6 @@ export SUNSTONE_API_PORT="${API_PORT}"
 export SUNSTONE_API_INTERNAL="${SUNSTONE_API_INTERNAL:-http://localhost:${API_PORT}}"
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-3000}"
-
-# --- OPTIONAL bundle seed (env-gated; unset → skip, existing deploys unaffected).
-#
-# When SUNSTONE_BUNDLE_SEED_FROM is set, copy that path into $SUNSTONE_BUNDLE and,
-# if it is not already a git repo, `git init` it with a seed commit. This gives a
-# container-LOCAL, writable git copy of a bundle whose source (e.g. a read-only
-# bind mount of the host's docs/) must NOT be written back or git-init'd in place.
-# Edits/Saves then commit into this isolated in-container repo — the host source
-# is never modified.
-if [ -n "${SUNSTONE_BUNDLE_SEED_FROM:-}" ]; then
-  dest="${SUNSTONE_BUNDLE:?SUNSTONE_BUNDLE must be set to seed a bundle}"
-  echo "sunstone-web: seeding bundle ${dest} from ${SUNSTONE_BUNDLE_SEED_FROM}"
-  mkdir -p "${dest}"
-  # Copy contents (including dotfiles) of the source into the destination.
-  cp -a "${SUNSTONE_BUNDLE_SEED_FROM}/." "${dest}/"
-  if [ ! -d "${dest}/.git" ]; then
-    echo "sunstone-web: initialising git repo in ${dest}"
-    git config --global --add safe.directory "${dest}"
-    git -C "${dest}" init -q
-    git -C "${dest}" config user.name "${SUNSTONE_SEED_COMMIT_NAME:-Sunstone Seed}"
-    git -C "${dest}" config user.email "${SUNSTONE_SEED_COMMIT_EMAIL:-seed@sunstone.local}"
-    git -C "${dest}" config commit.gpgsign false
-    git -C "${dest}" add -A
-    git -C "${dest}" commit -q -m "seed bundle" || echo "sunstone-web: nothing to seed-commit"
-  fi
-fi
 
 pids=()
 

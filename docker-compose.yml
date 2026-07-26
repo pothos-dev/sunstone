@@ -24,6 +24,9 @@ services:
     # Reap zombies + forward signals cleanly to the entrypoint (PID 1).
     init: true
     restart: unless-stopped
+    # If the host bundle is not owned by uid 1000, either chown it or run as its
+    # owner. Only needed for a WRITABLE bind mount; the :ro default never hits it.
+    # user: "${SUNSTONE_UID:-1000}:${SUNSTONE_GID:-1000}"
     environment:
       # Public SSR web server (adapter-node reads HOST/PORT).
       HOST: 0.0.0.0

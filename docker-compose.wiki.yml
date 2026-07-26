@@ -1,0 +1,43 @@
+# Sunstone Web — git-synced collaborative wiki.
+#
+# One container: SSR web app + Rust API + the git sync loop. The server clones
+# SUNSTONE_GIT_ORIGIN into the `repo` named volume on boot, commits every web
+# Save as the signed-in OIDC user, and continuously fetch→rebase→pushes so
+# external `git push` and web edits reconcile (tickets 03/07).
+#
+# The volume is a CACHE, not the record of truth — origin is. It is safe to
+# delete when `GET /api/sync-status` reports pendingCommits: 0.
+#
+#   cp docker/wiki.env.example ./wiki.env   # then fill it in
+#   docker compose -f docker-compose.wiki.yml up -d
+#
+# Confirm the shape took effect (an empty SUNSTONE_GIT_ORIGIN silently
+# downgrades to git-local — commits that never leave the container):
+#   curl -s localhost:3000/api/sync-status
+
+services:
+  sunstone-wiki:
+    image: ${DOCKERHUB_USERNAME:-chonkybirb}/sunstone-web:${SUNSTONE_TAG:-latest}
+    init: true
+    restart: unless-stopped
+    # env_file, not inline `environment:` — this stack carries three secrets, one
+    # of them a base64 private key. Inline values land in ~/.bash_history and in
+    # every `ps` listing. NOT a secrets manager: values still show in
+    # `docker inspect` (ticket 12).
+    env_file:
+      - ./wiki.env
+    # Reach a bare repo on the DOCKER HOST. Drop this line when origin is remote
+    # (e.g. GitLab) — nothing else changes (ticket 02).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # The clone. In-tree .git; writable by uid 1000 by construction because
+      # /srv/repo exists in the image chowned to node (ticket 10).
+      - repo:/srv/repo
+    ports:
+      - "${SUNSTONE_WEB_PORT:-3000}:3000"
+    # Behind Traefik instead of a published port, drop `ports:` and mirror the
+    # label block from docker-compose.dex.yml with this deployment's Host rule.
+
+volumes:
+  repo:

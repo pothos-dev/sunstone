@@ -113,10 +113,12 @@ ENV NODE_ENV=production \
     SUNSTONE_BUNDLE=/bundle
 
 # git is the backend of the write path (sunstone-server commits via the system
-# `git` binary) and of the optional bundle-seed step in entrypoint.sh. The slim
-# base omits it, so install it. Harmless for the read-only deployment.
+# `git` binary) and of the git sync loop. The slim base omits it, so install it.
+# openssh-client comes along because `git` SHELLS OUT to `ssh` for SSH transport:
+# without it the git-synced shape cannot clone/fetch/push at all. Both are
+# harmless for the read-only deployment.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
+ && apt-get install -y --no-install-recommends git openssh-client ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 # Rust API binary + the adapter-node build + its production node_modules.
@@ -131,12 +133,25 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Bake the repo's docs/ in as an OPTIONAL bundle seed source. Unused by the
 # default (read-only) deployment — it sets SUNSTONE_BUNDLE elsewhere and never
 # reads /bundle-src. The Dex dev stack (docker-compose.dex.yml) sets
-# SUNSTONE_BUNDLE_SEED_FROM=/bundle-src so the entrypoint seeds a container-local,
-# writable git copy from here. Baked in (not bind-mounted) because this sandbox's
-# Docker daemon does not share the host filesystem.
+# SUNSTONE_BUNDLE_SEED_FROM=/bundle-src so the SERVER copies it into the resolved
+# bundle root and seed-commits there. Baked in (not bind-mounted) because this
+# sandbox's Docker daemon does not share the host filesystem.
 COPY docs /bundle-src
+
+# /srv/repo — the clone (a named volume in the git-synced stack).
+# /srv/ssh  — the deploy key + known_hosts (NEVER a volume; dies with the container).
+# Docker copies the IMAGE DIRECTORY's owner onto a freshly created named volume,
+# so chowning here makes the volume writable by uid 1000 BY CONSTRUCTION — no
+# chown step at boot, no gosu, no root at PID 1.
+RUN mkdir -p /srv/repo /srv/ssh \
+ && chown node:node /srv/repo /srv/ssh
 
 # Public SSR web port (the Rust API on 8787 stays internal to the container).
 EXPOSE 3000
+
+# LAST in the stage, after every COPY and the entrypoint chmod: the build output
+# stays root:root 0755 and only ever needs to be READ, so /app is deliberately
+# not chowned. Both ports (3000, 8787) are >1024, so non-root needs no capability.
+USER node
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -12,6 +12,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  SyncNotice,
 } from '$lib/types';
 
 /**
@@ -109,6 +110,48 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 /**
+ * GET a *gated* git read route (`/api/history`, `/api/file-at-rev`), mapping an
+ * UNAVAILABLE CAPABILITY to the seam's graceful status instead of an error
+ * (git-sync spec §11).
+ *
+ * The mapping follows the seam's documented contract literally — **only a
+ * path-escape rejects** — and that path escape is exactly the **400** spec §11.2
+ * specifies:
+ *   - **400** → throw (an invalid path, the one case the seam permits rejecting);
+ *   - **every other failure** → `unavailable` (`{ status: 'gitMissing' }`): 401
+ *     (not signed in) and 503 (no `SUNSTONE_JWT_SECRET`) from
+ *     `hooks.server.ts`'s gate, 404 from a server that predates these routes,
+ *     500, and a network-level throw (server down mid-session).
+ *
+ * This FAILS SAFE: the review-diff toggle disables itself instead of hanging on
+ * "Checking git history…" forever, which is what a rejection here caused (the
+ * caller leaves its state `null` on a rejected probe).
+ */
+async function getGatedGit<T>(url: string, unavailable: T): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    // Network-level failure (server down, connection dropped): the capability is
+    // unavailable, not a caller error.
+    return unavailable;
+  }
+  if (res.status === 400) {
+    // The ONE rejection the seam permits: an invalid / escaping path.
+    const detail = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${res.statusText}: ${detail || url}`);
+  }
+  if (!res.ok) return unavailable;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // A 2xx with a body we cannot parse (an unexpected proxy/HTML response) is
+    // no more usable than a 404 — same graceful status, still no rejection.
+    return unavailable;
+  }
+}
+
+/**
  * Map a write route's HTTP status + server detail to a user-facing message
  * (ticket 07 §8 taxonomy: 400 invalid path / 409 conflict / 404 missing / 401
  * unauthenticated / 500 server). Pure so it is unit-testable; `sendJson` throws
@@ -187,6 +230,59 @@ export function parseFileChange(data: string): FileChange | null {
   return null;
 }
 
+/**
+ * Parse one `sync` SSE `data:` payload into a `SyncNotice`, or `null` if it is
+ * not a well-formed notice (git-sync spec §10.2). Pure so it can be unit-tested;
+ * the `addEventListener('sync', …)` bridge in `onSyncNotice` only invokes the
+ * callback for a non-null result. A `forked` notice without a `fork` path carries
+ * nothing actionable, so it is dropped rather than rendered half-formed.
+ */
+export function parseSyncNotice(data: string): SyncNotice | null {
+  try {
+    const raw = JSON.parse(data) as Partial<SyncNotice> & { fork?: unknown };
+    if (typeof raw.path !== 'string') return null;
+    if (raw.kind === 'forked' && typeof raw.fork === 'string') {
+      return { kind: 'forked', path: raw.path, fork: raw.fork };
+    }
+    if (raw.kind === 'deletionDropped') {
+      return { kind: 'deletionDropped', path: raw.path };
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+// --- The ONE `/api/events` connection, shared by both event streams. ---------
+// `/api/events` multiplexes two SSE streams over a single connection: unnamed
+// `message` events carrying a `FileChange` (the watcher) and named `sync` events
+// carrying a `SyncNotice` (the git sync loop, git-sync spec §10.3). Both seam
+// subscriptions ride THIS source — a second `EventSource` would buy a second
+// connection + keep-alive for what the event name gives free.
+//
+// Handlers are attached with `addEventListener` (not `onmessage =`) precisely
+// because the source is shared: assignment would let a second subscriber clobber
+// the first's handler, and an unsubscribe could not detach just its own.
+let eventSource: EventSource | null = null;
+let eventRefs = 0;
+
+/** Open (or join) the shared `/api/events` connection; `null` under SSR. */
+function acquireEvents(): EventSource | null {
+  if (typeof EventSource === 'undefined') return null; // SSR / non-browser
+  if (!eventSource) eventSource = new EventSource('/api/events');
+  eventRefs += 1;
+  return eventSource;
+}
+
+/** Release one reference; the last one out closes the connection. */
+function releaseEvents(): void {
+  eventRefs = Math.max(0, eventRefs - 1);
+  if (eventRefs === 0 && eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+}
+
 export const httpBackend: Backend = {
   bundleRoot(): Promise<string> {
     return getJson<string>('/api/bundle-root');
@@ -263,15 +359,39 @@ export const httpBackend: Backend = {
   // synchronous (matching the seam contract): it closes the stream at once.
   onFileChanged(cb: (change: FileChange) => void): () => void {
     // No EventSource under SSR / non-browser — nothing to subscribe to.
-    if (typeof EventSource === 'undefined') return () => {};
-    const source = new EventSource('/api/events');
-    source.onmessage = (e: MessageEvent) => {
+    const source = acquireEvents();
+    if (!source) return () => {};
+    const handler = (e: MessageEvent) => {
       const change = parseFileChange(typeof e.data === 'string' ? e.data : '');
       // Drop the echo of THIS tab's own write (ticket 08 §1): we already have
       // that content. Every other client sees it as a genuine change.
       if (change && !isOwnEcho(change, CLIENT_ID)) cb(change);
     };
-    return () => source.close();
+    source.addEventListener('message', handler);
+    return () => {
+      source.removeEventListener('message', handler);
+      releaseEvents();
+    };
+  },
+
+  // --- Git sync-loop divergence notices (git-sync spec §10.3). ---------------
+  // The loop sends `event: sync` frames on the SAME `/api/events` stream;
+  // `EventSource` dispatches a named event ONLY to a matching listener, so the
+  // unnamed `message` channel above (and `parseFileChange`, and the `FileChange`
+  // type) is untouched. No second connection, no polling.
+  onSyncNotice(cb: (notice: SyncNotice) => void): () => void {
+    const source = acquireEvents();
+    if (!source) return () => {};
+    const handler = (e: MessageEvent) => {
+      const notice = parseSyncNotice(typeof e.data === 'string' ? e.data : '');
+      // Broadcast to every client and un-attributed, so there is no echo to drop.
+      if (notice) cb(notice);
+    };
+    source.addEventListener('sync', handler as EventListener);
+    return () => {
+      source.removeEventListener('sync', handler as EventListener);
+      releaseEvents();
+    };
   },
 
   // --- Index-backed read queries over the proxied `/api/...` routes. --------
@@ -313,14 +433,26 @@ export const httpBackend: Backend = {
     return getJson<SearchHit[]>(`/api/search?q=${encodeURIComponent(query)}`);
   },
 
-  // Git seam: the read-only web build exposes no git route, so history is
-  // simply unavailable. Report it gracefully (`gitMissing`) rather than
-  // rejecting, so the shared review-diff UI just disables its toggle.
-  fileHistory(): Promise<FileHistory> {
-    return Promise.resolve({ status: 'gitMissing' });
+  // Git seam over the two SESSION-GATED read routes (git-sync spec §11):
+  // `fileAtRev` returns the full text of any path at any revision — including
+  // content deliberately deleted from the Bundle — so both routes take the same
+  // session→mint-JWT→forward branch as a write (`hooks.server.ts`'s
+  // `GATED_READS`). A signed-out visitor is answered 401 there and a server with
+  // no auth wired 503; `getGatedGit` folds those — and every other failure short
+  // of a 400 path escape — into the seam's graceful `gitMissing`, so the shared
+  // review-diff UI just disables its toggle instead of surfacing an error or
+  // hanging. The server maps git's own outcomes 1:1 (`notARepo` / `untracked` /
+  // `noHistory` / `gitMissing`); only a path escape (400) rejects.
+  fileHistory(path: string): Promise<FileHistory> {
+    return getGatedGit<FileHistory>(`/api/history?path=${encodeURIComponent(path)}`, {
+      status: 'gitMissing',
+    });
   },
-  fileAtRev(): Promise<FileAtRev> {
-    return Promise.resolve({ status: 'gitMissing' });
+  fileAtRev(path: string, rev: string): Promise<FileAtRev> {
+    return getGatedGit<FileAtRev>(
+      `/api/file-at-rev?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(rev)}`,
+      { status: 'gitMissing' },
+    );
   },
 
   // Server-quality render over the proxied `/api/render` — the same route the

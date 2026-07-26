@@ -59,6 +59,26 @@ export type FileChangeOrigin = {
 };
 
 /**
+ * A divergence notice from the server's git sync loop (git-sync spec §10.2) —
+ * the ONE case where a committed web action did not land where its author would
+ * look for it. Delivered over the seam by `Backend.onSyncNotice`, which on the
+ * web rides the named `sync` SSE event on the SAME `/api/events` connection the
+ * `FileChange` stream uses. Paths are bundle-relative, forward-slash.
+ *
+ *  - `forked`          — a conflicting web version of `path` was saved beside it
+ *                        as `fork` (origin keeps the canonical name);
+ *  - `deletionDropped` — a web deletion of `path` was reverted because origin
+ *                        modified the file concurrently.
+ *
+ * Carries NO author or email: the change channel deliberately carries only a
+ * name, and provenance lives in git. The notice is broadcast to ALL connected
+ * clients, so its copy is worded impersonally (see `web/syncNotice.ts`).
+ */
+export type SyncNotice =
+  | { kind: 'forked'; path: string; fork: string }
+  | { kind: 'deletionDropped'; path: string };
+
+/**
  * A tag and the number of Concepts that carry it. Matches the Rust `TagCount`
  * (`serde rename_all = "camelCase"`). Returned by `Backend.allTags()`.
  */

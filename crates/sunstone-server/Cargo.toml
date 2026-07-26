@@ -13,7 +13,8 @@ path = "src/main.rs"
 # Sunstone's reusable domain logic — the SAME bundle/index code the desktop uses.
 sunstone-native = { path = "../sunstone-native" }
 axum = "0.8"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync"] }
+# `time` is for the sync loop's notify-with-timeout tick scheduling (Spec 2 §8.1).
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
 # Wrap a broadcast receiver as a Stream for the SSE (`/api/events`) route.
 tokio-stream = { version = "0.1", features = ["sync"] }
 serde = { workspace = true }

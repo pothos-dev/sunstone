@@ -12,6 +12,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  SyncNotice,
 } from '$lib/types';
 import {
   FAKE_BUNDLE_ROOT,
@@ -58,6 +59,9 @@ import { parseFrontmatter, parseFrontmatterKeys, rewriteAnchors } from '$lib/was
 
 /** Subscribers to simulated filesystem changes (see `onFileChanged`). */
 const fileChangeSubscribers = new Set<(change: FileChange) => void>();
+
+/** Subscribers to simulated git sync-loop notices (see `onSyncNotice`). */
+const syncNoticeSubscribers = new Set<(notice: SyncNotice) => void>();
 
 /**
  * Ensure the wasm module is initialized before an index query computes over the
@@ -152,9 +156,26 @@ function clearAllTags(): void {
   }
 }
 
+/**
+ * Test hook: drive a git sync-loop divergence notice (git-sync spec §10.2), as
+ * if the server's loop had just forked a conflicting web version or dropped a web
+ * deletion. There is no loop in the fake — and no filesystem effect is simulated
+ * (the fork file's appearance is an ordinary watcher change, drivable separately
+ * via `simulateExternalChange`) — this is purely the notice channel, so Playwright
+ * can assert the dismissible notice for BOTH kinds.
+ *
+ * Exposed on `window.__sunstoneFake` alongside `simulateExternalChange`.
+ */
+function simulateSyncNotice(notice: SyncNotice): void {
+  for (const cb of syncNoticeSubscribers) {
+    cb(notice);
+  }
+}
+
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).__sunstoneFake = {
     simulateExternalChange,
+    simulateSyncNotice,
     clearAllTags,
     files: FILES,
   };
@@ -232,6 +253,16 @@ export const fakeBackend: Backend = {
     fileChangeSubscribers.add(cb);
     return () => {
       fileChangeSubscribers.delete(cb);
+    };
+  },
+
+  // Emitter-backed (git-sync spec §10.3) so Playwright can drive both notice
+  // kinds through `window.__sunstoneFake.simulateSyncNotice`; nothing else in the
+  // fake ever emits one.
+  onSyncNotice(cb: (notice: SyncNotice) => void): () => void {
+    syncNoticeSubscribers.add(cb);
+    return () => {
+      syncNoticeSubscribers.delete(cb);
     };
   },
 
