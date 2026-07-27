@@ -4,11 +4,20 @@
 // CriticMarkup. The stepper walks BACKWARD through the open Concept's git
 // history, one commit pair per step:
 //
-//   position 0 : Working tree ↔ HEAD      (what 04 shows by default)
-//   position 1 : HEAD        ↔ HEAD~1
-//   position 2 : HEAD~1      ↔ HEAD~2
+//   position 0 : Working tree ↔ commits[0]   (what 04 shows by default)
+//   position 1 : commits[0]  ↔ commits[1]
+//   position 2 : commits[1]  ↔ commits[2]
 //   …
-//   position k : HEAD~(k-1)  ↔ HEAD~k
+//   position k : commits[k-1] ↔ commits[k]
+//
+// The revs are the file's OWN commit hashes, taken from `Backend.fileHistory`
+// (which runs `git log --follow -- <path>`, so the list holds only the commits
+// that TOUCHED the file). We deliberately do NOT address the older sides as
+// `HEAD~k`: `HEAD~k` is the k-th first-parent ancestor of HEAD across the whole
+// repo, so any commit that touched OTHER files sits between two file commits and
+// makes `HEAD~k`/`HEAD~(k-1)` resolve to the same file content — an empty diff
+// even though the file changed between its own commits. Diffing hash-to-hash
+// sidesteps that entirely.
 //
 // This module holds the DOM-free, IPC-free INDEX math: given the file's commit
 // list (newest first, from `Backend.fileHistory`, issue 02) and a step position,
@@ -46,11 +55,6 @@ export interface ReviewStep {
   canNewer: boolean;
 }
 
-/** The rev name for the commit `n` generations back from HEAD (`HEAD`, `HEAD~1`, …). */
-function revName(n: number): string {
-  return n === 0 ? 'HEAD' : `HEAD~${n}`;
-}
-
 /**
  * The highest valid stepper position for a file with these `commits`: position 0
  * (working ↔ HEAD) plus one per consecutive commit pair. With N commits the last
@@ -66,9 +70,11 @@ export function maxStep(commits: FileCommit[]): number {
  * Resolve the comparison at stepper `position`, clamped into `[0, maxStep]`.
  *
  * Position 0 diffs the working tree against `HEAD` (newer side = working tree,
- * no commit). Position k ≥ 1 diffs `HEAD~(k-1)` (newer) against `HEAD~k` (older),
- * so the bar shows `commits[k-1]` — the newer side's commit. `canOlder`/`canNewer`
- * bound the two step buttons at the ends of history.
+ * no commit). Position k ≥ 1 diffs `commits[k-1]` (newer) against `commits[k]`
+ * (older) BY HASH, so the bar shows `commits[k-1]` — the newer side's commit —
+ * and the two sides are always the file's adjacent committed versions regardless
+ * of unrelated commits between them. `canOlder`/`canNewer` bound the two step
+ * buttons at the ends of history.
  */
 export function reviewStep(commits: FileCommit[], position: number): ReviewStep {
   const max = maxStep(commits);
@@ -85,13 +91,13 @@ export function reviewStep(commits: FileCommit[], position: number): ReviewStep 
     };
   }
 
-  const newerRev = revName(pos - 1);
-  const olderRev = revName(pos);
+  const newer = commits[pos - 1];
+  const older = commits[pos];
   return {
-    oldRev: olderRev,
-    newRev: newerRev,
-    label: `${newerRev} ↔ ${olderRev}`,
-    newer: commits[pos - 1] ?? null,
+    oldRev: older.hash,
+    newRev: newer.hash,
+    label: `${newer.hash} ↔ ${older.hash}`,
+    newer,
     canOlder: pos < max,
     canNewer: true,
   };

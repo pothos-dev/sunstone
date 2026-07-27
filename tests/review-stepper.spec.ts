@@ -8,15 +8,18 @@ import { test, expect } from './fixtures';
  * Drives the stepper bar in the read-only review view against the fake backend's
  * MULTI-commit git seam and asserts the user-visible behaviour:
  *  - the bar opens at `Working tree ↔ HEAD` (04's default), `newer →` disabled;
- *  - `← older` steps to `HEAD ↔ HEAD~1`, then `HEAD~1 ↔ HEAD~2`, re-rendering a
- *    DIFFERENT diff and showing the newer side's short hash + subject + date;
+ *  - `← older` steps to the two newest commits, then the next pair, each labelled
+ *    with the pair's short hashes, re-rendering a DIFFERENT diff and showing the
+ *    newer side's short hash + subject + date;
  *  - `← older` disables at the oldest pair; `newer →` walks back toward the
  *    working tree and disables there.
  *
- * The fake's `fileAtRev` returns the committed snapshot at HEAD and a
- * deterministically-altered variant at each older generation (a unique
+ * The fake's `fileAtRev` returns the committed snapshot at the newest commit and
+ * a deterministically-altered variant at each older commit (a unique
  * `revision marker N` line per generation), so each pair's diff is distinct and
- * stable.
+ * stable. Crucially the fake's commits are NOT adjacent HEAD ancestors — an
+ * unrelated commit sits between them — so the stepper must diff by commit hash,
+ * not `HEAD~N`, to produce these diffs at all.
  */
 
 async function openReview(page: Page, path: string) {
@@ -64,7 +67,7 @@ test('stepping older/newer walks consecutive commit pairs and updates the diff',
   // and the diff changes: the working-tree sentence is gone, HEAD~1's marker
   // (deleted at HEAD) appears. `newer →` is now enabled.
   await older.click();
-  await expect(label).toHaveText('HEAD ↔ HEAD~1');
+  await expect(label).toHaveText('a1b2c3d ↔ 0f1e2d3');
   await expect(page.getByTestId('review-stepper-hash')).toHaveText('a1b2c3d');
   await expect(page.getByTestId('review-stepper-subject')).toHaveText('Refine the concept');
   await expect(page.getByTestId('review-stepper-date')).toHaveText('yesterday');
@@ -72,10 +75,10 @@ test('stepping older/newer walks consecutive commit pairs and updates the diff',
   await expect(review).toContainText('revision marker 1');
   await expect(review).not.toContainText('A working-tree only sentence.');
 
-  // Step older again → HEAD~1 ↔ HEAD~2, the OLDEST pair. Different newer commit,
-  // different diff (marker 2), and `← older` is now bounded.
+  // Step older again → the OLDEST pair. Different newer commit, different diff
+  // (marker 2), and `← older` is now bounded.
   await older.click();
-  await expect(label).toHaveText('HEAD~1 ↔ HEAD~2');
+  await expect(label).toHaveText('0f1e2d3 ↔ 9a8b7c6');
   await expect(page.getByTestId('review-stepper-hash')).toHaveText('0f1e2d3');
   await expect(page.getByTestId('review-stepper-subject')).toHaveText('Expand the details');
   await expect(review).toContainText('revision marker 2');
@@ -84,7 +87,7 @@ test('stepping older/newer walks consecutive commit pairs and updates the diff',
 
   // Step newer twice → back to the default working ↔ HEAD comparison.
   await newer.click();
-  await expect(label).toHaveText('HEAD ↔ HEAD~1');
+  await expect(label).toHaveText('a1b2c3d ↔ 0f1e2d3');
   await expect(review).toContainText('revision marker 1');
   await newer.click();
   await expect(label).toHaveText('Working tree ↔ HEAD');
@@ -104,7 +107,7 @@ test('the stepper marks are red/green track-changes and hide raw delimiters', as
   // At an older pair the deleted marker renders as a delete (red) mark, with the
   // raw CriticMarkup delimiters hidden.
   await older.click();
-  await expect(page.getByTestId('review-stepper-label')).toHaveText('HEAD ↔ HEAD~1');
+  await expect(page.getByTestId('review-stepper-label')).toHaveText('a1b2c3d ↔ 0f1e2d3');
   await expect(review.locator('.cm-critic-del').first()).toBeVisible();
   await expect(review).not.toContainText('{--');
   await expect(review).not.toContainText('--}');

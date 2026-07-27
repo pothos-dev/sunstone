@@ -34,21 +34,21 @@ describe('reviewStep', () => {
     expect(step.canOlder).toBe(true); // history exists
   });
 
-  test('position 1 is HEAD ↔ HEAD~1 with the newest commit on the newer side', () => {
+  test('position 1 diffs the two newest commits by hash, newest on the newer side', () => {
     const step = reviewStep(commits, 1);
-    expect(step.newRev).toBe('HEAD');
-    expect(step.oldRev).toBe('HEAD~1');
-    expect(step.label).toBe('HEAD ↔ HEAD~1');
+    expect(step.newRev).toBe('aaa1111'); // commits[0]
+    expect(step.oldRev).toBe('bbb2222'); // commits[1]
+    expect(step.label).toBe('aaa1111 ↔ bbb2222');
     expect(step.newer).toBe(commits[0]);
     expect(step.canNewer).toBe(true);
     expect(step.canOlder).toBe(true);
   });
 
-  test('position 2 is HEAD~1 ↔ HEAD~2 with the middle commit on the newer side', () => {
+  test('position 2 diffs the middle/oldest commits by hash, middle on the newer side', () => {
     const step = reviewStep(commits, 2);
-    expect(step.newRev).toBe('HEAD~1');
-    expect(step.oldRev).toBe('HEAD~2');
-    expect(step.label).toBe('HEAD~1 ↔ HEAD~2');
+    expect(step.newRev).toBe('bbb2222'); // commits[1]
+    expect(step.oldRev).toBe('ccc3333'); // commits[2]
+    expect(step.label).toBe('bbb2222 ↔ ccc3333');
     expect(step.newer).toBe(commits[1]);
     expect(step.canNewer).toBe(true);
     expect(step.canOlder).toBe(false); // oldest pair — bounded

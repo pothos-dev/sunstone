@@ -540,37 +540,57 @@ const FAKE_COMMITS: FileCommit[] = [
 ];
 
 /**
- * The generation of a git rev relative to HEAD: `HEAD` → 0, `HEAD~N` → N, or a
- * `FAKE_COMMITS` short hash → its index (newest = 0). `null` for an unrecognized
- * rev. Lets the fake answer `fileAtRev` for both the stepper's `HEAD~N` revs and
- * a direct commit-hash lookup (faithful to `git show <rev>:<path>`).
+ * HEAD-distance of each `FAKE_COMMITS` entry (newest first). The gaps are
+ * deliberate: unrelated commits (touching OTHER files) sit BETWEEN this file's
+ * own commits, so `HEAD~1` is NOT the file's second-newest version — `HEAD~2`
+ * is. This models the real `git log --follow` gap the stepper must diff around:
+ * it addresses commits by HASH, never by `HEAD~N`, precisely because `HEAD~N`
+ * would resolve unrelated commits to the same (unchanged) file content and show
+ * an empty diff. A fake that mapped `HEAD~N → Nth file version` would hide that
+ * bug, so it must not.
  */
-function revGeneration(rev: string): number | null {
+const COMMIT_HEAD_DISTANCE = [0, 2, 3];
+
+/**
+ * The file-version index a git rev resolves to for THIS file: a `FAKE_COMMITS`
+ * short hash → its own index (newest = 0); `HEAD`/`HEAD~N` → the newest file
+ * commit at or before that HEAD distance (an unrelated ancestor keeps the file
+ * at its previous version), faithful to `git show <rev>:<path>`. `null` when the
+ * rev is unrecognized or older than the file's first commit (file absent there).
+ */
+function revToVersion(rev: string): number | null {
   const r = rev.trim();
-  const m = /^HEAD(?:~(\d+))?$/.exec(r);
-  if (m) return m[1] ? Number(m[1]) : 0;
   const idx = FAKE_COMMITS.findIndex((c) => c.hash === r);
-  return idx === -1 ? null : idx;
+  if (idx !== -1) return idx;
+  const m = /^HEAD(?:~(\d+))?$/.exec(r);
+  if (!m) return null;
+  const dist = m[1] ? Number(m[1]) : 0;
+  if (dist > COMMIT_HEAD_DISTANCE[COMMIT_HEAD_DISTANCE.length - 1]) return null;
+  let version: number | null = null;
+  for (let i = 0; i < COMMIT_HEAD_DISTANCE.length; i++) {
+    if (COMMIT_HEAD_DISTANCE[i] <= dist) version = i;
+  }
+  return version;
 }
 
 /**
  * Deterministic committed content of `path` at `rev` (the fake's stand-in for
  * `git show <rev>:<path>`), or `null` when the path was never committed or the
- * rev is out of this file's history. HEAD is the COMMITTED snapshot; each older
- * generation prepends one UNIQUE marker line PER generation, so every
- * consecutive pair (`HEAD~k ↔ HEAD~(k-1)`) yields a distinct, non-empty diff —
- * enough for the history stepper to be exercised end-to-end under Playwright.
+ * rev resolves to before the file existed. Version 0 (newest commit) is the
+ * COMMITTED snapshot; each older version prepends one UNIQUE marker line PER
+ * generation, so every consecutive commit pair yields a distinct, non-empty diff
+ * — enough for the history stepper to be exercised end-to-end under Playwright.
  * The working tree is the mutable `FILES`, so the position-0 (working ↔ HEAD)
  * diff stays driven by the user's live edits, exactly as issue 04.
  */
 function committedContentAt(path: string, rev: string): string | null {
   const base = COMMITTED_FILES[path];
   if (base === undefined) return null;
-  const gen = revGeneration(rev);
-  if (gen === null || gen < 0 || gen >= FAKE_COMMITS.length) return null;
-  if (gen === 0) return base;
+  const version = revToVersion(rev);
+  if (version === null) return null;
+  if (version === 0) return base;
   const markers: string[] = [];
-  for (let g = gen; g >= 1; g--) {
+  for (let g = version; g >= 1; g--) {
     markers.push(`> revision marker ${g} — older wording (generation ${g})`);
   }
   return `${markers.join('\n')}\n\n${base}`;

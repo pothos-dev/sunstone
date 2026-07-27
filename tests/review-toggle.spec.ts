@@ -234,7 +234,7 @@ test('the git-sync seam addition leaves the desktop review path untouched', asyn
   await expect(review.locator('.cm-content')).toHaveAttribute('contenteditable', 'false');
   await expect(review).toContainText('A paragraph added while the sync seam exists.');
   await page.getByTestId('review-older').click();
-  await expect(page.getByTestId('review-stepper-label')).toHaveText('HEAD ↔ HEAD~1');
+  await expect(page.getByTestId('review-stepper-label')).toHaveText('a1b2c3d ↔ 0f1e2d3');
 
   // Exiting still restores normal editing with the working-tree edit intact.
   await reviewToggle.click();
