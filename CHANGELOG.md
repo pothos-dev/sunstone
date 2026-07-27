@@ -4,6 +4,16 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.2] - 2026-07-27
+
+### Fixed
+
+- Mermaid diagrams no longer crash on their first render in the production build.
+- Restoring the previously open Concept on startup no longer briefly shows its raw
+  frontmatter block, even with Properties hidden — switching Concepts always looked
+  right, but the very first restored one didn't.
+- Horizontal padding is back on Concept header icons.
+
 ## [0.19.1] - 2026-07-27
 
 ### Fixed
