@@ -101,6 +101,39 @@ export default defineConfig(async () => ({
     external: ["$lib/wasm/pkg"],
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        // Rollup's default chunk splitting scatters mermaid's (huge, d3-heavy)
+        // dependency graph across several output chunks. In the production
+        // build this reliably breaks: d3's colour-space classes are wired up
+        // via a shared `define(constructor, factory, prototype)` helper
+        // (`constructor.prototype = factory.prototype = prototype`), and when
+        // that helper ends up in a different chunk than a colour-space
+        // constructor, the constructor is read as `undefined` before its own
+        // chunk has finished evaluating — throwing "Cannot set properties of
+        // undefined (setting 'prototype')" the first time ANY Diagram renders
+        // (reproduced with both mermaid 11.15.0 and 11.16.0, and even with
+        // minification disabled, so it's a cross-chunk evaluation-order issue,
+        // not a minifier bug). Forcing the whole mermaid+d3 subgraph into one
+        // chunk keeps its internal module evaluation order intact.
+        /** @param {string} id */
+        manualChunks(id) {
+          if (
+            id.includes("node_modules/mermaid") ||
+            id.includes("node_modules/d3") ||
+            id.includes("node_modules/khroma") ||
+            id.includes("node_modules/dagre") ||
+            id.includes("node_modules/cytoscape") ||
+            id.includes("node_modules/@mermaid-js")
+          ) {
+            return "mermaid-vendor";
+          }
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
