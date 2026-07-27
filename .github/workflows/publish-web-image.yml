@@ -62,4 +62,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # ignore-error: the cache export runs AFTER the image has been pushed, so
+          # without it a cache-side hiccup fails the job on work that already
+          # succeeded — v0.19.0 published both tags and still went red with
+          # "exporting to GitHub Actions Cache: ERROR: not_found". A build cache is
+          # an optimisation; losing it must not mean losing the release.
+          cache-to: type=gha,mode=max,ignore-error=true
