@@ -4,6 +4,14 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.3] - 2026-07-27
+
+### Changed
+
+- The published Sunstone Web image now lives on GHCR
+  (`ghcr.io/pothos-dev/sunstone-web`) instead of Docker Hub. Compose files and
+  the deployment docs default to the new location.
+
 ## [0.19.2] - 2026-07-27
 
 ### Fixed
