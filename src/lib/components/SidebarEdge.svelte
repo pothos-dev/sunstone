@@ -123,20 +123,32 @@
 ></div>
 
 <style>
-  /* A comfortable hit-strip drawn transparent, with a 1px hairline via a pseudo
-     so the visible seam stays 1px while the whole strip is grabbable. The
-     hairline hugs the SIDEBAR-facing edge of the strip (not centred) so the
-     sidebar's backdrop touches the border with no gap; the rest of the strip
-     extends into the centre as invisible grab area. Cursor signals the axis. */
+  /* The edge takes only the 1px seam in layout, so the sidebar's backdrop and
+     the editor's chrome (tile header) both touch the border with no gutter of
+     app background bleeding between them. The comfortable grab strip is an
+     absolutely-positioned overhang (`::before`) that spills over BOTH
+     neighbours without occupying layout space. `z-index` keeps that overhang —
+     and the thickened collapsed bar — above the positioned tile next to it.
+     Cursor signals the axis. */
   .sidebar-edge {
     flex: none;
     align-self: stretch;
-    width: 7px;
+    width: 1px;
     height: 100vh;
     position: relative;
+    z-index: 1;
     background: transparent;
     cursor: col-resize;
     touch-action: none;
+  }
+
+  .sidebar-edge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    right: -3px;
   }
 
   .sidebar-edge::after {
@@ -149,8 +161,9 @@
     transition: background 0.12s ease, width 0.12s ease;
   }
 
-  /* Left sidebar's edge sits to its right → hairline on the strip's left.
-     Right sidebar's edge sits to its left → hairline on the strip's right. */
+  /* Anchor the hairline to the SIDEBAR-facing side of the seam so the collapsed
+     thickening below grows inward (over the editor) rather than shifting the
+     seam: left sidebar's edge sits to its right, right sidebar's to its left. */
   .sidebar-edge.left::after {
     left: 0;
   }
