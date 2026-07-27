@@ -4,6 +4,20 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1] - 2026-07-27
+
+### Fixed
+
+- On Sunstone Web, the address bar now follows the Concept you have open when
+  signed in — navigating and the browser's Back/Forward land on the right
+  Concept, and a reload no longer flashes the read-only surface in the wrong
+  theme before showing the wrong Concept. Splitting the editor into multiple
+  panes is no longer available on the web, which is what keeps the URL
+  well-defined.
+- The review-changes diff no longer shows an empty "no changes" step when an
+  unrelated commit sits between two revisions of a file.
+- A stray 6px gap next to the sidebar seams is gone.
+
 ## [0.19.0] - 2026-07-27
 
 ### Added
