@@ -90,6 +90,23 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
+      # The browser wasm module. `vite build` — which tauri-action runs as its
+      # beforeBuildCommand — imports the wasm-pack `--target web` output at
+      # `$lib/wasm/pkg` as a HARD dependency (ADR 0006 §1), and pkg/ is generated,
+      # never committed. Without these three steps every platform fails in
+      # vite:load-fallback with "Could not load src/lib/wasm/pkg", which is exactly
+      # how v0.18.0 shipped with no installers at all. The Dockerfile builds the
+      # same artifact for the web image; that is why Publish Web Image kept passing
+      # while this job did not.
+      - name: Add the wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      - name: Build the browser wasm module
+        run: bun run build:wasm
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
