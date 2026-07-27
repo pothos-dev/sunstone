@@ -40,6 +40,7 @@
   } from '$lib/tileLayout';
   import { nextTile } from '$lib/tileNav';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
+  import { ensureWasm } from '$lib/wasm';
 
   interface Props {
     /**
@@ -147,7 +148,12 @@
     }
 
     void (async () => {
-      await Promise.all([bundle.load(), session.load()]);
+      // `ensureWasm()` races alongside the bundle/session loads (not gated
+      // behind them) so restoring a tile's Concept never seeds its CodeMirror
+      // doc before the wasm-backed frontmatter/body split is ready — that race
+      // used to leave the raw YAML block sitting in the editable body on the
+      // very first restored tile.
+      await Promise.all([bundle.load(), session.load(), ensureWasm()]);
 
       // Reconstruct the tiling workspace from the persisted layout: rebuild every
       // column/tile, open each tile's Concept into its Tile, and restore each
