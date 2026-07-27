@@ -272,35 +272,41 @@
     </button>
 
     <!-- Split affordances: Split Right opens this Tile's Concept in a new Column
-         to the right; Split Down opens it in a new TileSlot below, in this Column. -->
-    <div class="btn-group">
-      <button
-        type="button"
-        class="icon-btn"
-        data-testid="split-right"
-        title="Split Right"
-        aria-label="Split Right"
-        onclick={onSplitRight}
-      >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-          <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
-          <line x1="8" y1="2.5" x2="8" y2="13.5" stroke="currentColor" stroke-width="1.2" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        class="icon-btn"
-        data-testid="split-down"
-        title="Split Down"
-        aria-label="Split Down"
-        onclick={onSplitDown}
-      >
-        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-          <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
-          <line x1="1.5" y1="8" x2="14.5" y2="8" stroke="currentColor" stroke-width="1.2" />
-        </svg>
-      </button>
-    </div>
+         to the right; Split Down opens it in a new TileSlot below, in this Column.
+         DESKTOP ONLY: on the web the URL addresses the open Concept (see
+         `web/urlSync.ts`), which is only well-defined with a single Tile — so the
+         web build ships no split affordance at all (`__SUNSTONE_WEB__` is a
+         compile-time constant, so these buttons are stripped from that bundle). -->
+    {#if !__SUNSTONE_WEB__}
+      <div class="btn-group">
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="split-right"
+          title="Split Right"
+          aria-label="Split Right"
+          onclick={onSplitRight}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+            <line x1="8" y1="2.5" x2="8" y2="13.5" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          data-testid="split-down"
+          title="Split Down"
+          aria-label="Split Down"
+          onclick={onSplitDown}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+            <line x1="1.5" y1="8" x2="14.5" y2="8" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
+      </div>
+    {/if}
 
     <!-- Close the Concept: sits at the far right edge, past the split buttons.
          Only shown when more than one tile is on screen — closing the sole tile

@@ -9,7 +9,7 @@
   import { backend } from '$lib/ipc';
   import { editToggleLabel } from './concurrency';
   import type { WebEditorApi } from './WebEditorIsland.svelte';
-  import { theme } from '$lib/state/theme.svelte';
+  import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { ordinaryChildren, reservedChildren } from '$lib/treeNav';
   import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
@@ -47,10 +47,12 @@
 
   // WP0: an AUTHENTICATED user gets the FULL desktop `App.svelte` shell (mounted
   // via the client-only `WebAppShellIsland`); an anonymous user keeps this SSR
-  // read surface. `showApp` is flipped in `onMount` (NOT a `browser`-derived) so
-  // SSR + the first hydration render the read surface identically, avoiding a
-  // hydration mismatch; it then flips on the client for a signed-in user.
-  let showApp = $state(false);
+  // read surface. The session is known SERVER-side (`data.user` comes from the
+  // route `load`), so this is decided on SSR too: a signed-in user's first paint
+  // is the shell's own "Loading workspace…" state rather than a read surface that
+  // is then thrown away — no flash of a second surface, and no hydration mismatch
+  // (SSR and the first client render read the same `data.user`).
+  let showApp = $derived(data.user !== null);
 
   // --- Editing (ticket 06): viewer stays the SSR default; an Edit toggle swaps
   // the CENTER rendered article for the client-only editor island in place. The
@@ -108,8 +110,18 @@
     nav();
   }
 
+  // The Concept the App shell has open, once it starts driving navigation itself
+  // (its URL updates are shallow, so the route `load` — and `data` — stay put).
+  let appConcept = $state<string | null>(null);
+
   // The document title is the open Concept's name (frontmatter title / H1 / path).
-  const pageTitle = $derived(conceptTitle(data.selected, data.rendered));
+  // The SSR `rendered` payload only describes the SSR-selected Concept, so once
+  // the shell has navigated elsewhere the title is derived from the path alone.
+  const pageTitle = $derived(
+    appConcept !== null && appConcept !== data.selected
+      ? conceptTitle(appConcept, null)
+      : conceptTitle(data.selected, data.rendered),
+  );
 
   // Back / forward: navigation is URL-driven (`goto` pushes history), so
   // drive the browser history — SvelteKit's router handles popstate + re-runs load.
@@ -125,17 +137,17 @@
   // shell follows the OS only — the web reader has no other theme entry point). --
   let appRoot = $state<HTMLElement | null>(null);
   $effect(() => {
-    const resolved = theme.resolved;
-    if (appRoot) appRoot.setAttribute('data-theme', resolved);
+    applyTheme(appRoot, theme.resolved);
   });
   function toggleTheme() {
     theme.mode = theme.resolved === 'dark' ? 'light' : 'dark';
   }
 
   // Sign out via the Auth.js client helper (same round-trip as the App shell's
-  // account bar). Only reachable in the edge case where a signed-in user renders
-  // this read surface before `showApp` flips; lazy-imported so the auth client
-  // stays out of the SSR + initial client graph.
+  // account bar). A signed-in user normally gets the App shell instead of this
+  // surface, so this is the fallback path (e.g. the session appearing without a
+  // reload); lazy-imported so the auth client stays out of the SSR + initial
+  // client graph.
   async function signOut(): Promise<void> {
     const { signOut: doSignOut } = await import('@auth/sveltekit/client');
     await doSignOut({ callbackUrl: '/' });
@@ -247,10 +259,6 @@
     // holder's degrade fallback keeps navigation working (ADR 0006 §5).
     void ensureWasm();
 
-    // Signed-in users get the full App shell instead of this read surface. Done
-    // in onMount (post-hydration) so SSR + first render stay the read surface.
-    showApp = data.user !== null;
-
     // Restore persisted UI state before tracking the OS scheme.
     const ui = loadUiState();
     if (ui.themeMode) theme.mode = ui.themeMode;
@@ -272,10 +280,17 @@
     uiLoaded = true;
 
     // Live reload (SSE): re-query Backlinks + Tags and re-render the open Concept.
-    const unsubscribe = backend.onFileChanged(() => {
-      indexVersion += 1;
-      void invalidateAll();
-    });
+    // READ SURFACE ONLY. Under the mounted App shell this surface is not rendered
+    // and the shell is the single `onFileChanged` handler (`WebAppShellIsland`),
+    // so a second subscription here would only re-run the route `load` for a
+    // Concept nobody is looking at — and `invalidateAll()` RESETS `page.state`,
+    // which is where the shell keeps the Concept the URL addresses.
+    const unsubscribe = showApp
+      ? null
+      : backend.onFileChanged(() => {
+          indexVersion += 1;
+          void invalidateAll();
+        });
 
     // Ctrl/Cmd+Shift+F toggles Search; Ctrl/Cmd+K toggles the quick-nav palette
     // (both capture phase, converging on the same flags the rail buttons flip).
@@ -297,7 +312,7 @@
 
     return () => {
       stopTheme();
-      unsubscribe();
+      unsubscribe?.();
       window.removeEventListener('keydown', onKeydown, true);
     };
   });
@@ -309,7 +324,11 @@
 
 {#if showApp}
   <!-- Authenticated: mount the full desktop App shell (client-only island). -->
-  <WebAppShellIsland selected={data.selected} user={data.user} />
+  <WebAppShellIsland
+    selected={data.selected}
+    user={data.user}
+    onConcept={(path) => (appConcept = path)}
+  />
 {:else}
 <div class="app" data-testid="web-viewer" bind:this={appRoot}>
   <!-- Far-left activity rail: quick-nav + search launcher + a bottom theme

@@ -6,7 +6,7 @@
   import { indexStore } from '$lib/state/index.svelte';
   import { session } from '$lib/state/session.svelte';
   import { suggestions } from '$lib/state/suggestions.svelte';
-  import { theme } from '$lib/state/theme.svelte';
+  import { applyTheme, theme } from '$lib/state/theme.svelte';
   import type { TreeNode } from '$lib/types';
   import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
   import Tree from '$lib/components/Tree.svelte';
@@ -155,11 +155,15 @@
       // (only `lastOpenConcept` + one `editorMode`, no layout) migrates to a
       // single tile; a missing/corrupt/empty layout falls back to the default
       // single empty tile — kept as-is, just adopting the persisted global mode.
-      const stored = resolveStoredLayout(
-        session.layout,
-        session.lastOpenConcept,
-        session.editorMode,
-      );
+      //
+      // WEB: never restored. There the URL addresses the open Concept, which is
+      // only well-defined with ONE Tile (splitting is web-disabled — see
+      // `TileHeader` / `web/urlSync.ts`), so a persisted layout would silently
+      // override the Concept the visitor asked for. The single Tile opens
+      // `initialConcept` instead; the persisted view-mode still applies.
+      const stored = __SUNSTONE_WEB__
+        ? null
+        : resolveStoredLayout(session.layout, session.lastOpenConcept, session.editorMode);
       if (stored) {
         await workspace.restore(stored);
       } else {
@@ -326,10 +330,10 @@
   });
 
   // Apply the resolved theme as `data-theme` on the app root (each Tile's view
-  // mirrors it onto its own CodeMirror root).
+  // mirrors it onto its own CodeMirror root) and on <html> (the document
+  // background + the pre-hydration paint seeded in `app.html`).
   $effect(() => {
-    const resolved = theme.resolved;
-    if (appRoot) appRoot.setAttribute('data-theme', resolved);
+    applyTheme(appRoot, theme.resolved);
   });
 
   // Persist the last-open Concept whenever active-Tile navigation changes it.
@@ -346,7 +350,10 @@
   // reconstructed on relaunch. `snapshotLayout` reads the reactive workspace
   // state, so this re-runs on split/close/resize/navigation/mode/active changes;
   // gated on `restored` and debounced (via `setLayout`) like other session state.
+  // NOT on the web, where the layout is never restored (see the restore above) —
+  // writing it there would only leave a stale shape behind.
   $effect(() => {
+    if (__SUNSTONE_WEB__) return;
     const snapshot = workspace.snapshotLayout();
     if (session.restored) session.setLayout(snapshot);
   });

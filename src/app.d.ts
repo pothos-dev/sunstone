@@ -8,7 +8,16 @@ declare global {
       auth(): Promise<import('@auth/sveltekit').Session | null>;
     }
     // interface PageData {}
-    // interface PageState {}
+    interface PageState {
+      /**
+       * WEB build: the bundle-relative Concept path the current history entry
+       * addresses (`null` = the Bundle root with nothing open). The App shell
+       * keeps it in step with the single Tile via shallow `pushState`, so
+       * Back/Forward re-open a Concept without re-running the route `load` (see
+       * `src/lib/web/urlSync.ts`).
+       */
+      concept?: string | null;
+    }
     // interface Platform {}
   }
 

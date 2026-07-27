@@ -66,3 +66,17 @@ class ThemeStore {
 }
 
 export const theme = new ThemeStore();
+
+/**
+ * Apply `resolved` to the DOM: `data-theme` on the app `root` (what the app CSS
+ * and the CodeMirror editors read) AND on `<html>`, which keeps the DOCUMENT
+ * background in step — overscroll/rubber-band, and the pre-hydration paint that
+ * `app.html` seeds from the same two rules. Called from each shell's theme
+ * `$effect`; `root` may be null before the element is bound.
+ */
+export function applyTheme(root: HTMLElement | null, resolved: ResolvedTheme): void {
+  root?.setAttribute('data-theme', resolved);
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme', resolved);
+  }
+}

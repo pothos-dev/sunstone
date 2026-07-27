@@ -24,17 +24,24 @@
   //   5. `beforeunload` guard — armed only while the active buffer is dirty.
   //   6. Sync notices — the server sync loop's two divergence events (a fork
   //      created / a web deletion dropped), rendered as DISMISSIBLE notices.
+  //   7. URL ⇄ Concept sync — the address bar always names the Concept on screen
+  //      (see `urlSync.ts`), so a reload / copied link / browser Back-Forward
+  //      lands on it. Web-only: it is what makes splitting web-disabled.
   import { onMount } from 'svelte';
   import type { Component } from 'svelte';
+  import { page } from '$app/state';
+  import { pushState, replaceState } from '$app/navigation';
   import { backend } from '$lib/ipc';
   import { bundle } from '$lib/state/bundle.svelte';
   import { editor } from '$lib/state/editor.svelte';
   import { indexStore } from '$lib/state/index.svelte';
+  import { session } from '$lib/state/session.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { setDirtyLeaveGate } from '$lib/state/workspace.svelte';
   import type { Document } from '$lib/state/document.svelte';
   import type { FileChange, SyncNotice } from '$lib/types';
   import { routeFileChange, structuralOpGated, type GatedStructuralOp } from './concurrency';
+  import { conceptHref, urlSyncAction } from './urlSync';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
   import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
   import UserMenu from './UserMenu.svelte';
@@ -45,9 +52,15 @@
     selected: string | null;
     /** The authenticated user (for the rail's avatar / sign-out menu). */
     user: WebUser | null;
+    /**
+     * Called with the active Tile's Concept whenever the shell navigates, so the
+     * host (`WebViewer`) can keep the document `<title>` in step — the SSR `load`
+     * does not re-run for the shell's shallow URL updates.
+     */
+    onConcept?: (path: string | null) => void;
   }
 
-  let { selected, user }: Props = $props();
+  let { selected, user, onConcept }: Props = $props();
 
   // Sign out via the Auth.js client helper (does the /auth/csrf round-trip + the
   // POST /auth/signout, then a full-page redirect that re-lands on the anon read
@@ -67,6 +80,58 @@
     const last = p.split('/').pop() ?? p;
     return last.replace(/\.md$/, '');
   }
+
+  // --- (7) URL ⇄ Concept sync (web-only; rule + rationale in `urlSync.ts`) ----
+  // The address bar is a projection of the single Tile's Concept. `page.state`
+  // carries the Concept path itself, so Back/Forward over our shallow entries
+  // needs no path re-resolution — and, being shallow, re-runs no route `load`
+  // (no SSR round-trip, no re-mount of this island).
+  //
+  // Runs once the initial restore has settled (`session.restored`) — that is the
+  // point App has opened `selected` into the single Tile. Before it the Tile is
+  // legitimately empty and syncing would rewrite the URL to the Bundle root.
+  let syncedConcept: string | null = null;
+  /** True while a URL-driven (Back/Forward) open is loading; see `urlSyncAction`. */
+  let openingFromUrl = $state(false);
+
+  $effect(() => {
+    // Read both sides + the in-flight flag unconditionally, so this effect tracks
+    // all three however it exits below.
+    const urlConcept = page.state.concept;
+    const appConcept = editor.path;
+    const inFlight = openingFromUrl;
+    if (!__SUNSTONE_WEB__ || !session.restored) return;
+
+    const action = urlSyncAction(syncedConcept, urlConcept, appConcept, inFlight);
+    if (action.kind === 'idle') return;
+    syncedConcept = action.concept;
+    onConcept?.(action.concept);
+
+    if (action.kind === 'stamp') {
+      // An unstamped entry (the SSR one we landed on, or one whose state a real
+      // navigation wiped): mark it with what the Tile holds, keeping the URL.
+      replaceState('', { concept: action.concept });
+      return;
+    }
+
+    if (action.kind === 'url') {
+      // The app navigated → project it onto the URL. A new history entry, so the
+      // browser's Back walks the Concepts the user visited. (The Tile keeps its
+      // own history too: using ITS Back also appends an entry here, which is why
+      // the two never desync — every move, whoever made it, lands in the URL.)
+      pushState(conceptHref(action.concept), { concept: action.concept });
+      return;
+    }
+
+    // The URL navigated → follow it in the Tile. `null` (the Bundle root with no
+    // `index.md`) clears the Tile to its empty state. A dirty buffer routes
+    // through the leave gate; a CANCEL leaves the Tile put and the next reconcile
+    // writes the URL back to it.
+    openingFromUrl = true;
+    void (action.concept === null ? editor.close() : editor.open(action.concept)).finally(() => {
+      openingFromUrl = false;
+    });
+  });
 
   // --- Concurrency surfaces (all thin over concurrency.ts) --------------------
   let conflict = $state<{ author: string | null } | null>(null);
@@ -378,8 +443,15 @@
     background-clip: padding-box;
   }
 
+  /* The SSR + pre-import state for a signed-in visitor: this IS the first paint
+     (the anon read surface is not rendered for them), so it fills the viewport
+     over the themed app background instead of reading as a stray line of text. */
   .loading {
-    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
     color: var(--text-muted, #777);
   }
 </style>

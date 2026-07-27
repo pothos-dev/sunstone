@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { backend } from '$lib/ipc';
-  import { theme } from '$lib/state/theme.svelte';
+  import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { errMessage } from '$lib/errors';
   import type { KnownBundle } from '$lib/types';
 
@@ -26,8 +26,7 @@
   // Apply the resolved theme as `data-theme` so the shared design tokens (and the
   // `body:has([data-theme=dark])` rule) resolve correctly in either scheme.
   $effect(() => {
-    const resolved = theme.resolved;
-    if (launcherRoot) launcherRoot.setAttribute('data-theme', resolved);
+    applyTheme(launcherRoot, theme.resolved);
   });
 
   async function refresh() {

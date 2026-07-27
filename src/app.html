@@ -4,6 +4,29 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Pre-hydration theme. The scheme is otherwise applied by the theme store
+      // (`state/theme.svelte.ts`) once the app mounts — which, on the SSR web
+      // build, is long after the first paint, so the page flashed LIGHT before
+      // going dark. This blocking snippet resolves the same two rules the store
+      // does (an explicitly persisted mode wins, else the OS preference) and puts
+      // `data-theme` on <html>; `app.css` keys its token blocks on that attribute,
+      // so the very first paint is already the right scheme. The app root gets its
+      // own copy on mount (see `applyTheme`), which also re-syncs this one.
+      // Skipped for the chrome-free print/PDF window, whose sheet is always white.
+      try {
+        if (location.search.indexOf('print=') === -1) {
+          var ui = JSON.parse(localStorage.getItem('sunstone:webUI') || '{}');
+          var mode = ui && ui.themeMode;
+          var dark =
+            mode === 'dark' ||
+            (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        }
+      } catch (e) {
+        /* private mode / no matchMedia — fall back to the light default */
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
