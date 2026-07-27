@@ -1,18 +1,18 @@
 # Sunstone Web — run the PUBLISHED image on a remote host.
 #
-# Unlike docker-compose.yml, this pulls a prebuilt image from Docker Hub instead
-# of building from source — so it needs NO repo checkout and NO build context on
-# the remote. Same env / volume / port wiring as the base compose: the Bundle is
-# bind-mounted READ-ONLY at /bundle, only the web port is published, and the API
-# stays internal to the container.
+# Unlike docker-compose.yml, this pulls a prebuilt image from GHCR (ghcr.io)
+# instead of building from source — so it needs NO repo checkout and NO build
+# context on the remote. Same env / volume / port wiring as the base compose:
+# the Bundle is bind-mounted READ-ONLY at /bundle, only the web port is
+# published, and the API stays internal to the container.
 #
 #   SUNSTONE_BUNDLE_HOST  host path of the Bundle to serve (default ./examples)
 #   SUNSTONE_WEB_PORT     host port to publish the web viewer on (default 3000)
-#   DOCKERHUB_USERNAME    Docker Hub namespace the image was pushed under
+#   GHCR_NAMESPACE        GHCR namespace (GitHub org/user) the image was pushed under
 #   SUNSTONE_TAG          image tag to run (default latest)
 #
 # Example:
-#   DOCKERHUB_USERNAME=your-user SUNSTONE_TAG=0.14.0 \
+#   GHCR_NAMESPACE=your-user SUNSTONE_TAG=0.14.0 \
 #   SUNSTONE_BUNDLE_HOST=/srv/okf/my-bundle SUNSTONE_WEB_PORT=8080 \
 #     docker compose -f docker-compose.remote.yml pull && \
 #     docker compose -f docker-compose.remote.yml up -d
@@ -24,7 +24,7 @@
 services:
   sunstone-web:
     # Pull the published image; no build context, no repo checkout needed.
-    image: ${DOCKERHUB_USERNAME:-your-user}/sunstone-web:${SUNSTONE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-your-user}/sunstone-web:${SUNSTONE_TAG:-latest}
     # Reap zombies + forward signals cleanly to the entrypoint (PID 1).
     init: true
     restart: unless-stopped

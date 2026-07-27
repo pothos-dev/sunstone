@@ -485,7 +485,7 @@ deployments that exist today. Everywhere, an **empty value means unset**.
 | `SUNSTONE_OIDC_*` | unset | n/a | `_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_NAME` — read by the SSR process (`src/auth.ts`), never by Rust. The callback is `/auth/callback/oidc`; the provider id is hardcoded `oidc`. |
 | `SUNSTONE_TEST_AUTH*` | unset | n/a | Playwright-only auth bypass, read by `src/auth.ts`. Never set in production. |
 | `ORIGIN` / `PROTOCOL_HEADER` / `HOST_HEADER` / `AUTH_SECRET` / `AUTH_TRUST_HOST` | — | n/a | Standard SvelteKit + Auth.js variables, read by the SSR process. |
-| `DOCKERHUB_USERNAME` / `SUNSTONE_TAG` | per compose file (`your-user` / `chonkybirb`) / `latest` | n/a | Image coordinates; compose interpolation only. |
+| `GHCR_NAMESPACE` / `SUNSTONE_TAG` | per compose file (`your-user` / `pothos-dev`) / `latest` | n/a | Image coordinates (`ghcr.io/<namespace>/sunstone-web`); compose interpolation only. |
 
 Volumes and paths:
 
@@ -502,27 +502,29 @@ intentional and a restart fixes nothing.
 
 ---
 
-# Publishing & installing from Docker Hub
+# Publishing & installing from GHCR
 
 The guides above build the image locally. To install Sunstone Web on a remote host
-**without a repo checkout or build context**, push the image to Docker Hub once and
-pull it there (see [running the published image](#running-the-published-image-remote-host)
-below).
+**without a repo checkout or build context**, push the image to GHCR (GitHub
+Container Registry) once and pull it there (see [running the published
+image](#running-the-published-image-remote-host) below).
 
 ## One-time setup (maintainer only)
 
-Pushing requires **your** Docker Hub credentials — nobody else can push under
-your namespace on your behalf. Do this once:
+The publish workflow authenticates with the repo-scoped `GITHUB_TOKEN` — there
+is **no maintainer secret to create or rotate**. The only manual step is making
+the resulting package pullable without credentials, since GHCR packages default
+to **private**:
 
-1. Create a [Docker Hub](https://hub.docker.com/) account and, under **Account
-   Settings → Personal access tokens**, create an access token with
-   **Read & Write** scope.
-2. In this GitHub repo, under **Settings → Secrets and variables → Actions**, set:
-   - a **variable** `DOCKERHUB_USERNAME` — your Docker Hub namespace (used to
-     derive the image name `<namespace>/sunstone-web`; nothing is hardcoded), and
-   - a **secret** `DOCKERHUB_TOKEN` — the access token from step 1.
+1. After the first push (tag a release, or run the workflow manually — see
+   below), open the package at
+   `https://github.com/users/<owner>/packages/container/package/sunstone-web`
+   (or **Organization → Packages** for an org-owned repo).
+2. **Package settings → Change visibility → Public.** If the package isn't
+   already linked to this repo, link it there too (`Package settings → Connect
+   repository`) so it shows up under the repo's sidebar.
 
-The image name is always `${DOCKERHUB_USERNAME}/sunstone-web`.
+The image name is always `ghcr.io/<repository_owner>/sunstone-web`.
 
 ## Automatic path: tag a release
 
@@ -540,15 +542,17 @@ to `latest`).
 ## Manual path: build & push from your machine
 
 If you'd rather push by hand (or don't use GitHub Actions), build multi-arch with
-buildx and push in one step. Log in first, then:
+buildx and push in one step. Log in with a
+[personal access token](https://github.com/settings/tokens) scoped to
+`write:packages`, then:
 
 ```bash
-docker login                     # authenticate to Docker Hub
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-user> --password-stdin
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t <your-user>/sunstone-web:<version> \
-  -t <your-user>/sunstone-web:latest \
+  -t ghcr.io/<your-github-user>/sunstone-web:<version> \
+  -t ghcr.io/<your-github-user>/sunstone-web:latest \
   --push .
 ```
 
@@ -567,7 +571,7 @@ read-only Bundle mount, published web port, and no-auth/internal-only posture as
 the base compose:
 
 ```bash
-DOCKERHUB_USERNAME=your-user SUNSTONE_TAG=0.14.0 \
+GHCR_NAMESPACE=your-user SUNSTONE_TAG=0.14.0 \
 SUNSTONE_BUNDLE_HOST=/srv/okf/my-bundle SUNSTONE_WEB_PORT=8080 \
   docker compose -f docker-compose.remote.yml pull && \
   docker compose -f docker-compose.remote.yml up -d

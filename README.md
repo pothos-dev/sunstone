@@ -117,7 +117,7 @@ reconciled with a git remote. See [`docker/README.md`](docker/README.md) for the
 the **three deployment shapes** (plain / git-local / git-synced) with the
 normative environment reference, how to back the served Bundle with a **git repo**
 (the server clones your origin and syncs it itself — no sidecar), and how to
-**publish the image to Docker Hub** and install it on a remote from the registry.
+**publish the image to GHCR** and install it on a remote from the registry.
 This is separate from the desktop release flow.
 
 ## License

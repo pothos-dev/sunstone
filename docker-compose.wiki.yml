@@ -17,7 +17,7 @@
 
 services:
   sunstone-wiki:
-    image: ${DOCKERHUB_USERNAME:-chonkybirb}/sunstone-web:${SUNSTONE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-pothos-dev}/sunstone-web:${SUNSTONE_TAG:-latest}
     init: true
     restart: unless-stopped
     # env_file, not inline `environment:` — this stack carries three secrets, one
