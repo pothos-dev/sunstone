@@ -12,9 +12,9 @@ The **app shell** is the top-level arrangement of [Panes](/GLOSSARY.md) inside t
 
 ```mermaid
 flowchart LR
-  A["Activity<br/>Rail"] --- L["Left Sidebar<br/>Explorer · Tags"]
-  L --- E["Editor pane<br/>Columns of Tiles"]
-  E --- R["Right Sidebar<br/>Outline · Backlinks"]
+  A[Activity<br/>Rail] --- L[Left Sidebar<br/>Explorer · Tags]
+  L --- E[Editor pane<br/>Columns of Tiles]
+  E --- R[Right Sidebar<br/>Outline · Backlinks]
 ```
 
 - The **Activity Rail** is a thin, always-visible icon strip (menu, Quick nav, Search, a bottom user slot). It is *not* a Pane — it sits outside the left Sidebar so it stays visible when that Sidebar collapses.
