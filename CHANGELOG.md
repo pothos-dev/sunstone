@@ -4,6 +4,40 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-07-27
+
+### Added
+
+- **Git-synced wiki** — a web deployment can now be backed by a git remote
+  instead of a plain folder. The server clones the repository on boot, commits
+  every Save as the signed-in user, and continuously reconciles with the remote,
+  so edits made in the browser and changes pushed from a clone converge on their
+  own. Nothing sits beside it: no sidecar, no host-side hook, no manual step.
+- **A conflict never blocks a Save.** When a browser edit and an incoming change
+  touch the same Concept, the remote keeps the canonical name and your version is
+  written beside it as an ordinary Concept — `notes/foo-20260727T101500Z.md`,
+  which appears in the tree, in Search and in Quick nav — with a dismissible
+  notice in the editor. The history behind it still holds every author's edit.
+- **Live updates from outside the browser** — a change pushed to the remote
+  reaches every connected reader within one sync interval, the same way a local
+  file change already did.
+
+### Changed
+
+- In a web deployment, **file history and the review-changes diff now require
+  signing in.** Between them they expose every revision of every file, including
+  content deleted from the Bundle, so they are gated with the write path rather
+  than left open to anonymous readers.
+- The container **refuses to boot on an unrecognised `SUNSTONE_GIT_*` variable**,
+  reporting every configuration error at once. A typo, or a leftover variable from
+  an older sync mechanism, is now a startup failure instead of a wiki that quietly
+  serves un-synced content.
+
+### Fixed
+
+- The git deploy key is no longer readable from the web server process's
+  environment. Only the component that runs `git` receives it.
+
 ## [0.18.0] - 2026-07-25
 
 ### Added
