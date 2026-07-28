@@ -151,6 +151,30 @@
     right: -3px;
   }
 
+  /* Collapsed: the seam is the only affordance left, and it sits right next to
+     the editor's scrollbar/content edge, which can steal pointer events at a
+     thin 6px hit area (seen under niri + WebKitGTK). Widen the grab area to
+     20px — but on the ELEMENT ITSELF, not on the `::before` overhang: a hit
+     target that exists only as a pseudo-element box of a 1px parent is
+     hit-tested inconsistently across engines (it works in Chromium, not
+     reliably in WebKitGTK, which is what the desktop shell runs). A real box
+     works everywhere and is inspectable in devtools.
+     A negative margin on the SIDEBAR-facing side keeps layout neutral (the
+     seam stays where it was) so the widening grows inward over the editor
+     only — never back over the activity rail, whose buttons a ±100px overhang
+     would swallow whole. */
+  .sidebar-edge.collapsed {
+    width: 20px;
+  }
+
+  .sidebar-edge.left.collapsed {
+    margin-right: -19px;
+  }
+
+  .sidebar-edge.right.collapsed {
+    margin-left: -19px;
+  }
+
   .sidebar-edge::after {
     content: '';
     position: absolute;
