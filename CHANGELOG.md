@@ -4,6 +4,30 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.4] - 2026-07-28
+
+### Added
+
+- The Outline highlights the heading whose section you are reading, and follows
+  along as you scroll or click your way through a Concept.
+
+### Changed
+
+- Clicking an Outline entry now parks that heading at the top of the view
+  instead of its vertical centre.
+
+### Fixed
+
+- The collapsed right Sidebar can be reopened by clicking its edge again. The
+  click was being swallowed outright, and sometimes only took effect on the next
+  click elsewhere in the app.
+- Collapsing the right Sidebar no longer leaves a gap between its border and the
+  Concept.
+- Clicking a tile's Close button next to the collapsed right Sidebar no longer
+  misses.
+- Clicking the edge of a Sidebar that was only transiently revealed (via an
+  Alt+arrow peek) now collapses it.
+
 ## [0.19.3] - 2026-07-27
 
 ### Changed
