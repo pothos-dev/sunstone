@@ -967,13 +967,17 @@ export function setEditorMode(view: EditorView, mode: EditorMode): void {
   });
 }
 
-export function scrollToLine(view: EditorView, line: number): void {
+export function scrollToLine(
+  view: EditorView,
+  line: number,
+  y: 'center' | 'start' = 'center',
+): void {
   const total = view.state.doc.lines;
   const clamped = Math.max(1, Math.min(line, total));
   const pos = view.state.doc.line(clamped).from;
   view.dispatch({
     selection: { anchor: pos },
-    effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+    effects: EditorView.scrollIntoView(pos, { y }),
     annotations: programmatic.of(true),
   });
 }

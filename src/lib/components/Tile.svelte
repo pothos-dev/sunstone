@@ -449,7 +449,9 @@
 
   function scrollToOutlineLine(line: number) {
     if (!view) return;
-    scrollToLine(view, line - frontmatterLineCount(tile.content));
+    // Headings sit at the top of the viewport — that's where the eye expects
+    // them after an outline jump, not floating in the vertical middle.
+    scrollToLine(view, line - frontmatterLineCount(tile.content), 'start');
   }
 
   function handleLinkClick(href: string) {
