@@ -49,31 +49,41 @@
     onResizeEnd,
   }: Props = $props();
 
-  // Pointer-driven resize/toggle. Capture the base width at pointer-down and
-  // apply the TOTAL pointer delta from that base (idempotent clamp), mirroring
-  // the tiling divider drags in App.svelte. Only after the pointer travels past
-  // the threshold does the gesture become a resize; otherwise pointerup toggles.
+  // Whether the pointer gesture already resolved this press (toggled or
+  // resized). The trailing compatibility `click` must then do nothing, or
+  // collapsing via the pointer path would immediately re-expand. Reset at every
+  // press, so a drag (which emits no click) cannot leave it latched.
+  let pointerHandled = false;
+
+  // Pointer-driven resize (and the collapse toggle) for an OPEN sidebar. Capture
+  // the base width at pointer-down and apply the TOTAL pointer delta from that
+  // base (idempotent clamp), mirroring the tiling divider drags in App.svelte.
+  // Only after the pointer travels past the threshold does the gesture become a
+  // resize; otherwise the release toggles.
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
+    pointerHandled = false;
+    // COLLAPSED the edge is an Expand button and nothing else: there is no
+    // visible sidebar to resize, so it takes the plain `click` path below and
+    // runs NO pointer gesture. WebKitGTK (the desktop shell's webview) did not
+    // deliver the `pointerup` for a press on the collapsed bar at all: the
+    // window listener installed here survived the press and fired on the user's
+    // NEXT click anywhere, so the sidebar appeared unexpandable and then sprang
+    // open on an unrelated click. A gesture with nothing to gesture about was
+    // never worth that risk.
+    if (!open) return;
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
     const startX = e.clientX;
     const startY = e.clientY;
     const base = width;
     let dragging = false;
-    // While COLLAPSED the edge is purely an Expand button: there is no visible
-    // sidebar to resize, so treating pointer travel as a drag would silently eat
-    // the click (a few px of jitter — a touchpad tap, a heavy mouse click — and
-    // the gesture became an invisible resize of a 0-width aside, leaving the
-    // sidebar stuck collapsed). Any release over the edge expands it.
-    const resizable = open;
     try {
       el.setPointerCapture(e.pointerId);
     } catch {
       /* best-effort: window listeners below catch the moves regardless */
     }
     const move = (ev: PointerEvent) => {
-      if (!resizable) return;
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       if (!dragging && isDragGesture(dx, dy)) {
@@ -82,19 +92,36 @@
       }
       if (dragging) onResize(resizeSidebarWidth(base, dx, side));
     };
+    // Ends the gesture on whichever release event the engine actually delivers —
+    // `mouseup` is the fallback for a swallowed `pointerup` — and only once.
+    let finished = false;
     const up = () => {
+      if (finished) return;
+      finished = true;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('mouseup', up);
       try {
         el.releasePointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
+      pointerHandled = true;
       if (dragging) onResizeEnd?.();
       else onToggle();
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('mouseup', up);
+  }
+
+  // The collapsed edge's Expand affordance (see `onPointerDown`): a native click,
+  // no gesture bookkeeping. Inert once the pointer path has resolved the press —
+  // including the collapse it just performed, whose `click` lands with `open`
+  // already false.
+  function onClick() {
+    if (pointerHandled || open) return;
+    onToggle();
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -126,6 +153,7 @@
   aria-pressed={open}
   title={open ? `Collapse ${label} — drag to resize` : `Expand ${label}`}
   onpointerdown={onPointerDown}
+  onclick={onClick}
   onkeydown={onKeyDown}
 ></div>
 
@@ -166,10 +194,17 @@
      hit-tested inconsistently across engines (it works in Chromium, not
      reliably in WebKitGTK, which is what the desktop shell runs). A real box
      works everywhere and is inspectable in devtools.
-     A negative margin on the SIDEBAR-facing side keeps layout neutral (the
-     seam stays where it was) so the widening grows inward over the editor
-     only — never back over the activity rail, whose buttons a ±100px overhang
-     would swallow whole. */
+     The widened box must not OVERLAP the editor either. The right Sidebar's
+     collapsed bar originally grew inward over the editor via a negative margin
+     (layout-neutral), which landed it squarely on top of the Concept's
+     scrollbar — and under WebKitGTK the scrollbar wins that hit test, so the
+     bar was unclickable and the right Sidebar could not be reopened at all.
+     So the right side claims REAL layout width: the editor's scroll container
+     ends before the bar, its scrollbar sits to the LEFT of it, and nothing can
+     swallow the click.
+     The left side keeps the layout-neutral overhang: it has no scrollbar to
+     collide with, and widening it into layout would push the whole editor —
+     while growing it the other way would cover the activity rail's buttons. */
   .sidebar-edge.collapsed {
     width: 20px;
   }
@@ -178,9 +213,9 @@
     margin-right: -19px;
   }
 
-  .sidebar-edge.right.collapsed {
-    margin-left: -19px;
-  }
+  /* The right edge's 20px comes out of layout (see the note above) — no negative
+     margin — so the Concept's scrollbar ends to its left instead of on top of
+     it. */
 
   .sidebar-edge::after {
     content: '';
@@ -208,6 +243,28 @@
      grabbable/visible at the window edge. */
   .sidebar-edge.collapsed::after {
     width: 5px;
+  }
+
+  /* Note for the next person who finds the collapsed right bar hard to hit: the
+     window's outermost ~10px can be reserved by the compositor for window
+     resizing (measured under niri), so clicks landing there never reach the
+     page — hover still works, which makes it look like a JS bug. The 20px strip
+     is what buys the margin for error: the inner half receives events normally.
+     Keep the strip at least this wide.
+
+     Because that strip is REAL layout on the right side, it must not read as a
+     gap between the Concept and the border. So the seam is drawn on its
+     Concept-facing edge (the two touch, as they do when the Sidebar is open) and
+     the strip carries the Sidebar's own surface — a 20px remnant of the panel
+     that is left standing when it collapses, rather than a hole showing the app
+     canvas. */
+  .sidebar-edge.right.collapsed {
+    background: var(--bg-elevated);
+  }
+
+  .sidebar-edge.right.collapsed::after {
+    left: 0;
+    right: auto;
   }
 
   .sidebar-edge:hover::after {
