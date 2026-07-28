@@ -625,6 +625,11 @@
     activeTileRef?.openWithScrollLine(path, line);
   }
 
+  // Full-document line at the active Tile's viewport probe, reported by that Tile
+  // as it scrolls; the Outline turns it into the highlighted entry
+  // (outline-active-heading).
+  let activeHeadingLine = $state<number | null>(null);
+
   // Scroll the active Tile's editor to an Outline heading's full-document line.
   function scrollToOutlineLine(line: number) {
     activeTileRef?.scrollToDocLine(line);
@@ -831,6 +836,11 @@
                     workspace.splitDown();
                   }}
                   onClose={() => void closeTileAndFocus(tile.id)}
+                  onViewportLine={(line) => {
+                    // Only the active Tile feeds the Outline — it is the Tile the
+                    // Outline lists headings for.
+                    if (tile.id === workspace.activeId) activeHeadingLine = line;
+                  }}
                 />
               </div>
             {/if}
@@ -901,7 +911,12 @@
           onkeydown={onOutlineKeydown}
           role="presentation"
         >
-          <Outline path={editor.path} content={editor.content} onselect={scrollToOutlineLine} />
+          <Outline
+            path={editor.path}
+            content={editor.content}
+            viewportLine={activeHeadingLine}
+            onselect={scrollToOutlineLine}
+          />
         </div>
       </SidebarSection>
       <SidebarSection

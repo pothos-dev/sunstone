@@ -177,6 +177,9 @@ one from scratch.
   // INSIDE the frontmatter (a YAML comment that must NOT become an H1), and a
   // `#`-prefixed line INSIDE a fenced code block (a shell comment that must NOT
   // become a heading). The Outline must list exactly the four real headings.
+  // Trailing filler prose (appended AFTER the last heading, so every heading's
+  // line number stays put) makes the body taller than the editor viewport, which
+  // is what lets the active-heading spec scroll the last heading to the top.
   'concepts/outline-demo.md': `---
 type: concept
 title: Outline Demo
@@ -204,6 +207,8 @@ echo hello
 ## Second Section
 
 Closing prose.
+
+${Array.from({ length: 60 }, (_, i) => `Trailing filler line ${i + 1} to make this Concept taller than the editor viewport, so the last heading can be scrolled to the top.`).join('\n\n')}
 `,
 
   // A Concept whose body contains MANY lines sharing one distinctive word

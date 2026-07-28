@@ -967,6 +967,22 @@ export function setEditorMode(view: EditorView, mode: EditorMode): void {
   });
 }
 
+/**
+ * The 1-based editor line sitting `offsetPx` below the top of the scroll
+ * viewport — the probe the Outline's active-heading highlight rides on
+ * (outline-active-heading). Returns null when the geometry is not measurable
+ * yet (view not laid out / detached).
+ */
+export function lineAtViewportTop(view: EditorView, offsetPx: number): number | null {
+  const rect = view.scrollDOM.getBoundingClientRect();
+  if (rect.height === 0) return null;
+  // Probe a little in from the left edge so the gutter never swallows the hit,
+  // and clamp the y into the viewport so a short document still answers.
+  const y = Math.min(rect.top + offsetPx, rect.bottom - 1);
+  const pos = view.posAtCoords({ x: rect.left + 8, y }, false);
+  return view.state.doc.lineAt(pos).number;
+}
+
 export function scrollToLine(
   view: EditorView,
   line: number,

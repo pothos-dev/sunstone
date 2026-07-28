@@ -40,6 +40,7 @@
     refreshBrokenLinkDecorations,
     reconfigureWikiLinks,
     scrollToLine,
+    lineAtViewportTop,
     openSearch,
     annotate,
     annotateActionFor,
@@ -68,6 +69,7 @@
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
+  import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
   import Properties from '$lib/components/Properties.svelte';
@@ -92,6 +94,10 @@
     onSplitDown: () => void;
     /** Close this tile. */
     onClose: () => void;
+    /** Report the full-document line at this Tile's viewport probe, so the
+     *  Outline can highlight the current heading (outline-active-heading).
+     *  Null when nothing is open / the view has no geometry yet. */
+    onViewportLine?: (line: number | null) => void;
   }
 
   let {
@@ -103,6 +109,7 @@
     onSplitRight,
     onSplitDown,
     onClose,
+    onViewportLine,
   }: Props = $props();
 
   let editorParent = $state<HTMLDivElement | null>(null);
@@ -122,7 +129,11 @@
   $effect(() => {
     const mode = session.editorMode;
     tile.mode = mode;
-    if (view) setEditorMode(view, mode);
+    if (view) {
+      setEditorMode(view, mode);
+      // Reading vs editing re-lays out the document: re-probe the current heading.
+      requestAnimationFrame(reportViewportLine);
+    }
   });
 
   // Whether the editor is in live-editing mode (vs read-only reading), for the
@@ -447,11 +458,24 @@
   let pendingScrollLine: number | null = null;
   let pendingScrollAnchor: string | null = null;
 
+  // --- Active-heading reporting (outline-active-heading) -----------------------
+  // The Outline highlights the heading whose section the reader is in. The probe
+  // lives in the editor's coordinate space, so only this Tile can measure it; it
+  // reports the full-document line (the editor doc holds the BODY only, hence the
+  // frontmatter offset) and App maps it to an Outline entry.
+  function reportViewportLine(): void {
+    if (!view || !onViewportLine) return;
+    const line = lineAtViewportTop(view, ACTIVE_HEADING_PROBE_PX);
+    onViewportLine(line === null ? null : line + frontmatterLineCount(tile.content));
+  }
+
   function scrollToOutlineLine(line: number) {
     if (!view) return;
     // Headings sit at the top of the viewport — that's where the eye expects
     // them after an outline jump, not floating in the vertical middle.
     scrollToLine(view, line - frontmatterLineCount(tile.content), 'start');
+    // A jump that lands where we already were emits no scroll event.
+    requestAnimationFrame(reportViewportLine);
   }
 
   function handleLinkClick(href: string) {
@@ -549,6 +573,9 @@
       frontmatterProps = props;
       view.dom.setAttribute('data-theme', theme.resolved);
       syncHistoryDepths();
+      // Natural scrolling drives the Outline highlight; the listener dies with
+      // the view's DOM on destroy.
+      view.scrollDOM.addEventListener('scroll', reportViewportLine, { passive: true });
     } else {
       setEditorConcept(view, body, props, tile.activePath);
     }
@@ -562,6 +589,11 @@
       if (line !== null) scrollToOutlineLine(line);
       pendingScrollAnchor = null;
     }
+
+    // Re-probe after a build / Concept switch / edit: heading lines move even
+    // when the scroll offset does not, so a scroll event alone is not enough.
+    // Deferred a frame so CodeMirror has laid the new content out.
+    requestAnimationFrame(reportViewportLine);
   });
 
   // Keep broken-link styling + wikilink resolution fresh.

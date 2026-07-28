@@ -7,7 +7,13 @@
   //
   // The scan (in `$lib/outline`) skips the frontmatter block and fenced code
   // blocks, and tracks line numbers against the FULL document so the scroll
-  // target is correct. No active-heading highlight in this slice.
+  // target is correct.
+  //
+  // The reverse link (outline-active-heading): the active Tile reports the
+  // full-document line at its viewport probe (~50px below the viewport top — where
+  // an Outline click parks a heading) and the entry for the last heading at or
+  // above that line is marked Current, so scrolling the Concept walks the
+  // highlight down the Outline.
   //
   // Keyboard nav (outline-backlinks-keyboard-nav): the entries form a flat,
   // navigate-and-open Region with roving tabindex — exactly one entry is
@@ -19,20 +25,35 @@
 
   import { scanHeadings, type OutlineHeading } from '$lib/wasm/exports';
   import { outlineNav } from '$lib/state/listFocusNav.svelte';
+  import { activeHeadingIndex } from '$lib/outlineActive';
 
   interface Props {
     /** bundle-relative path of the open Concept, or null when none open. */
     path: string | null;
     /** Raw markdown of the open Concept (the editor's live content). */
     content: string;
+    /** Full-document line at the editor's viewport probe (the active Tile's
+     *  reading position), or null when unknown — drives the Current-heading
+     *  highlight (outline-active-heading). */
+    viewportLine?: number | null;
     /** Scroll the editor to a 1-based full-document line. */
     onselect: (line: number) => void;
   }
 
-  let { path, content, onselect }: Props = $props();
+  let { path, content, viewportLine = null, onselect }: Props = $props();
 
   // Live heading list: recomputed whenever the editor content changes.
   const headings = $derived<OutlineHeading[]>(path === null ? [] : scanHeadings(content));
+
+  // The Current heading: the last one at or above the editor's viewport probe.
+  const activeIndex = $derived(
+    viewportLine === null
+      ? -1
+      : activeHeadingIndex(
+          headings.map((h) => h.line),
+          viewportLine,
+        ),
+  );
 
   // Re-clamp the Focused item into bounds whenever the list shrinks/empties
   // (Concept switch, headings edited away), so the roving tabindex never points
@@ -55,7 +76,10 @@
             type="button"
             class="entry"
             class:focused-item={outlineNav.focusedIndex === i}
+            class:current={activeIndex === i}
             data-testid="outline-entry"
+            data-current={activeIndex === i ? 'true' : undefined}
+            aria-current={activeIndex === i ? 'true' : undefined}
             data-level={heading.level}
             data-line={heading.line}
             data-index={i}
@@ -114,6 +138,15 @@
 
   .entry:hover {
     background: var(--hover);
+  }
+
+  /* The Current heading (the section being read). A soft accent wash plus an
+     accent rail on the left — a persistent "you are here" marker, deliberately
+     unlike the keyboard spotlight ring so the two can coexist on one entry. */
+  .entry.current {
+    background: var(--accent-soft);
+    color: var(--tag-text);
+    box-shadow: inset 2px 0 0 0 var(--accent);
   }
 
   .entry:focus-visible {
