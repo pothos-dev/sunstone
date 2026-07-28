@@ -787,11 +787,11 @@
   <!-- The left Sidebar's border: click to collapse/expand, drag to resize. -->
   <SidebarEdge
     side="left"
-    open={session.leftSidebarOpen}
+    open={session.leftSidebarVisible}
     width={session.leftSidebarWidth}
     label="sidebar"
     testid="left-sidebar-edge"
-    onToggle={() => session.setLeftSidebarOpen(!session.leftSidebarOpen)}
+    onToggle={() => session.setLeftSidebarOpen(!session.leftSidebarVisible)}
     onResize={(w) => session.setLeftSidebarWidth(w)}
     onResizeStart={() => (leftResizing = true)}
     onResizeEnd={() => (leftResizing = false)}
@@ -863,11 +863,11 @@
   <!-- The right Sidebar's border: click to collapse/expand, drag to resize. -->
   <SidebarEdge
     side="right"
-    open={session.rightSidebarOpen}
+    open={session.rightSidebarVisible}
     width={session.rightSidebarWidth}
     label="Outline & Backlinks"
     testid="right-sidebar-edge"
-    onToggle={() => session.setRightSidebarOpen(!session.rightSidebarOpen)}
+    onToggle={() => session.setRightSidebarOpen(!session.rightSidebarVisible)}
     onResize={(w) => session.setRightSidebarWidth(w)}
     onResizeStart={() => (rightResizing = true)}
     onResizeEnd={() => (rightResizing = false)}

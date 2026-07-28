@@ -266,8 +266,19 @@ class SessionStore {
     this.#scheduleSave();
   }
 
-  /** Record the left Sidebar's expanded/collapsed state and schedule a persist. */
+  /**
+   * Record the left Sidebar's expanded/collapsed state and schedule a persist.
+   *
+   * Ends any transient peek FIRST: an explicit collapse/expand is deliberate
+   * user intent and must supersede an auto-reveal, or `leftSidebarVisible`
+   * (`open || revealed`) would stay pinned to `true` and the Sidebar would
+   * refuse to collapse. The flag is cleared BEFORE the no-op guard below,
+   * since the common case — collapsing a revealed-but-not-open Sidebar — sets
+   * `open` to the value it already holds and would otherwise return early with
+   * the peek still latched.
+   */
   setLeftSidebarOpen(open: boolean): void {
+    this.leftSidebarRevealed = false;
     if (open === this.leftSidebarOpen) return;
     this.leftSidebarOpen = open;
     this.#scheduleSave();
@@ -296,6 +307,8 @@ class SessionStore {
 
   /** Record the right Sidebar's expanded/collapsed state and schedule a persist. */
   setRightSidebarOpen(open: boolean): void {
+    // Clears the transient peek first — see `setLeftSidebarOpen`.
+    this.rightSidebarRevealed = false;
     if (open === this.rightSidebarOpen) return;
     this.rightSidebarOpen = open;
     this.#scheduleSave();
