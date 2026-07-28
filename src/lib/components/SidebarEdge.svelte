@@ -61,12 +61,19 @@
     const startY = e.clientY;
     const base = width;
     let dragging = false;
+    // While COLLAPSED the edge is purely an Expand button: there is no visible
+    // sidebar to resize, so treating pointer travel as a drag would silently eat
+    // the click (a few px of jitter — a touchpad tap, a heavy mouse click — and
+    // the gesture became an invisible resize of a 0-width aside, leaving the
+    // sidebar stuck collapsed). Any release over the edge expands it.
+    const resizable = open;
     try {
       el.setPointerCapture(e.pointerId);
     } catch {
       /* best-effort: window listeners below catch the moves regardless */
     }
     const move = (ev: PointerEvent) => {
+      if (!resizable) return;
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       if (!dragging && isDragGesture(dx, dy)) {
