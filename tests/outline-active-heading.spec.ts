@@ -49,4 +49,17 @@ test('the Outline marks the heading whose section is being read', async ({ page 
   // Natural scrolling drives it too: scroll the editor back to the top.
   await editor.locator('.cm-scroller').evaluate((el) => el.scrollTo({ top: 0 }));
   await expect(current).toHaveText('Outline Demo');
+
+  // A heading on the LAST line can still become Current: the editor keeps a
+  // blank scroll tail after the final line, so even it can reach the probe.
+  // Without the tail the document simply runs out of scroll and the highlight
+  // stays stuck on an earlier heading.
+  await page.getByTestId('edit-toggle').click();
+  await editor.locator('.cm-content').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('\n## Very Last Heading');
+  const entries2 = page.getByTestId('outline').getByTestId('outline-entry');
+  await expect(entries2).toHaveCount(5);
+  await entries2.nth(4).click();
+  await expect(current).toHaveText('Very Last Heading');
 });

@@ -140,13 +140,12 @@
     background: var(--hover);
   }
 
-  /* The Current heading (the section being read). A soft accent wash plus an
-     accent rail on the left — a persistent "you are here" marker, deliberately
-     unlike the keyboard spotlight ring so the two can coexist on one entry. */
+  /* The Current heading (the section being read): a soft accent wash, nothing
+     more — the keyboard spotlight ring is an outline, so the two still read as
+     separate affordances when they land on the same entry. */
   .entry.current {
     background: var(--accent-soft);
     color: var(--tag-text);
-    box-shadow: inset 2px 0 0 0 var(--accent);
   }
 
   .entry:focus-visible {

@@ -463,9 +463,17 @@
   // lives in the editor's coordinate space, so only this Tile can measure it; it
   // reports the full-document line (the editor doc holds the BODY only, hence the
   // frontmatter offset) and App maps it to an Outline entry.
+  // Scrolled to the very end, the probe is useless: the last screenful cannot
+  // move up any further, so a heading in it would never light up. Report the
+  // viewport's BOTTOM line there instead, which makes the final heading in view
+  // the Current one (see the note in `outlineActive.ts`).
   function reportViewportLine(): void {
     if (!view || !onViewportLine) return;
-    const line = lineAtViewportTop(view, ACTIVE_HEADING_PROBE_PX);
+    const sc = view.scrollDOM;
+    const atEnd = sc.scrollHeight - sc.scrollTop - sc.clientHeight <= 1;
+    const line = atEnd
+      ? lineAtViewportTop(view, sc.clientHeight)
+      : lineAtViewportTop(view, ACTIVE_HEADING_PROBE_PX);
     onViewportLine(line === null ? null : line + frontmatterLineCount(tile.content));
   }
 
