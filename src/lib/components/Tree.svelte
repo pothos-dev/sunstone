@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { TreeNode } from '$lib/types';
   import { dirname, stripMd } from '$lib/path';
   import { session } from '$lib/state/session.svelte';
@@ -123,6 +124,11 @@
       expandTimer = null;
     }
   }
+
+  // A row can be destroyed (parent collapsed/re-rendered) while a drag-hover
+  // expand timer is still pending; without this the timer fires later against
+  // a stale/unmounted node.
+  onDestroy(clearExpandTimer);
 
   function onDragOver(e: DragEvent) {
     const from = treeDnd.dragging;
