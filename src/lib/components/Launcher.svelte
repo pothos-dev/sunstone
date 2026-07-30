@@ -4,6 +4,7 @@
   import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { errMessage } from '$lib/errors';
   import type { KnownBundle } from '$lib/types';
+  import { relativeTime } from '$lib/relativeTime';
 
   // The launcher: shown when Sunstone starts with no Bundle (`sunstone` alone).
   // Lists previously-opened folders (most-recent first, each removable) and an
@@ -76,22 +77,6 @@
     }
   }
 
-  /** Compact "time since last opened" label, or '' when never stamped. */
-  function relativeTime(ms: number | null): string {
-    if (ms === null) return '';
-    const diff = Date.now() - ms;
-    if (diff < 0) return 'just now';
-    const min = 60_000;
-    const hour = 60 * min;
-    const day = 24 * hour;
-    const week = 7 * day;
-    if (diff < min) return 'just now';
-    if (diff < hour) return `${Math.floor(diff / min)}m ago`;
-    if (diff < day) return `${Math.floor(diff / hour)}h ago`;
-    if (diff < week) return `${Math.floor(diff / day)}d ago`;
-    if (diff < 5 * week) return `${Math.floor(diff / week)}w ago`;
-    return new Date(ms).toLocaleDateString();
-  }
 </script>
 
 <div class="launcher" data-testid="launcher" bind:this={launcherRoot}>
