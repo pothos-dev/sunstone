@@ -199,6 +199,18 @@ pub fn delete_path(root: &Path, rel_path: &str) -> Result<(), String> {
     }
 }
 
+/// Reject any path component other than a normal segment or `.` (i.e. `..`
+/// and root/prefix components), which would let a rel path escape the Bundle.
+fn reject_escaping_components(rel: &Path, rel_path: &str) -> Result<(), String> {
+    for component in rel.components() {
+        match component {
+            Component::Normal(_) | Component::CurDir => {}
+            _ => return Err(format!("path escapes the bundle: {rel_path}")),
+        }
+    }
+    Ok(())
+}
+
 /// Resolve a bundle-relative path against the root, rejecting escapes
 /// (`..`, absolute paths, or anything outside the Bundle).
 pub fn resolve(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
@@ -206,12 +218,7 @@ pub fn resolve(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     if rel.is_absolute() {
         return Err(format!("path must be bundle-relative: {rel_path}"));
     }
-    for component in rel.components() {
-        match component {
-            Component::Normal(_) | Component::CurDir => {}
-            _ => return Err(format!("path escapes the bundle: {rel_path}")),
-        }
-    }
+    reject_escaping_components(rel, rel_path)?;
     let joined = root.join(rel);
     // Defence in depth: canonicalize and confirm containment.
     let canonical = joined
@@ -236,12 +243,7 @@ pub fn resolve_new(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     if rel.as_os_str().is_empty() {
         return Err("path must not be empty".to_string());
     }
-    for component in rel.components() {
-        match component {
-            Component::Normal(_) | Component::CurDir => {}
-            _ => return Err(format!("path escapes the bundle: {rel_path}")),
-        }
-    }
+    reject_escaping_components(rel, rel_path)?;
     let joined = root.join(rel);
 
     // Walk up to the nearest existing ancestor, canonicalize it, and confirm it
