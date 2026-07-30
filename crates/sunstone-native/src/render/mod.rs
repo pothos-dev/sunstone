@@ -24,8 +24,16 @@
 //!
 //! Mermaid fenced blocks are left as inert `<pre><code>` source here; their
 //! client-side hydration is a later slice.
+//!
+//! This module is split into: the pipeline above (here), the CriticMarkup
+//! sentinel pass (`critic.rs`), and the citation-superscript sentinel pass
+//! (`citations.rs`); the two sentinel passes share their scan/substitute
+//! plumbing via `sentinel::Sentinels`.
 
-use std::collections::HashMap;
+mod citations;
+mod critic;
+mod sentinel;
+
 use std::path::Path;
 
 use comrak::nodes::NodeValue;
@@ -36,13 +44,14 @@ use serde::Serialize;
 use crate::bundle;
 use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
-use sunstone_shared::citations::find_citation_refs;
-use sunstone_shared::critic::{parse_critic_marks, CriticMarkKind};
 use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
 use sunstone_shared::paths::{is_external, resolve_internal};
 use sunstone_shared::url::concept_url;
 use sunstone_shared::wikilink::{self, parse_target};
+
+use citations::{citations_to_sentinels, substitute_citation_sentinels};
+use critic::{critic_to_sentinels, substitute_critic_sentinels};
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -295,285 +304,6 @@ fn rewrite_marker_hrefs(html: &str) -> String {
     .into_owned()
 }
 
-// --- CriticMarkup -----------------------------------------------------------
-//
-// A pure Rust scanner mirroring the TS `parseCriticMarks` in
-// `src/lib/editor/criticMarkup.ts` (house pattern: cf. `index/frontmatter.rs`
-// mirrors `frontmatter.ts`). It renders the five CriticMarkup marks to the HTML
-// the downstream CSS depends on (matching the desktop CM view's vocabulary:
-// green add / red del / amber highlight, NO underline/strikethrough):
-//
-//   {++X++}       -> <ins class="critic-add">X</ins>
-//   {--X--}       -> <del class="critic-del">X</del>
-//   {~~O~>N~~}    -> <del class="critic-del">O</del><ins class="critic-add">N</ins>
-//   {==X==}       -> <mark class="critic-highlight">X</mark>
-//   {>>NOTE<<}    -> an inline, print-safe bordered callout carrying NOTE
-//
-// The delimiter-sentinel technique keeps `render.unsafe_` OFF: only the
-// delimiters (never the inner content) are swapped for sentinel tokens before
-// comrak, so the inner text is still markdown-rendered/escaped by comrak; the
-// sentinels are then swapped for our tags after comrak. Sentinels are a
-// private-use-area pair around a decimal id (`\u{E000}<id>\u{E001}`) — comrak
-// treats them as ordinary text and neither escapes nor mangles them.
-//
-// CriticMarkup marks apply to the BODY only; frontmatter/outline/wikilinks are
-// untouched. An unterminated open (no matching close) is NOT a mark: it stays as
-// literal text (comrak escapes it like any other text).
-
-const SENT_OPEN: char = '\u{E000}';
-const SENT_CLOSE: char = '\u{E001}';
-
-const CRITIC_INS_OPEN: &str = r#"<ins class="critic-add">"#;
-const CRITIC_INS_CLOSE: &str = "</ins>";
-const CRITIC_DEL_OPEN: &str = r#"<del class="critic-del">"#;
-const CRITIC_DEL_CLOSE: &str = "</del>";
-const CRITIC_MARK_OPEN: &str = r#"<mark class="critic-highlight">"#;
-const CRITIC_MARK_CLOSE: &str = "</mark>";
-/// Substitution's middle: close the deleted `<del>` and open the inserted
-/// `<ins>`, adjacent, so `{~~O~>N~~}` renders `…O</del><ins …>N…`.
-const CRITIC_SUB_MID: &str = r#"</del><ins class="critic-add">"#;
-
-/// Speech-bubble icon (mirrors `COMMENT_ICON_SVG` in `criticMarkupView.ts`) —
-/// the visual vocabulary for a comment, reused so print matches the editor.
-const CRITIC_COMMENT_SVG: &str = concat!(
-    r#"<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">"#,
-    r#"<path fill="currentColor" d="M2.5 2.5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6.6L3.7 14a.5.5 0 0 1-.85-.35V11.5H2.5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z"/>"#,
-    r#"</svg>"#,
-);
-
-/// Rewrite each CriticMarkup mark's DELIMITERS to sentinel tokens, keeping its
-/// inner content in the markdown stream. The marks come from the SHARED
-/// `parse_critic_marks` (ADR 0006 family 13 — one grammar for the editor and
-/// SSR; the former local `critic_open_at`/`critic_close`/`find_close` scanner is
-/// retired). Returns the prepared body plus the replacement HTML for each
-/// sentinel (indexed by the sentinel's id). Offsets from the shared parse are
-/// UTF-16 units, so the body is walked over its UTF-16 units to slice on them.
-fn critic_to_sentinels(body: &str) -> (String, Vec<String>) {
-    let marks = parse_critic_marks(body);
-    if marks.is_empty() {
-        return (body.to_string(), Vec::new());
-    }
-    let units: Vec<u16> = body.encode_utf16().collect();
-    let mut out = String::with_capacity(body.len());
-    let mut repls: Vec<String> = Vec::new();
-
-    // Emit a sentinel for `html`, recording the replacement under a fresh id.
-    let sentinel = |out: &mut String, repls: &mut Vec<String>, html: &str| {
-        let id = repls.len();
-        repls.push(html.to_string());
-        out.push(SENT_OPEN);
-        out.push_str(&id.to_string());
-        out.push(SENT_CLOSE);
-    };
-
-    let decode = |a: usize, b: usize| String::from_utf16_lossy(&units[a..b]);
-
-    let mut pos = 0usize;
-    for mark in &marks {
-        // The verbatim text before this mark (kept as markdown for comrak).
-        out.push_str(&decode(pos, mark.from));
-        let content = decode(mark.content_from, mark.content_to);
-        match mark.kind {
-            CriticMarkKind::Addition => {
-                sentinel(&mut out, &mut repls, CRITIC_INS_OPEN);
-                out.push_str(&content);
-                sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
-            }
-            CriticMarkKind::Deletion => {
-                sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                out.push_str(&content);
-                sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
-            }
-            CriticMarkKind::Highlight => {
-                sentinel(&mut out, &mut repls, CRITIC_MARK_OPEN);
-                out.push_str(&content);
-                sentinel(&mut out, &mut repls, CRITIC_MARK_CLOSE);
-            }
-            CriticMarkKind::Substitution => {
-                // The FIRST `~>` splits old/new (as in the shared parse); with
-                // none present, render the whole inner as a deletion.
-                if let Some(p) = content.find("~>") {
-                    let (deleted, inserted) = (&content[..p], &content[p + 2..]);
-                    sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                    out.push_str(deleted);
-                    sentinel(&mut out, &mut repls, CRITIC_SUB_MID);
-                    out.push_str(inserted);
-                    sentinel(&mut out, &mut repls, CRITIC_INS_CLOSE);
-                } else {
-                    sentinel(&mut out, &mut repls, CRITIC_DEL_OPEN);
-                    out.push_str(&content);
-                    sentinel(&mut out, &mut repls, CRITIC_DEL_CLOSE);
-                }
-            }
-            CriticMarkKind::Comment => {
-                // The note is plain text (NOT markdown-rendered), escaped into a
-                // self-contained callout injected whole, at the comment's spot.
-                sentinel(&mut out, &mut repls, &critic_comment_callout(&content));
-            }
-        }
-        pos = mark.to;
-    }
-    out.push_str(&decode(pos, units.len()));
-    (out, repls)
-}
-
-/// Build the inline, print-safe comment callout carrying the (HTML-escaped)
-/// `note`. Inline (a `<span>`, not a block) so it nests validly inside comrak's
-/// `<p>` wrappers; visible (not hover-only) so the PDF export shows it.
-fn critic_comment_callout(note: &str) -> String {
-    format!(
-        r#"<span class="critic-comment"><span class="critic-comment-icon" aria-hidden="true">{svg}</span><span class="critic-comment-text">{note}</span></span>"#,
-        svg = CRITIC_COMMENT_SVG,
-        note = attr_escape(note),
-    )
-}
-
-/// Substitute the CriticMarkup sentinels (`\u{E000}<id>\u{E001}`) comrak carried
-/// through with their recorded HTML replacements. This injects OUR critic tags
-/// only — nothing else in the body is emitted as raw HTML.
-fn substitute_critic_sentinels(html: &str, repls: &[String]) -> String {
-    if repls.is_empty() {
-        return html.to_string();
-    }
-    let re = Regex::new("\u{E000}(\\d+)\u{E001}").unwrap();
-    re.replace_all(html, |caps: &regex::Captures| {
-        caps[1]
-            .parse::<usize>()
-            .ok()
-            .and_then(|id| repls.get(id))
-            .cloned()
-            .unwrap_or_default()
-    })
-    .into_owned()
-}
-
-// --- Citation references (citation-superscripts) ----------------------------
-//
-// Mirrors the pure TS rules in `src/lib/citations.ts` so the exported PDF / web
-// render matches the live editor:
-//   - an inline `[n]` that FOLLOWS a word (preceded by a non-whitespace char
-//     that is not `[`, and not trailed by `]`/`(`/`:`) → a superscript link to
-//     the citation-table row;
-//   - a line-start `[n]` (the table rows) → the literal `[n]` jump TARGET
-//     carrying `id="cite-n"` (NOT superscript — a superscript row head reads
-//     wrong);
-//   - anything else → left untouched.
-// A distinct PUA sentinel pair (from the CriticMarkup one) keeps the two
-// substitution passes independent.
-
-const CITE_OPEN: char = '\u{E002}';
-const CITE_CLOSE: char = '\u{E003}';
-
-/// Superscript link standing in for an inline `[n]` reference.
-fn citation_ref_html(num: &str) -> String {
-    format!(r##"<sup class="citation-ref"><a href="#cite-{num}">[{num}]</a></sup>"##)
-}
-
-/// Literal, anchored `[n]` for a citation-table row (the jump target).
-fn citation_def_html(num: &str) -> String {
-    format!(r#"<a id="cite-{num}" class="citation-def">[{num}]</a>"#)
-}
-
-/// Rewrite citation markers in `body` to sentinel tokens, returning the prepared
-/// body plus the replacement HTML for each sentinel id.
-///
-/// Inline REFERENCES come from the SHARED `find_citation_refs` (ADR 0006 family
-/// 13 — one recognition of what a reference is, for the editor and SSR). The
-/// line-start DEFINITIONS (table rows) are not references (the shared scan
-/// excludes them), so they are detected here; the two are disjoint. Offsets from
-/// the shared scan are UTF-16 units, so the body is walked over its UTF-16 units.
-fn citations_to_sentinels(body: &str) -> (String, Vec<String>) {
-    let units: Vec<u16> = body.encode_utf16().collect();
-    let n = units.len();
-    // Inline references keyed by their `[` offset (UTF-16 units).
-    let refs: HashMap<usize, (usize, String)> = find_citation_refs(body)
-        .into_iter()
-        .map(|r| (r.from, (r.to, r.num)))
-        .collect();
-
-    let mut out = String::with_capacity(body.len());
-    let mut repls: Vec<String> = Vec::new();
-
-    let sentinel = |out: &mut String, repls: &mut Vec<String>, html: String| {
-        let id = repls.len();
-        repls.push(html);
-        out.push(CITE_OPEN);
-        out.push_str(&id.to_string());
-        out.push(CITE_CLOSE);
-    };
-
-    let decode = |a: usize, b: usize| String::from_utf16_lossy(&units[a..b]);
-    const L_BRACKET: u16 = b'[' as u16;
-    const R_BRACKET: u16 = b']' as u16;
-    const NEWLINE: u16 = b'\n' as u16;
-    let is_digit = |u: u16| (b'0' as u16..=b'9' as u16).contains(&u);
-    let is_ws = |u: u16| char::from_u32(u as u32).is_some_and(|c| c.is_whitespace());
-
-    let mut pos = 0usize;
-    let mut i = 0usize;
-    while i < n {
-        // Inline reference (shared recognition): superscript link.
-        if let Some((to, num)) = refs.get(&i) {
-            out.push_str(&decode(pos, i));
-            sentinel(&mut out, &mut repls, citation_ref_html(num));
-            i = *to;
-            pos = i;
-            continue;
-        }
-        // Line-start `[n]` definition (table row): literal anchored jump target.
-        if units[i] == L_BRACKET {
-            let mut j = i + 1;
-            while j < n && is_digit(units[j]) {
-                j += 1;
-            }
-            if j > i + 1 && j < n && units[j] == R_BRACKET {
-                // At line start iff only whitespace back to the newline / start.
-                let mut k = i;
-                let mut at_line_start = true;
-                while k > 0 {
-                    let c = units[k - 1];
-                    if c == NEWLINE {
-                        break;
-                    }
-                    if !is_ws(c) {
-                        at_line_start = false;
-                        break;
-                    }
-                    k -= 1;
-                }
-                if at_line_start {
-                    let num = decode(i + 1, j);
-                    out.push_str(&decode(pos, i));
-                    sentinel(&mut out, &mut repls, citation_def_html(&num));
-                    i = j + 1;
-                    pos = i;
-                    continue;
-                }
-            }
-        }
-        i += 1;
-    }
-    out.push_str(&decode(pos, n));
-    (out, repls)
-}
-
-/// Substitute the citation sentinels (`\u{E002}<id>\u{E003}`) with their HTML.
-fn substitute_citation_sentinels(html: &str, repls: &[String]) -> String {
-    if repls.is_empty() {
-        return html.to_string();
-    }
-    let re = Regex::new("\u{E002}(\\d+)\u{E003}").unwrap();
-    re.replace_all(html, |caps: &regex::Captures| {
-        caps[1]
-            .parse::<usize>()
-            .ok()
-            .and_then(|id| repls.get(id))
-            .cloned()
-            .unwrap_or_default()
-    })
-    .into_owned()
-}
-
 // --- Small escaping helpers -------------------------------------------------
 
 /// Escape the characters that would break a markdown link TEXT (`[ ... ]`).
@@ -749,102 +479,6 @@ mod tests {
         assert!(p.html.contains("<code>"));
     }
 
-    // --- CriticMarkup rendering ---------------------------------------------
-    // The exact HTML emitted here is the contract downstream CSS/tests match.
-
-    #[test]
-    fn critic_addition_renders_ins() {
-        let p = render("{++added++}", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<ins class="critic-add">added</ins>"#));
-        // Delimiters are stripped — raw CriticMarkup never surfaces.
-        assert!(!p.html.contains("{++"));
-    }
-
-    #[test]
-    fn critic_deletion_renders_del() {
-        let p = render("{--removed--}", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<del class="critic-del">removed</del>"#));
-        assert!(!p.html.contains("{--"));
-    }
-
-    #[test]
-    fn critic_substitution_renders_del_then_ins_adjacent() {
-        let p = render("{~~old~>new~~}", "a.md", &["a.md"]);
-        assert!(p.html.contains(
-            r#"<del class="critic-del">old</del><ins class="critic-add">new</ins>"#
-        ));
-        assert!(!p.html.contains("~>"));
-    }
-
-    #[test]
-    fn critic_substitution_without_arrow_is_a_deletion() {
-        let p = render("{~~gone~~}", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<del class="critic-del">gone</del>"#));
-        assert!(!p.html.contains("critic-add"));
-    }
-
-    #[test]
-    fn critic_highlight_renders_mark() {
-        let p = render("{==important==}", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<mark class="critic-highlight">important</mark>"#));
-        assert!(!p.html.contains("{=="));
-    }
-
-    #[test]
-    fn critic_point_comment_renders_inline_callout() {
-        let p = render("before {>>a note<<} after", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<span class="critic-comment">"#));
-        assert!(p.html.contains(r#"<span class="critic-comment-icon" aria-hidden="true">"#));
-        assert!(p.html.contains(r#"<span class="critic-comment-text">a note</span>"#));
-        assert!(!p.html.contains("{>>"));
-        // The surrounding prose is preserved around the point callout.
-        assert!(p.html.contains("before "));
-        assert!(p.html.contains(" after"));
-    }
-
-    #[test]
-    fn critic_bound_comment_follows_the_highlight_content() {
-        // A comment directly after a highlight (bound) lands right after the
-        // highlight's `</mark>`, ahead of the callout span.
-        let p = render("{==term==}{>>see me<<}", "a.md", &["a.md"]);
-        assert!(p.html.contains(
-            r#"<mark class="critic-highlight">term</mark><span class="critic-comment">"#
-        ));
-        assert!(p.html.contains(r#"<span class="critic-comment-text">see me</span>"#));
-    }
-
-    #[test]
-    fn markdown_inside_a_mark_is_still_rendered() {
-        // Only the delimiters become sentinels; the inner content stays in the
-        // markdown stream, so comrak bolds it inside the <ins>.
-        let p = render("{++**bold**++}", "a.md", &["a.md"]);
-        assert!(p.html.contains(r#"<ins class="critic-add"><strong>bold</strong></ins>"#));
-    }
-
-    #[test]
-    fn unterminated_open_is_not_a_mark() {
-        // No matching close → not a mark: the text stays literal (comrak escapes
-        // it as ordinary text) and no critic tag is injected.
-        let p = render("{++ dangling with no close", "a.md", &["a.md"]);
-        assert!(!p.html.contains("critic-add"));
-        assert!(p.html.contains("{++ dangling with no close"));
-    }
-
-    #[test]
-    fn comment_note_text_is_html_escaped() {
-        let p = render("{>>a < b & c > d<<}", "a.md", &["a.md"]);
-        assert!(p.html.contains("a &lt; b &amp; c &gt; d"));
-        // The raw angle/amp must not leak into the note text.
-        assert!(!p.html.contains("a < b & c"));
-    }
-
-    #[test]
-    fn critic_sentinels_do_not_survive_into_output() {
-        let p = render("{++x++} {==y==}{>>z<<} {~~o~>n~~}", "a.md", &["a.md"]);
-        assert!(!p.html.contains(SENT_OPEN));
-        assert!(!p.html.contains(SENT_CLOSE));
-    }
-
     #[test]
     fn mermaid_fence_emits_language_class_and_is_left_inert() {
         // comrak leaves a ```mermaid fence as an inert code block; the web island
@@ -855,40 +489,5 @@ mod tests {
         assert!(p.html.contains("graph TD"));
         // A fenced code block is not a heading → excluded from the outline.
         assert!(p.outline.is_empty());
-    }
-
-    #[test]
-    fn inline_citation_becomes_superscript_link() {
-        let p = render("deepen umami and body.[6][7][8]\n", "a.md", &["a.md"]);
-        // Each reference is its own superscript link to the matching row, with
-        // the `[n]` brackets kept around the clickable number.
-        assert!(p
-            .html
-            .contains(r##"<sup class="citation-ref"><a href="#cite-6">[6]</a></sup>"##));
-        assert!(p.html.contains(r##"href="#cite-7">[7]<"##));
-        assert!(p.html.contains(r##"href="#cite-8">[8]<"##));
-        // comrak's stray URL-less reference link is gone — the only `[7]` left is
-        // the one inside our superscript anchor, never bare text.
-        assert!(!p.html.contains(">[7]</a></sup>[7]"));
-    }
-
-    #[test]
-    fn citation_table_row_is_literal_anchor_not_superscript() {
-        let p = render("body.[6]\n\n[6] Kokumi source. https://x.y\n", "a.md", &["a.md"]);
-        // The table row keeps literal `[6]` and carries the jump-target id.
-        assert!(p
-            .html
-            .contains(r#"<a id="cite-6" class="citation-def">[6]</a>"#));
-        // …and is NOT wrapped in a superscript.
-        assert!(!p.html.contains(r##"<sup class="citation-ref"><a href="#cite-6">[6]</a></sup> Kokumi"##));
-    }
-
-    #[test]
-    fn bracketed_number_not_following_a_word_is_left_alone() {
-        // Space-preceded `[6]` is neither a reference nor a table row: untouched.
-        let p = render("a paragraph [6] mid-sentence\n", "a.md", &["a.md"]);
-        assert!(p.html.contains("[6]"));
-        assert!(!p.html.contains("citation-ref"));
-        assert!(!p.html.contains("citation-def"));
     }
 }
