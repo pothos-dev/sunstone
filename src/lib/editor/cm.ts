@@ -902,13 +902,6 @@ function minimalDocChange(
 }
 
 /**
- * Scroll the editor to (and place the cursor at the start of) `line`, a 1-based
- * line number. Used by full-text search to reveal the matching line after
- * opening a Concept. Clamps out-of-range lines (the doc may differ slightly
- * from the searched snapshot). Marked programmatic so the selection change is
- * not mistaken for a user edit.
- */
-/**
  * Reconfigure the view's wikilink Compartment to clear the `wikiLinks`
  * extension's resolve-cache and re-resolve visible links. Hook this to the SAME
  * index signal that refreshes broken markdown links (the index's path set
@@ -983,6 +976,13 @@ export function lineAtViewportTop(view: EditorView, offsetPx: number): number | 
   return view.state.doc.lineAt(pos).number;
 }
 
+/**
+ * Scroll the editor to (and place the cursor at the start of) `line`, a 1-based
+ * line number. Used by full-text search to reveal the matching line after
+ * opening a Concept. Clamps out-of-range lines (the doc may differ slightly
+ * from the searched snapshot). Marked programmatic so the selection change is
+ * not mistaken for a user edit.
+ */
 export function scrollToLine(
   view: EditorView,
   line: number,
