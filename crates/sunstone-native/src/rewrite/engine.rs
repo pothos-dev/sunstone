@@ -14,7 +14,7 @@ use sunstone_shared::paths::{dir_of, find_byte, is_external, resolve_internal};
 use sunstone_shared::wikilink::{self, find_double_close, parse_target};
 
 use super::paths::{basename_of, relative_path, shortest_resolving_suffix};
-use sunstone_shared::rewrite::paths::{split_suffix, utf8_len};
+use sunstone_shared::rewrite::text::{split_suffix, utf8_len};
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
 /// changed. Matches the TS `{ linksChanged, filesChanged }`.
