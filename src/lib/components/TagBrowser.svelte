@@ -26,6 +26,7 @@
   // There are deliberately NO CRUD verbs here — tags derive from frontmatter.
 
   import { backend } from '$lib/ipc';
+  import { createCancelGuard } from '$lib/asyncGuard';
   import { stripMd } from '$lib/path';
   import type { TagCount } from '$lib/types';
   import { focus } from '$lib/state/focus.svelte';
@@ -62,9 +63,9 @@
   // cache entry whose tag no longer exists (e.g. its last Concept was untagged).
   $effect(() => {
     void version;
-    let cancelled = false;
+    const guard = createCancelGuard();
     void backend.allTags().then((result) => {
-      if (cancelled) return;
+      if (guard.isCancelled()) return;
       tags = result;
       const live = new Set(result.map((t) => t.tag));
       // Prune expanded tags that vanished.
@@ -84,9 +85,7 @@
       }
       if (prunedCache) conceptCache = nextCache;
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => guard.cancel();
   });
 
   // Re-query the Concept list for every expanded tag, also re-running on version
@@ -95,19 +94,17 @@
   $effect(() => {
     void version;
     const open = [...expanded];
-    let cancelled = false;
+    const guard = createCancelGuard();
     for (const tag of open) {
       void backend.conceptsByTag(tag).then((result) => {
-        if (cancelled) return;
+        if (guard.isCancelled()) return;
         // Replace the Map so the change is observed by the reactive read below.
         const next = new Map(conceptCache);
         next.set(tag, result);
         conceptCache = next;
       });
     }
-    return () => {
-      cancelled = true;
-    };
+    return () => guard.cancel();
   });
 
   /** Concepts cached for `tag` (empty until the query for an expand resolves). */

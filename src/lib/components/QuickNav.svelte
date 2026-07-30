@@ -11,6 +11,7 @@
    * replaced by the Concepts carrying that tag (same render style), and Escape
    * steps back out to the normal search before it closes the palette.
    */
+  import { createLatestGuard } from '$lib/asyncGuard';
   import { fuzzyRank } from '$lib/fuzzy';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
@@ -63,7 +64,7 @@
    */
   let tagMode = $state<string | null>(null);
   let tagConcepts = $state<string[]>([]);
-  let tagToken = 0;
+  const tagGuard = createLatestGuard();
 
   // Mirror drill-down state to the parent for the Escape peel (see prop docs).
   $effect(() => {
@@ -162,9 +163,9 @@
     query = '';
     selected = 0;
     tagConcepts = [];
-    const token = ++tagToken;
+    const token = tagGuard.next();
     void conceptsForTag(tag).then((c) => {
-      if (token === tagToken) tagConcepts = c;
+      if (tagGuard.isLatest(token)) tagConcepts = c;
     });
     // A tag row reached by CLICK moves focus to the button (then removed from the
     // DOM as the list swaps); pull focus back to the input so typing filters the
@@ -176,7 +177,7 @@
   function exitTag() {
     tagMode = null;
     tagConcepts = [];
-    tagToken++;
+    tagGuard.next();
     query = '';
     selected = 0;
   }
