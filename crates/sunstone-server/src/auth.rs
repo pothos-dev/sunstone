@@ -58,7 +58,7 @@ fn unix_now() -> u64 {
 }
 
 /// HMAC-SHA256 sign `msg` with `secret`, base64url (no pad) encoded.
-#[allow(dead_code)] // used by `mint` (tests + mirrors the Node hook)
+#[cfg(test)]
 fn sign(msg: &[u8], secret: &[u8]) -> String {
     let mut mac = HmacSha256::new_from_slice(secret).expect("HMAC accepts any key length");
     mac.update(msg);
@@ -67,8 +67,10 @@ fn sign(msg: &[u8], secret: &[u8]) -> String {
 
 /// Mint an HS256 JWT for `claims` under `secret`. Used by the Rust tests (and
 /// mirrors what the Node hook does in production) — production axum only verifies.
-#[allow(dead_code)] // minting lives in the Node hook; here it backs the tests
-pub fn mint(claims: &Claims, secret: &[u8]) -> String {
+/// `cfg(test)`-gated so its test-only nature is compiler-enforced, not just by
+/// convention: minting for real requests lives in the Node hook, not here.
+#[cfg(test)]
+pub(crate) fn mint(claims: &Claims, secret: &[u8]) -> String {
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"HS256","typ":"JWT"}"#);
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).expect("claims serialize"));
     let signing_input = format!("{header}.{payload}");
