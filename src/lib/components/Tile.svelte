@@ -27,6 +27,7 @@
   import { theme } from '$lib/state/theme.svelte';
   import { focus } from '$lib/state/focus.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
+  import { minimalChange } from '$lib/minimalChange';
   import type { Tile } from '$lib/state/workspace.svelte';
   import type { FileHistory } from '$lib/types';
   import {
@@ -524,23 +525,6 @@
       treeActions.noteRewrite(summary);
     });
     commitAnchorBaseline(view);
-  }
-
-  function minimalChange(
-    oldStr: string,
-    newStr: string,
-  ): { from: number; to: number; insert: string } | null {
-    if (oldStr === newStr) return null;
-    let start = 0;
-    const max = Math.min(oldStr.length, newStr.length);
-    while (start < max && oldStr[start] === newStr[start]) start++;
-    let endOld = oldStr.length;
-    let endNew = newStr.length;
-    while (endOld > start && endNew > start && oldStr[endOld - 1] === newStr[endNew - 1]) {
-      endOld--;
-      endNew--;
-    }
-    return { from: start, to: endOld, insert: newStr.slice(start, endNew) };
   }
 
   // --- Build / update this Tile's CodeMirror view ------------------------------
