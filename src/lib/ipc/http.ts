@@ -297,10 +297,10 @@ export const httpBackend: Backend = {
   listKnownBundles(): Promise<KnownBundle[]> {
     return Promise.resolve([]);
   },
-  forgetBundle(): Promise<void> {
+  forgetBundle(_path: string): Promise<void> {
     return Promise.reject(new Error(NO_LAUNCHER));
   },
-  openBundle(): Promise<void> {
+  openBundle(_path: string): Promise<void> {
     return Promise.reject(new Error(NO_LAUNCHER));
   },
   pickFolder(): Promise<string | null> {
