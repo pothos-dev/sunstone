@@ -3,7 +3,6 @@ import {
   keymap,
   highlightActiveLine,
   drawSelection,
-  type Command,
   type KeyBinding,
 } from '@codemirror/view';
 import { EditorState, Annotation, Compartment, type Extension } from '@codemirror/state';
@@ -18,6 +17,7 @@ import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-mar
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { backend } from '$lib/ipc';
 import { joinConcept, serializeFrontmatter, type Property } from '$lib/frontmatter';
+import { minimalChange } from '$lib/minimalChange';
 import {
   inlinePreview,
   imageBlocks,
@@ -42,15 +42,23 @@ import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
-import { parseCriticMarks, pairAnnotations, annotationAt } from '$lib/wasm/exports';
-import {
-  insertHighlightComment,
-  removeAnnotation,
-  setCommentText,
-} from './criticMarkup';
 import { anchorTracking } from './anchor-tracking';
 import { findExtensions, findPanelTheme } from './find';
-import { headingFormatEdit, toggleInlineWrap, insertLink, linkAt } from './textFormat';
+import { inlineWrapCommand, headingCommand, annotateCommand } from './commands';
+import {
+  initViewSession,
+  getViewOptions,
+  getViewPath,
+  setViewPath,
+  getWikiCompartment,
+  ensureWikiCompartment,
+  getLivePreviewCompartment,
+  ensureLivePreviewCompartment,
+  getViewMode,
+  setViewMode,
+  getViewMermaidTheme,
+  setViewMermaidTheme,
+} from './viewState';
 
 // The editor's public surface is re-exported here so consumers keep importing
 // from `$lib/editor/cm`. The frontmatter/broken-link/find concerns now live in
@@ -73,6 +81,23 @@ export {
   commitAnchorBaseline,
 } from './anchor-tracking';
 export { openSearch } from './find';
+export {
+  annotateActionFor,
+  selectionForAnnotate,
+  annotate,
+  addAnnotationWithComment,
+  updateAnnotationComment,
+  removeAnnotationAt,
+  toggleBold,
+  toggleItalic,
+  toggleStrikethrough,
+  toggleInlineCode,
+  linkActionFor,
+  insertOrEditLink,
+  copySelection,
+  cutSelection,
+  pasteFromClipboard,
+} from './commands';
 
 /**
  * Builds the CodeMirror 6 EditorView with the atomic-editor live-preview
@@ -301,272 +326,6 @@ function modeExtensions(
 }
 
 /**
- * A CM command that toggles an inline wrap (`**`, `*`, `` ` ``, `~~`) around the
- * current selection via the pure `toggleInlineWrap` transform. No-op in
- * read-only (reading-view) mode, where it declines the key so it can fall
- * through. Selecting the inner text afterwards keeps the formatted run highlighted.
- */
-function inlineWrapCommand(marker: string): Command {
-  return (view) => {
-    if (view.state.readOnly) return false;
-    const { from, to } = view.state.selection.main;
-    const edit = toggleInlineWrap(view.state.doc.toString(), from, to, marker);
-    view.dispatch({ changes: edit.changes, selection: edit.selection, scrollIntoView: true });
-    return true;
-  };
-}
-
-/**
- * A CM command that toggles ATX heading `level` (1–6, or 0 for "plain
- * paragraph") across the lines the selection touches, via `headingFormatEdit`.
- * The selection is remapped through the changes by CodeMirror. No-op in
- * read-only mode.
- */
-function headingCommand(level: number): Command {
-  return (view) => {
-    if (view.state.readOnly) return false;
-    const { from, to } = view.state.selection.main;
-    const edit = headingFormatEdit(view.state.doc.toString(), from, to, level);
-    if (edit.changes.length > 0) view.dispatch({ changes: edit.changes, scrollIntoView: true });
-    return true;
-  };
-}
-
-/**
- * What the annotate toggle would do for the current selection:
- *   - `'add'`    — wrap the selection as an annotation.
- *   - `'remove'` — strip the annotation under an empty caret.
- *   - `null`     — no-op: read-only, an empty caret outside any annotation, or a
- *                  selection overlapping an existing annotation (no nesting).
- * Shared by `annotateCommand` (which then acts) and the right-click menu (which
- * uses it to decide whether to offer the item and how to label it).
- */
-export function annotateActionFor(view: EditorView): 'add' | 'remove' | null {
-  // NOT readOnly-gated: annotating works in reading mode too (the preferred way),
-  // where the popup applies the change programmatically. The RANGE comes from
-  // `selectionForAnnotate`, which falls back to the DOM selection when CodeMirror
-  // does not sync it (non-editable reading mode).
-  const { from, to } = selectionForAnnotate(view);
-  const anns = pairAnnotations(parseCriticMarks(view.state.doc.toString()));
-  if (from === to) return annotationAt(anns, from) ? 'remove' : null;
-  // A selection overlapping an existing annotation can't be wrapped (no nesting).
-  return anns.some((a) => from <= a.to && to >= a.from) ? null : 'add';
-}
-
-/**
- * The range to annotate: the state selection when it is non-empty, else — in
- * reading mode, where CodeMirror does not sync the non-editable DOM selection —
- * the browser's text selection mapped back to document offsets via `posAtDOM`.
- * Returns a collapsed range (from === to) when there is nothing selected.
- */
-export function selectionForAnnotate(view: EditorView): { from: number; to: number } {
-  const sel = view.state.selection.main;
-  if (sel.from !== sel.to) return { from: sel.from, to: sel.to };
-  const dom = typeof window !== 'undefined' ? window.getSelection() : null;
-  if (dom && dom.rangeCount > 0 && !dom.isCollapsed && dom.anchorNode && dom.focusNode) {
-    try {
-      const a = view.posAtDOM(dom.anchorNode, dom.anchorOffset);
-      const b = view.posAtDOM(dom.focusNode, dom.focusOffset);
-      if (a !== b) return { from: Math.min(a, b), to: Math.max(a, b) };
-    } catch {
-      /* selection outside the editor content — fall through */
-    }
-  }
-  return { from: sel.from, to: sel.to };
-}
-
-/**
- * A CM command that TOGGLES a CriticMarkup highlight+comment annotation over the
- * selection, via the pure `criticMarkup` transforms. See `annotateActionFor` for
- * the branching; on `'add'` it wraps the selection as `{==sel==}{>><<}` and parks
- * the caret inside the empty comment so the user types the note.
- */
-const annotateCommand: Command = (view) => {
-  // Raw-authoring keybinding: it parks the caret in the note to type, so it needs
-  // an editable buffer. Reading mode annotates via the popup instead (see App).
-  if (view.state.readOnly) return false;
-  const action = annotateActionFor(view);
-  if (!action) return false;
-  const doc = view.state.doc.toString();
-  const { from, to } = view.state.selection.main;
-  if (action === 'remove') {
-    const at = annotationAt(pairAnnotations(parseCriticMarks(doc)), from);
-    if (!at) return false;
-    view.dispatch({ changes: removeAnnotation(doc, at).changes, scrollIntoView: true });
-    return true;
-  }
-  const edit = insertHighlightComment(doc, from, to);
-  if (!edit) return false;
-  view.dispatch({
-    changes: edit.changes,
-    selection: edit.cursor != null ? { anchor: edit.cursor } : undefined,
-    scrollIntoView: true,
-  });
-  return true;
-};
-
-/**
- * Run the annotate toggle imperatively (from the editor's right-click menu),
- * refocusing the editor afterwards. Mirrors the keybinding path. No-op when
- * `annotateActionFor` says there is nothing to do.
- */
-export function annotate(view: EditorView): void {
-  annotateCommand(view);
-  view.focus();
-}
-
-/**
- * Imperative annotation authoring for the popup (App.svelte). All three dispatch
- * changes PROGRAMMATICALLY, so they apply even in reading (read-only) mode — the
- * preferred way to annotate — and the change listener autosaves the result.
- */
-
-/** Wrap [from,to) as an annotation carrying `comment`. No-op for an empty range. */
-export function addAnnotationWithComment(
-  view: EditorView,
-  from: number,
-  to: number,
-  comment: string,
-): void {
-  const edit = insertHighlightComment(view.state.doc.toString(), from, to, comment);
-  if (!edit) return;
-  view.dispatch({ changes: edit.changes, scrollIntoView: true });
-}
-
-/**
- * Set the note of the annotation covering `anchor` to `text`. The doc is
- * re-parsed so a shifted range is re-found; empty `text` removes the whole
- * annotation (an emptied note is a deleted annotation).
- */
-export function updateAnnotationComment(view: EditorView, anchor: number, text: string): void {
-  const doc = view.state.doc.toString();
-  const ann = annotationAt(pairAnnotations(parseCriticMarks(doc)), anchor);
-  if (!ann) return;
-  const edit = text.trim() === '' ? removeAnnotation(doc, ann) : setCommentText(doc, ann, text);
-  if (edit.changes.length === 0) return;
-  view.dispatch({ changes: edit.changes, scrollIntoView: true });
-}
-
-/** Strip the annotation covering `anchor`, keeping the highlighted text (the popup's Remove). */
-export function removeAnnotationAt(view: EditorView, anchor: number): void {
-  const doc = view.state.doc.toString();
-  const ann = annotationAt(pairAnnotations(parseCriticMarks(doc)), anchor);
-  if (!ann) return;
-  view.dispatch({ changes: removeAnnotation(doc, ann).changes, scrollIntoView: true });
-}
-
-/**
- * Imperative inline-format toggles for the editor's right-click menu, mirroring
- * `annotate`: run the shared `inlineWrapCommand` transform (which is read-only
- * guarded and dispatches) then refocus the editor. One per intent so the menu
- * can call by name.
- */
-export function toggleBold(view: EditorView): void {
-  inlineWrapCommand('**')(view);
-  view.focus();
-}
-export function toggleItalic(view: EditorView): void {
-  inlineWrapCommand('*')(view);
-  view.focus();
-}
-export function toggleStrikethrough(view: EditorView): void {
-  inlineWrapCommand('~~')(view);
-  view.focus();
-}
-export function toggleInlineCode(view: EditorView): void {
-  inlineWrapCommand('`')(view);
-  view.focus();
-}
-
-/**
- * What the link action would do for the current selection head:
- *   - `'edit'`   — the caret sits inside an existing `[text](url)` link.
- *   - `'insert'` — no link under the caret; a new link scaffold would be added.
- *   - `null`     — read-only (reading view): the menu leaves the native menu.
- * Drives the menu label ("Edit link" / "Insert link").
- */
-export function linkActionFor(view: EditorView): 'insert' | 'edit' | null {
-  if (view.state.readOnly) return null;
-  const head = view.state.selection.main.head;
-  return linkAt(view.state.doc.toString(), head) ? 'edit' : 'insert';
-}
-
-/**
- * Insert a markdown link over the selection, OR edit the one under the caret.
- * When `linkAt` matches at the selection head we SELECT that link's url range so
- * the user can retype it (EDIT); otherwise we apply `insertLink` and place its
- * caret (INSERT — see `insertLink` for the two caret-park cases). Refocuses the
- * editor afterwards. No-op in read-only (reading-view) mode.
- */
-export function insertOrEditLink(view: EditorView): void {
-  if (view.state.readOnly) return;
-  const doc = view.state.doc.toString();
-  const { from, to, head } = view.state.selection.main;
-  const existing = linkAt(doc, head);
-  if (existing) {
-    view.dispatch({
-      selection: { anchor: existing.urlFrom, head: existing.urlTo },
-      scrollIntoView: true,
-    });
-  } else {
-    const edit = insertLink(doc, from, to);
-    view.dispatch({ changes: edit.changes, selection: edit.selection, scrollIntoView: true });
-  }
-  view.focus();
-}
-
-/**
- * Clipboard actions for the right-click menu, over the web Clipboard API
- * (`navigator.clipboard` — available in the webview and on localhost; NOT a
- * Tauri API, so it does not cross the IPC seam). CodeMirror already handles the
- * Ctrl/Cmd+C/X/V keys natively; these expose the same operations to the menu.
- * All are async (the Clipboard API is promise-based) and best-effort: if the API
- * is unavailable or denied, they no-op rather than throw. A menu click is a user
- * gesture, which satisfies the clipboard permission requirement.
- */
-export async function copySelection(view: EditorView): Promise<void> {
-  const { from, to } = view.state.selection.main;
-  if (from === to) return; // nothing selected
-  try {
-    await navigator.clipboard?.writeText(view.state.sliceDoc(from, to));
-  } catch {
-    /* clipboard unavailable/denied — no-op */
-  }
-  view.focus();
-}
-
-export async function cutSelection(view: EditorView): Promise<void> {
-  if (view.state.readOnly) return;
-  const { from, to } = view.state.selection.main;
-  if (from === to) return;
-  try {
-    await navigator.clipboard?.writeText(view.state.sliceDoc(from, to));
-  } catch {
-    return; // don't delete the text if the copy half failed
-  }
-  view.dispatch({ changes: { from, to, insert: '' }, selection: { anchor: from } });
-  view.focus();
-}
-
-export async function pasteFromClipboard(view: EditorView): Promise<void> {
-  if (view.state.readOnly) return;
-  let text = '';
-  try {
-    text = (await navigator.clipboard?.readText()) ?? '';
-  } catch {
-    return; // clipboard read unavailable/denied
-  }
-  if (!text) return;
-  const { from, to } = view.state.selection.main;
-  view.dispatch({
-    changes: { from, to, insert: text },
-    selection: { anchor: from + text.length },
-    scrollIntoView: true,
-  });
-  view.focus();
-}
-
-/**
  * Markdown formatting shortcuts (Obsidian-style; `Mod` = Cmd on macOS, Ctrl
  * elsewhere). Everything toggles. Headings follow the de-facto Word/LibreOffice
  * convention (`Mod-1`…`Mod-6`, `Mod-0` for paragraph) since Obsidian ships no
@@ -696,40 +455,11 @@ function editorExtensions(
 }
 
 /**
- * The build options behind a view, kept so `setEditorConcept` can rebuild the
- * EditorState (fresh history) on Concept switch using the SAME extension set /
- * listeners — without the caller having to thread the options back in.
+ * Per-view session state (build options, Concept path, the wikilink/mode
+ * Compartments, the current mode, and the mermaid theme) lives in `viewState.ts`
+ * as one record per `EditorView`, keyed there rather than via five separate
+ * WeakMaps here — see `initViewSession` and its `getView*`/`setView*` accessors.
  */
-const viewOptions = new WeakMap<EditorView, BuildEditorOptions>();
-
-/** Which Concept path each view is currently showing (for switch detection). */
-const viewPath = new WeakMap<EditorView, string | null>();
-
-/**
- * The wikilink Compartment per view. Reconfiguring it recreates the `wikiLinks`
- * StateField, which clears the extension's (un-invalidatable) resolve-cache and
- * re-resolves the visible links. The host drives this on index change via
- * `reconfigureWikiLinks`. One instance per view, reused across Concept switches.
- */
-const viewWikiCompartment = new WeakMap<EditorView, Compartment>();
-
-/**
- * The mode Compartment per view. Reconfiguring it swaps the mode-dependent
- * extension slice (decorations + read-only gating) for `setEditorMode` without
- * rebuilding the view. One instance per view, reused across Concept switches.
- */
-const viewLivePreviewCompartment = new WeakMap<EditorView, Compartment>();
-
-/** The current view mode per view, so it survives Concept switches (state rebuild). */
-const viewMode = new WeakMap<EditorView, EditorMode>();
-
-/**
- * The resolved app theme each view renders diagrams in, so it survives Concept
- * switches AND mode switches (both rebuild the mode slice). Updated by
- * `setEditorMermaidTheme`, which reconfigures the mode Compartment to re-render
- * every diagram in the new scheme (ADR-0005, theme-sync).
- */
-const viewMermaidTheme = new WeakMap<EditorView, ResolvedTheme>();
 
 /**
  * Build a READ-ONLY review buffer (review-toggle: working-tree ↔ HEAD).
@@ -787,12 +517,7 @@ export function buildEditor(options: BuildEditorOptions): EditorView {
   });
 
   const view = new EditorView({ state, parent });
-  viewOptions.set(view, options);
-  viewPath.set(view, options.path ?? null);
-  viewWikiCompartment.set(view, wikiCompartment);
-  viewLivePreviewCompartment.set(view, livePreviewCompartment);
-  viewMode.set(view, mode);
-  viewMermaidTheme.set(view, theme);
+  initViewSession(view, options, wikiCompartment, livePreviewCompartment, mode, theme);
 
   // Seed the editor root's theme from the app root (the theme store keeps it in
   // sync afterwards). atomic-editor reads `data-theme` on the CodeMirror root.
@@ -826,24 +551,22 @@ export function setEditorConcept(
   props: Property[],
   path: string | null = null,
 ): void {
-  const prevPath = viewPath.get(view) ?? null;
+  const prevPath = getViewPath(view);
   const switched = path !== prevPath;
-  viewPath.set(view, path);
+  setViewPath(view, path);
 
   if (switched) {
     // Fresh state = fresh history. No history can survive the Concept boundary.
-    const options = viewOptions.get(view);
+    const options = getViewOptions(view);
     // Reuse the view's existing Compartment instance so `reconfigureWikiLinks`
     // keeps targeting it after the switch. The fresh state re-evaluates the
     // compartment, so the wikilink cache also starts clean for the new Concept.
-    const wikiCompartment = viewWikiCompartment.get(view) ?? new Compartment();
-    viewWikiCompartment.set(view, wikiCompartment);
+    const wikiCompartment = ensureWikiCompartment(view);
     // Likewise reuse the mode Compartment and carry the current mode across the
     // switch, so the new Concept opens in the same editing/read mode.
-    const livePreviewCompartment = viewLivePreviewCompartment.get(view) ?? new Compartment();
-    viewLivePreviewCompartment.set(view, livePreviewCompartment);
-    const mode = viewMode.get(view) ?? DEFAULT_EDITOR_MODE;
-    const theme = viewMermaidTheme.get(view) ?? 'light';
+    const livePreviewCompartment = ensureLivePreviewCompartment(view);
+    const mode = getViewMode(view) ?? DEFAULT_EDITOR_MODE;
+    const theme = getViewMermaidTheme(view) ?? 'light';
     view.setState(
       EditorState.create({
         doc: body,
@@ -873,32 +596,13 @@ export function setEditorConcept(
   // multi-tile sync: when a SECOND tile shows the same Concept, an edit in the
   // first tile pushes new content here — a minimal change keeps the untouched
   // tile's caret in place instead of collapsing it to the doc end.
+  // `minimalChange` returns `null` when the strings are equal; `docChanged` already
+  // guards that case, so the change is only omitted when there's no doc edit at all.
   view.dispatch({
-    changes: docChanged ? minimalDocChange(current, body) : undefined,
+    changes: docChanged ? (minimalChange(current, body) ?? undefined) : undefined,
     effects: fmChanged ? [setFrontmatter.of(props)] : [],
     annotations: programmatic.of(true),
   });
-}
-
-/**
- * The single `{from,to,insert}` change covering the difference between two
- * strings (common prefix + suffix trimmed). Keeps a programmatic doc replacement
- * localized so CodeMirror maps the cursor through it instead of jumping it.
- */
-function minimalDocChange(
-  oldStr: string,
-  newStr: string,
-): { from: number; to: number; insert: string } {
-  let start = 0;
-  const max = Math.min(oldStr.length, newStr.length);
-  while (start < max && oldStr[start] === newStr[start]) start++;
-  let endOld = oldStr.length;
-  let endNew = newStr.length;
-  while (endOld > start && endNew > start && oldStr[endOld - 1] === newStr[endNew - 1]) {
-    endOld--;
-    endNew--;
-  }
-  return { from: start, to: endOld, insert: newStr.slice(start, endNew) };
 }
 
 /**
@@ -909,8 +613,8 @@ function minimalDocChange(
  * context. Recreating the extension recreates its StateField → fresh cache.
  */
 export function reconfigureWikiLinks(view: EditorView): void {
-  const compartment = viewWikiCompartment.get(view);
-  const ctx = viewOptions.get(view)?.wikiLinkContext;
+  const compartment = getWikiCompartment(view);
+  const ctx = getViewOptions(view)?.wikiLinkContext;
   if (!compartment || !ctx) return;
   view.dispatch({ effects: compartment.reconfigure(wikiLinksExtension(ctx)) });
 }
@@ -926,12 +630,12 @@ export function reconfigureWikiLinks(view: EditorView): void {
  * is unchanged or before the compartment exists.
  */
 export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme): void {
-  const compartment = viewLivePreviewCompartment.get(view);
-  if (!compartment || viewMermaidTheme.get(view) === resolved) return;
-  viewMermaidTheme.set(view, resolved);
+  const compartment = getLivePreviewCompartment(view);
+  if (!compartment || getViewMermaidTheme(view) === resolved) return;
+  setViewMermaidTheme(view, resolved);
   const mode = getEditorMode(view);
-  const onLinkClick = viewOptions.get(view)?.onLinkClick ?? defaultLinkClick;
-  const onCommentEdit = viewOptions.get(view)?.onCommentEdit;
+  const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
+  const onCommentEdit = getViewOptions(view)?.onCommentEdit;
   view.dispatch({
     effects: compartment.reconfigure(modeExtensions(mode, onLinkClick, resolved, onCommentEdit)),
   });
@@ -939,22 +643,22 @@ export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme)
 
 /** The view's current mode (`read` if the view predates mode tracking). */
 export function getEditorMode(view: EditorView): EditorMode {
-  return viewMode.get(view) ?? DEFAULT_EDITOR_MODE;
+  return getViewMode(view) ?? DEFAULT_EDITOR_MODE;
 }
 
 /**
  * Switch the view between `editing` / `read` by reconfiguring the mode
  * Compartment — no view rebuild, so the document, history and selection are
- * preserved. The mode is remembered (WeakMap) so it carries across Concept
+ * preserved. The mode is remembered (view session) so it carries across Concept
  * switches. No-op if the mode is unchanged or the view has no compartment.
  */
 export function setEditorMode(view: EditorView, mode: EditorMode): void {
-  const compartment = viewLivePreviewCompartment.get(view);
+  const compartment = getLivePreviewCompartment(view);
   if (!compartment || getEditorMode(view) === mode) return;
-  viewMode.set(view, mode);
-  const onLinkClick = viewOptions.get(view)?.onLinkClick ?? defaultLinkClick;
-  const onCommentEdit = viewOptions.get(view)?.onCommentEdit;
-  const theme = viewMermaidTheme.get(view) ?? 'light';
+  setViewMode(view, mode);
+  const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
+  const onCommentEdit = getViewOptions(view)?.onCommentEdit;
+  const theme = getViewMermaidTheme(view) ?? 'light';
   view.dispatch({
     effects: compartment.reconfigure(modeExtensions(mode, onLinkClick, theme, onCommentEdit)),
   });
