@@ -15,7 +15,7 @@
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import SidebarEdge from '$lib/components/SidebarEdge.svelte';
-  import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
+  import { DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
   import WebAppShellIsland from './WebAppShellIsland.svelte';
   import WebTree from './WebTree.svelte';
   import WebSearch from './WebSearch.svelte';
@@ -24,7 +24,9 @@
   import WebOutline from './WebOutline.svelte';
   import WebBacklinks from './WebBacklinks.svelte';
   import { hydrateMermaid } from './webMermaid';
-  import { loadUiState, saveUiState, type WebUiState } from './uiState';
+  import { loadUiState, saveUiState } from './uiState';
+  import { snapshotWebViewerUiState, restoreWebViewerUiState } from './webViewerUiState';
+  import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptTitle } from './conceptUrl';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
@@ -230,11 +232,12 @@
   });
 
   // --- Persist UI state (localStorage) — gated until the initial load applies. ---
-  let uiLoaded = false;
-  function snapshot(): WebUiState {
-    return {
+  let uiLoaded = $state(false);
+  $effect(() => {
+    // read all deps so this re-runs on any change
+    const state = snapshotWebViewerUiState({
       themeMode: theme.mode,
-      expandedFolders: [...expandedFolders],
+      expandedFolders,
       explorerOpen,
       tagsOpen,
       outlineOpen,
@@ -244,10 +247,7 @@
       leftSidebarWidth,
       rightSidebarWidth,
       propertiesOpen,
-    };
-  }
-  $effect(() => {
-    const state = snapshot(); // read all deps so this re-runs on any change
+    });
     if (!uiLoaded) return; // don't clobber storage during the initial seed
     saveUiState(state);
   });
@@ -260,22 +260,18 @@
     void ensureWasm();
 
     // Restore persisted UI state before tracking the OS scheme.
-    const ui = loadUiState();
-    if (ui.themeMode) theme.mode = ui.themeMode;
-    if (typeof ui.explorerOpen === 'boolean') explorerOpen = ui.explorerOpen;
-    if (typeof ui.tagsOpen === 'boolean') tagsOpen = ui.tagsOpen;
-    if (typeof ui.outlineOpen === 'boolean') outlineOpen = ui.outlineOpen;
-    if (typeof ui.backlinksOpen === 'boolean') backlinksOpen = ui.backlinksOpen;
-    if (typeof ui.leftSidebarOpen === 'boolean') leftSidebarOpen = ui.leftSidebarOpen;
-    if (typeof ui.rightSidebarOpen === 'boolean') rightSidebarOpen = ui.rightSidebarOpen;
-    if (typeof ui.leftSidebarWidth === 'number')
-      leftSidebarWidth = clampSidebarWidth(ui.leftSidebarWidth);
-    if (typeof ui.rightSidebarWidth === 'number')
-      rightSidebarWidth = clampSidebarWidth(ui.rightSidebarWidth);
-    if (typeof ui.propertiesOpen === 'boolean') propertiesOpen = ui.propertiesOpen;
-    if (Array.isArray(ui.expandedFolders)) {
-      expandedFolders = new Set(ui.expandedFolders);
-    }
+    const patch = restoreWebViewerUiState(loadUiState());
+    if (patch.themeMode) theme.mode = patch.themeMode;
+    if (typeof patch.explorerOpen === 'boolean') explorerOpen = patch.explorerOpen;
+    if (typeof patch.tagsOpen === 'boolean') tagsOpen = patch.tagsOpen;
+    if (typeof patch.outlineOpen === 'boolean') outlineOpen = patch.outlineOpen;
+    if (typeof patch.backlinksOpen === 'boolean') backlinksOpen = patch.backlinksOpen;
+    if (typeof patch.leftSidebarOpen === 'boolean') leftSidebarOpen = patch.leftSidebarOpen;
+    if (typeof patch.rightSidebarOpen === 'boolean') rightSidebarOpen = patch.rightSidebarOpen;
+    if (typeof patch.leftSidebarWidth === 'number') leftSidebarWidth = patch.leftSidebarWidth;
+    if (typeof patch.rightSidebarWidth === 'number') rightSidebarWidth = patch.rightSidebarWidth;
+    if (typeof patch.propertiesOpen === 'boolean') propertiesOpen = patch.propertiesOpen;
+    if (patch.expandedFolders) expandedFolders = patch.expandedFolders;
     const stopTheme = theme.start();
     uiLoaded = true;
 
@@ -295,15 +291,10 @@
     // Ctrl/Cmd+Shift+F toggles Search; Ctrl/Cmd+K toggles the quick-nav palette
     // (both capture phase, converging on the same flags the rail buttons flip).
     const onKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+      if (matchesHotkey(e, { key: 'f', shift: true })) {
         e.preventDefault();
         searchOpen = !searchOpen;
-      } else if (
-        (e.ctrlKey || e.metaKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key.toLowerCase() === 'k'
-      ) {
+      } else if (matchesHotkey(e, { key: 'k' })) {
         e.preventDefault();
         quickNavOpen = !quickNavOpen;
       }

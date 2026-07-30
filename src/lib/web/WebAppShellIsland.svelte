@@ -41,6 +41,7 @@
   import type { Document } from '$lib/state/document.svelte';
   import type { FileChange, SyncNotice } from '$lib/types';
   import { routeFileChange, structuralOpGated, type GatedStructuralOp } from './concurrency';
+  import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptHref, urlSyncAction } from './urlSync';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
   import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
@@ -338,7 +339,7 @@
 
     // (2) Cmd/Ctrl+S → flush the active Document (one commit).
     const onKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
+      if (matchesHotkey(e, { key: 's' })) {
         e.preventDefault();
         save();
       }
