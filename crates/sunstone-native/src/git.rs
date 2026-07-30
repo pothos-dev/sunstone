@@ -204,11 +204,7 @@ pub fn commit(
     let env = identity_env(identity);
     let output = run_git_env(root, &["commit", "-m", msg], &env)
         .ok_or_else(|| "git is not available".to_string())?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(git_err("commit", &output))
-    }
+    unit("commit", output)
 }
 
 /// Stage `paths` and amend HEAD (`git commit --amend --no-edit`), preserving the
@@ -221,11 +217,7 @@ pub fn amend(root: &Path, paths: &[&str], identity: &CommitIdentity) -> Result<(
     let env = identity_env(identity);
     let output = run_git_env(root, &["commit", "--amend", "--no-edit"], &env)
         .ok_or_else(|| "git is not available".to_string())?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(git_err("amend", &output))
-    }
+    unit("amend", output)
 }
 
 /// Read HEAD's subject + author name/email, or `None` when there is no HEAD
@@ -257,11 +249,7 @@ fn stage(root: &Path, paths: &[&str]) -> Result<(), String> {
     let mut args: Vec<&str> = vec!["add", "-A", "--"];
     args.extend(paths.iter().copied());
     let output = run_git(root, &args).ok_or_else(|| "git is not available".to_string())?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(git_err("add", &output))
-    }
+    unit("add", output)
 }
 
 /// The four `GIT_AUTHOR_*` / `GIT_COMMITTER_*` env pairs for `identity`, so the
