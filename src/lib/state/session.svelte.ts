@@ -284,25 +284,29 @@ class SessionStore {
     this.#scheduleSave();
   }
 
+  /** Assign `this[key] = value` and schedule a persist, unless unchanged. */
+  #setIfChanged<K extends 'explorerOpen' | 'tagsOpen' | 'backlinksOpen' | 'outlineOpen' | 'propertiesShown' | 'editorMode'>(
+    key: K,
+    value: this[K],
+  ): void {
+    if (value === this[key]) return;
+    this[key] = value;
+    this.#scheduleSave();
+  }
+
   /** Record the Explorer section's expanded/collapsed state and schedule a persist. */
   setExplorerOpen(open: boolean): void {
-    if (open === this.explorerOpen) return;
-    this.explorerOpen = open;
-    this.#scheduleSave();
+    this.#setIfChanged('explorerOpen', open);
   }
 
   /** Record the Tags section's expanded/collapsed state and schedule a persist. */
   setTagsOpen(open: boolean): void {
-    if (open === this.tagsOpen) return;
-    this.tagsOpen = open;
-    this.#scheduleSave();
+    this.#setIfChanged('tagsOpen', open);
   }
 
   /** Record the Backlinks section's expanded/collapsed state and schedule a persist. */
   setBacklinksOpen(open: boolean): void {
-    if (open === this.backlinksOpen) return;
-    this.backlinksOpen = open;
-    this.#scheduleSave();
+    this.#setIfChanged('backlinksOpen', open);
   }
 
   /** Record the right Sidebar's expanded/collapsed state and schedule a persist. */
@@ -332,23 +336,17 @@ class SessionStore {
 
   /** Record the Outline section's expanded/collapsed state and schedule a persist. */
   setOutlineOpen(open: boolean): void {
-    if (open === this.outlineOpen) return;
-    this.outlineOpen = open;
-    this.#scheduleSave();
+    this.#setIfChanged('outlineOpen', open);
   }
 
   /** Record the global Properties show/hide flag and schedule a persist. */
   setPropertiesShown(shown: boolean): void {
-    if (shown === this.propertiesShown) return;
-    this.propertiesShown = shown;
-    this.#scheduleSave();
+    this.#setIfChanged('propertiesShown', shown);
   }
 
   /** Record the editor view mode and schedule a persist. */
   setEditorMode(mode: EditorMode): void {
-    if (mode === this.editorMode) return;
-    this.editorMode = mode;
-    this.#scheduleSave();
+    this.#setIfChanged('editorMode', mode);
   }
 
   /**
