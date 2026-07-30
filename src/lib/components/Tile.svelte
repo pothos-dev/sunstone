@@ -68,6 +68,7 @@
   import { reviewStep, maxStep } from '$lib/editor/reviewStepper';
   import { parseProperties, type Property } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
+  import { buildEditorMenuItems, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
@@ -201,7 +202,6 @@
   }
 
   // --- Editor formatting context menu ------------------------------------------
-  type EditorMenuItem = { id: string; label: string; separated?: boolean };
   let editorMenu = $state<{
     x: number;
     y: number;
@@ -265,52 +265,22 @@
     const readOnly = view.state.readOnly;
     const range = selectionForAnnotate(view);
     const annAction = annotateActionFor(view);
+    const linkAction = linkActionFor(view);
 
-    if (readOnly) {
-      if (!annAction) return;
-      e.preventDefault();
-      editorMenu = {
-        x: e.clientX,
-        y: e.clientY,
-        items: [{ id: 'annotate', label: annAction === 'add' ? 'Add comment' : 'Remove comment' }],
-        annotateRange: annAction === 'add' ? range : undefined,
-      };
-      return;
-    }
+    const { items, annotateUsesSelectionRange } = buildEditorMenuItems({
+      readOnly,
+      hasSelection: range.from !== range.to,
+      annotateAction: annAction,
+      linkAction,
+    });
+    if (items.length === 0) return;
 
     e.preventDefault();
-    const items: EditorMenuItem[] = [];
-    const hasSelection = range.from !== range.to;
-    if (hasSelection) {
-      items.push({ id: 'cut', label: 'Cut' });
-      items.push({ id: 'copy', label: 'Copy' });
-    }
-    items.push({ id: 'paste', label: 'Paste' });
-    if (hasSelection) {
-      items.push({ id: 'bold', label: 'Bold', separated: true });
-      items.push({ id: 'italic', label: 'Italic' });
-      items.push({ id: 'strike', label: 'Strikethrough' });
-      items.push({ id: 'code', label: 'Inline code' });
-    }
-    const linkAction = linkActionFor(view);
-    items.push({
-      id: 'link',
-      label: linkAction === 'edit' ? 'Edit link' : 'Insert link',
-      separated: true,
-    });
-    if (annAction) {
-      items.push({
-        id: 'annotate',
-        label: annAction === 'add' ? 'Add comment' : 'Remove comment',
-        separated: true,
-      });
-    }
-
     editorMenu = {
       x: e.clientX,
       y: e.clientY,
       items,
-      annotateRange: annAction === 'add' ? range : undefined,
+      annotateRange: annotateUsesSelectionRange ? range : undefined,
     };
   }
 
