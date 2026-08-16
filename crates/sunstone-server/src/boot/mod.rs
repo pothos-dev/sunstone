@@ -34,16 +34,20 @@
 //! the container from serving reads. Ongoing reachability is
 //! `GET /api/sync-status`'s job.
 
-use std::fs;
-use std::io;
+mod fsutil;
+mod ssh;
+
+pub use fsutil::probe_writable;
+pub use ssh::write_ssh_material;
+
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use sunstone_native::git::{self, GitEnv};
 
-use crate::config::{
-    Config, GitConfig, KNOWN_HOSTS_PATH, REPO_DIR, SEED_FROM_ENV, SSH_DIR, SSH_KEY_PATH,
-};
+use crate::config::{Config, GitConfig, SEED_FROM_ENV};
+
+use fsutil::{canonical, copy_dir_contents, dir_is_empty, ensure_dir};
+use ssh::{ssh_command, SSH_KEY_ENV};
 
 /// Filename of the writability probe (§4.6). **Dot-prefixed on purpose**: §6's
 /// watcher filter drops every path with a dot-prefixed component, so the probe
@@ -55,17 +59,10 @@ pub const WRITE_PROBE_NAME: &str = ".sunstone-write-probe";
 /// initialised by the old entrypoint and one initialised here read alike.
 const SEED_COMMIT_MSG: &str = "seed bundle";
 
-// The two variables §4.2 acts on. `config` keeps its per-key constants private,
-// so they are spelled again here and asserted against its closed
-// `KNOWN_GIT_VARS` set by `spelled_env_names_are_in_configs_closed_set` — a
-// rename that misses one fails the suite rather than drifting silently.
-const SSH_KEY_ENV: &str = "SUNSTONE_GIT_SSH_KEY";
-const KNOWN_HOSTS_ENV: &str = "SUNSTONE_GIT_KNOWN_HOSTS";
-
 /// The compose escape hatch every permission message points at (§4.6, ticket
 /// 10): non-root removed root's blanket permission bypass, so a bind mount not
 /// owned by uid 1000 must either be chowned or run as its owner.
-const UID_HINT: &str = "either chown it to the container's uid (1000 by default) \
+pub(super) const UID_HINT: &str = "either chown it to the container's uid (1000 by default) \
                         or run the container as its owner — compose: \
                         `user: \"${SUNSTONE_UID:-1000}:${SUNSTONE_GID:-1000}\"`";
 
@@ -160,109 +157,6 @@ fn run_after_git_env(cfg: &Config) -> Result<BootOutcome, String> {
     })
 }
 
-/// §4.2 — write the ssh material for a git-synced deployment with an ssh-shaped
-/// origin, then **remove the key from our own environment**.
-///
-/// 1. `SUNSTONE_GIT_SSH_KEY` must be set and must base64-decode to something
-///    `ssh-keygen -y -f` accepts (see [`validate_ssh_key`]) — otherwise exit
-///    naming the variable.
-/// 2. Write [`crate::config::SSH_KEY_PATH`] at `0600`; owner is correct **by
-///    construction** because our own uid creates it. Then
-///    `std::env::remove_var(SUNSTONE_GIT_SSH_KEY)` so no git or ssh child
-///    inherits the material. (Residual, accepted: `docker inspect` and the
-///    initial `/proc/<pid>/environ` still expose it — the same place this
-///    deployment's other secrets already sit.)
-/// 3. `SUNSTONE_GIT_KNOWN_HOSTS` set ⇒ write the lines to
-///    [`crate::config::KNOWN_HOSTS_PATH`] and use `StrictHostKeyChecking=yes`;
-///    unset ⇒ `accept-new` against that same path.
-///
-/// A no-op in every other shape. This is the **only** place in the crate that
-/// mutates the process environment.
-pub fn write_ssh_material(cfg: &Config) -> Result<(), String> {
-    // Not ssh-shaped ⇒ nothing to write and nothing to hide: an https origin
-    // never spawns `ssh`, and git-local/plain never talk to a remote at all.
-    // Checked before any filesystem call so those shapes never touch `/srv/ssh`.
-    let Some(git) = cfg.git().filter(|git| git.origin_is_ssh()) else {
-        return Ok(());
-    };
-
-    // 1. `config::parse` already reported a missing (`SshKeyRequired`) or
-    //    undecodable (`SshKeyNotBase64`) key, so this is belt-and-braces — but
-    //    it is checked before touching the filesystem, so the message an
-    //    operator reads names the variable either way.
-    let pem = git.ssh_key_pem.as_deref().ok_or_else(|| {
-        format!(
-            "{SSH_KEY_ENV} is required because SUNSTONE_GIT_ORIGIN is ssh-shaped. Set it to \
-             the base64 of a passphrase-less private deploy key (`base64 -w0 < id_ed25519`), \
-             or use an https origin."
-        )
-    })?;
-
-    ensure_dir(Path::new(SSH_DIR), "the ssh material directory")?;
-
-    // 2. `0600` and owned by us: ssh refuses a key file *we own* at anything
-    //    looser (measured, ticket 11), so the mode is load-bearing rather than
-    //    hygiene. No chown — our own uid creates the file.
-    write_private_key(Path::new(SSH_KEY_PATH), pem)?;
-    validate_ssh_key(Path::new(SSH_KEY_PATH))?;
-    forget_ssh_key_var();
-
-    // 3. Host-key trust: pin if set, TOFU otherwise (§4.2.3).
-    match &git.known_hosts {
-        Some(lines) => write_known_hosts(Path::new(KNOWN_HOSTS_PATH), lines)?,
-        // `/srv/ssh` is **not** a volume, so an unpinned deployment re-trusts the
-        // remote on first connect after every container recreate. That is
-        // intended: `accept-new` is the zero-config bring-up path, and pinning
-        // (which the live stack does) never TOFUs at all. The file is created
-        // empty so `accept-new` has somewhere of ours to append to.
-        None => touch(Path::new(KNOWN_HOSTS_PATH))?,
-    }
-
-    Ok(())
-}
-
-/// Whether the decoded PEM is a private key `ssh` will accept, checked with
-/// `ssh-keygen -y -f <path>` (which derives the public key, so it both parses
-/// the file and proves it is a private key). Catches a truncated or
-/// passphrase-protected key at boot instead of mid-tick.
-pub fn validate_ssh_key(key_path: &Path) -> Result<(), String> {
-    // `-P ""` and a null stdin keep this non-interactive: without them an
-    // encrypted key makes `ssh-keygen` prompt for a passphrase, and a boot that
-    // blocks on a prompt is worse than one that fails.
-    let output = Command::new("ssh-keygen")
-        .arg("-y")
-        .arg("-P")
-        .arg("")
-        .arg("-f")
-        .arg(key_path)
-        .stdin(Stdio::null())
-        .output();
-
-    let output = match output {
-        Ok(output) => output,
-        Err(_) => {
-            // `ssh-keygen` absent: there is nothing to validate *against*.
-            // Refusing to boot over a missing validator would be wrong — if
-            // `ssh-keygen` is missing so is `ssh`, and the clone/fetch then
-            // fails with git's own message.
-            eprintln!(
-                "sunstone-server: ssh-keygen is not on PATH — skipping the {SSH_KEY_ENV} check"
-            );
-            return Ok(());
-        }
-    };
-    if output.status.success() {
-        return Ok(());
-    }
-    Err(format!(
-        "{SSH_KEY_ENV} does not decode to a usable private key — ssh-keygen rejected \
-         {}: {}. It must be the base64 of a **passphrase-less private key file** \
-         (`base64 -w0 < id_ed25519`), not a public key and not an encrypted key.",
-        key_path.display(),
-        first_line(&output.stderr)
-    ))
-}
-
 /// §4.2.4 — hand the process-global git environment to `sunstone-native`:
 /// `GIT_SSH_COMMAND` built from [`crate::config::SSH_KEY_PATH`] +
 /// [`crate::config::KNOWN_HOSTS_PATH`] + the strict-host-key mode, and the sync
@@ -281,21 +175,6 @@ pub fn configure_git(cfg: &Config) {
         ssh_command: git.origin_is_ssh().then(|| ssh_command(git)),
         committer: Some(git.sync_identity.clone()),
     });
-}
-
-/// The `GIT_SSH_COMMAND` string (§3, ticket 11). Built **here**, not in
-/// `git.rs`: that module is host-agnostic and shared with the desktop, so it
-/// must never learn container paths.
-///
-/// `-i` + `IdentitiesOnly=yes` so no agent or default identity can be picked up
-/// silently; no `~/.ssh` and no ssh config file — measured unnecessary, and a
-/// config file on disk would apply to every later `ssh` an operator execs.
-fn ssh_command(git: &GitConfig) -> String {
-    format!(
-        "ssh -i {SSH_KEY_PATH} -o IdentitiesOnly=yes -o StrictHostKeyChecking={} \
-         -o UserKnownHostsFile={KNOWN_HOSTS_PATH}",
-        git.strict_host_key_checking()
-    )
 }
 
 /// §4.3 — copy `SUNSTONE_BUNDLE_SEED_FROM`'s **contents** into the resolved
@@ -517,160 +396,6 @@ pub fn preflight_bundle_writable(cfg: &Config, bundle_root: &Path) -> Result<(),
     })
 }
 
-/// The writability probe: **create then remove** [`WRITE_PROBE_NAME`] in `dir`.
-///
-/// *Never* compare ownership — group permissions and `:ro` mounts both mean
-/// ownership does not imply writability. Removing the probe again is part of the
-/// contract: a leftover file would be a permanent tree-dirtying artefact that
-/// stalls every rebase.
-pub fn probe_writable(dir: &Path) -> Result<(), String> {
-    let probe = dir.join(WRITE_PROBE_NAME);
-    fs::File::create(&probe)
-        .map_err(|e| format!("{} is not writable: {e}", dir.display()))?;
-    fs::remove_file(&probe).map_err(|e| {
-        format!(
-            "{} is writable but the probe file {WRITE_PROBE_NAME} could not be removed again: \
-             {e}",
-            dir.display()
-        )
-    })
-}
-
-// --- Small filesystem helpers -----------------------------------------------
-
-/// `mkdir -p` with a message naming what the directory is *for*, so the failure
-/// is actionable rather than a bare `errno`.
-fn ensure_dir(dir: &Path, what: &str) -> Result<(), String> {
-    fs::create_dir_all(dir).map_err(|e| {
-        format!(
-            "could not create {what} {}: {e}. {UID_HINT}. (A volume mounted at a path absent \
-             from the image lands `root:root` and our uid cannot write it — {REPO_DIR} and \
-             {SSH_DIR} both exist in the image for exactly this reason.)",
-            dir.display()
-        )
-    })
-}
-
-/// Write the private key at `0600` in one shot.
-///
-/// The mode is set at **creation** (so the material is never briefly readable by
-/// others) and again afterwards, which covers a file that already existed with a
-/// looser mode. Measured (ticket 11): a key file *we own* is refused by ssh at
-/// anything looser than `0600`.
-fn write_private_key(path: &Path, pem: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-
-    let mut opts = fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(0o600);
-    }
-    let mut file = opts
-        .open(path)
-        .map_err(|e| format!("could not write the deploy key to {}: {e}", path.display()))?;
-    file.write_all(pem)
-        .and_then(|()| {
-            // OpenSSH's parser wants the PEM's final newline; `base64 -w0 <
-            // id_ed25519` carries it, a hand-trimmed paste may not.
-            if pem.last() == Some(&b'\n') {
-                Ok(())
-            } else {
-                file.write_all(b"\n")
-            }
-        })
-        .map_err(|e| format!("could not write the deploy key to {}: {e}", path.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|e| {
-            format!(
-                "could not set mode 0600 on {}: {e} — ssh refuses a key file we own at a looser \
-                 mode.",
-                path.display()
-            )
-        })?;
-    }
-    Ok(())
-}
-
-/// Write the pinned `ssh-keyscan` lines, newline-terminated (an unterminated
-/// final line is not a host-key entry ssh will match).
-fn write_known_hosts(path: &Path, lines: &str) -> Result<(), String> {
-    let mut body = lines.to_string();
-    if !body.ends_with('\n') {
-        body.push('\n');
-    }
-    fs::write(path, body).map_err(|e| {
-        format!(
-            "could not write {KNOWN_HOSTS_ENV} to {}: {e}",
-            path.display()
-        )
-    })
-}
-
-/// Create `path` if it is missing, leaving an existing file untouched.
-fn touch(path: &Path) -> Result<(), String> {
-    if path.exists() {
-        return Ok(());
-    }
-    fs::write(path, "").map_err(|e| format!("could not create {}: {e}", path.display()))
-}
-
-/// Drop `SUNSTONE_GIT_SSH_KEY` from our own environment (§4.2.2), so no git or
-/// ssh child inherits the key material — `GIT_SSH_COMMAND` hands ssh the key by
-/// *path*, and the bytes have no business in any child's environment.
-///
-/// SAFETY: `remove_var` requires that no other thread reads or writes the
-/// environment concurrently. Verified against `main.rs`: this runs from the
-/// boot sequence at the top of `main`, on the main thread — *before*
-/// `watcher::start` spawns its notify thread, before the sync loop's
-/// `tokio::spawn`, and before `axum::serve`, so no thread of ours exists that
-/// could observe the environment. (`#[tokio::main]` has already built the
-/// runtime, but its worker threads are parked and no code in this binary reads
-/// `std::env` off the main thread at all; `main`'s own later reads —
-/// `SUNSTONE_API_PORT`, the JWT secret — are on this same thread.) It is also
-/// the crate's **only** environment mutation, by design: `config::parse` is pure.
-///
-/// The `unsafe` block documents that contract for edition 2024, where
-/// `remove_var` carries the marker; this crate is still edition 2021, where the
-/// call is safe — hence the `unused_unsafe` allow rather than a cfg dance.
-#[allow(unused_unsafe)]
-fn forget_ssh_key_var() {
-    unsafe {
-        std::env::remove_var(SSH_KEY_ENV);
-    }
-}
-
-/// Recursive copy of a directory's **contents** into `dest` (`cp -a src/.
-/// dest/`), dotfiles included. Symlinked directories are followed, so the
-/// destination is a plain tree of real files.
-fn copy_dir_contents(src: &Path, dest: &Path) -> io::Result<()> {
-    fs::create_dir_all(dest)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let from = entry.path();
-        let to = dest.join(entry.file_name());
-        if from.is_dir() {
-            copy_dir_contents(&from, &to)?;
-        } else {
-            fs::copy(&from, &to)?;
-        }
-    }
-    Ok(())
-}
-
-/// Whether `dir` has no entries — missing counts as empty (§4.4's
-/// "missing / empty" row is one branch).
-fn dir_is_empty(dir: &Path) -> Result<bool, String> {
-    match fs::read_dir(dir) {
-        Ok(mut entries) => Ok(entries.next().is_none()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(true),
-        Err(e) => Err(format!("could not read {}: {e}", dir.display())),
-    }
-}
-
 /// Whether the checked-out repo's `origin` is the configured one. Trailing
 /// slashes are ignored; nothing else is normalised, because the origin is an
 /// opaque string everywhere else in this codebase (Spec 1 §7).
@@ -716,22 +441,6 @@ fn origin_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> S
     )
 }
 
-/// `canonicalize`, falling back to the path as given (it may not exist yet).
-fn canonical(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
-}
-
-/// The first line of a child's stderr — enough to name the fault without
-/// pasting `ssh-keygen`'s multi-line banner into the boot log.
-fn first_line(stderr: &[u8]) -> String {
-    let text = String::from_utf8_lossy(stderr);
-    text.lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .unwrap_or("no output")
-        .to_string()
-}
-
 // --- Tests ------------------------------------------------------------------
 //
 // Everything runs over temp dirs and a `Config` built by hand — the whole point
@@ -747,22 +456,19 @@ fn first_line(stderr: &[u8]) -> String {
 // - **No test writes `/srv`**, so the `write_ssh_material` cases exercised here
 //   are the ones that fail (or no-op) *before* any filesystem call.
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::process::Command;
     use std::time::Duration;
     use sunstone_native::git::CommitIdentity;
 
     use crate::testutil::{git, git_available, git_stdout, temp_dir};
 
-    fn ssh_keygen_available() -> bool {
-        // Spawnability is the whole question; `-h` exits non-zero with a usage
-        // banner, which is fine.
-        Command::new("ssh-keygen").arg("-h").output().is_ok()
-    }
-
     /// Whether we are root, for whom no directory mode is unwritable — a
     /// root-era CI would otherwise silently defeat the read-only probe test.
-    fn is_root() -> bool {
+    pub(crate) fn is_root() -> bool {
         Command::new("id")
             .arg("-u")
             .output()
@@ -778,7 +484,7 @@ mod tests {
     }
 
     /// A `GitConfig` with the defaults `config::parse` would produce.
-    fn git_config(branch: &str, origin: Option<&str>) -> GitConfig {
+    pub(crate) fn git_config(branch: &str, origin: Option<&str>) -> GitConfig {
         GitConfig {
             branch: branch.to_string(),
             origin: origin.map(str::to_string),
@@ -792,7 +498,7 @@ mod tests {
 
     /// A git-shaped `Config` over a temp repo root, mirroring what
     /// `config::parse` builds (which points `repo_root` at `REPO_DIR`).
-    fn git_shaped(repo_root: &Path, subdir: &str, origin: Option<&str>) -> Config {
+    pub(crate) fn git_shaped(repo_root: &Path, subdir: &str, origin: Option<&str>) -> Config {
         let mut git = git_config("main", origin);
         git.bundle_subdir = subdir.to_string();
         let bundle_root = crate::config::join_bundle_subdir(repo_root, subdir);
@@ -813,7 +519,7 @@ mod tests {
     }
 
     /// Every path under `dir`, sorted — the "touched nothing" assertion.
-    fn tree(dir: &Path) -> Vec<String> {
+    pub(crate) fn tree(dir: &Path) -> Vec<String> {
         fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) {
             let mut entries: Vec<_> = fs::read_dir(dir)
                 .unwrap()
@@ -851,33 +557,7 @@ mod tests {
         dir
     }
 
-    // --- §4.6 the probe -----------------------------------------------------
-
-    #[test]
-    fn probe_succeeds_on_a_writable_dir_and_leaves_nothing_behind() {
-        let dir = temp_dir("probe-ok");
-        assert!(probe_writable(&dir).is_ok());
-        // Load-bearing: a leftover probe file would dirty the tree forever and
-        // stall every rebase.
-        assert!(tree(&dir).is_empty(), "probe left {:?} behind", tree(&dir));
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn probe_fails_on_a_read_only_dir() {
-        use std::os::unix::fs::PermissionsExt;
-        if is_root() {
-            return; // root writes anything; the probe cannot be defeated by mode
-        }
-        let dir = temp_dir("probe-ro");
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
-        let err = probe_writable(&dir).unwrap_err();
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
-        assert!(
-            err.contains("is not writable") && err.contains(&dir.display().to_string()),
-            "unhelpful probe error: {err}"
-        );
-    }
+    // --- §4.6 the preflights --------------------------------------------------
 
     #[test]
     #[cfg(unix)]
@@ -1155,111 +835,6 @@ mod tests {
         // the path through — and never create it.
         assert_eq!(resolve_bundle_root(&cfg).unwrap(), missing);
         assert!(!missing.exists());
-    }
-
-    // --- §4.2 the ssh material ----------------------------------------------
-
-    #[test]
-    fn the_ssh_command_is_exact_for_both_strict_settings() {
-        let mut git = git_config("main", Some("git@example.com:org/wiki.git"));
-
-        // Unpinned: TOFU against the same (non-persistent) path.
-        assert_eq!(
-            ssh_command(&git),
-            "ssh -i /srv/ssh/id_ed25519 -o IdentitiesOnly=yes \
-             -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/srv/ssh/known_hosts"
-        );
-
-        // Pinned via SUNSTONE_GIT_KNOWN_HOSTS: strict.
-        git.known_hosts = Some("example.com ssh-ed25519 AAAA...".to_string());
-        assert_eq!(
-            ssh_command(&git),
-            "ssh -i /srv/ssh/id_ed25519 -o IdentitiesOnly=yes \
-             -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/srv/ssh/known_hosts"
-        );
-    }
-
-    #[test]
-    fn an_unusable_key_is_rejected_naming_the_variable() {
-        if !ssh_keygen_available() {
-            return;
-        }
-        let dir = temp_dir("bad-key");
-        let key = dir.join("id_ed25519");
-        // Decodes fine (so `config::parse` passed it) but is not a private key —
-        // exactly the case that would otherwise surface as a *sync* error deep
-        // in the first loop tick.
-        write_private_key(&key, b"-----BEGIN OPENSSH PRIVATE KEY-----\nnot really\n").unwrap();
-        let err = validate_ssh_key(&key).unwrap_err();
-        assert!(err.contains(SSH_KEY_ENV), "must name the variable: {err}");
-        assert!(err.contains("base64 -w0 < id_ed25519"), "must name the fix: {err}");
-    }
-
-    #[test]
-    fn a_real_passphrase_less_key_is_accepted() {
-        if !ssh_keygen_available() {
-            return;
-        }
-        let dir = temp_dir("good-key");
-        let generated = dir.join("generated");
-        let out = Command::new("ssh-keygen")
-            .args(["-q", "-t", "ed25519", "-N", ""])
-            .arg("-f")
-            .arg(&generated)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "ssh-keygen failed: {out:?}");
-
-        // Round-trip through our own writer, mode included.
-        let key = dir.join("id_ed25519");
-        write_private_key(&key, &fs::read(&generated).unwrap()).unwrap();
-        assert!(validate_ssh_key(&key).is_ok());
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = fs::metadata(&key).unwrap().permissions().mode() & 0o777;
-            assert_eq!(mode, 0o600, "ssh refuses a key we own at a looser mode");
-        }
-    }
-
-    #[test]
-    fn a_missing_key_variable_is_reported_before_anything_is_written() {
-        // ssh-shaped origin with no key: `config::parse` catches this first, but
-        // the boot message must name the variable too — and must not reach
-        // `/srv/ssh` (this test would fail if it did).
-        let repo = temp_dir("ssh-nokey");
-        let cfg = git_shaped(&repo, "", Some("git@example.com:org/wiki.git"));
-        let err = write_ssh_material(&cfg).unwrap_err();
-        assert!(err.contains(SSH_KEY_ENV), "{err}");
-        assert!(!Path::new(SSH_KEY_PATH).exists());
-    }
-
-    #[test]
-    fn a_non_ssh_shape_writes_no_ssh_material() {
-        // Each of these must return before touching `/srv/ssh` — which is also
-        // what makes the assertion below safe on a dev machine.
-        let repo = temp_dir("ssh-noop");
-        for cfg in [
-            git_shaped(&repo, "", Some("https://example.com/org/wiki.git")),
-            git_shaped(&repo, "", None),
-            Config::plain(repo.clone()),
-        ] {
-            assert!(write_ssh_material(&cfg).is_ok());
-        }
-        assert!(!Path::new(SSH_KEY_PATH).exists());
-    }
-
-    #[test]
-    fn spelled_env_names_are_in_configs_closed_set() {
-        // `config` keeps its per-key constants private, so these two are spelled
-        // again in this module; a rename must not drift (§2.2's namespace is
-        // closed, so an unrecognised name is a boot error).
-        for name in [SSH_KEY_ENV, KNOWN_HOSTS_ENV] {
-            assert!(
-                crate::config::KNOWN_GIT_VARS.contains(&name),
-                "{name} is not in config::KNOWN_GIT_VARS"
-            );
-        }
     }
 
     #[test]
