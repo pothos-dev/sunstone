@@ -286,6 +286,9 @@ function serializeKey(key: string): string {
  * Serialize a scalar value the way YAML would, but minimally — we want clean
  * output without disturbing surrounding text. Quote only when necessary.
  */
+/** What YAML would parse as a number (int, float, or exponent form). */
+const YAML_NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+
 function serializeScalar(value: string, asBoolean: boolean, asNumber = false): string {
   if (asBoolean) {
     const v = value.trim().toLowerCase();
@@ -297,7 +300,7 @@ function serializeScalar(value: string, asBoolean: boolean, asNumber = false): s
     // parses as a number. If the user edited it to something non-numeric, fall
     // through to string handling (which will quote as needed).
     const v = value.trim();
-    if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(v)) return v;
+    if (YAML_NUMBER.test(v)) return v;
   }
   if (value === '') return "''";
   if (needsQuoting(value)) {
@@ -322,7 +325,7 @@ function needsQuoting(value: string): boolean {
     return true;
   }
   // Looks like a number.
-  if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(value)) return true;
+  if (YAML_NUMBER.test(value)) return true;
   return false;
 }
 
