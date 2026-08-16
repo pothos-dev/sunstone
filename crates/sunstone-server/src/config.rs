@@ -468,7 +468,7 @@ impl fmt::Display for ConfigError {
 /// key-lookup function has no enumeration — so it enforces §2.2 over the
 /// closed [`KNOWN_GIT_VARS`] set only. `main()` calls [`parse_env`], which
 /// takes the present key names too; unit tests over a `HashMap` can use either.
-#[allow(dead_code)] // the `HashMap`-friendly entry point for tests; `main()` calls `parse_env`
+#[cfg(test)] // the `HashMap`-friendly entry point for tests; `main()` calls `parse_env`
 pub fn parse(get: impl Fn(&str) -> Option<String>) -> Result<Config, Vec<ConfigError>> {
     parse_env(KNOWN_GIT_VARS.iter().map(|s| s.to_string()), get)
 }

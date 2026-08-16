@@ -6,7 +6,7 @@
 //! identity flows into the git commit author/committer; a stamped `FileChange`
 //! is broadcast so other browsers live-refresh while the writer drops its echo.
 //!
-//! All 7 handlers share one skeleton — `identity` → `write_shape` →
+//! All 7 handlers share one skeleton — identity → shape →
 //! `run_write` → `broadcast_write` — differing only in which `WriteShape`
 //! method they call and how they map the resulting `WriteResult` into an HTTP
 //! response. [`write_and_broadcast`] captures that skeleton once; each handler
@@ -197,30 +197,21 @@ where
         + Send
         + 'static,
 {
-    let ident = identity(user);
-    let shape = write_shape(state);
+    // The commit identity for the authenticated user (author == committer).
+    let ident = CommitIdentity {
+        name: user.name.clone(),
+        email: user.email.clone(),
+    };
+    // §5's write-path gate, read off the one parse of the environment — never
+    // off the environment itself and never by sniffing the filesystem for a
+    // `.git`. Taken BEFORE `run_write`, because the closure it hands to the
+    // blocking task sees only an `&AppState`; `WriteShape` is `Copy`, so the
+    // closure captures the decision rather than the whole `ServerState`.
+    let shape = WriteShape::for_config(&state.cfg);
     let result = run_write(state, move |app| op(app, shape, &ident)).await?;
     let response = to_response(&result);
     broadcast_write(state, result, headers, user);
     Ok(response)
-}
-
-/// §5's write-path gate, read off the one parse of the environment — never off
-/// the environment itself and never by sniffing the filesystem for a `.git`.
-///
-/// Taken **before** `run_write`, because the closure it hands to the blocking
-/// task sees only an `&AppState`; `WriteShape` is `Copy`, so the closure captures
-/// the decision rather than the whole `ServerState`.
-fn write_shape(state: &Arc<ServerState>) -> WriteShape {
-    WriteShape::for_config(&state.cfg)
-}
-
-/// The commit identity for the authenticated user (author == committer).
-fn identity(user: &AuthedUser) -> CommitIdentity {
-    CommitIdentity {
-        name: user.name.clone(),
-        email: user.email.clone(),
-    }
 }
 
 /// Run a write op on a blocking thread while holding the global write lock, so
@@ -347,15 +338,15 @@ mod tests {
     fn write_handlers_take_their_shape_from_the_parsed_config() {
         let root = temp_bundle();
         assert_eq!(
-            write_shape(&state_with(Config::plain(root.clone()))),
+            WriteShape::for_config(&state_with(Config::plain(root.clone())).cfg),
             WriteShape::Plain
         );
         let mut git_cfg = Config::plain(root.clone());
         git_cfg.shape = config::Shape::GitLocal;
-        assert_eq!(write_shape(&state_with(git_cfg)), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&state_with(git_cfg).cfg), WriteShape::Git);
         let mut synced = Config::plain(root);
         synced.shape = config::Shape::GitSynced;
-        assert_eq!(write_shape(&state_with(synced)), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&state_with(synced).cfg), WriteShape::Git);
     }
 
     /// §5's kick: the write path signals the loop once the write lock is free
