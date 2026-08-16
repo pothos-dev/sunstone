@@ -2,7 +2,6 @@ import { test, expect } from 'bun:test';
 import {
   isOwnEcho,
   routeFileChange,
-  editToggleLabel,
   structuralOpGated,
   conflictTitle,
   updatedNoticeText,
@@ -85,12 +84,7 @@ test('an external edit (no origin) reloads with a null author', () => {
   });
 });
 
-// --- toggle label + structural gate (ticket 08 §4-5) -----------------------
-
-test('editToggleLabel is Save when dirty, Done when clean', () => {
-  expect(editToggleLabel(true)).toBe('Save');
-  expect(editToggleLabel(false)).toBe('Done');
-});
+// --- structural gate (ticket 08 §5) ----------------------------------------
 
 test('structural gate: create exempt; rename/move/delete gate only when dirty', () => {
   expect(structuralOpGated('create', true)).toBe(false);

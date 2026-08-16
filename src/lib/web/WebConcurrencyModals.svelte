@@ -16,11 +16,11 @@
 <script lang="ts">
   // Presentational-only surface for the web write concurrency UX (ticket 08):
   // the non-blocking "updated" notice, the deleted-state banner, and the three
-  // blocking modals (conflict / leave / structural-op). Extracted from the
-  // ticket-06 `WebEditorIsland` so both it and the full-App `WebAppShellIsland`
-  // (WP3) render byte-identical markup + copy over the SAME `data-testid`s. All
-  // decision logic + state machines stay in the islands; this is a thin switch
-  // over the pure `concurrency.ts` copy helpers.
+  // blocking modals (conflict / leave / structural-op). Originally extracted
+  // from the ticket-06 `WebEditorIsland` (since removed — authenticated users
+  // get the full App shell instead); rendered today by `WebAppShellIsland`.
+  // All decision logic + state machines stay in the island; this is a thin
+  // switch over the pure `concurrency.ts` copy helpers.
   import type { GatedStructuralOp } from './concurrency';
   import {
     conflictTitle,

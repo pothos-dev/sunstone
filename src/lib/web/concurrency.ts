@@ -63,16 +63,6 @@ export function routeFileChange(
   return dirty ? { type: 'conflict', author } : { type: 'reload', author };
 }
 
-/**
- * The Edit-toggle label (ticket 08 §4): "Save" when the buffer is dirty (its
- * click IS the Save path — no ambiguity), "Done" when clean (exit to the viewer
- * with no dialog). The implicit three-way exit dialog fires only on the OTHER,
- * implicit exits (Concept switch, wikilink nav), never on this toggle.
- */
-export function editToggleLabel(dirty: boolean): 'Save' | 'Done' {
-  return dirty ? 'Save' : 'Done';
-}
-
 /** A structural tree operation that may need the clean-buffer gate. */
 export type StructuralOp = 'create' | 'rename' | 'move' | 'delete';
 

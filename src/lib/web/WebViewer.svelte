@@ -2,13 +2,9 @@
   import type { TreeNode, TagCount } from '$lib/types';
   import type { RenderPayload } from './render';
   import type { WebUser } from './loadConcept';
-  import type { Component } from 'svelte';
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
   import { goto, invalidateAll } from '$app/navigation';
   import { backend } from '$lib/ipc';
-  import { editToggleLabel } from './concurrency';
-  import type { WebEditorApi } from './WebEditorIsland.svelte';
   import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { ordinaryChildren, reservedChildren } from '$lib/treeNav';
   import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
@@ -39,8 +35,7 @@
       selected: string | null;
       rendered: RenderPayload | null;
       renderError: string | null;
-      /** Authenticated user (Auth.js session), or null when signed out. The
-       *  Edit affordance is shown ONLY when this is present (ticket 06). */
+      /** Authenticated user (Auth.js session), or null when signed out. */
       user: WebUser | null;
     };
   }
@@ -56,37 +51,8 @@
   // (SSR and the first client render read the same `data.user`).
   let showApp = $derived(data.user !== null);
 
-  // --- Editing (ticket 06): viewer stays the SSR default; an Edit toggle swaps
-  // the CENTER rendered article for the client-only editor island in place. The
-  // island (and, transitively, CodeMirror) is NEVER statically imported here —
-  // it is pulled in via dynamic `import()` on first Edit, keeping it out of the
-  // SSR graph. Done/Save returns to the rendered view (reusing invalidateAll).
-  let editing = $state(false);
-  let IslandComponent = $state<Component | null>(null);
-  let islandApi = $state<WebEditorApi | null>(null);
-  let islandDirty = $state(false);
-  const canEdit = $derived(browser && data.user !== null && data.selected !== null);
-
-  async function startEdit() {
-    if (!IslandComponent) {
-      IslandComponent = (await import('./WebEditorIsland.svelte')).default as unknown as Component;
-    }
-    editing = true;
-  }
-
-  /** Leave edit mode. `reRender` re-fetches the Concept for the rendered view
-   *  (Done/Save on the SAME Concept); a Concept switch skips it (goto reloads). */
-  function endEdit(reRender: boolean) {
-    editing = false;
-    islandApi = null;
-    islandDirty = false;
-    if (reRender) void invalidateAll();
-  }
-
-  function onToggleEdit() {
-    if (!editing) void startEdit();
-    else islandApi?.requestDone();
-  }
+  // Web editing for authenticated users happens via the full App shell
+  // (`WebAppShellIsland` above) — this SSR surface is read-only.
 
   // The read-only "Sunstone Web" viewer, shaped like the desktop shell: a far-left
   // activity rail (quick-nav + search + a bottom theme toggle + a user slot wired
@@ -99,17 +65,7 @@
   // A Concept is addressed by its path in the URL (`/research/providers/mistral-ai`),
   // not a `?path=` query — `conceptToUrl` drops `.md` and a trailing `/index`.
   function open(path: string) {
-    const nav = () => void goto(conceptToUrl(path), { keepFocus: true });
-    // Switching Concept while editing is an implicit exit (ticket 08 §4): route
-    // it through the island's dirty gate (three-way leave modal) first.
-    if (editing && islandApi) {
-      islandApi.tryLeave(() => {
-        endEdit(false);
-        nav();
-      });
-      return;
-    }
-    nav();
+    void goto(conceptToUrl(path), { keepFocus: true });
   }
 
   // The Concept the App shell has open, once it starts driving navigation itself
@@ -143,16 +99,6 @@
   });
   function toggleTheme() {
     theme.mode = theme.resolved === 'dark' ? 'light' : 'dark';
-  }
-
-  // Sign out via the Auth.js client helper (same round-trip as the App shell's
-  // account bar). A signed-in user normally gets the App shell instead of this
-  // surface, so this is the fallback path (e.g. the session appearing without a
-  // reload); lazy-imported so the auth client stays out of the SSR + initial
-  // client graph.
-  async function signOut(): Promise<void> {
-    const { signOut: doSignOut } = await import('@auth/sveltekit/client');
-    await doSignOut({ callbackUrl: '/' });
   }
 
   // --- Search (Ctrl+Shift+F) ---
@@ -344,11 +290,10 @@
       >
     {/snippet}
     {#snippet user()}
-      <!-- The rail's bottom slot surfaces the REAL auth action. Anon (signed
-           out) → a link into Auth.js sign-in (a full reload so the OIDC flow
-           runs and re-lands with a session → the full App shell). If a signed-in
-           user somehow renders this read surface, offer sign-out (mirrors the
-           App shell's account bar). Web-only (dead-code-stripped on desktop). -->
+      <!-- The rail's bottom slot surfaces the REAL auth action: a link into
+           Auth.js sign-in (a full reload so the OIDC flow runs and re-lands
+           with a session → the full App shell). This surface only renders for
+           `data.user === null`. Web-only (dead-code-stripped on desktop). -->
       {#if __SUNSTONE_WEB__ && data.user === null}
         <a
           class="rail-user-btn"
@@ -363,20 +308,6 @@
             <path d="M2.75 13.5a5.25 5.25 0 0 1 10.5 0" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
           </svg>
         </a>
-      {:else if data.user}
-        <button
-          type="button"
-          class="rail-user-btn"
-          data-testid="web-sign-out"
-          title={`Sign out (${data.user.name})`}
-          aria-label="Sign out"
-          onclick={signOut}
-        >
-          <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-            <path d="M6.5 2.5h-3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-            <path d="M9 5l3 3-3 3M12 8H6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
       {/if}
     {/snippet}
   </ActivityRail>
@@ -451,8 +382,8 @@
     <!-- Slim "concept strip": the web analogue of the desktop concept header
          (web has no tiles/CodeMirror, so it is light). The left group holds the
          per-Concept history + title; the right group the per-Concept controls
-         (Edit for a signed-in user, Properties, export-PDF; theme lives in the
-         activity rail). Sidebar collapse/resize moved to the edge borders. -->
+         (Properties, export-PDF; theme lives in the activity rail). Sidebar
+         collapse/resize moved to the edge borders. -->
     <div class="concept-strip" data-testid="concept-strip">
       <div class="cs-title-group">
         <div class="btn-group">
@@ -479,21 +410,6 @@
       </div>
 
       <div class="cs-controls">
-        <!-- Edit toggle (ticket 06): shown ONLY to an authenticated user with a
-             Concept open (inert for the anonymous reader). "Edit" enters the
-             island; while editing the label is Save (dirty) / Done (clean). -->
-        {#if canEdit}
-          <button
-            type="button"
-            class="icon-btn text-btn edit-toggle"
-            class:active={editing}
-            data-testid="web-edit-toggle"
-            title={editing ? 'Return to the rendered view' : 'Edit this Concept'}
-            aria-label={editing ? 'Finish editing' : 'Edit this Concept'}
-            aria-pressed={editing}
-            onclick={onToggleEdit}>{editing ? editToggleLabel(islandDirty) : 'Edit'}</button
-          >
-        {/if}
         <!-- Properties show/hide: flips the read-only Properties panel in the centre. -->
         <button
           type="button"
@@ -541,20 +457,8 @@
       </div>
     </div>
 
-    <main class="reader" class:editing aria-label="Concept">
-      {#if editing}
-        <!-- CENTER swapped in place for the client-only editor island. -->
-        {#if IslandComponent && data.selected}
-          <IslandComponent
-            path={data.selected}
-            onExit={() => endEdit(true)}
-            onDirty={(d: boolean) => (islandDirty = d)}
-            onReady={(a: WebEditorApi) => (islandApi = a)}
-          />
-        {:else}
-          <p class="status" data-testid="reader-empty">Loading editor…</p>
-        {/if}
-      {:else if data.renderError}
+    <main class="reader" aria-label="Concept">
+      {#if data.renderError}
         <p class="status error" data-testid="reader-error">
           Cannot render {data.selected}: {data.renderError}
         </p>
@@ -808,20 +712,6 @@
     cursor: default;
   }
 
-  /* Text-labelled chrome buttons (Edit): widen past the square icon-btn footprint. */
-  .text-btn {
-    width: auto;
-    padding-inline: 0.6rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
-  .edit-toggle.active {
-    background: var(--accent-soft, rgba(217, 98, 43, 0.2));
-    border-color: var(--accent, #d9622b);
-    color: var(--tag-text, inherit);
-  }
-
   /* Rail user slot affordance (sign-in / sign-out), sized to the rail button. */
   .rail-user-btn {
     display: inline-flex;
@@ -892,17 +782,6 @@
     padding: 1rem 1.5rem 4rem;
     min-width: 0;
     min-height: 0;
-  }
-
-  /* While editing, the editor island fills the centre: drop the reader padding
-     + scroll (the island/CodeMirror own their own), and anchor the island's
-     floating "updated" notice. */
-  .reader.editing {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    padding: 0;
-    position: relative;
   }
 
   /* Read-only Properties: a metadata grid (frontmatter key → value), shown/hidden
