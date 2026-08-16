@@ -426,7 +426,7 @@ pub fn rebase_head_timestamp(root: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::commit::{commit, CommitIdentity};
+    use crate::git::commit::commit;
     use crate::git::history::FileHistory;
     use crate::git::test_support::{git, git_available, ident, temp_dir};
     use std::path::PathBuf;
