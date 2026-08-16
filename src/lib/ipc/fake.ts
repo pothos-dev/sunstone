@@ -7,7 +7,6 @@ import type {
   SearchHit,
   RewriteSummary,
   AnchorRename,
-  FileCommit,
   FileHistory,
   FileAtRev,
   RenderPayload,
@@ -27,6 +26,16 @@ import { buildTree, applyRename, applyDelete } from './fake/tree';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
+import { FAKE_COMMITS, committedContentAt } from './fake/git';
+import { searchFiles } from './fake/search';
+import {
+  isLauncherForced,
+  getFakeOpenBundle,
+  setFakeOpenBundle,
+  loadKnownBundles,
+  saveKnownBundles,
+  touchKnownBundle,
+} from './fake/launcher';
 // The index-parse kernels are pure wasm FREE exports (ADR 0006 §11-A); the fake
 // consumes the single shared source rather than a divergent TS twin.
 import { parseFrontmatter, parseFrontmatterKeys, rewriteAnchors } from '$lib/wasm/exports';
@@ -41,13 +50,17 @@ import { parseFrontmatter, parseFrontmatterKeys, rewriteAnchors } from '$lib/was
  *
  * The fixture, mutable in-memory state, and the focused operations over it live
  * in `./fake/*`:
- *   - `store`   — the fixture data + the shared mutable `FILES`/`FOLDERS` state
+ *   - `fixture` — the seeded markdown fixture literal (imported only by `store`);
+ *   - `store`   — the shared mutable `FILES`/`FOLDERS`/`COMMITTED_FILES` state
  *                 (exported as live bindings, so every module shares one copy)
  *                 plus the path predicates over them;
  *   - `tree`    — TreeNode construction + path-mutating rename/delete;
  *   - `frontmatter` — the test-only `stripTagsFromFrontmatter` affordance (the
  *                 index-parse kernels are wasm FREE exports, `$lib/wasm/exports`);
- *   - `links`   — outbound-link extraction + the rename/move link-rewrite engine.
+ *   - `links`   — outbound-link extraction + the rename/move link-rewrite engine;
+ *   - `git`     — the canned commit history + committed-content-at-rev fixture;
+ *   - `search`  — the capped full-text search over the fixture;
+ *   - `launcher` — the localStorage/sessionStorage-backed launcher store.
  * This module wires them into the watcher-subscriber model and the exported
  * `fakeBackend`.
  */
@@ -426,30 +439,11 @@ export const fakeBackend: Backend = {
     localStorage.setItem(BUNDLE_STATE_KEY, JSON.stringify(state));
   },
 
-  // Full-text search: scan every `.md` Concept's full content for a
-  // case-insensitive substring of `query`, the JS equivalent of the Rust
-  // ripgrep-crate search. Returns one hit per matching line (path + 1-based
-  // line + the matching line text), ordered by path then line and capped at
-  // MAX_SEARCH_RESULTS to mirror the backend's server-side cap. An empty /
-  // whitespace query yields no matches (the UI doesn't search until input).
+  // Full-text search: the JS equivalent of the Rust ripgrep-crate search, capped
+  // at MAX_SEARCH_RESULTS to mirror the backend's server-side cap; see
+  // `./fake/search`.
   async search(query: string): Promise<SearchHit[]> {
-    const needle = query.trim().toLowerCase();
-    if (needle === '') return [];
-
-    const hits: SearchHit[] = [];
-    for (const path of conceptPaths()) {
-      const lines = FILES[path].split('\n');
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].replace(/\r$/, '');
-        if (line.toLowerCase().includes(needle)) {
-          hits.push({ path, line: i + 1, snippet: line });
-          if (hits.length >= MAX_SEARCH_RESULTS) break;
-        }
-      }
-      if (hits.length >= MAX_SEARCH_RESULTS) break;
-    }
-    hits.sort((a, b) => (a.path === b.path ? a.line - b.line : a.path.localeCompare(b.path)));
-    return hits.slice(0, MAX_SEARCH_RESULTS);
+    return searchFiles(query);
   },
 
   // Git seam: canned, deterministic history/content so the review-diff UI is
@@ -505,186 +499,6 @@ export const fakeBackend: Backend = {
     window.open(url, '_blank', 'noopener,noreferrer');
   },
 };
-
-/**
- * Canned commit history for the fake backend (newest first). Fixed hashes/dates
- * keep the review-diff UI deterministic under Playwright. A MULTI-commit history
- * (issue 05) lets the review-view stepper walk consecutive pairs — position 0 is
- * working tree ↔ HEAD, then HEAD ↔ HEAD~1, HEAD~1 ↔ HEAD~2. Mirrors the real
- * `FileHistory` `ok` shape.
- */
-const FAKE_COMMITS: FileCommit[] = [
-  {
-    hash: 'a1b2c3d',
-    subject: 'Refine the concept',
-    author: 'Ada Lovelace',
-    date: '2026-07-19T10:00:00+00:00',
-    relativeDate: 'yesterday',
-  },
-  {
-    hash: '0f1e2d3',
-    subject: 'Expand the details',
-    author: 'Grace Hopper',
-    date: '2026-07-10T09:00:00+00:00',
-    relativeDate: '10 days ago',
-  },
-  {
-    hash: '9a8b7c6',
-    subject: 'Initial version',
-    author: 'Grace Hopper',
-    date: '2026-07-01T09:00:00+00:00',
-    relativeDate: '3 weeks ago',
-  },
-];
-
-/**
- * HEAD-distance of each `FAKE_COMMITS` entry (newest first). The gaps are
- * deliberate: unrelated commits (touching OTHER files) sit BETWEEN this file's
- * own commits, so `HEAD~1` is NOT the file's second-newest version — `HEAD~2`
- * is. This models the real `git log --follow` gap the stepper must diff around:
- * it addresses commits by HASH, never by `HEAD~N`, precisely because `HEAD~N`
- * would resolve unrelated commits to the same (unchanged) file content and show
- * an empty diff. A fake that mapped `HEAD~N → Nth file version` would hide that
- * bug, so it must not.
- */
-const COMMIT_HEAD_DISTANCE = [0, 2, 3];
-
-/**
- * The file-version index a git rev resolves to for THIS file: a `FAKE_COMMITS`
- * short hash → its own index (newest = 0); `HEAD`/`HEAD~N` → the newest file
- * commit at or before that HEAD distance (an unrelated ancestor keeps the file
- * at its previous version), faithful to `git show <rev>:<path>`. `null` when the
- * rev is unrecognized or older than the file's first commit (file absent there).
- */
-function revToVersion(rev: string): number | null {
-  const r = rev.trim();
-  const idx = FAKE_COMMITS.findIndex((c) => c.hash === r);
-  if (idx !== -1) return idx;
-  const m = /^HEAD(?:~(\d+))?$/.exec(r);
-  if (!m) return null;
-  const dist = m[1] ? Number(m[1]) : 0;
-  if (dist > COMMIT_HEAD_DISTANCE[COMMIT_HEAD_DISTANCE.length - 1]) return null;
-  let version: number | null = null;
-  for (let i = 0; i < COMMIT_HEAD_DISTANCE.length; i++) {
-    if (COMMIT_HEAD_DISTANCE[i] <= dist) version = i;
-  }
-  return version;
-}
-
-/**
- * Deterministic committed content of `path` at `rev` (the fake's stand-in for
- * `git show <rev>:<path>`), or `null` when the path was never committed or the
- * rev resolves to before the file existed. Version 0 (newest commit) is the
- * COMMITTED snapshot; each older version prepends one UNIQUE marker line PER
- * generation, so every consecutive commit pair yields a distinct, non-empty diff
- * — enough for the history stepper to be exercised end-to-end under Playwright.
- * The working tree is the mutable `FILES`, so the position-0 (working ↔ HEAD)
- * diff stays driven by the user's live edits, exactly as issue 04.
- */
-function committedContentAt(path: string, rev: string): string | null {
-  const base = COMMITTED_FILES[path];
-  if (base === undefined) return null;
-  const version = revToVersion(rev);
-  if (version === null) return null;
-  if (version === 0) return base;
-  const markers: string[] = [];
-  for (let g = version; g >= 1; g--) {
-    markers.push(`> revision marker ${g} — older wording (generation ${g})`);
-  }
-  return `${markers.join('\n')}\n\n${base}`;
-}
-
-// ---------------------------------------------------------------------------
-// Launcher backing store (fake). The known-folder list persists in localStorage;
-// the "which Bundle is open" marker uses sessionStorage so it survives the reload
-// the launcher triggers but resets per fresh test context.
-// ---------------------------------------------------------------------------
-
-/** localStorage key for the fake launcher's known-folder list. */
-const KNOWN_BUNDLES_KEY = 'sunstone:knownBundles';
-/** sessionStorage key marking which Bundle the launcher opened this session. */
-const FAKE_OPEN_KEY = 'sunstone:fakeOpenBundle';
-
-/** True when the URL forces launcher mode (`?launcher=1`/`?launcher`). */
-function isLauncherForced(): boolean {
-  if (typeof location === 'undefined') return false;
-  return new URLSearchParams(location.search).has('launcher');
-}
-
-function getFakeOpenBundle(): string | null {
-  if (typeof sessionStorage === 'undefined') return null;
-  return sessionStorage.getItem(FAKE_OPEN_KEY);
-}
-
-function setFakeOpenBundle(path: string): void {
-  if (typeof sessionStorage === 'undefined') return;
-  sessionStorage.setItem(FAKE_OPEN_KEY, path);
-}
-
-/** Display basename of a folder path (mirrors the Rust `display_name`). */
-function bundleName(path: string): string {
-  return path.split('/').filter(Boolean).pop() ?? path;
-}
-
-/**
- * The seed known-folder list — two fixtures so the launcher shows a non-empty,
- * sorted list out of the box (for the screenshot + list-ordering test). Fixed
- * `lastOpened` values keep the order deterministic.
- */
-function seedKnownBundles(): KnownBundle[] {
-  // Offsets from "now" (stamped once, then persisted) so the relative-time labels
-  // read realistically; the descending order matches the assertions below.
-  const now = Date.now();
-  const min = 60_000;
-  return [
-    { path: '/home/user/Knowledge Base', name: 'Knowledge Base', lastOpened: now - 5 * min, exists: true },
-    { path: '/home/user/Project Notes', name: 'Project Notes', lastOpened: now - 120 * min, exists: true },
-    { path: '/home/user/Archive', name: 'Archive', lastOpened: now - 3 * 24 * 60 * min, exists: true },
-  ];
-}
-
-/** Load the known-folder list (seeding on first use), sorted newest-first. */
-function loadKnownBundles(): KnownBundle[] {
-  if (typeof localStorage === 'undefined') return seedKnownBundles();
-  const raw = localStorage.getItem(KNOWN_BUNDLES_KEY);
-  if (raw === null) {
-    const seeded = seedKnownBundles();
-    saveKnownBundles(seeded);
-    return sortKnownBundles(seeded);
-  }
-  try {
-    const parsed = JSON.parse(raw) as KnownBundle[];
-    return sortKnownBundles(Array.isArray(parsed) ? parsed : []);
-  } catch {
-    return [];
-  }
-}
-
-/** Persist the known-folder list verbatim. */
-function saveKnownBundles(list: KnownBundle[]): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(KNOWN_BUNDLES_KEY, JSON.stringify(list));
-}
-
-/** Sort newest-first (lastOpened desc, null last), tie-broken by name — mirrors Rust. */
-function sortKnownBundles(list: KnownBundle[]): KnownBundle[] {
-  return [...list].sort(
-    (a, b) =>
-      (b.lastOpened ?? -Infinity) - (a.lastOpened ?? -Infinity) ||
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
-  );
-}
-
-/** Stamp `path` as just-opened (adding it to the known list if new). */
-function touchKnownBundle(path: string): void {
-  const list = loadKnownBundles().filter((b) => b.path !== path);
-  const stamp = list.reduce((max, b) => Math.max(max, b.lastOpened ?? 0), 0) + 1000;
-  list.push({ path, name: bundleName(path), lastOpened: stamp, exists: true });
-  saveKnownBundles(list);
-}
-
-/** Mirror of the Rust `MAX_RESULTS` cap (search.rs). */
-const MAX_SEARCH_RESULTS = 500;
 
 /** localStorage key for the fake Bundle's session state. */
 const BUNDLE_STATE_KEY = `sunstone:bundleState:${FAKE_BUNDLE_ROOT}`;
