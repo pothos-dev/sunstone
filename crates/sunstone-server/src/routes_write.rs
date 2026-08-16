@@ -393,4 +393,82 @@ mod tests {
         .await
         .expect("the write left a wake-up permit for the loop");
     }
+
+    /// Ticket 08 §1: a rename broadcasts exactly two change groups — `removed`
+    /// (old path) then `modified` (new path) — each stamped with the forwarded
+    /// `x-sunstone-client` id and the OIDC author name, so the writing tab drops
+    /// its echo and every other tab live-refreshes.
+    #[tokio::test]
+    async fn rename_broadcasts_removed_then_modified_with_the_forwarded_client_id() {
+        let state = state_with(Config::plain(temp_bundle()));
+        let user = AuthedUser {
+            name: "Ada Lovelace".to_string(),
+            email: "ada@example.com".to_string(),
+        };
+        let mut headers = HeaderMap::new();
+        headers.insert("x-sunstone-client", "tab-42".parse().unwrap());
+        let mut events = state.events.subscribe();
+
+        let result = rename_handler(
+            State(state.clone()),
+            user,
+            headers,
+            Json(RenameBody {
+                from: "note.md".to_string(),
+                to: "renamed.md".to_string(),
+            }),
+        )
+        .await;
+        if let Err(e) = result {
+            panic!("plain-shape rename failed: {}", e.0);
+        }
+
+        let ServerEvent::File(first) = events.recv().await.unwrap() else {
+            panic!("expected a File event");
+        };
+        assert_eq!(first.kind, "removed");
+        assert_eq!(first.paths, vec!["note.md".to_string()]);
+        let origin = first.origin.expect("the write stamps its origin");
+        assert_eq!(origin.client_id, "tab-42");
+        assert_eq!(origin.author.name, "Ada Lovelace");
+
+        let ServerEvent::File(second) = events.recv().await.unwrap() else {
+            panic!("expected a File event");
+        };
+        assert_eq!(second.kind, "modified");
+        assert!(second.paths.contains(&"renamed.md".to_string()));
+        let origin = second.origin.expect("the write stamps its origin");
+        assert_eq!(origin.client_id, "tab-42");
+        assert_eq!(origin.author.name, "Ada Lovelace");
+
+        // Exactly two groups — nothing else was broadcast.
+        assert!(events.try_recv().is_err());
+    }
+
+    /// A missing/absent `x-sunstone-client` header stamps an empty client id,
+    /// so no browser matches it and every tab treats the change as genuine.
+    #[test]
+    fn a_missing_client_header_yields_an_empty_client_id() {
+        assert_eq!(client_id(&HeaderMap::new()), "");
+    }
+
+    /// `WriteError::into_response` carries the write taxonomy onto HTTP:
+    /// 400 invalid path, 409 existing target, 404 missing referent, 500 default.
+    #[test]
+    fn write_error_maps_the_write_taxonomy_onto_http_statuses() {
+        let status = |msg: &str| WriteError(msg.to_string()).into_response().status();
+        assert_eq!(
+            status("path escapes the bundle: ../x"),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(status("already exists: a.md"), StatusCode::CONFLICT);
+        assert_eq!(
+            status("target folder does not exist: sub"),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status("git commit failed: boom"),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }
