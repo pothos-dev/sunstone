@@ -241,11 +241,6 @@ pub(crate) fn classify(msg: &str) -> StatusCode {
     }
 }
 
-// Bundle-root resolution lives in `config::parse_env` (the `SUNSTONE_BUNDLE` read
-// and the `CARGO_MANIFEST_DIR`-relative dev fallback) plus
-// `boot::resolve_bundle_root` (the canonicalization and the git-shape join), so
-// the duplicate pair that used to sit here is gone rather than left to drift.
-
 #[cfg(test)]
 mod tests {
     use super::*;

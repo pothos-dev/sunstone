@@ -13,7 +13,7 @@
 //! The store is robust: a missing or corrupt file loads as defaults (we never
 //! propagate a parse error up to the UI — losing session state is harmless).
 //!
-//! Pure-ish module logic — the `#[tauri::command]` wrappers in `lib.rs` stay
+//! Pure-ish module logic — the host command/route wrappers stay
 //! thin and just forward to `load_bundle_state` / `save_bundle_state`.
 
 use std::collections::HashMap;

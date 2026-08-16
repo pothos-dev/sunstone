@@ -315,9 +315,8 @@ pub struct Config {
 impl Config {
     /// A [`Shape::Plain`] config over `bundle_root`, with writes disabled.
     ///
-    /// Trivially correct and used by `main()` as the interim boot path until
-    /// W4 wires [`parse`] + [`crate::boot::run`], so the skeleton keeps the
-    /// binary behaving exactly as it does today.
+    /// The trivially-correct plain config every module's tests build on;
+    /// `main()` itself goes through [`parse_env`] + [`crate::boot::run`].
     #[allow(dead_code)] // the trivially-correct plain config every module's tests build on
     pub fn plain(bundle_root: PathBuf) -> Config {
         Config {

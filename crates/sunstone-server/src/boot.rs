@@ -678,9 +678,6 @@ fn same_origin(found: &str, configured: &str) -> bool {
     found.trim().trim_end_matches('/') == configured.trim().trim_end_matches('/')
 }
 
-/// §4.4's loud refusal for an adopted repo pointing somewhere else. Names both
-/// URLs and both ways out — the *only* place either URL is printed, since
-/// `GET /api/sync-status` is content-free by rule (§10.5).
 /// §4.4's "fail loudly, touch nothing" for an adopted repo sitting on the wrong
 /// branch — a restored or hand-prepared volume with the right origin but another
 /// branch checked out.
@@ -701,6 +698,9 @@ fn branch_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> S
     )
 }
 
+/// §4.4's loud refusal for an adopted repo pointing somewhere else. Names both
+/// URLs and both ways out — the *only* place either URL is printed, since
+/// `GET /api/sync-status` is content-free by rule (§10.5).
 fn origin_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> String {
     let found = match found {
         Some(url) => format!("has origin {url}"),

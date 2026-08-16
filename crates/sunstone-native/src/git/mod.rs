@@ -1,17 +1,9 @@
-//! Minimal git seam: file history + file-at-revision, backed by the system
+//! The git seam: every git operation Sunstone performs, backed by the system
 //! `git` binary via `std::process::Command` (NO git-library dependency).
 //!
-//! The backend stays "dumb": it exposes just enough git for the review feature
-//! and does NO diffing (that is the frontend's job). Two operations:
-//!   - [`file_history`] — the commits that touched a bundle-relative file,
-//!     newest first (`git log --follow`).
-//!   - [`file_at_rev`]  — a file's full text at a given revision
-//!     (`git show <rev>:<path>`). The working-tree side is the ordinary
-//!     `bundle::read_concept`.
-//!
-//! Every failure mode is surfaced as a distinguishable, non-panic *value* (not
-//! an error) so the UI can disable its diff toggle: not a git repo, an untracked
-//! file, a tracked file with no commits, or `git` missing from PATH.
+//! It began as read-only history for the review feature and has grown the web
+//! server's write path: commit/amend, fetch/rebase/push, and conflict
+//! resolution. The backend still does NO diffing (that is the frontend's job).
 //!
 //! Paths crossing in are bundle-relative, '/'-separated (the seam convention).
 //! Git is run with the Bundle root as its working directory, so pathspecs and
