@@ -20,6 +20,7 @@
    * web backend, so an empty query browses ALL Concept paths instead.
    */
   import { backend } from '$lib/ipc';
+  import { createLatestGuard } from '$lib/asyncGuard';
   import { fuzzyRank } from '$lib/fuzzy';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
@@ -48,11 +49,11 @@
   let loaded = false;
 
   // Tag drill-down: the tag whose Concepts the list is currently showing (null =
-  // normal search). `tagConcepts` holds the resolved paths; `tagToken` guards a
+  // normal search). `tagConcepts` holds the resolved paths; `tagGuard` guards a
   // slow resolve from landing after the user stepped back out / drilled another.
   let tagMode = $state<string | null>(null);
   let tagConcepts = $state<string[]>([]);
-  let tagToken = 0;
+  const tagGuard = createLatestGuard();
 
   // Results. A tagged Concept is rendered exactly like a normal Concept row.
   type Result = { kind: 'concept'; path: string } | { kind: 'tag'; tag: string };
@@ -135,9 +136,9 @@
     query = '';
     selected = 0;
     tagConcepts = [];
-    const token = ++tagToken;
+    const token = tagGuard.next();
     void backend.conceptsByTag(tag).then((c) => {
-      if (token === tagToken) tagConcepts = c;
+      if (tagGuard.isLatest(token)) tagConcepts = c;
     });
     // A tag row reached by CLICK moves focus to the button (then removed from the
     // DOM as the list swaps); pull focus back to the input so typing filters and
@@ -149,7 +150,7 @@
   function exitTag() {
     tagMode = null;
     tagConcepts = [];
-    tagToken++;
+    tagGuard.next(); // invalidate any in-flight resolve
     query = '';
     selected = 0;
   }

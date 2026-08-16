@@ -16,6 +16,7 @@
    * web viewer has no need for), managing open/close/keys locally instead.
    */
   import { backend } from '$lib/ipc';
+  import { createLatestGuard } from '$lib/asyncGuard';
   import { highlightParts } from '$lib/highlight';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath } from '$lib/path';
@@ -43,8 +44,8 @@
   let list = $state<HTMLUListElement | null>(null);
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  // Monotonic token so a slow earlier search cannot overwrite a newer one.
-  let queryToken = 0;
+  // Guards a slow earlier search from overwriting a newer one.
+  const queryGuard = createLatestGuard();
 
   const activeIndex = $derived(clampIndex(selected, results.length));
 
@@ -83,10 +84,10 @@
       searching = false;
       return;
     }
-    const token = ++queryToken;
+    const token = queryGuard.next();
     searching = true;
     void backend.search(trimmed).then((hits) => {
-      if (token !== queryToken) return; // a newer query superseded this one
+      if (!queryGuard.isLatest(token)) return; // a newer query superseded this one
       results = hits;
       selected = 0;
       searching = false;
