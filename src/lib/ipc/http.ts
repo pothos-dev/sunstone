@@ -1,6 +1,7 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
+import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
 import type {
   TreeNode,
   FileChange,
@@ -434,22 +435,10 @@ export const httpBackend: Backend = {
     return getJson<RenderPayload>(`/api/render?path=${encodeURIComponent(path)}`);
   },
 
-  // The web viewer opens its own chrome-free print tab directly (no toolbar,
-  // relying on the browser's native print → Save-as-PDF UI), so this seam is
-  // unused on web; implemented for interface parity as a new tab WITH toolbar.
-  async openPrintWindow(path: string): Promise<void> {
-    window.open(`/?print=${encodeURIComponent(path)}&toolbar=1`, '_blank');
-  },
-
-  // The web viewer relies on the browser's native print → Save-as-PDF, so direct
-  // export has no server-side counterpart; resolve to `null` (no file written).
-  async savePdf(_defaultName: string): Promise<string | null> {
-    return null;
-  },
-
-  // On the web the app already runs in the browser, so a new tab IS the default
-  // application; open it directly.
-  async openExternal(url: string): Promise<void> {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  },
+  // The web app already runs in a browser: the browser-shell fallbacks shared
+  // with the fake backend (see `./browserShell`). (The web viewer opens its own
+  // chrome-free print tab directly, so `openPrintWindow` is interface parity.)
+  openPrintWindow: openPrintTab,
+  savePdf: noSavePdf,
+  openExternal: openExternalTab,
 };

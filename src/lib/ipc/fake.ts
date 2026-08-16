@@ -23,6 +23,7 @@ import {
   folderExists,
 } from './fake/store';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
+import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
@@ -480,24 +481,11 @@ export const fakeBackend: Backend = {
     return renderConceptFake(content);
   },
 
-  // No native window under plain Chromium (dev / Playwright): open the print
-  // preview as a new browser tab WITH the desktop reader toolbar, so the
-  // desktop print flow stays exercisable without the Tauri shell.
-  async openPrintWindow(path: string): Promise<void> {
-    window.open(`/?print=${encodeURIComponent(path)}&toolbar=1`, '_blank');
-  },
-
-  // No native filesystem under plain Chromium: direct save is a no-op (the
-  // desktop print flow is still exercisable; the button just yields nothing).
-  async savePdf(_defaultName: string): Promise<string | null> {
-    return null;
-  },
-
-  // Running in a real browser (dev / Playwright): a plain new-tab open matches
-  // the desktop "open in default app" behaviour closely enough.
-  async openExternal(url: string): Promise<void> {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  },
+  // Running under plain Chromium (dev / Playwright): the browser-shell
+  // fallbacks shared with the http backend (see `./browserShell`).
+  openPrintWindow: openPrintTab,
+  savePdf: noSavePdf,
+  openExternal: openExternalTab,
 };
 
 /** localStorage key for the fake Bundle's session state. */
