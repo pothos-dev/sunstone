@@ -15,7 +15,6 @@
 //! - `GET /api/types`                → distinct frontmatter `type` values
 //! - `GET /api/keys`                 → distinct frontmatter keys used
 //! - `GET /api/concept-paths`        → every Concept path in the index
-//! - `GET /api/concept-exists?path=` → whether a Concept exists (bool)
 //! - `GET /api/events`               → SSE stream of `ServerEvent`s (unnamed
 //!   `FileChange`s + named `sync` divergence notices)
 //! - `GET /api/history?path=`        → `FileHistory` (gated — Spec 2 §11)
@@ -270,10 +269,6 @@ fn router(state: Arc<ServerState>) -> Router {
         .route(
             "/api/concept-paths",
             get(routes_read::concept_paths_handler),
-        )
-        .route(
-            "/api/concept-exists",
-            get(routes_read::concept_exists_handler),
         )
         .route("/api/events", get(routes_read::events_handler))
         // Git history (Spec 2 §11) — both gated by the `AuthedUser` extractor,

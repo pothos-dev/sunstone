@@ -1,7 +1,7 @@
 //! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
 //! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! `/api/concept-exists` and `/api/events` (SSE), plus the shared `ApiError`
+//! and `/api/events` (SSE), plus the shared `ApiError`
 //! HTTP-boundary error type and its `sunstone-native` string classifier.
 //!
 //! Split out of `main.rs` verbatim (ticket: split main.rs) — no behavior
@@ -143,15 +143,6 @@ pub(crate) async fn concept_paths_handler(
 ) -> Result<Json<Vec<String>>, ApiError> {
     let index = read_index(&state)?;
     Ok(Json(index.concept_paths()))
-}
-
-pub(crate) async fn concept_exists_handler(
-    State(state): State<Arc<ServerState>>,
-    Query(q): Query<ConceptQuery>,
-) -> Result<Json<bool>, ApiError> {
-    guard_rel_path(&q.path)?;
-    let index = read_index(&state)?;
-    Ok(Json(index.concept_exists(&q.path)))
 }
 
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.

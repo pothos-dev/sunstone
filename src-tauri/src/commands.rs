@@ -176,15 +176,6 @@ pub(crate) fn list_concept_paths(session: State<'_, Arc<Session>>) -> Result<Vec
     Ok(index.concept_paths())
 }
 
-/// Whether a Concept exists at `path` (bundle-relative). Convenience companion
-/// to `list_concept_paths`; the broken-link decoration uses the cached set.
-#[tauri::command]
-pub(crate) fn concept_exists(session: State<'_, Arc<Session>>, path: String) -> Result<bool, String> {
-    let state = session.current()?;
-    let index = state.read_index()?;
-    Ok(index.concept_exists(&path))
-}
-
 /// Sources linking TO `path` (backlinks). Used by the backlinks panel (slice 7).
 #[tauri::command]
 pub(crate) fn backlinks(session: State<'_, Arc<Session>>, path: String) -> Result<Vec<String>, String> {

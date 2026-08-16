@@ -96,7 +96,6 @@ pub fn run() {
             commands::delete_path,
             commands::rewrite_anchors,
             commands::list_concept_paths,
-            commands::concept_exists,
             commands::backlinks,
             commands::all_tags,
             commands::concepts_by_tag,
