@@ -488,11 +488,61 @@ pub fn parse_env(
     let mut errors: Vec<ConfigError> = Vec::new();
     let mut warnings: Vec<ConfigWarning> = Vec::new();
 
-    // --- The gate (§2.1) + the closed namespace (§2.2) ----------------------
-    //
-    // One prefix scan does both jobs. Sorted so the error list is stable
-    // regardless of how the caller enumerates the environment (a `HashMap` in
-    // tests, `std::env::vars()` in `main`).
+    let any_git_var = scan_git_vars(names, &get, &mut errors);
+
+    let branch = non_empty(&get, BRANCH_ENV);
+    let origin = non_empty(&get, ORIGIN_ENV);
+
+    let (subdir, git, shape) = parse_git_family(any_git_var, &get, branch, &origin, &mut errors);
+
+    let (repo_root, bundle_root) = resolve_roots(shape, &get, &subdir, &mut warnings);
+
+    // --- Seed (§4.3) --------------------------------------------------------
+    let seed_from = non_empty(&get, SEED_FROM_ENV);
+    if let (Some(seed), Some(_)) = (&seed_from, &origin) {
+        // Fatal rather than log-and-ignore: this variable has no baked image
+        // default, so its presence is always an explicit operator act (§2.4).
+        errors.push(ConfigError::SeedWithOrigin { seed: seed.clone() });
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(Config {
+        shape,
+        git,
+        repo_root,
+        bundle_root,
+        seed_from: seed_from.map(PathBuf::from),
+        // Pre-existing and lenient, byte-identical to `main.rs`: empty is unset,
+        // but the value is passed through untrimmed — a secret's whitespace is
+        // part of the secret, and the Node hook mints against the raw value.
+        jwt_secret: get(crate::auth::SECRET_ENV)
+            .filter(|v| !v.is_empty())
+            .map(String::into_bytes),
+        // Pre-existing and lenient: `SUNSTONE_API_PORT=banana` falls back rather
+        // than refusing to boot. Knowingly inconsistent with the git family
+        // (§2.4) — making it fatal is a behaviour change for deployments that
+        // exist today.
+        api_port: get(API_PORT_ENV)
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(crate::DEFAULT_PORT),
+        warnings,
+    })
+}
+
+/// The gate (§2.1) + the closed namespace (§2.2).
+///
+/// One prefix scan does both jobs. Sorted so the error list is stable
+/// regardless of how the caller enumerates the environment (a `HashMap` in
+/// tests, `std::env::vars()` in `main`). Returns whether any *recognised*
+/// `SUNSTONE_GIT_*` variable is set (the gate).
+fn scan_git_vars(
+    names: impl IntoIterator<Item = String>,
+    get: &impl Fn(&str) -> Option<String>,
+    errors: &mut Vec<ConfigError>,
+) -> bool {
     let mut git_names: Vec<String> = names
         .into_iter()
         .filter(|n| n.starts_with(GIT_VAR_PREFIX))
@@ -505,7 +555,7 @@ pub fn parse_env(
         // `VAR=` is unset (§2.3), so it neither trips the gate nor — for an
         // unrecognised name — is an error: a blank line in an env file means
         // "default", uniformly.
-        if non_empty(&get, &name).is_none() {
+        if non_empty(get, &name).is_none() {
             continue;
         }
         if KNOWN_GIT_VARS.contains(&name.as_str()) {
@@ -517,18 +567,26 @@ pub fn parse_env(
             errors.push(ConfigError::UnknownGitVar { name });
         }
     }
+    any_git_var
+}
 
-    let branch = non_empty(&get, BRANCH_ENV);
-    let origin = non_empty(&get, ORIGIN_ENV);
-
-    // --- The git family (§2.3) — strict, and validated even when the branch is
-    // missing, so one boot reports every git problem at once ------------------
+/// The git family (§2.3) — strict, and validated even when the branch is
+/// missing, so one boot reports every git problem at once. Returns the
+/// (already escape-checked) bundle subdir, the git config when a branch was
+/// given, and the shape the gate + origin imply.
+fn parse_git_family(
+    any_git_var: bool,
+    get: &impl Fn(&str) -> Option<String>,
+    branch: Option<String>,
+    origin: &Option<String>,
+    errors: &mut Vec<ConfigError>,
+) -> (String, Option<GitConfig>, Shape) {
     let mut subdir = String::new();
     let mut git: Option<GitConfig> = None;
     let mut shape = Shape::Plain;
 
     if any_git_var {
-        subdir = non_empty(&get, SUBDIR_ENV).unwrap_or_default();
+        subdir = non_empty(get, SUBDIR_ENV).unwrap_or_default();
         if subdir_escapes(&subdir) {
             errors.push(ConfigError::BundleSubdirEscapes {
                 value: subdir.clone(),
@@ -538,7 +596,7 @@ pub fn parse_env(
             subdir = String::new();
         }
 
-        let sync_interval = match non_empty(&get, INTERVAL_ENV) {
+        let sync_interval = match non_empty(get, INTERVAL_ENV) {
             None => Duration::from_secs(DEFAULT_SYNC_INTERVAL_SECS),
             Some(value) => match value.parse::<u64>() {
                 Ok(secs) if secs > 0 => Duration::from_secs(secs),
@@ -550,7 +608,7 @@ pub fn parse_env(
             },
         };
 
-        let raw_key = non_empty(&get, SSH_KEY_ENV);
+        let raw_key = non_empty(get, SSH_KEY_ENV);
         let ssh_key_pem = match &raw_key {
             None => None,
             // Whitespace is stripped first: a key pasted across lines is still
@@ -589,25 +647,34 @@ pub fn parse_env(
                     bundle_subdir: subdir.clone(),
                     sync_interval,
                     sync_identity: CommitIdentity {
-                        name: non_empty(&get, SYNC_NAME_ENV)
+                        name: non_empty(get, SYNC_NAME_ENV)
                             .unwrap_or_else(|| DEFAULT_SYNC_NAME.to_string()),
-                        email: non_empty(&get, SYNC_EMAIL_ENV)
+                        email: non_empty(get, SYNC_EMAIL_ENV)
                             .unwrap_or_else(|| DEFAULT_SYNC_EMAIL.to_string()),
                     },
                     ssh_key_pem,
-                    known_hosts: non_empty(&get, KNOWN_HOSTS_ENV),
+                    known_hosts: non_empty(get, KNOWN_HOSTS_ENV),
                 });
             }
             None => errors.push(ConfigError::GitBranchRequired),
         }
     }
 
-    // --- Bundle root (§4.5) and the one log-and-ignore case (§2.4) ----------
-    //
-    // `SUNSTONE_BUNDLE` keeps `main.rs`'s exact leniency: whitespace-only counts
-    // as unset, but the surviving value is *not* trimmed.
+    (subdir, git, shape)
+}
+
+/// Bundle root (§4.5) and the one log-and-ignore case (§2.4).
+///
+/// `SUNSTONE_BUNDLE` keeps `main.rs`'s exact leniency: whitespace-only counts
+/// as unset, but the surviving value is *not* trimmed.
+fn resolve_roots(
+    shape: Shape,
+    get: &impl Fn(&str) -> Option<String>,
+    subdir: &str,
+    warnings: &mut Vec<ConfigWarning>,
+) -> (Option<PathBuf>, PathBuf) {
     let bundle_env = get(BUNDLE_ENV).filter(|v| !v.trim().is_empty());
-    let (repo_root, bundle_root) = if shape.is_git() {
+    if shape.is_git() {
         if let Some(value) = &bundle_env {
             // Not fatal: the image bakes `SUNSTONE_BUNDLE=/bundle` into its ENV,
             // so an operator's override is indistinguishable from that default.
@@ -616,7 +683,7 @@ pub fn parse_env(
             });
         }
         let repo_root = PathBuf::from(REPO_DIR);
-        let bundle_root = join_bundle_subdir(&repo_root, &subdir);
+        let bundle_root = join_bundle_subdir(&repo_root, subdir);
         (Some(repo_root), bundle_root)
     } else {
         (
@@ -625,41 +692,7 @@ pub fn parse_env(
                 .map(PathBuf::from)
                 .unwrap_or_else(default_dev_bundle_root),
         )
-    };
-
-    // --- Seed (§4.3) --------------------------------------------------------
-    let seed_from = non_empty(&get, SEED_FROM_ENV);
-    if let (Some(seed), Some(_)) = (&seed_from, &origin) {
-        // Fatal rather than log-and-ignore: this variable has no baked image
-        // default, so its presence is always an explicit operator act (§2.4).
-        errors.push(ConfigError::SeedWithOrigin { seed: seed.clone() });
     }
-
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    Ok(Config {
-        shape,
-        git,
-        repo_root,
-        bundle_root,
-        seed_from: seed_from.map(PathBuf::from),
-        // Pre-existing and lenient, byte-identical to `main.rs`: empty is unset,
-        // but the value is passed through untrimmed — a secret's whitespace is
-        // part of the secret, and the Node hook mints against the raw value.
-        jwt_secret: get(crate::auth::SECRET_ENV)
-            .filter(|v| !v.is_empty())
-            .map(String::into_bytes),
-        // Pre-existing and lenient: `SUNSTONE_API_PORT=banana` falls back rather
-        // than refusing to boot. Knowingly inconsistent with the git family
-        // (§2.4) — making it fatal is a behaviour change for deployments that
-        // exist today.
-        api_port: get(API_PORT_ENV)
-            .and_then(|v| v.parse::<u16>().ok())
-            .unwrap_or(crate::DEFAULT_PORT),
-        warnings,
-    })
 }
 
 /// Whether a `SUNSTONE_GIT_BUNDLE_SUBDIR` value would escape [`REPO_DIR`]:
