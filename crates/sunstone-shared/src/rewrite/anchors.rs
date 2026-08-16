@@ -19,11 +19,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{find_byte, is_external, resolve_internal};
+use crate::paths::{is_external, resolve_internal};
 use crate::slug::slugify;
-use crate::wikilink::{self, find_double_close, parse_target};
+use crate::wikilink::{self, parse_target};
 
-use super::text::{split_suffix, utf8_len};
+use super::text::split_suffix;
 
 /// One heading-slug rename: the old slug (`from`) and the new slug (`to`). Sent
 /// from the editor, which tracks each heading's identity across edits and emits a
@@ -73,110 +73,26 @@ pub fn rewrite_anchors_in(
     renames: &[AnchorRename],
     all_paths: &[String],
 ) -> (String, usize) {
-    let mut out = String::with_capacity(content.len());
-    let mut count = 0usize;
-    let bytes = content.as_bytes();
-    let mut i = 0usize;
-    let mut in_inline_code = false;
-    let mut fence: Option<u8> = None;
-    let mut at_line_start = true;
-
-    while i < bytes.len() {
-        // --- Fenced code blocks (line-start ``` / ~~~) — copied verbatim ----
-        if at_line_start {
-            let mut j = i;
-            while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
-                j += 1;
+    let count = std::cell::Cell::new(0usize);
+    let out = crate::scan::scan_replace_links(
+        content,
+        |raw| match rewrite_wikilink_anchor(source, raw, target, renames, all_paths) {
+            Some(new_raw) => {
+                count.set(count.get() + 1);
+                format!("[[{new_raw}]]")
             }
-            if j + 2 < bytes.len()
-                && (bytes[j] == b'`' || bytes[j] == b'~')
-                && bytes[j + 1] == bytes[j]
-                && bytes[j + 2] == bytes[j]
-            {
-                let ch = bytes[j];
-                match fence {
-                    Some(f) if f == ch => fence = None,
-                    None => fence = Some(ch),
-                    _ => {}
-                }
-                let line_end = find_byte(bytes, i, b'\n').map(|p| p + 1).unwrap_or(bytes.len());
-                out.push_str(&content[i..line_end]);
-                i = line_end;
-                at_line_start = true;
-                continue;
+            None => format!("[[{raw}]]"),
+        },
+        |inner, is_image| {
+            if is_image {
+                return None;
             }
-        }
-
-        // --- Wikilink `[[ ... ]]` --------------------------------------------
-        if fence.is_none()
-            && !in_inline_code
-            && bytes[i] == b'['
-            && i + 1 < bytes.len()
-            && bytes[i + 1] == b'['
-        {
-            let is_embed = i > 0 && bytes[i - 1] == b'!';
-            if let Some(close) = find_double_close(bytes, i + 2) {
-                let raw = &content[i + 2..close];
-                let replacement = if is_embed {
-                    None
-                } else {
-                    rewrite_wikilink_anchor(source, raw, target, renames, all_paths)
-                };
-                out.push_str("[[");
-                match replacement {
-                    Some(new_raw) => {
-                        out.push_str(&new_raw);
-                        count += 1;
-                    }
-                    None => out.push_str(raw),
-                }
-                out.push_str("]]");
-                i = close + 2;
-                at_line_start = false;
-                continue;
-            }
-        }
-
-        if bytes[i] == b'`' && fence.is_none() {
-            in_inline_code = !in_inline_code;
-        }
-
-        // --- Markdown link `[text](target#anchor)` ---------------------------
-        if fence.is_none() && bytes[i] == b'[' {
-            let is_image = i > 0 && bytes[i - 1] == b'!';
-            if let Some(close) = find_byte(bytes, i + 1, b']') {
-                if close + 1 < bytes.len() && bytes[close + 1] == b'(' {
-                    if let Some(paren) = find_byte(bytes, close + 2, b')') {
-                        let inner = &content[close + 2..paren];
-                        let new_inner = if is_image {
-                            None
-                        } else {
-                            rewrite_md_anchor(source, inner, target, renames)
-                        };
-                        out.push_str(&content[i..close + 2]);
-                        match new_inner {
-                            Some(replacement) => {
-                                out.push_str(&replacement);
-                                count += 1;
-                            }
-                            None => out.push_str(inner),
-                        }
-                        out.push(')');
-                        i = paren + 1;
-                        at_line_start = false;
-                        continue;
-                    }
-                }
-            }
-        }
-
-        at_line_start = bytes[i] == b'\n';
-        let ch_len = utf8_len(bytes[i]);
-        out.push_str(&content[i..i + ch_len]);
-        i += ch_len;
-    }
-
-    (out, count)
+            let replacement = rewrite_md_anchor(source, inner, target, renames)?;
+            count.set(count.get() + 1);
+            Some(replacement)
+        },
+    );
+    (out, count.get())
 }
 
 /// Rewrite a wikilink's anchor if it resolves to `target` and its slug was

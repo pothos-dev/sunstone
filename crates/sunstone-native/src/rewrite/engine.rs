@@ -10,11 +10,11 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use sunstone_shared::paths::{dir_of, find_byte, is_external, resolve_internal};
-use sunstone_shared::wikilink::{self, find_double_close, parse_target};
+use sunstone_shared::paths::{dir_of, is_external, resolve_internal};
+use sunstone_shared::wikilink::{self, parse_target};
 
 use super::paths::{basename_of, relative_path, shortest_resolving_suffix};
-use sunstone_shared::rewrite::text::{split_suffix, utf8_len};
+use sunstone_shared::rewrite::text::split_suffix;
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
 /// changed. Matches the TS `{ linksChanged, filesChanged }`.
@@ -118,117 +118,29 @@ fn rewrite_links_in(
     new_paths: &[String],
 ) -> (String, usize) {
     let moved = old_source != new_source;
-    let mut out = String::with_capacity(content.len());
-    let mut count = 0usize;
-    let bytes = content.as_bytes();
-    let mut i = 0usize;
-    // Code state so wikilinks inside code are left untouched (mirrors the
-    // extraction scanner in `wikilink::wikilink_raws`). Markdown links keep
-    // their original code-agnostic behaviour.
-    let mut in_inline_code = false;
-    let mut fence: Option<u8> = None;
-    let mut at_line_start = true;
-
-    while i < bytes.len() {
-        // --- Fenced code blocks (line-start ``` / ~~~) -------------------
-        if at_line_start {
-            let mut j = i;
-            while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
-                j += 1;
+    // The shared code-aware scanner (`sunstone_shared::scan`) skips fenced /
+    // inline code for wikilinks and hands markdown-link inners through with
+    // their original code-agnostic behaviour. Embeds / images arrive flagged.
+    let count = std::cell::Cell::new(0usize);
+    let out = sunstone_shared::scan::scan_replace_links(
+        content,
+        |raw| match rewrite_wikilink(old_source, raw, moves, all_paths, new_paths) {
+            Some(new_raw) => {
+                count.set(count.get() + 1);
+                format!("[[{new_raw}]]")
             }
-            if j + 2 < bytes.len()
-                && (bytes[j] == b'`' || bytes[j] == b'~')
-                && bytes[j + 1] == bytes[j]
-                && bytes[j + 2] == bytes[j]
-            {
-                let ch = bytes[j];
-                match fence {
-                    Some(f) if f == ch => fence = None,
-                    None => fence = Some(ch),
-                    _ => {}
-                }
-                // Copy the whole fence line through verbatim.
-                let line_end = find_byte(bytes, i, b'\n').map(|p| p + 1).unwrap_or(bytes.len());
-                out.push_str(&content[i..line_end]);
-                i = line_end;
-                at_line_start = true;
-                continue;
+            None => format!("[[{raw}]]"),
+        },
+        |inner, is_image| {
+            if is_image {
+                return None;
             }
-        }
-
-        // --- Wikilink `[[ ... ]]` (name-based) ---------------------------
-        if fence.is_none()
-            && !in_inline_code
-            && bytes[i] == b'['
-            && i + 1 < bytes.len()
-            && bytes[i + 1] == b'['
-        {
-            // Embeds (`![[ ... ]]`) are OUT OF SCOPE for v1 — leave untouched,
-            // like the markdown image branch below. Embed support is DEFERRED.
-            let is_embed = i > 0 && bytes[i - 1] == b'!';
-            if let Some(close) = find_double_close(bytes, i + 2) {
-                let raw = &content[i + 2..close];
-                let replacement = if is_embed {
-                    None
-                } else {
-                    rewrite_wikilink(old_source, raw, moves, all_paths, new_paths)
-                };
-                out.push_str("[[");
-                match replacement {
-                    Some(new_raw) => {
-                        out.push_str(&new_raw);
-                        count += 1;
-                    }
-                    None => out.push_str(raw),
-                }
-                out.push_str("]]");
-                i = close + 2;
-                at_line_start = false;
-                continue;
-            }
-        }
-
-        if bytes[i] == b'`' && fence.is_none() {
-            in_inline_code = !in_inline_code;
-        }
-
-        if fence.is_none() && bytes[i] == b'[' {
-            let is_image = i > 0 && bytes[i - 1] == b'!';
-            if let Some(close) = find_byte(bytes, i + 1, b']') {
-                if close + 1 < bytes.len() && bytes[close + 1] == b'(' {
-                    if let Some(paren) = find_byte(bytes, close + 2, b')') {
-                        // The whole `(...)` inner text (target + optional title).
-                        let inner = &content[close + 2..paren];
-                        let new_inner = if is_image {
-                            None
-                        } else {
-                            rewrite_target(old_source, new_source, moved, inner, moves)
-                        };
-                        // Emit `[...]( ` then the (possibly rewritten) inner.
-                        out.push_str(&content[i..close + 2]);
-                        match new_inner {
-                            Some(replacement) => {
-                                out.push_str(&replacement);
-                                count += 1;
-                            }
-                            None => out.push_str(inner),
-                        }
-                        out.push(')');
-                        i = paren + 1;
-                        at_line_start = false;
-                        continue;
-                    }
-                }
-            }
-        }
-        // Default: copy this byte through.
-        at_line_start = bytes[i] == b'\n';
-        let ch_len = utf8_len(bytes[i]);
-        out.push_str(&content[i..i + ch_len]);
-        i += ch_len;
-    }
-
-    (out, count)
+            let replacement = rewrite_target(old_source, new_source, moved, inner, moves)?;
+            count.set(count.get() + 1);
+            Some(replacement)
+        },
+    );
+    (out, count.get())
 }
 
 /// Given the inside of a link's parens (`target "title"`), decide whether the
