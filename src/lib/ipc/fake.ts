@@ -39,6 +39,7 @@ import {
 // The index-parse kernels are pure wasm FREE exports (ADR 0006 §11-A); the fake
 // consumes the single shared source rather than a divergent TS twin.
 import { parseFrontmatter, parseFrontmatterKeys, rewriteAnchors } from '$lib/wasm/exports';
+import { loadBundleState, saveBundleState } from './bundleState';
 
 /**
  * In-memory Backend implementation over a seeded fixture Bundle.
@@ -431,12 +432,11 @@ export const fakeBackend: Backend = {
   // the last-open Concept + expanded folders exactly as the real backend would
   // restore them from the OS config file. Robust to corrupt JSON (-> defaults).
   async loadBundleState(): Promise<BundleState> {
-    return loadFakeBundleState();
+    return loadBundleState(BUNDLE_STATE_KEY);
   },
 
   async saveBundleState(state: BundleState): Promise<void> {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(BUNDLE_STATE_KEY, JSON.stringify(state));
+    saveBundleState(BUNDLE_STATE_KEY, state);
   },
 
   // Full-text search: the JS equivalent of the Rust ripgrep-crate search, capped
@@ -502,51 +502,3 @@ export const fakeBackend: Backend = {
 
 /** localStorage key for the fake Bundle's session state. */
 const BUNDLE_STATE_KEY = `sunstone:bundleState:${FAKE_BUNDLE_ROOT}`;
-
-/** Default per-Bundle state (mirrors the Rust `BundleState::default`). */
-function defaultBundleState(): BundleState {
-  return { lastOpenConcept: null, expandedFolders: [], recentFiles: [] };
-}
-
-/** Read the fake Bundle state from localStorage; corrupt/missing -> defaults. */
-function loadFakeBundleState(): BundleState {
-  if (typeof localStorage === 'undefined') return defaultBundleState();
-  const raw = localStorage.getItem(BUNDLE_STATE_KEY);
-  if (raw === null) return defaultBundleState();
-  try {
-    const parsed = JSON.parse(raw) as Partial<BundleState>;
-    return {
-      lastOpenConcept: parsed.lastOpenConcept ?? null,
-      expandedFolders: Array.isArray(parsed.expandedFolders) ? parsed.expandedFolders : [],
-      recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
-      window: parsed.window,
-      // Sidebar collapse flags: passed through untouched (undefined when absent,
-      // which the session store defaults to `true` on read).
-      leftSidebarOpen: parsed.leftSidebarOpen,
-      explorerOpen: parsed.explorerOpen,
-      tagsOpen: parsed.tagsOpen,
-      backlinksOpen: parsed.backlinksOpen,
-      // Right Sidebar collapse flag: passed through untouched (undefined when
-      // absent, which the session store defaults to `false` on read).
-      rightSidebarOpen: parsed.rightSidebarOpen,
-      // Sidebar widths: passed through untouched (undefined when absent, which the
-      // session store defaults + clamps on read).
-      leftSidebarWidth: parsed.leftSidebarWidth,
-      rightSidebarWidth: parsed.rightSidebarWidth,
-      // Outline section collapse flag: passed through untouched (undefined when
-      // absent, which the session store defaults to `true` on read).
-      outlineOpen: parsed.outlineOpen,
-      // Global Properties show/hide flag: passed through untouched (undefined
-      // when absent, which the session store defaults to `false` on read).
-      propertiesShown: parsed.propertiesShown,
-      // Editor view mode: passed through untouched (undefined when absent, which
-      // the session store defaults to `DEFAULT_EDITOR_MODE` on read).
-      editorMode: parsed.editorMode,
-      // Tiling workspace layout: passed through untouched (undefined when absent;
-      // the session/App layer validates + migrates + falls back on read).
-      layout: parsed.layout,
-    };
-  } catch {
-    return defaultBundleState();
-  }
-}

@@ -1,5 +1,6 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
+import { loadBundleState, saveBundleState } from './bundleState';
 import type {
   TreeNode,
   FileChange,
@@ -47,43 +48,14 @@ const NO_LAUNCHER = 'the web serves a single fixed Bundle: no folder switching';
  */
 const BUNDLE_STATE_KEY = 'sunstone:bundleState';
 
-/** Fresh-Bundle default (mirrors the Rust `BundleState::default`). */
-function defaultBundleState(): BundleState {
-  return { lastOpenConcept: null, expandedFolders: [], recentFiles: [] };
-}
-
-/**
- * Load the web Bundle's View state from `localStorage`. Returns the fresh
- * default on the server (SSR: no `localStorage`), a missing key, or corrupt
- * JSON — never rejects. Optional fields pass through untouched (the session
- * store defaults each on read).
- */
+/** Load/save the web Bundle's View state via the shared localStorage plumbing
+ * (`./bundleState`) — SSR-safe, corrupt-JSON-safe, best-effort on write. */
 function loadWebBundleState(): BundleState {
-  if (typeof localStorage === 'undefined') return defaultBundleState();
-  const raw = localStorage.getItem(BUNDLE_STATE_KEY);
-  if (raw === null) return defaultBundleState();
-  try {
-    const parsed = JSON.parse(raw) as Partial<BundleState>;
-    return {
-      ...parsed,
-      lastOpenConcept: parsed.lastOpenConcept ?? null,
-      expandedFolders: Array.isArray(parsed.expandedFolders) ? parsed.expandedFolders : [],
-      recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
-    };
-  } catch {
-    return defaultBundleState();
-  }
+  return loadBundleState(BUNDLE_STATE_KEY);
 }
 
-/** Persist the web Bundle's View state to `localStorage`. A no-op on the server
- * or if storage is full/disabled (best-effort — never throws into the UI). */
 function saveWebBundleState(state: BundleState): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(BUNDLE_STATE_KEY, JSON.stringify(state));
-  } catch {
-    /* storage full / disabled — best-effort, never throw */
-  }
+  saveBundleState(BUNDLE_STATE_KEY, state);
 }
 
 /**
