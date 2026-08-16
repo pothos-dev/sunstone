@@ -39,6 +39,7 @@
     MIN_WEIGHT,
   } from '$lib/tileLayout';
   import { nextTile } from '$lib/tileNav';
+  import { startDividerDrag } from '$lib/dividerDrag';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
 
@@ -354,52 +355,30 @@
   // id, so the live CodeMirror views survive the re-render (only weights change).
   function onColumnDividerDown(e: PointerEvent, boundaryIndex: number) {
     if (e.button !== 0 || !editorArea) return;
-    e.preventDefault();
-    const width = Math.max(editorArea.getBoundingClientRect().width, 1);
-    const startX = e.clientX;
     const base = workspace.layout;
-    const el = e.currentTarget as HTMLElement;
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      /* best-effort: window listeners below catch the moves regardless */
-    }
-    const move = (ev: PointerEvent) => {
-      const delta = (ev.clientX - startX) / width;
-      workspace.layout = layoutResizeColumns(base, boundaryIndex, delta, MIN_WEIGHT);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    startDividerDrag({
+      event: e,
+      axis: 'x',
+      size: editorArea.getBoundingClientRect().width,
+      onFraction: (delta) => {
+        workspace.layout = layoutResizeColumns(base, boundaryIndex, delta, MIN_WEIGHT);
+      },
+    });
   }
 
   function onTileDividerDown(e: PointerEvent, columnIndex: number, boundaryIndex: number) {
     if (e.button !== 0) return;
-    e.preventDefault();
-    const el = e.currentTarget as HTMLElement;
-    const columnEl = el.parentElement;
+    const columnEl = (e.currentTarget as HTMLElement).parentElement;
     if (!columnEl) return;
-    const height = Math.max(columnEl.getBoundingClientRect().height, 1);
-    const startY = e.clientY;
     const base = workspace.layout;
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      /* best-effort: window listeners below catch the moves regardless */
-    }
-    const move = (ev: PointerEvent) => {
-      const delta = (ev.clientY - startY) / height;
-      workspace.layout = layoutResizeTiles(base, columnIndex, boundaryIndex, delta, MIN_WEIGHT);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    startDividerDrag({
+      event: e,
+      axis: 'y',
+      size: columnEl.getBoundingClientRect().height,
+      onFraction: (delta) => {
+        workspace.layout = layoutResizeTiles(base, columnIndex, boundaryIndex, delta, MIN_WEIGHT);
+      },
+    });
   }
 
   // --- Explorer keyboard nav + CRUD (unchanged from single-tile) --------------
