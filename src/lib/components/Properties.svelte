@@ -12,7 +12,16 @@
   // it through `onchange`; the app shell dispatches it into the field and the
   // editor recombines `serialize(props) + body` for autosave.
 
-  import { renameProperty, type Property } from '$lib/frontmatter';
+  import { type Property } from '$lib/frontmatter';
+  import {
+    addChipAt,
+    appendProperty,
+    commitKeyEdit,
+    removeChipAt,
+    removePropertyAt,
+    setListAt,
+    setScalarAt,
+  } from '$lib/propertiesEdits';
   import { focus } from '$lib/state/focus.svelte';
   import { propertiesNav, KEY_COL, VALUE_COL, type CellKind } from '$lib/state/propertiesNav.svelte';
   import { moveCell, nextCellTab, type Cell } from '$lib/propertiesGrid';
@@ -115,7 +124,7 @@
    */
   function addProperty(prop: Property) {
     newRowId = properties.length;
-    onchange([...properties, prop]);
+    onchange(appendProperty(properties, prop));
   }
 
   function addText() {
@@ -143,35 +152,19 @@
     return d === undefined ? liveKey : d;
   }
 
-  /** Commit a key rename for the row at `id` (blur / Enter). */
+  /**
+   * Commit a key rename for the row at `id` (blur / Enter). The discard/revert
+   * rules live in `$lib/propertiesEdits` (`commitKeyEdit`); here we only manage
+   * the local draft + new-row bookkeeping.
+   */
   function commitKey(id: number) {
-    const prop = properties[id];
-    if (!prop) return;
+    if (!properties[id]) return;
     const isNew = id === newRowId;
-    const next = (keyDrafts[id] ?? prop.key).trim();
-    const duplicate = properties.some((p, i) => i !== id && p.key === next);
-
-    if (isNew) {
-      // A freshly added row has no prior key to revert to (unlike slice 2's
-      // rename). So both rejection cases DISCARD the row: an empty key, and a
-      // duplicate key. Discarding is the least-surprising consistent rule — it
-      // never commits under the duplicate name and leaves no half-edited row
-      // lingering after blur (no focus-fighting). The user simply re-adds.
-      delete keyDrafts[id];
-      newRowId = null;
-      if (next === '' || duplicate) {
-        onchange(properties.filter((_, i) => i !== id));
-        return;
-      }
-      onchange(properties.map((p, i) => (i === id ? renameProperty(p, next) : p)));
-      return;
-    }
-
+    const next = commitKeyEdit(properties, id, keyDrafts[id], isNew);
     // Clear the draft regardless of outcome (revert reverts to the live key).
     delete keyDrafts[id];
-    if (next === '' || next === prop.key) return; // empty or no-op -> revert
-    if (duplicate) return; // duplicate key -> revert
-    onchange(properties.map((p, i) => (i === id ? renameProperty(p, next) : p)));
+    if (isNew) newRowId = null;
+    if (next !== null) onchange(next);
   }
 
   /** Abandon an in-progress key edit (Escape), reverting to the live key. */
@@ -193,7 +186,7 @@
   /** Remove the property at row `id`. */
   function deleteProperty(id: number) {
     delete keyDrafts[id];
-    onchange(properties.filter((_, i) => i !== id));
+    onchange(removePropertyAt(properties, id));
   }
 
   // Value edits address the row by its positional `id` (the array index), NOT by
@@ -205,25 +198,23 @@
 
   /** Replace the value of the scalar property at row `id`. */
   function editScalar(id: number, value: string) {
-    onchange(properties.map((p, i) => (i === id ? { ...p, scalar: value } : p)));
+    onchange(setScalarAt(properties, id, value));
   }
 
   /** Set the items of the list property at row `id`. */
   function setListItems(id: number, items: string[]) {
-    onchange(properties.map((p, i) => (i === id ? { ...p, list: items } : p)));
+    onchange(setListAt(properties, id, items));
   }
 
   function addChip(id: number, current: string[]) {
-    const draft = (chipDrafts[id] ?? '').trim();
-    if (draft === '') return;
-    setListItems(id, [...current, draft]);
+    const next = addChipAt(properties, id, current, chipDrafts[id] ?? '');
+    if (next === null) return;
+    onchange(next);
     chipDrafts[id] = '';
   }
 
   function removeChip(id: number, current: string[], index: number) {
-    const next = current.slice();
-    next.splice(index, 1);
-    setListItems(id, next);
+    onchange(removeChipAt(properties, id, current, index));
   }
 
   function onChipKeydown(event: KeyboardEvent, id: number, current: string[]) {
