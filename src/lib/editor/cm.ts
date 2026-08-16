@@ -642,7 +642,7 @@ export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme)
 }
 
 /** The view's current mode (`read` if the view predates mode tracking). */
-export function getEditorMode(view: EditorView): EditorMode {
+function getEditorMode(view: EditorView): EditorMode {
   return getViewMode(view) ?? DEFAULT_EDITOR_MODE;
 }
 

@@ -4,7 +4,7 @@ import { errMessage } from '$lib/errors';
 import { remapPath } from '$lib/path';
 
 /** Autosave debounce: save this long after the user stops typing. */
-export const AUTOSAVE_DEBOUNCE_MS = 300;
+const AUTOSAVE_DEBOUNCE_MS = 300;
 
 /**
  * A Document owns the *content* of a single Concept — the editable buffer, its
