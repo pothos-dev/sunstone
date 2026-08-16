@@ -2,7 +2,7 @@
 //
 // Operates on the shared `FILES` / `FOLDERS` state (imported live from `store`,
 // never copied). `buildTree` derives the recursive TreeNode from the flat FILES
-// map; `renameInternal` / `deleteInternal` mutate FILES + FOLDERS in place,
+// map; `applyRename` / `applyDelete` mutate FILES + FOLDERS in place,
 // mirroring the real backend's directory semantics.
 
 import type { TreeNode } from '$lib/types';
@@ -64,7 +64,7 @@ export function buildTree(): TreeNode {
  * Rename/move `from` to `to`, handling both a single Concept and a folder
  * (rewriting every descendant path). Mutates FILES + FOLDERS in place.
  */
-export function renameInternal(from: string, to: string): void {
+export function applyRename(from: string, to: string): void {
   if (!pathExists(from)) throw new Error(`no such path: ${from}`);
   if (pathExists(to)) throw new Error(`already exists: ${to}`);
   // Mirror the Rust `rename_path` guard: the target's parent folder must exist
@@ -107,7 +107,7 @@ export function renameInternal(from: string, to: string): void {
  * Delete `path` (file or folder, recursively). Returns the list of removed
  * paths (so each can be reported as a `removed` change).
  */
-export function deleteInternal(path: string): string[] {
+export function applyDelete(path: string): string[] {
   const removed: string[] = [];
   if (Object.prototype.hasOwnProperty.call(FILES, path)) {
     delete FILES[path];

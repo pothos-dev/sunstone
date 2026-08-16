@@ -23,7 +23,7 @@ import {
   isSafePath,
   folderExists,
 } from './fake/store';
-import { buildTree, renameInternal, deleteInternal } from './fake/tree';
+import { buildTree, applyRename, applyDelete } from './fake/tree';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
@@ -103,9 +103,7 @@ function simulateExternalChange(
   } else if (content !== undefined) {
     FILES[path] = content;
   }
-  for (const cb of fileChangeSubscribers) {
-    cb({ kind, paths: [path] });
-  }
+  notifyFsChange(kind, path);
 }
 
 /**
@@ -129,7 +127,7 @@ function renameAndRewrite(from: string, to: string): RewriteSummary {
   // 1. Plan from the pre-move snapshot.
   const { summary, writes } = planRewrites(from, to);
   // 2. Perform the rename (mutates FILES + FOLDERS, validates existence).
-  renameInternal(from, to);
+  applyRename(from, to);
   // 3. Apply rewritten content at the NEW locations.
   for (const [path, content] of writes) FILES[path] = content;
   // 4. A rename is a remove of the old path + create of the new one.
@@ -317,7 +315,7 @@ export const fakeBackend: Backend = {
 
   async deletePath(path: string): Promise<void> {
     if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
-    const removed = deleteInternal(path);
+    const removed = applyDelete(path);
     if (removed.length === 0) throw new Error(`no such path: ${path}`);
     for (const p of removed) notifyFsChange('removed', p);
   },

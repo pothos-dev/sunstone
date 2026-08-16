@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { FILES, FOLDERS } from './store';
-import { renameInternal } from './tree';
+import { applyRename } from './tree';
 import { fakeBackend } from '../fake';
 
 // These CRUD ops mutate the shared in-memory fixture; restore it after each test
@@ -21,9 +21,9 @@ afterEach(() => {
 // parent explicitly). Without these checks the fake was laxer than production,
 // so Playwright could green-light a frontend that relies on the lax behaviour.
 
-describe('renameInternal target-folder faithfulness', () => {
+describe('applyRename target-folder faithfulness', () => {
   test('rejects a rename into a non-existent target folder', () => {
-    expect(() => renameInternal('index.md', 'ghost-dir/index.md')).toThrow(
+    expect(() => applyRename('index.md', 'ghost-dir/index.md')).toThrow(
       /target folder does not exist/,
     );
     // Rejected before any mutation: the source is untouched.
@@ -32,12 +32,12 @@ describe('renameInternal target-folder faithfulness', () => {
   });
 
   test('still rejects an existing target and a missing source', () => {
-    expect(() => renameInternal('index.md', 'log.md')).toThrow(/already exists/);
-    expect(() => renameInternal('does-not-exist.md', 'x.md')).toThrow(/no such path/);
+    expect(() => applyRename('index.md', 'log.md')).toThrow(/already exists/);
+    expect(() => applyRename('does-not-exist.md', 'x.md')).toThrow(/no such path/);
   });
 
   test('allows a rename whose target folder exists', () => {
-    renameInternal('index.md', 'concepts/index-moved.md');
+    applyRename('index.md', 'concepts/index-moved.md');
     expect(FILES['concepts/index-moved.md']).toBeDefined();
     expect(FILES['index.md']).toBeUndefined();
   });

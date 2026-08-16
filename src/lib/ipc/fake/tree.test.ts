@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { TreeNode } from '$lib/types';
 import { FILES, FOLDERS } from './store';
-import { buildTree, deleteInternal, renameInternal } from './tree';
+import { buildTree, applyDelete, applyRename } from './tree';
 
 // These ops mutate the shared in-memory fixture; restore it after each test
 // so ordering never leaks (other fake specs read the same live `FILES`/`FOLDERS`).
@@ -75,15 +75,15 @@ describe('buildTree', () => {
   });
 });
 
-describe('deleteInternal', () => {
+describe('applyDelete', () => {
   test('deletes a single file and returns its path', () => {
-    expect(deleteInternal('log.md')).toEqual(['log.md']);
+    expect(applyDelete('log.md')).toEqual(['log.md']);
     expect(FILES['log.md']).toBeUndefined();
   });
 
   test('recursively deletes a folder: descendant files first, then the folder itself', () => {
     FOLDERS.add('concepts/editor'); // also tracked explicitly
-    const removed = deleteInternal('concepts/editor');
+    const removed = applyDelete('concepts/editor');
     // Descendant files precede the folder path in the returned list.
     expect(removed).toEqual(['concepts/editor/live-preview.md', 'concepts/editor']);
     expect(FILES['concepts/editor/live-preview.md']).toBeUndefined();
@@ -93,7 +93,7 @@ describe('deleteInternal', () => {
   test('deleting a folder removes tracked subfolders too', () => {
     FOLDERS.add('drafts');
     FOLDERS.add('drafts/nested');
-    const removed = deleteInternal('drafts');
+    const removed = applyDelete('drafts');
     // Empty folders contribute no file paths; only the folder itself is reported.
     expect(removed).toEqual(['drafts']);
     expect(FOLDERS.has('drafts')).toBe(false);
@@ -101,21 +101,21 @@ describe('deleteInternal', () => {
   });
 
   test('deleting a non-existent path is a no-op returning []', () => {
-    expect(deleteInternal('nope.md')).toEqual([]);
-    expect(deleteInternal('no-such-folder')).toEqual([]);
+    expect(applyDelete('nope.md')).toEqual([]);
+    expect(applyDelete('no-such-folder')).toEqual([]);
   });
 });
 
-describe('renameInternal folder moves', () => {
+describe('applyRename folder moves', () => {
   test('moves a folder and rewrites every descendant path, tracking the new folder', () => {
-    renameInternal('concepts/editor', 'concepts/editor2');
+    applyRename('concepts/editor', 'concepts/editor2');
     expect(FILES['concepts/editor2/live-preview.md']).toBeDefined();
     expect(FILES['concepts/editor/live-preview.md']).toBeUndefined();
     expect(FOLDERS.has('concepts/editor2')).toBe(true);
   });
 
   test('rejects a folder move into a non-existent parent, leaving state untouched', () => {
-    expect(() => renameInternal('concepts/editor', 'ghost/editor')).toThrow(
+    expect(() => applyRename('concepts/editor', 'ghost/editor')).toThrow(
       /target folder does not exist/,
     );
     expect(FILES['concepts/editor/live-preview.md']).toBeDefined();
