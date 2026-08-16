@@ -262,3 +262,118 @@ pub fn rewrite_anchors(
 
     Ok(summary)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build an Index from `(path, content)` pairs via the public API.
+    fn index_of(entries: &[(&str, &str)]) -> Index {
+        let mut idx = Index::default();
+        for (path, content) in entries {
+            idx.reindex_concept(path, content);
+        }
+        idx
+    }
+
+    // ---------------- build_move_map ----------------
+
+    #[test]
+    fn move_map_single_file_rename() {
+        let idx = index_of(&[("a.md", "# A"), ("b.md", "# B")]);
+        let map = build_move_map(&idx, "a.md", "sub/renamed.md");
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["a.md"], "sub/renamed.md");
+    }
+
+    #[test]
+    fn move_map_md_source_not_in_index_still_mapped() {
+        // A freshly-created Concept absent from the index is still a single
+        // Concept move — the `.md` branch does not consult the index at all.
+        let idx = index_of(&[("other.md", "# O")]);
+        let map = build_move_map(&idx, "new.md", "moved/new.md");
+        assert_eq!(map.len(), 1);
+        assert_eq!(map["new.md"], "moved/new.md");
+    }
+
+    #[test]
+    fn move_map_folder_rename_remaps_contained_concepts() {
+        let idx = index_of(&[
+            ("docs/a.md", "# A"),
+            ("docs/deep/b.md", "# B"),
+            ("outside.md", "# Out"),
+            // Prefix trap: `docsx/…` must not match the `docs/` prefix.
+            ("docsx/c.md", "# C"),
+        ]);
+        let map = build_move_map(&idx, "docs", "notes");
+        assert_eq!(map.len(), 2);
+        assert_eq!(map["docs/a.md"], "notes/a.md");
+        assert_eq!(map["docs/deep/b.md"], "notes/deep/b.md");
+    }
+
+    #[test]
+    fn move_map_empty_for_unknown_folder() {
+        let idx = index_of(&[("a.md", "# A")]);
+        assert!(build_move_map(&idx, "no-such-folder", "elsewhere").is_empty());
+    }
+
+    #[test]
+    fn move_map_empty_folder_move_on_empty_index() {
+        let idx = Index::default();
+        assert!(build_move_map(&idx, "docs", "notes").is_empty());
+    }
+
+    #[test]
+    fn move_map_identity_move_still_maps() {
+        // Current behavior: `from == to` for a `.md` file still yields an
+        // entry (no no-op short-circuit inside build_move_map).
+        let idx = index_of(&[("a.md", "# A")]);
+        let map = build_move_map(&idx, "a.md", "a.md");
+        assert_eq!(map["a.md"], "a.md");
+    }
+
+    // ---------------- inbound_sources ----------------
+
+    #[test]
+    fn inbound_sources_finds_linkers_to_moved_target() {
+        let idx = index_of(&[
+            ("a.md", "[to t](/t.md)"),
+            ("b.md", "see [[t]]"),
+            ("c.md", "no links"),
+            ("t.md", "# T"),
+        ]);
+        let moves = build_move_map(&idx, "t.md", "moved/t.md");
+        assert_eq!(inbound_sources(&idx, &moves), vec!["a.md", "b.md"]);
+    }
+
+    #[test]
+    fn inbound_sources_dedupes_and_sorts_across_multiple_moves() {
+        let idx = index_of(&[
+            ("z.md", "[x](/docs/x.md) and [y](/docs/y.md)"),
+            ("a.md", "[y](/docs/y.md)"),
+            ("docs/x.md", "[sibling](/docs/y.md)"),
+            ("docs/y.md", "# Y"),
+        ]);
+        let moves = build_move_map(&idx, "docs", "notes");
+        // z links to both moved files but appears once; docs/x.md is itself
+        // moved yet still listed as an inbound source (caller de-dupes);
+        // BTreeSet ordering is lexicographic.
+        assert_eq!(
+            inbound_sources(&idx, &moves),
+            vec!["a.md", "docs/x.md", "z.md"]
+        );
+    }
+
+    #[test]
+    fn inbound_sources_empty_when_nothing_links_in() {
+        let idx = index_of(&[("t.md", "# T"), ("other.md", "# O")]);
+        let moves = build_move_map(&idx, "t.md", "moved/t.md");
+        assert!(inbound_sources(&idx, &moves).is_empty());
+    }
+
+    #[test]
+    fn inbound_sources_empty_for_empty_move_map() {
+        let idx = index_of(&[("a.md", "[t](/t.md)"), ("t.md", "# T")]);
+        assert!(inbound_sources(&idx, &HashMap::new()).is_empty());
+    }
+}
