@@ -32,7 +32,7 @@
   } from '$lib/treeNav';
   import { outlineNav, backlinksNav } from '$lib/state/listFocusNav.svelte';
   import { propertiesNav } from '$lib/state/propertiesNav.svelte';
-  import { directionForKey } from '$lib/regionGrid';
+  import { routeAppHotkey } from '$lib/appHotkeys';
   import {
     resizeColumns as layoutResizeColumns,
     resizeTiles as layoutResizeTiles,
@@ -202,107 +202,76 @@
         });
 
     const onKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        quickNavOpen = !quickNavOpen;
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        searchOpen = !searchOpen;
-        return;
-      }
-
-      // Export as PDF: Ctrl/Cmd+P opens the clean print/PDF preview for the active
-      // Concept. Only when a Concept is open; otherwise let the browser handle it.
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') {
-        if (editor.path === null) return;
-        e.preventDefault();
-        void backend.openPrintWindow(editor.path);
-        return;
-      }
-
-      // In-Concept Find: Ctrl/Cmd+F. Focus the active Tile's editor + open its
-      // find panel. NO-OP when no Concept is open.
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
-        if (editor.path === null) return;
-        e.preventDefault();
-        activeTileRef?.enterFind();
-        return;
-      }
-
-      // Unified undo/redo: route Ctrl/Cmd+Z/Shift+Z/Y to the active Tile's history
-      // unless focus is already inside a CodeMirror editor (CM handles it natively).
-      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
-        const key = e.key.toLowerCase();
-        const isUndo = key === 'z' && !e.shiftKey;
-        const isRedo = (key === 'z' && e.shiftKey) || key === 'y';
-        if (isUndo || isRedo) {
-          const inEditor = !!(document.activeElement as HTMLElement | null)?.closest('.cm-editor');
-          if (inEditor) return;
+      // Pure routing lives in `appHotkeys.ts`; this switch only performs the
+      // side effects (and the matching preventDefault) for the routed intent.
+      const intent = routeAppHotkey(e, {
+        conceptOpen: editor.path !== null,
+        inCmEditor: !!(document.activeElement as HTMLElement | null)?.closest('.cm-editor'),
+        reviewActive: activeTileRef?.isReviewActive() ?? false,
+        focusedRegion: focus.focusedRegion,
+        propertiesEditing: propertiesNav.mode !== 'nav',
+        quickNavOpen,
+        quickNavTagActive,
+      });
+      if (intent === null) return;
+      switch (intent.kind) {
+        case 'toggle-quicknav':
           e.preventDefault();
-          if (isUndo) activeTileRef?.undoActive();
-          else activeTileRef?.redoActive();
+          quickNavOpen = !quickNavOpen;
           return;
-        }
-      }
-
-      // Browser-style history: Ctrl+Alt+Left/Right on the active Tile.
-      if (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey) {
-        if (e.key === 'ArrowLeft') {
+        case 'toggle-search':
+          e.preventDefault();
+          searchOpen = !searchOpen;
+          return;
+        case 'print':
+          e.preventDefault();
+          if (editor.path !== null) void backend.openPrintWindow(editor.path);
+          return;
+        case 'find':
+          e.preventDefault();
+          activeTileRef?.enterFind();
+          return;
+        case 'undo':
+          e.preventDefault();
+          activeTileRef?.undoActive();
+          return;
+        case 'redo':
+          e.preventDefault();
+          activeTileRef?.redoActive();
+          return;
+        case 'history-back':
           e.preventDefault();
           void editor.back();
           return;
-        } else if (e.key === 'ArrowRight') {
+        case 'history-forward':
           e.preventDefault();
           void editor.forward();
           return;
-        }
-      }
-
-      // Review mode owns Escape first: exit the active Tile's review view.
-      if (
-        e.key === 'Escape' &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey &&
-        !e.shiftKey &&
-        activeTileRef?.isReviewActive()
-      ) {
-        e.preventDefault();
-        activeTileRef.exitReview();
-        return;
-      }
-
-      // Escape: the UNIFIED peel — one layer per press, innermost first.
-      if (e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        const propertiesPeel =
-          focus.focusedRegion === 'properties' && propertiesNav.mode !== 'nav';
-        const editorPeel = focus.focusedRegion === 'editor';
-        const quickNavTagPeel = quickNavOpen && quickNavTagActive;
-        const localPeelActive = propertiesPeel || editorPeel || quickNavTagPeel;
-        if (focus.escape(localPeelActive)) e.preventDefault();
-        return;
-      }
-
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      const dir = directionForKey(e.key);
-      if (dir !== null) {
-        e.preventDefault();
-        // Editor grid layer FIRST: when focus is in the editor Region, Alt+arrows
-        // move between tiles (left/right → columns, up/down → tiles in a column).
-        // Only a move that EXITS the grid edge delegates to the Region backbone,
-        // so the leftmost/rightmost column crosses into the sidebars exactly as
-        // the single editor does today.
-        if (focus.focusedRegion === 'editor') {
-          const move = nextTile(workspace.layout, workspace.activeId, dir, workspace.columnMemory);
-          if (move.kind === 'tile') {
-            focusTile(move.id);
-            return;
+        case 'exit-review':
+          e.preventDefault();
+          activeTileRef?.exitReview();
+          return;
+        case 'escape':
+          // The UNIFIED peel — one layer per press, innermost first.
+          if (focus.escape(intent.localPeelActive)) e.preventDefault();
+          return;
+        case 'move': {
+          e.preventDefault();
+          // Editor grid layer FIRST: when focus is in the editor Region, Alt+arrows
+          // move between tiles (left/right → columns, up/down → tiles in a column).
+          // Only a move that EXITS the grid edge delegates to the Region backbone,
+          // so the leftmost/rightmost column crosses into the sidebars exactly as
+          // the single editor does today.
+          if (focus.focusedRegion === 'editor') {
+            const move = nextTile(workspace.layout, workspace.activeId, intent.dir, workspace.columnMemory);
+            if (move.kind === 'tile') {
+              focusTile(move.id);
+              return;
+            }
           }
+          focus.moveFocus(intent.dir);
+          return;
         }
-        focus.moveFocus(dir);
       }
     };
     window.addEventListener('keydown', onKeydown, true);
