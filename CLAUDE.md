@@ -38,7 +38,9 @@ and the web write test strategy.
   `src/lib/ipc/`. All backend access goes through the `Backend` interface; both
   `tauri.ts` (real) and `fake.ts` (in-memory) must implement every method.
 - **Pure logic lives in plain `.ts`** (e.g. `path.ts`, `treeNav.ts`,
-  `frontmatter.ts`, `outline.ts`, `highlight.ts`) so it can be unit-tested;
-  `.svelte`/`.svelte.ts` files stay thin over those helpers.
+  `frontmatter.ts`, `appHotkeys.ts`, `propertiesEdits.ts`, `quickNavResults.ts`)
+  so it can be unit-tested; `.svelte`/`.svelte.ts` files stay thin over those
+  helpers. When component logic grows, extract it this way (precedents:
+  `tileEditorMenu.ts`, `treeCrud.ts`, `editor/mermaidRender.ts`).
 - **Paths crossing the seam** are bundle-relative, forward-slash.
 - Commit messages end with: `🤖 Generated with claude-code`.

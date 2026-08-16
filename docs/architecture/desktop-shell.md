@@ -25,7 +25,10 @@ timestamp: 2026-07-23T00:00:00Z
 | File | Role |
 | --- | --- |
 | `src/main.rs` | 4-line binary entry point; sets the Windows subsystem in release and calls `sunstone_lib::run()`. |
-| `src/lib.rs` | The heart of the shell: all IPC command definitions, print-window and PDF-export machinery, startup-bundle resolution, `--detached` re-spawn, window-geometry capture, and the `tauri::Builder` setup (`run()`). |
+| `src/lib.rs` | The `tauri::Builder` setup (`run()`), CLI dispatch, and the `generate_handler!` command list. |
+| `src/commands.rs` | All non-PDF `#[tauri::command]` IPC wrappers — thin forwards into `sunstone-native`. |
+| `src/pdf.rs` | Print-window and PDF-export machinery (per-platform `export_webview_pdf` impls). |
+| `src/startup.rs` | Startup-bundle resolution, `--detached` re-spawn, window-geometry capture/persistence. |
 | `src/session.rs` | `Session`: the current `AppState` and its `WatcherHandle` behind mutexes. `open()` builds the index, starts a fresh watcher (dropping the old), records the folder in config, and restores window geometry. |
 | `src/cli.rs` | Hand-rolled arg parser (no clap): `CliAction` (`Run`/`Version`/`Help`/`Error`), `RunOptions { bundle, detached }`. |
 | `tauri.conf.json` | Product config: single frameless 1200×800 window, frontend served from `../build` (the SvelteKit static SPA). |

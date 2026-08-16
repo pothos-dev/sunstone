@@ -68,13 +68,24 @@ bunx playwright test -c playwright.local.config.ts             # all desktop spe
 bunx playwright test -c playwright.local.config.ts tree-crud   # a subset (by spec name)
 ```
 
-`playwright.local.config.ts` is a sandbox override: this machine has a system Chromium at `/tmp/chromium` (no ms-playwright cache), and the override points the launcher at it and runs `--no-sandbox`. On a normal machine use `playwright.config.ts` directly. Override the binary with `CHROMIUM_BIN=/path/to/chromium`.
+`playwright.local.config.ts` is a sandbox override: it points the launcher at a
+system Chromium and runs `--no-sandbox`. On a normal machine use
+`playwright.config.ts` directly. Override the binary with
+`CHROMIUM_BIN=/path/to/chromium` — `/tmp/chromium` is the historical default but
+`/tmp` gets wiped; the ms-playwright cache is a durable fallback:
+
+```bash
+CHROMIUM_BIN=~/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome \
+  bunx playwright test -c playwright.local.config.ts
+```
 
 ### 2. Web e2e suite — `playwright.web.config.ts`
 
 The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over the committed fixture Bundle `tests/fixtures/web-bundle`, plus the real adapter-node SSR build (`SUNSTONE_TARGET=web`) proxying `/api` to it. This is the only place the web chrome (`web-viewer`, the editor island, concurrency modals) renders, so all **web** behaviour is proven here.
 
 ```bash
+mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start
+                                    # watching it before globalSetup seeds it
 bunx playwright test -c playwright.web.config.ts
 ```
 

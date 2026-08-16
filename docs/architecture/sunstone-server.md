@@ -17,10 +17,10 @@ The server exposes only a JSON/SSE API — it serves **no** static assets. The p
 
 | File | Role |
 | --- | --- |
-| `src/main.rs` | Entrypoint, `ServerState`, the axum router, all HTTP handlers, SSE wiring, error classification, bundle-root resolution. |
-| `src/config.rs` | One **pure** `parse(get) -> Result<Config, Vec<ConfigError>>` over an injected getter — the whole env surface, git and pre-existing alike, read once at boot and stored in `ServerState`. Every problem is reported at once. |
-| `src/boot.rs` | The ordered boot sequence: ssh material, the optional seed copy, the clone/adopt/`init` state machine at `/srv/repo`, bundle-root resolution, and the two writability preflights. Every failure exits non-zero with an actionable message. |
-| `src/sync.rs` | The sync loop (git-synced only) plus its two surfaces: the named `sync` SSE notice and `GET /api/sync-status`. |
+| `src/main.rs` | Entrypoint, `ServerState`, the axum router, SSE wiring (handlers live in `routes_read.rs`/`routes_write.rs`). |
+| `src/config/` | One **pure** `parse_env(names, get) -> Result<Config, Vec<ConfigError>>` over an injected getter — the whole env surface, git and pre-existing alike, read once at boot and stored in `ServerState`. Every problem is reported at once. Split into `mod.rs` (the parse), `types.rs` (`Shape`/`GitConfig`/`Config`), `errors.rs` (the error/warning message text). |
+| `src/boot/` | The ordered boot sequence: ssh material (`ssh.rs`), the optional seed copy, the clone/adopt/`init` state machine at `/srv/repo`, bundle-root resolution, and the two writability preflights (fs helpers in `fsutil.rs`). Every failure exits non-zero with an actionable message. |
+| `src/sync/` | The sync loop (git-synced only, `mod.rs`) plus its state (`state.rs`) and its two surfaces (`status.rs`): the named `sync` SSE notice and `GET /api/sync-status`. |
 | `src/conflict.rs` | The conflict resolver — the one uniform fork rule, and the `path → fork` map that coalesces a rebase run to one fork per path. |
 | `src/auth.rs` | Hand-rolled HS256 JWT mint/verify and the `AuthedUser` axum extractor that gates every write route and the two history reads. |
 | `src/write.rs` | Write orchestration: composes sunstone-native writers + a git commit per op, decides amend-vs-fresh-commit, produces the SSE change groups to broadcast, and (in a git shape) signals the sync loop. |
@@ -29,7 +29,7 @@ The server exposes only a JSON/SSE API — it serves **no** static assets. The p
 
 All under `/api`. Reads are open GETs; writes require a verified JWT and return `204 No Content` unless noted.
 
-**Reads:** `GET /api/bundle-root`, `/api/tree` (`TreeNode`), `/api/concept?path=` (raw markdown), `/api/render?path=` (`RenderPayload`), `/api/search?q=`, `/api/backlinks?path=`, `/api/tags`, `/api/concepts-by-tag?tag=`, `/api/types`, `/api/keys`, `/api/concept-paths`, `/api/concept-exists?path=`, and `GET /api/events` — the **SSE** stream (`text/event-stream`) carrying `FileChange` events for live reload plus, under the named `sync` event, the two [sync notices](#the-sync-loop-git-synced-only).
+**Reads:** `GET /api/bundle-root`, `/api/tree` (`TreeNode`), `/api/concept?path=` (raw markdown), `/api/render?path=` (`RenderPayload`), `/api/search?q=`, `/api/backlinks?path=`, `/api/tags`, `/api/concepts-by-tag?tag=`, `/api/types`, `/api/keys`, `/api/concept-paths`, and `GET /api/events` — the **SSE** stream (`text/event-stream`) carrying `FileChange` events for live reload plus, under the named `sync` event, the two [sync notices](#the-sync-loop-git-synced-only).
 
 **Gated reads (JWT, same gate as writes):** `GET /api/history?path=` (`FileHistory`) and `GET /api/file-at-rev?path=&rev=` (`FileAtRev`) — the review-diff surface. Gated because `fileAtRev` returns the full text of any path at any revision, so unguarded it would republish every version of every file ever committed, including content deliberately **deleted** from the Bundle. `hooks.server.ts` therefore treats these two pathnames as a `GATED_READS` set, taking the session→mint→forward branch even though the method is GET; the frontend maps `401` to `gitMissing`, so an anonymous client simply sees the toggle disabled. In the **plain** shape the handlers **short-circuit to `notARepo` without spawning git** — load-bearing, because git's upward repo discovery would otherwise let a Bundle bind-mounted inside a host repo serve *that* repo's log.
 
