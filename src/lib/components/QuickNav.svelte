@@ -12,7 +12,11 @@
    * steps back out to the normal search before it closes the palette.
    */
   import { createLatestGuard } from '$lib/asyncGuard';
-  import { fuzzyRank } from '$lib/fuzzy';
+  import {
+    quickNavResults,
+    recentKnownPaths,
+    type QuickNavResult as Result,
+  } from '$lib/quickNavResults';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
   import { focus } from '$lib/state/focus.svelte';
@@ -71,40 +75,19 @@
     tagActive = tagMode !== null;
   });
 
-  // Results. A tagged Concept is rendered exactly like a normal Concept row.
-  type Result = { kind: 'concept'; path: string } | { kind: 'tag'; tag: string };
-  const results = $derived.by<Result[]>(() => {
-    const q = query.trim();
-
-    // Drill-down: the Concepts carrying the active tag, fuzzy-filtered by query.
-    if (tagMode !== null) {
-      const filtered = q === '' ? tagConcepts : fuzzyRank(q, tagConcepts).map((m) => m.target);
-      return filtered.map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Empty query: recent files (kept only to existing paths so a deleted file
-    // never lingers).
-    if (q === '') {
-      const known = new Set(paths);
-      return recent.filter((p) => known.has(p)).map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Mix Concept and tag matches, best score first (ties: shorter target).
-    const scored = [
-      ...fuzzyRank(q, paths).map((m) => ({
-        r: { kind: 'concept', path: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-      ...fuzzyRank(q, tags).map((m) => ({
-        r: { kind: 'tag', tag: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-    ];
-    scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.len - b.len));
-    return scored.map((s) => s.r);
-  });
+  // Results (pure building shared with the web palette via `quickNavResults`).
+  // Empty query shows the recent files, kept only to existing paths so a
+  // deleted file never lingers.
+  const results = $derived.by<Result[]>(() =>
+    quickNavResults({
+      query,
+      tagMode,
+      tagConcepts,
+      paths,
+      tags,
+      emptyQueryPaths: recentKnownPaths(recent, paths),
+    }),
+  );
 
   // The effective selection, clamped to the current result set without writing
   // back to state (avoids an effect-update loop). `selected` is the user's

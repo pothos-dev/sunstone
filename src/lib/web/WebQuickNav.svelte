@@ -21,7 +21,7 @@
    */
   import { backend } from '$lib/ipc';
   import { createLatestGuard } from '$lib/asyncGuard';
-  import { fuzzyRank } from '$lib/fuzzy';
+  import { quickNavResults, type QuickNavResult as Result } from '$lib/quickNavResults';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
 
@@ -55,38 +55,12 @@
   let tagConcepts = $state<string[]>([]);
   const tagGuard = createLatestGuard();
 
-  // Results. A tagged Concept is rendered exactly like a normal Concept row.
-  type Result = { kind: 'concept'; path: string } | { kind: 'tag'; tag: string };
-  const results = $derived.by<Result[]>(() => {
-    const q = query.trim();
-
-    // Drill-down: the Concepts carrying the active tag, fuzzy-filtered by query.
-    if (tagMode !== null) {
-      const filtered = q === '' ? tagConcepts : fuzzyRank(q, tagConcepts).map((m) => m.target);
-      return filtered.map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Empty query: browse all Concept paths (no recents on the read-only web).
-    if (q === '') {
-      return paths.map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Mix Concept and tag matches, best score first (ties: shorter target).
-    const scored = [
-      ...fuzzyRank(q, paths).map((m) => ({
-        r: { kind: 'concept', path: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-      ...fuzzyRank(q, tags).map((m) => ({
-        r: { kind: 'tag', tag: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-    ];
-    scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.len - b.len));
-    return scored.map((s) => s.r);
-  });
+  // Results (pure building shared with the desktop palette via
+  // `quickNavResults`). Empty query browses ALL Concept paths — no recents on
+  // the read-only web backend.
+  const results = $derived.by<Result[]>(() =>
+    quickNavResults({ query, tagMode, tagConcepts, paths, tags, emptyQueryPaths: paths }),
+  );
 
   // The effective selection, clamped to the current result set without writing
   // back to state (avoids an effect-update loop).
