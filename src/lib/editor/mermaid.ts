@@ -81,6 +81,9 @@ function ensureMermaid(): Promise<typeof import('mermaid').default> {
       // strict sanitisation (no click callbacks, no raw HTML labels) is the
       // safe default (ADR-0005). Interactivity is a later concern.
       securityLevel: 'strict',
+      // Stop mermaid from injecting its OWN error graph into the DOM on a
+      // parse failure — we render our own in-place error panel.
+      suppressErrorRendering: true,
     });
     return mermaid;
   });
@@ -200,7 +203,12 @@ function renderInto(
       // theme with our `themeVariables`), not mermaid's generic dark/default.
       // mermaid bakes colours in at `render` time, so re-`initialize` per render
       // keeps the diagram in step with the app's light/dark scheme (option 5a).
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', ...themeConfig });
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        suppressErrorRendering: true,
+        ...themeConfig,
+      });
       return mermaid.render(id, source);
     })
     .then(({ svg }) => {
@@ -216,6 +224,11 @@ function renderInto(
       // message) rather than swallowing it — a half-typed diagram is invalid
       // most of the time the cursor sits just outside it (ADR-0005, 4a).
       // Errors are NOT cached: fixing the source must re-attempt the render.
+      // Belt-and-suspenders: remove any temporary render element mermaid may
+      // have left appended to the document on failure (in addition to
+      // `suppressErrorRendering`), so no orphan diagram lingers in the page.
+      document.getElementById(id)?.remove();
+      document.getElementById(`d${id}`)?.remove();
       if (!host.isConnected || !current()) return;
       const message = err instanceof Error ? err.message : String(err);
       host.innerHTML = '';
