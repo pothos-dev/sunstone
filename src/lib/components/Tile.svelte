@@ -42,15 +42,7 @@
     openSearch,
     annotate,
     annotateActionFor,
-    toggleBold,
-    toggleItalic,
-    toggleStrikethrough,
-    toggleInlineCode,
-    insertOrEditLink,
     linkActionFor,
-    copySelection,
-    cutSelection,
-    pasteFromClipboard,
     selectionForAnnotate,
     addAnnotationWithComment,
     updateAnnotationComment,
@@ -63,7 +55,7 @@
   import { createTileReview } from '$lib/tileReview.svelte';
   import { parseProperties, type Property } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
-  import { buildEditorMenuItems, type EditorMenuItem } from '$lib/tileEditorMenu';
+  import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
@@ -281,48 +273,23 @@
 
   function onEditorMenuSelect(id: string): void {
     if (!view) return;
-    switch (id) {
-      case 'cut':
-        void cutSelection(view);
-        break;
-      case 'copy':
-        void copySelection(view);
-        break;
-      case 'paste':
-        void pasteFromClipboard(view);
-        break;
-      case 'bold':
-        toggleBold(view);
-        break;
-      case 'italic':
-        toggleItalic(view);
-        break;
-      case 'strike':
-        toggleStrikethrough(view);
-        break;
-      case 'code':
-        toggleInlineCode(view);
-        break;
-      case 'link':
-        insertOrEditLink(view);
-        break;
-      case 'annotate': {
-        const range = editorMenu?.annotateRange;
-        if (range) {
-          annotationPopup = {
-            x: editorMenu?.x ?? 0,
-            y: editorMenu?.y ?? 0,
-            mode: 'add',
-            text: '',
-            from: range.from,
-            to: range.to,
-          };
-        } else {
-          annotate(view);
-        }
-        break;
+    if (id === 'annotate') {
+      const range = editorMenu?.annotateRange;
+      if (range) {
+        annotationPopup = {
+          x: editorMenu?.x ?? 0,
+          y: editorMenu?.y ?? 0,
+          mode: 'add',
+          text: '',
+          from: range.from,
+          to: range.to,
+        };
+      } else {
+        annotate(view);
       }
+      return;
     }
+    editorCommandFor(id)?.(view);
   }
 
   // --- Review changes: working-tree ↔ HEAD (per Tile) --------------------------

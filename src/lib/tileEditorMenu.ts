@@ -3,6 +3,18 @@
 // WHICH items to show for the read-only vs editing branches, selection state,
 // and the annotate (comment) action — no DOM/CodeMirror side effects here.
 
+import type { EditorView } from '@codemirror/view';
+import {
+  copySelection,
+  cutSelection,
+  pasteFromClipboard,
+  toggleBold,
+  toggleItalic,
+  toggleStrikethrough,
+  toggleInlineCode,
+  insertOrEditLink,
+} from '$lib/editor/commands';
+
 export type EditorMenuItem = { id: string; label: string; separated?: boolean };
 
 export interface EditorMenuBuildInput {
@@ -75,4 +87,34 @@ export function buildEditorMenuItems(input: EditorMenuBuildInput): EditorMenuBui
   }
 
   return { items, annotateUsesSelectionRange: annotateAction === 'add' };
+}
+
+/**
+ * The id → editor-command dispatch table for the menu items above (extracted
+ * from Tile.svelte's onEditorMenuSelect). The clipboard commands are async;
+ * they are fire-and-forget here, exactly as Tile fired them (`void ...`).
+ *
+ * 'annotate' is deliberately ABSENT: it opens the Tile's annotation popup (or
+ * jumps to an existing comment), which needs the menu's selection range and the
+ * popup state, so it stays in Tile.svelte.
+ */
+const EDITOR_MENU_COMMANDS: Record<string, (view: EditorView) => void> = {
+  cut: (view) => void cutSelection(view),
+  copy: (view) => void copySelection(view),
+  paste: (view) => void pasteFromClipboard(view),
+  bold: toggleBold,
+  italic: toggleItalic,
+  strike: toggleStrikethrough,
+  code: toggleInlineCode,
+  link: insertOrEditLink,
+};
+
+/**
+ * Resolve a menu item id to the editor command it fires, or null for ids this
+ * table does not own (i.e. 'annotate' and anything unknown).
+ */
+export function editorCommandFor(id: string): ((view: EditorView) => void) | null {
+  return Object.prototype.hasOwnProperty.call(EDITOR_MENU_COMMANDS, id)
+    ? EDITOR_MENU_COMMANDS[id]
+    : null;
 }
