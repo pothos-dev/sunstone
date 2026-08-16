@@ -373,9 +373,6 @@ export const httpBackend: Backend = {
   listConceptPaths(): Promise<string[]> {
     return getJson<string[]>('/api/concept-paths');
   },
-  conceptExists(path: string): Promise<boolean> {
-    return getJson<boolean>(`/api/concept-exists?path=${encodeURIComponent(path)}`);
-  },
   backlinks(path: string): Promise<string[]> {
     return getJson<string[]>(`/api/backlinks?path=${encodeURIComponent(path)}`);
   },

@@ -166,15 +166,12 @@ export interface Backend {
   /**
    * Every Concept path in the Bundle index. The broken-link decoration seeds a
    * SYNCHRONOUS existence cache from this (CodeMirror decorations are
-   * synchronous, so they cannot await a per-link `conceptExists`). The cache is
-   * refreshed on `onFileChanged` and on Concept switch. We expose the full list
-   * (over per-path `conceptExists`) precisely because a one-shot snapshot makes
-   * the synchronous decoration efficient.
+   * synchronous, so they cannot await a per-link existence query). The cache is
+   * refreshed on `onFileChanged` and on Concept switch. The seam exposes the
+   * full list — not a per-path existence method — precisely because a one-shot
+   * snapshot makes the synchronous decoration efficient.
    */
   listConceptPaths(): Promise<string[]>;
-
-  /** Whether a Concept exists at `path` (companion to `listConceptPaths`). */
-  conceptExists(path: string): Promise<boolean>;
 
   /** Sources linking TO `path` (backlinks). Used by the backlinks panel (slice 7). */
   backlinks(path: string): Promise<string[]>;

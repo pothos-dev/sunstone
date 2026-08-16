@@ -369,10 +369,6 @@ export const fakeBackend: Backend = {
     return conceptPaths();
   },
 
-  async conceptExists(path: string): Promise<boolean> {
-    return path.endsWith('.md') && Object.prototype.hasOwnProperty.call(FILES, path);
-  },
-
   async backlinks(path: string): Promise<string[]> {
     await ensureIndexReady();
     const sources: string[] = [];

@@ -123,10 +123,6 @@ export const tauriBackend: Backend = {
     return invoke<string[]>('list_concept_paths');
   },
 
-  conceptExists(path: string): Promise<boolean> {
-    return invoke<boolean>('concept_exists', { path });
-  },
-
   backlinks(path: string): Promise<string[]> {
     return invoke<string[]>('backlinks', { path });
   },
