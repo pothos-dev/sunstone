@@ -2,23 +2,8 @@
 //! (dialog-free) PDF export, with one `export_webview_pdf` implementation per
 //! platform webview API.
 
+use sunstone_shared::url::query_encode;
 use tauri::Manager;
-
-/// Percent-encode a string for use in a URL query value (RFC 3986 unreserved
-/// set passes through; everything else is `%XX`). Small local helper so the
-/// print-window URL below needs no extra dependency.
-fn encode_query(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
 
 /// Open a chrome-free print/PDF preview of the Concept at `path` in a SEPARATE
 /// native window (WebKitGTK has no rich PDF chrome of its own, so the preview
@@ -27,7 +12,7 @@ fn encode_query(s: &str) -> String {
 /// If a print window is already open it is reused (navigated + focused).
 #[tauri::command]
 pub(crate) fn open_print_window(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    let query = format!("?print={}&toolbar=1", encode_query(&path));
+    let query = format!("?print={}&toolbar=1", query_encode(&path));
     if let Some(existing) = app.get_webview_window("print") {
         existing
             .eval(&format!("window.location.replace('index.html{query}')"))

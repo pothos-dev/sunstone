@@ -3940,6 +3940,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sunstone-native",
+ "sunstone-shared",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

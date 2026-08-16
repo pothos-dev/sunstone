@@ -13,9 +13,10 @@
 
 use std::collections::HashSet;
 
-/// Percent-encode a value for one URL path segment (like `encodeURIComponent`:
-/// keep unreserved chars, `%XX` everything else, including `/`).
-fn query_encode(s: &str) -> String {
+/// Percent-encode a value for one URL path segment or query value (like
+/// `encodeURIComponent`: the RFC 3986 unreserved set passes through, `%XX`
+/// everything else, including `/`).
+pub fn query_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {
         match b {
@@ -26,6 +27,28 @@ fn query_encode(s: &str) -> String {
         }
     }
     out
+}
+
+/// Decode `%XX` percent-escapes (e.g. `%20` → space). Invalid escapes are
+/// passed through verbatim. Inverse of [`query_encode`] for its output.
+pub fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16);
+            let lo = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// A Concept's bundle path → its pretty URL pathname. Drops `.md` and a trailing

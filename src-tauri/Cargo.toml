@@ -21,6 +21,8 @@ tauri-build = { version = "2", features = [] }
 # Sunstone's reusable domain logic (bundle, index, rewrite, search, watcher).
 # The desktop shell is now a thin Tauri wrapper over this crate.
 sunstone-native = { path = "../crates/sunstone-native" }
+# Host-agnostic helpers shared with the web/wasm builds (URL percent-encoding).
+sunstone-shared = { path = "../crates/sunstone-shared" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Native save-file chooser for the print window's "Save as PDF" button.
