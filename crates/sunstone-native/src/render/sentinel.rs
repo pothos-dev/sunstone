@@ -18,6 +18,9 @@ use regex::Regex;
 pub struct Sentinels {
     open: char,
     close: char,
+    /// `\u{open}(\d+)\u{close}` — built once per instance so `substitute`
+    /// doesn't recompile it on every render pass.
+    re: Regex,
     repls: Vec<String>,
 }
 
@@ -26,6 +29,7 @@ impl Sentinels {
         Self {
             open,
             close,
+            re: Regex::new(&format!("{open}(\\d+){close}")).unwrap(),
             repls: Vec::new(),
         }
     }
@@ -46,8 +50,7 @@ impl Sentinels {
         if self.repls.is_empty() {
             return html.to_string();
         }
-        let re = Regex::new(&format!("{}(\\d+){}", self.open, self.close)).unwrap();
-        re.replace_all(html, |caps: &regex::Captures| {
+        self.re.replace_all(html, |caps: &regex::Captures| {
             caps[1]
                 .parse::<usize>()
                 .ok()

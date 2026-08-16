@@ -35,6 +35,7 @@ mod critic;
 mod sentinel;
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use comrak::nodes::NodeValue;
 use comrak::{format_html, parse_document, Arena, Options};
@@ -180,7 +181,8 @@ pub fn render_body(
 /// tells us which `<hN>` to skip — a setext heading gets no id and consumes no
 /// outline slug, keeping the k-th ATX `<hN>` aligned with the k-th outline entry.
 fn inject_heading_ids(html: &str, outline: &[OutlineHeading], heading_is_setext: &[bool]) -> String {
-    let re = Regex::new(r"<(h[1-6])>").unwrap();
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<(h[1-6])>").unwrap());
+    let re = &*RE;
     let mut h_idx = 0usize; // index over ALL comrak headings (ATX + setext)
     let mut o_idx = 0usize; // index over the ATX-only outline
     re.replace_all(html, |caps: &regex::Captures| {
@@ -273,7 +275,9 @@ fn mark_link_url(
 
 /// Rewrite the marker hrefs comrak emitted into the final anchor attributes.
 fn rewrite_marker_hrefs(html: &str) -> String {
-    let re = Regex::new(r#"href="(sapint|sapbroken|sapext):([^"]*)""#).unwrap();
+    static RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"href="(sapint|sapbroken|sapext):([^"]*)""#).unwrap());
+    let re = &*RE;
     re.replace_all(html, |caps: &regex::Captures| {
         let payload = caps.get(2).map(|m| m.as_str()).unwrap_or("");
         match &caps[1] {
