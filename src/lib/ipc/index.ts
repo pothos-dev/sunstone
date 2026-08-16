@@ -23,7 +23,7 @@ export type { Backend } from './backend';
  * so the unused branch is eliminated — the desktop build keeps the exact old
  * behaviour and the web build drops the Tauri path entirely.
  *
- * See ARCHITECTURE.md "The IPC seam".
+ * See docs/architecture/web-frontend.md "The IPC seam".
  */
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 

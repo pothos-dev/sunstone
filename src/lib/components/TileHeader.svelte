@@ -10,8 +10,8 @@
   //   - Export as PDF.
   //
   // Presentational and thin: it owns no state. All logic (edit toggle, undo/redo,
-  // review, export, close, split) lives in App.svelte / Tile.svelte and is passed
-  // in as callbacks + reactive flags.
+  // review, export, close, split) lives in Tile.svelte and is passed in as
+  // callbacks + reactive flags.
 
   interface Props {
     /** The active Concept's derived header label ('' when the Tile is empty). */

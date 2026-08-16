@@ -24,7 +24,7 @@ import type {
  * When a slice adds a Rust command, add a method here and implement it in BOTH
  * impls. Paths crossing the seam are always bundle-relative, forward-slash.
  *
- * See ARCHITECTURE.md "The IPC seam".
+ * See docs/architecture/web-frontend.md "The IPC seam".
  */
 export interface Backend {
   /** Absolute path of the Bundle root opened via the CLI. */

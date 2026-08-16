@@ -243,7 +243,7 @@ export function serializeFrontmatter(props: Property[]): string {
  * (ADR 0003). We splice only the key portion of the first line (everything up to
  * and including the first `:`), leaving the value and any following block lines
  * untouched. If the entry shape is unexpected (no `:` on the first line), we
- * clear `entry` and fall back to the structured/raw form so the rename still
+ * rebuild `entry` from the new key plus the `raw` value so the rename still
  * applies without corrupting output.
  */
 export function renameProperty(prop: Property, newKey: string): Property {
@@ -256,8 +256,8 @@ export function renameProperty(prop: Property, newKey: string): Property {
   const firstLineEnd = nl === -1 ? entry.length : nl;
   const colon = entry.indexOf(':');
   if (colon === -1 || colon > firstLineEnd) {
-    // No usable key separator — drop the verbatim entry and let the serializer
-    // re-emit from `raw` instead (degrades gracefully; value still preserved).
+    // No usable key separator — rebuild the entry from the new key + `raw`
+    // value instead (degrades gracefully; value still preserved).
     const value = prop.raw ?? '';
     const rebuilt = `${serializeKey(newKey)}: ${value}`.replace(/\n*$/, '\n');
     return { ...prop, key: newKey, entry: rebuilt };

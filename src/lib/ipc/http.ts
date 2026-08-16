@@ -32,7 +32,7 @@ import type {
  * SSR reads its data directly in `+page.ts`'s `load`, so this seam is primarily
  * the hydrated-island path.
  *
- * See ARCHITECTURE.md "The IPC seam" and the enable-web-writing effort.
+ * See docs/architecture/web-frontend.md "The IPC seam" and the enable-web-writing effort.
  */
 
 /** The web serves ONE fixed Bundle and has no launcher, so folder switching is

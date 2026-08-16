@@ -29,7 +29,7 @@
     /**
      * Key-name suggestions for the key inputs (when adding/renaming a key):
      * OKF recommended keys ∪ distinct keys used across the Bundle. Merged and
-     * deduped by the caller (App.svelte).
+     * deduped by the caller (Tile.svelte).
      */
     keys?: string[];
     /**
@@ -39,8 +39,9 @@
      */
     tags?: string[];
     /**
-     * When true, focus the `type` input on mount/path-change. Set by the app
-     * shell right after a NEW Concept is created so the user lands in `type`.
+     * When true, focus the `type` input on mount/path-change. Driven by TreeCrud
+     * (via the `focusTypeForPath` $bindable chain) right after a NEW Concept is
+     * created so the user lands in `type`.
      */
     focusType?: boolean;
     /** Called with the new properties after an edit. */
