@@ -749,15 +749,10 @@ fn first_line(stderr: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::Duration;
     use sunstone_native::git::CommitIdentity;
 
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
-    }
+    use crate::testutil::{git, git_available, git_stdout, temp_dir};
 
     fn ssh_keygen_available() -> bool {
         // Spawnability is the whole question; `-h` exits non-zero with a usage
@@ -773,39 +768,6 @@ mod tests {
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).trim() == "0")
             .unwrap_or(false)
-    }
-
-    /// A fresh canonicalized temp directory, following `main.rs`'s counter idiom
-    /// (no `tempfile` dev-dependency in this crate).
-    fn temp_dir(tag: &str) -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-boot-{tag}-{}-{}",
-            std::process::id(),
-            n
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        dir.canonicalize().unwrap()
-    }
-
-    fn git(dir: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .current_dir(dir)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-    }
-
-    fn git_stdout(dir: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .current_dir(dir)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
     }
 
     fn sync_identity() -> CommitIdentity {

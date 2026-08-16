@@ -692,8 +692,6 @@ fn abort(repo_root: &Path, reason: impl std::fmt::Display) -> String {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use std::process::Command;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::Duration;
 
     use sunstone_native::git::CommitIdentity;
@@ -885,70 +883,10 @@ mod tests {
     // --- Live-git ticks over real temp repos with a local bare remote, skipped
     // cleanly when `git` is absent (the convention in git.rs / conflict.rs). --
 
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
-    }
-
-    fn git(root: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-    }
-
-    fn stdout(root: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
-    }
-
-    fn temp_dir(tag: &str) -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-sync-{tag}-{}-{}",
-            std::process::id(),
-            n
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.canonicalize().unwrap()
-    }
-
-    fn put(root: &Path, rel: &str, bytes: &[u8]) {
-        let abs = root.join(rel);
-        std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
-        std::fs::write(abs, bytes).unwrap();
-    }
-
-    fn read(root: &Path, rel: &str) -> Vec<u8> {
-        std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("reading {rel}: {e}"))
-    }
-
-    /// Identity and signing come from the repo, never the ambient `~/.gitconfig`.
-    fn local_identity(root: &Path) {
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test User"]);
-        git(root, &["config", "commit.gpgsign", "false"]);
-    }
-
-    fn commit_all(root: &Path, msg: &str, date: Option<&str>) {
-        git(root, &["add", "-A"]);
-        match date {
-            Some(date) => git(root, &["commit", "-q", "-m", msg, "--date", date]),
-            None => git(root, &["commit", "-q", "-m", msg]),
-        }
-    }
-
-    fn head(root: &Path) -> String {
-        stdout(root, &["rev-parse", "HEAD"])
-    }
+    use crate::testutil::{
+        commit_all, git, git_available, git_stdout as stdout, head, local_identity, put, read,
+        temp_dir,
+    };
 
     /// The whole deployment in three directories: a bare remote, a second clone
     /// standing in for **origin-side** actors (another container, a laptop), and

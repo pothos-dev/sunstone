@@ -41,6 +41,8 @@ mod history;
 mod routes_read;
 mod routes_write;
 mod sync;
+#[cfg(test)]
+mod testutil;
 mod write;
 
 use std::net::SocketAddr;

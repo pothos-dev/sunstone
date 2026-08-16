@@ -387,8 +387,6 @@ pub fn exists_either_side(repo_root: &Path, rel: &str) -> bool {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use std::process::Command;
-    use std::sync::atomic::{AtomicU32, Ordering};
 
     use sunstone_native::git::RebaseOutcome;
 
@@ -547,71 +545,18 @@ mod tests {
     // --- Live-git tests over real temp repos, skipped cleanly when `git` is
     // absent from PATH (the convention in write.rs / history.rs / git.rs). ---
 
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
-    }
-
-    fn run(root: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-    }
-
-    fn stdout(root: &Path, args: &[&str]) -> String {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-        String::from_utf8_lossy(&out.stdout).trim().to_string()
-    }
-
-    fn temp_dir(tag: &str) -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-conflict-{tag}-{}-{}",
-            std::process::id(),
-            n
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.canonicalize().unwrap()
-    }
-
-    fn put(root: &Path, rel: &str, bytes: &[u8]) {
-        let abs = root.join(rel);
-        std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
-        std::fs::write(abs, bytes).unwrap();
-    }
-
-    fn read(root: &Path, rel: &str) -> Vec<u8> {
-        std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("reading {rel}: {e}"))
-    }
+    use crate::testutil::{
+        commit_all, git as run, git_available, git_stdout as stdout, local_identity, put, read,
+        temp_dir,
+    };
 
     /// A repo on `main` whose identity and signing come from the repo, never the
     /// ambient `~/.gitconfig`.
     fn repo_on_main(tag: &str) -> PathBuf {
         let root = temp_dir(tag);
         run(&root, &["init", "-q", "--initial-branch=main"]);
-        run(&root, &["config", "user.email", "test@example.com"]);
-        run(&root, &["config", "user.name", "Test User"]);
-        run(&root, &["config", "commit.gpgsign", "false"]);
+        local_identity(&root);
         root
-    }
-
-    /// Commit everything. `date` fixes the **author** date, which is what §9's
-    /// `<ts>` is taken from.
-    fn commit_all(root: &Path, msg: &str, date: Option<&str>) {
-        run(root, &["add", "-A"]);
-        match date {
-            Some(date) => run(root, &["commit", "-q", "-m", msg, "--date", date]),
-            None => run(root, &["commit", "-q", "-m", msg]),
-        }
     }
 
     /// `origin/main` is just a ref as far as a rebase is concerned, so divergence
