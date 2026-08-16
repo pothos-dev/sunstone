@@ -40,6 +40,7 @@
   } from '$lib/tileLayout';
   import { nextTile } from '$lib/tileNav';
   import { startDividerDrag } from '$lib/dividerDrag';
+  import { retryFrames } from '$lib/retryFrames';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
 
@@ -415,27 +416,22 @@
 
   function refocusExplorerAt(path: string | null) {
     if (path !== null) explorerNav.setFocused(path);
-    let tries = 0;
-    const tryFocus = () => {
+    retryFrames(() => {
       const target = explorerNav.focusedPath;
-      if (target === null || !treePane) return;
+      if (target === null || !treePane) return true;
       const row = treePane.querySelector<HTMLElement>(
         `.row[data-row-path="${CSS.escape(target)}"]`,
       );
-      if (row) {
-        row.focus();
-      } else if (tries++ < 10) {
-        requestAnimationFrame(tryFocus);
-      }
-    };
-    requestAnimationFrame(tryFocus);
+      if (!row) return false;
+      row.focus();
+      return true;
+    }, 10);
   }
 
   function focusExplorerInitial() {
-    let tries = 0;
-    const attempt = () => {
+    retryFrames(() => {
       const active = document.activeElement;
-      if (active && active !== document.body) return;
+      if (active && active !== document.body) return true;
       const root = bundle.tree;
       if (treePane && root) {
         const rows = flattenVisible(root, (q) => session.isExpanded(q));
@@ -447,13 +443,12 @@
           );
           if (row) {
             row.focus();
-            return;
+            return true;
           }
         }
       }
-      if (tries++ < 20) requestAnimationFrame(attempt);
-    };
-    requestAnimationFrame(attempt);
+      return false;
+    }, 20);
   }
 
   function onCrudCommit(path: string, opts?: { deleted?: boolean }) {
@@ -482,30 +477,22 @@
   // `focusin`, which keeps the 'editor' Region active.
   function focusTile(id: string) {
     workspace.setActive(id);
-    let tries = 0;
-    const attempt = () => {
+    retryFrames(() => {
       const ref = tileRefs[id];
-      if (ref?.hasView()) {
-        ref.focusView();
-      } else if (tries++ < 10) {
-        requestAnimationFrame(attempt);
-      }
-    };
-    requestAnimationFrame(attempt);
+      if (!ref?.hasView()) return false;
+      ref.focusView();
+      return true;
+    }, 10);
   }
 
   // Focus the active Tile's CodeMirror view once it exists (retry across frames,
   // since the view (re)builds reactively and may be null the next microtask).
   function focusEditorWhenReady() {
-    let tries = 0;
-    const tryFocus = () => {
-      if (activeTileRef?.hasView()) {
-        activeTileRef.focusView();
-      } else if (tries++ < 10) {
-        requestAnimationFrame(tryFocus);
-      }
-    };
-    requestAnimationFrame(tryFocus);
+    retryFrames(() => {
+      if (!activeTileRef?.hasView()) return false;
+      activeTileRef.focusView();
+      return true;
+    }, 10);
   }
 
   // Mirror the Explorer Focused-item path into DOM focus while it holds focus.
