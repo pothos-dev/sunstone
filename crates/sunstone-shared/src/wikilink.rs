@@ -181,79 +181,15 @@ pub fn resolve_wikilink(all_paths: &[String], source_path: &str, raw: &str) -> O
 /// skipped here, the same way `![](...)` images are skipped by the markdown
 /// scanner. Embed support is DEFERRED to a later phase.
 pub fn wikilink_raws(body: &str) -> Vec<String> {
-    let bytes = body.as_bytes();
+    // One scanner, two products: extraction is replacement that collects and
+    // splices the span back unchanged, so the two can never disagree on which
+    // spans are wikilinks (the agreement test now pins an identity, not two
+    // parallel state machines).
     let mut out = Vec::new();
-    let mut i = 0usize;
-    // Tracks the active inline-code / fenced-code state so `[[`s inside code are
-    // ignored (matching the spec's "do not parse inside code").
-    let mut in_inline_code = false;
-    let mut fence: Option<u8> = None; // Some(b'`') or Some(b'~') when in a fence.
-    let mut at_line_start = true;
-
-    while i < bytes.len() {
-        let b = bytes[i];
-
-        // Fenced code blocks: a line beginning (after optional spaces) with
-        // ``` or ~~~ toggles the fence. We only honour the opener/closer at a
-        // line start, like CommonMark fences.
-        if at_line_start {
-            let mut j = i;
-            while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
-                j += 1;
-            }
-            if j + 2 < bytes.len()
-                && (bytes[j] == b'`' || bytes[j] == b'~')
-                && bytes[j + 1] == bytes[j]
-                && bytes[j + 2] == bytes[j]
-            {
-                let ch = bytes[j];
-                match fence {
-                    Some(f) if f == ch => fence = None, // closing fence
-                    None => fence = Some(ch),           // opening fence
-                    _ => {}                              // a different fence char inside; ignore
-                }
-                // Skip to end of this line.
-                while i < bytes.len() && bytes[i] != b'\n' {
-                    i += 1;
-                }
-                at_line_start = true;
-                continue;
-            }
-        }
-
-        if fence.is_some() {
-            at_line_start = b == b'\n';
-            i += 1;
-            continue;
-        }
-
-        if b == b'`' {
-            // Toggle inline code. (Single backtick spans; the OKF/Obsidian
-            // content does not nest multi-backtick spans around wikilinks.)
-            in_inline_code = !in_inline_code;
-            at_line_start = false;
-            i += 1;
-            continue;
-        }
-
-        if !in_inline_code && b == b'[' && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
-            // Skip embeds: a `!` immediately before `[[`.
-            let is_embed = i > 0 && bytes[i - 1] == b'!';
-            // Find the first closing `]]`.
-            if let Some(close) = find_double_close(bytes, i + 2) {
-                if !is_embed {
-                    out.push(body[i + 2..close].to_string());
-                }
-                i = close + 2;
-                at_line_start = false;
-                continue;
-            }
-        }
-
-        at_line_start = b == b'\n';
-        i += 1;
-    }
-
+    replace_wikilinks(body, |raw| {
+        out.push(raw.to_string());
+        format!("[[{raw}]]")
+    });
     out
 }
 
