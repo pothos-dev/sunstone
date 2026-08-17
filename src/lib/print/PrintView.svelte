@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { backend } from '$lib/ipc';
+  import { createLatestGuard } from '$lib/asyncGuard';
   import type { RenderPayload } from '$lib/types';
   import { hydrateMermaid } from '$lib/web/webMermaid';
   import { conceptTitle } from '$lib/web/conceptUrl';
@@ -37,7 +38,7 @@
   const currentPath = $derived(navigatedPath ?? path);
   // Guards against a slow render for an earlier Concept clobbering a later one
   // when links are clicked in quick succession.
-  let renderToken = 0;
+  const renderGuard = createLatestGuard();
   // Auto-print (web bare tab) must fire on the FIRST render only, not on every
   // in-preview navigation.
   let firstRender = true;
@@ -68,7 +69,7 @@
   // per-run token means a superseded render never writes its stale HTML.
   $effect(() => {
     const p = currentPath;
-    const token = ++renderToken;
+    const token = renderGuard.next();
     ready = false;
     error = null;
     void (async () => {
@@ -76,14 +77,14 @@
       try {
         payload = await backend.renderConcept(p);
       } catch (e) {
-        if (token === renderToken) error = e instanceof Error ? e.message : String(e);
+        if (renderGuard.isLatest(token)) error = e instanceof Error ? e.message : String(e);
         return;
       }
-      if (token !== renderToken || !bodyEl) return;
+      if (!renderGuard.isLatest(token) || !bodyEl) return;
       bodyEl.innerHTML = payload.html;
       // Force light Mermaid — dark diagrams read wrong / waste ink on paper.
       await hydrateMermaid(bodyEl, 'light');
-      if (token !== renderToken) return;
+      if (!renderGuard.isLatest(token)) return;
       if (surfaceEl) surfaceEl.scrollTop = 0; // a followed link starts at the top
       // Name the window/tab after the Concept so the saved PDF is sensibly named.
       document.title = conceptTitle(p, payload);

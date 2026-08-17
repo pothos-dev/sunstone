@@ -62,7 +62,12 @@
 //! **Deleted** (must not reappear): `SUNSTONE_GIT_MODE` (never shipped),
 //! `SUNSTONE_SEED_COMMIT_NAME` / `_EMAIL` (subsumed by the sync identity).
 
-use std::fmt;
+mod errors;
+mod types;
+
+pub use errors::{ConfigError, ConfigWarning};
+pub use types::{is_ssh_shaped, Config, GitConfig, Shape};
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -70,7 +75,6 @@ use base64::{
     engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
     Engine,
 };
-use serde::Serialize;
 use sunstone_native::git::CommitIdentity;
 
 // --- Constants, not env (§2.3) ----------------------------------------------
@@ -155,310 +159,6 @@ const SSH_KEY_B64: GeneralPurpose = GeneralPurpose::new(
     GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
 );
 
-// --- Shape ------------------------------------------------------------------
-
-/// The deployment shape (Spec 1 §1), derived from the presence gate. Serialized
-/// as `plain` / `git-local` / `git-synced` for `GET /api/sync-status` (§10.5).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Shape {
-    /// No `SUNSTONE_GIT_*` at all. Bundle root is `SUNSTONE_BUNDLE`; Save
-    /// writes the file and runs **no git whatsoever** (§5, §11.1).
-    Plain,
-    /// `SUNSTONE_GIT_BRANCH` only. Commits locally, never pushes, no loop.
-    GitLocal,
-    /// Branch + origin (+ key for an ssh origin). Runs the fetch → rebase →
-    /// push loop (§8).
-    GitSynced,
-}
-
-impl Shape {
-    /// Whether git runs at all. The plain shape's *whole* feature is that it
-    /// does not (read side §11.1, write side §5).
-    pub fn is_git(self) -> bool {
-        matches!(self, Shape::GitLocal | Shape::GitSynced)
-    }
-
-    /// Whether the sync loop is spawned (§4.7 — git-synced only).
-    pub fn syncs(self) -> bool {
-        matches!(self, Shape::GitSynced)
-    }
-
-    /// The wire/log spelling, identical to the serde rename.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Shape::Plain => "plain",
-            Shape::GitLocal => "git-local",
-            Shape::GitSynced => "git-synced",
-        }
-    }
-}
-
-// --- The git family ---------------------------------------------------------
-
-/// The `SUNSTONE_GIT_*` family, present exactly in the two git shapes. Every
-/// entry is strict (§2.3): the parse either produced a usable value or a
-/// [`ConfigError`].
-#[derive(Debug, Clone)]
-pub struct GitConfig {
-    /// `SUNSTONE_GIT_BRANCH` — **required**, no default. Does four jobs: clone
-    /// `--branch`, rebase target `origin/<branch>`, push target, and
-    /// `init --initial-branch`.
-    pub branch: String,
-    /// `SUNSTONE_GIT_ORIGIN` — unset ⇒ [`Shape::GitLocal`]. An **opaque**
-    /// string passed to `git clone`; the *one* inspection ever made of it is
-    /// [`is_ssh_shaped`], which gates the key requirement.
-    pub origin: Option<String>,
-    /// `SUNSTONE_GIT_BUNDLE_SUBDIR` — repo-relative, forward-slash, `""` for
-    /// the repo root. Absolute or containing `..` ⇒ boot error, which is what
-    /// makes [`Config::bundle_root`] contained **by construction** (§4.5).
-    pub bundle_subdir: String,
-    /// `SUNSTONE_GIT_SYNC_INTERVAL_SECS` (default
-    /// [`DEFAULT_SYNC_INTERVAL_SECS`]). Unparseable or `0` ⇒ boot error: `0`
-    /// would add a shape absent from §2.1's table; the escape hatch is a large
-    /// interval.
-    pub sync_interval: Duration,
-    /// `SUNSTONE_GIT_SYNC_NAME` / `_EMAIL`. The loop's **committer** identity,
-    /// and the author *only* of the git-local seed commit (§4.4) — the one
-    /// thing it ever authors, since no OIDC user exists at boot.
-    pub sync_identity: CommitIdentity,
-    /// `SUNSTONE_GIT_SSH_KEY`, base64-decoded to the private PEM. Undecodable
-    /// ⇒ boot error. Required when [`GitConfig::origin_is_ssh`].
-    pub ssh_key_pem: Option<Vec<u8>>,
-    /// `SUNSTONE_GIT_KNOWN_HOSTS` — `ssh-keyscan` lines. Set ⇒ strict host-key
-    /// checking; unset ⇒ `accept-new` against the same (non-persistent) path.
-    pub known_hosts: Option<String>,
-}
-
-impl GitConfig {
-    /// The single inspection of the origin string (§2.3, Spec 1 §7): whether it
-    /// is ssh-shaped, and therefore requires a deploy key.
-    pub fn origin_is_ssh(&self) -> bool {
-        self.origin.as_deref().is_some_and(is_ssh_shaped)
-    }
-
-    /// `StrictHostKeyChecking` value for `GIT_SSH_COMMAND`: `yes` when host
-    /// keys are pinned via `SUNSTONE_GIT_KNOWN_HOSTS`, else `accept-new`
-    /// (§4.2.3 — unpinned means re-trust on first connect after every
-    /// recreate, since `/srv/ssh` is not a volume).
-    pub fn strict_host_key_checking(&self) -> &'static str {
-        if self.known_hosts.is_some() {
-            "yes"
-        } else {
-            "accept-new"
-        }
-    }
-
-    /// `origin/<branch>` — the rebase and `rev-list` counterpart ref (§8.2).
-    pub fn upstream_ref(&self) -> String {
-        format!("origin/{}", self.branch)
-    }
-}
-
-/// Whether `origin` is ssh-shaped, i.e. git will shell out to `ssh` for it:
-/// an `ssh://` URL or the `user@host:path` scp-like form. **Pure** — the only
-/// inspection this codebase ever makes of the origin string, so relocating
-/// origin to another forge changes nothing else (Spec 1 §7).
-pub fn is_ssh_shaped(origin: &str) -> bool {
-    let origin = origin.trim();
-
-    // An explicit scheme settles it: only ssh (and git's `git+ssh` alias) shells
-    // out to `ssh`. `https://`, `http://`, `git://` and `file://` do not.
-    if let Some((scheme, _)) = origin.split_once("://") {
-        let scheme = scheme.to_ascii_lowercase();
-        return scheme == "ssh" || scheme == "git+ssh";
-    }
-
-    // Otherwise git's scp-like rule: a `:` appearing before any `/` makes it
-    // `[user@]host:path`. A bare local path (`/srv/repo`, `../x`) has no colon,
-    // or has one only after a slash.
-    let Some((host, _)) = origin.split_once(':') else {
-        return false;
-    };
-    // A single-character "host" is a Windows drive letter (`C:\repos\wiki`), the
-    // one form git itself excludes from the scp-like rule.
-    !host.is_empty() && !host.contains('/') && host.chars().count() > 1
-}
-
-// --- The parsed surface -----------------------------------------------------
-
-/// The whole environment surface the Rust server reads, git and pre-existing
-/// alike, resolved once at boot.
-#[derive(Debug, Clone)]
-pub struct Config {
-    /// The deployment shape from §2.1's presence gate.
-    pub shape: Shape,
-    /// The git family — `Some` in both git shapes, `None` in the plain shape.
-    pub git: Option<GitConfig>,
-    /// The repository root: `Some(`[`REPO_DIR`]`)` in a git shape, `None` in
-    /// the plain shape. Git runs **here**, not at the bundle root, so a
-    /// rebase covers the whole repo even for a subdir bundle.
-    pub repo_root: Option<PathBuf>,
-    /// The resolved bundle root the index, watcher and write path use (§4.5):
-    /// [`REPO_DIR`] joined with `SUNSTONE_GIT_BUNDLE_SUBDIR` in a git shape,
-    /// `SUNSTONE_BUNDLE` (or the dev default) in the plain shape. The join is
-    /// pure and unit-testable; canonicalization happens in [`crate::boot`].
-    pub bundle_root: PathBuf,
-    /// `SUNSTONE_BUNDLE_SEED_FROM` — contents copied into [`Self::bundle_root`]
-    /// before any git step (§4.3). Set **plus** an origin is a boot error.
-    pub seed_from: Option<PathBuf>,
-    /// `SUNSTONE_JWT_SECRET`. `None` ⇒ writes 401 **and** history is
-    /// unavailable (§11) — with no auth provider wired there is no way to tell
-    /// a viewer from a visitor.
-    pub jwt_secret: Option<Vec<u8>>,
-    /// `SUNSTONE_API_PORT`, lenient: unparseable ⇒ [`crate::DEFAULT_PORT`].
-    pub api_port: u16,
-    /// Non-fatal observations to print at boot (§2.4's log-and-ignore case).
-    pub warnings: Vec<ConfigWarning>,
-}
-
-impl Config {
-    /// A [`Shape::Plain`] config over `bundle_root`, with writes disabled.
-    ///
-    /// Trivially correct and used by `main()` as the interim boot path until
-    /// W4 wires [`parse`] + [`crate::boot::run`], so the skeleton keeps the
-    /// binary behaving exactly as it does today.
-    #[allow(dead_code)] // the trivially-correct plain config every module's tests build on
-    pub fn plain(bundle_root: PathBuf) -> Config {
-        Config {
-            shape: Shape::Plain,
-            git: None,
-            repo_root: None,
-            bundle_root,
-            seed_from: None,
-            jwt_secret: None,
-            api_port: crate::DEFAULT_PORT,
-            warnings: Vec::new(),
-        }
-    }
-
-    /// Whether git runs at all — the read-side (§11.1) and write-side (§5)
-    /// short-circuits both key off this.
-    pub fn is_git(&self) -> bool {
-        self.shape.is_git()
-    }
-
-    /// The git family, or `None` in the plain shape.
-    pub fn git(&self) -> Option<&GitConfig> {
-        self.git.as_ref()
-    }
-}
-
-/// A non-fatal configuration observation, printed at boot. Deliberately a
-/// closed enum: §2.4's line is that log-and-ignore applies **only** where a
-/// value cannot be distinguished from an image default.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConfigWarning {
-    /// `SUNSTONE_BUNDLE` set in a git shape, where the bundle root is
-    /// repo-relative. Not fatal because `Dockerfile` bakes
-    /// `SUNSTONE_BUNDLE=/bundle` into the image ENV, so an operator's override
-    /// is indistinguishable from the image's default.
-    BundleIgnoredInGitShape { value: String },
-}
-
-/// Renders the message **body only** — no `sunstone-server: ` prefix, so the
-/// caller keeps the crate's existing `eprintln!("sunstone-server: {w}")` idiom
-/// and the text also composes into other messages.
-impl fmt::Display for ConfigWarning {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigWarning::BundleIgnoredInGitShape { value } => write!(
-                f,
-                "{BUNDLE_ENV}={value} is ignored in a git shape — the bundle root is \
-                 {REPO_DIR} joined with {SUBDIR_ENV}. Nothing to do if you did not set it: \
-                 the image bakes {BUNDLE_ENV}=/bundle into its ENV."
-            ),
-        }
-    }
-}
-
-/// One reason the configuration refuses to boot. [`parse`] returns **every**
-/// error it found, so N typos cost one crash-loop rather than N.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConfigError {
-    /// A `SUNSTONE_GIT_*` variable is set but `SUNSTONE_GIT_BRANCH` is not
-    /// (§2.1). No default — a default would contradict omission meaning off.
-    GitBranchRequired,
-    /// An unrecognised `SUNSTONE_GIT_*` variable (§2.2) — a typo, or a stale
-    /// sidecar env file carrying the retired `SUNSTONE_GIT_REPO` / `_REF` /
-    /// `_PERIOD` / `_MODE`.
-    UnknownGitVar { name: String },
-    /// `SUNSTONE_GIT_BUNDLE_SUBDIR` is absolute or contains a `..` segment.
-    /// Rejecting here is what removes boot-time containment validation
-    /// downstream (§4.5).
-    BundleSubdirEscapes { value: String },
-    /// `SUNSTONE_GIT_SYNC_INTERVAL_SECS` is unparseable or `0`.
-    BadSyncInterval { value: String },
-    /// The origin is ssh-shaped but `SUNSTONE_GIT_SSH_KEY` is unset. Caught
-    /// here rather than deep in the first loop tick, where ticket 13 would
-    /// report a *sync error* for what is a misconfiguration.
-    SshKeyRequired,
-    /// `SUNSTONE_GIT_SSH_KEY` is not valid base64.
-    SshKeyNotBase64,
-    /// `SUNSTONE_BUNDLE_SEED_FROM` together with an origin: you cannot seed a
-    /// clone, and `git clone` requires an empty target. Fatal rather than
-    /// log-and-ignore because this var has no baked image default, so its
-    /// presence is always an explicit operator act (§2.4, §4.3).
-    SeedWithOrigin { seed: String },
-}
-
-/// Every message names the offending **variable** and the fix — this is what an
-/// operator reads in `docker logs` immediately before the container exits, and
-/// under `restart: unless-stopped` it is the only artefact of the crash loop.
-///
-/// Like [`ConfigWarning`], the body carries no `sunstone-server: ` prefix; the
-/// caller adds it.
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigError::GitBranchRequired => write!(
-                f,
-                "{BRANCH_ENV} is required as soon as any {GIT_VAR_PREFIX}* variable is set, \
-                 and has no default. Set it to the branch to track (e.g. {BRANCH_ENV}=main), \
-                 or unset every {GIT_VAR_PREFIX}* variable to run the plain shape."
-            ),
-            ConfigError::UnknownGitVar { name } => write!(
-                f,
-                "{name} is not a recognised variable and the {GIT_VAR_PREFIX}* namespace is \
-                 closed. Check the spelling; the recognised names are {}. \
-                 (SUNSTONE_GIT_REPO, SUNSTONE_GIT_REF, SUNSTONE_GIT_PERIOD and \
-                 SUNSTONE_GIT_MODE are retired — the server now owns the sync loop, so a \
-                 sidecar env file carrying them must be migrated.)",
-                KNOWN_GIT_VARS.join(", ")
-            ),
-            ConfigError::BundleSubdirEscapes { value } => write!(
-                f,
-                "{SUBDIR_ENV}={value} must be a repository-relative forward-slash path: it may \
-                 not be absolute and may not contain a `..` segment. Use an empty value (or \
-                 unset it) for the repository root, or e.g. {SUBDIR_ENV}=docs."
-            ),
-            ConfigError::BadSyncInterval { value } => write!(
-                f,
-                "{INTERVAL_ENV}={value} must be a whole number of seconds greater than zero \
-                 (default {DEFAULT_SYNC_INTERVAL_SECS}). Zero is not a way to stop polling — \
-                 use a large interval instead; outbound saves are pushed immediately either way."
-            ),
-            ConfigError::SshKeyRequired => write!(
-                f,
-                "{ORIGIN_ENV} is ssh-shaped, so {SSH_KEY_ENV} is required. Set it to the \
-                 base64 of a passphrase-less private deploy key \
-                 (`base64 -w0 < id_ed25519`), or use an https origin."
-            ),
-            ConfigError::SshKeyNotBase64 => write!(
-                f,
-                "{SSH_KEY_ENV} is not valid base64. It must be the base64 encoding of the \
-                 private key **file**, not the key itself: `base64 -w0 < id_ed25519`."
-            ),
-            ConfigError::SeedWithOrigin { seed } => write!(
-                f,
-                "{SEED_FROM_ENV}={seed} cannot be combined with {ORIGIN_ENV}: `git clone` \
-                 requires an empty target, so a clone cannot be seeded. Unset {SEED_FROM_ENV} \
-                 to clone from the origin, or unset {ORIGIN_ENV} to seed a local repository."
-            ),
-        }
-    }
-}
-
 // --- The parse --------------------------------------------------------------
 
 /// Parse the environment surface (Spec 2 §2). `get` answers for any key; an
@@ -469,7 +169,7 @@ impl fmt::Display for ConfigError {
 /// key-lookup function has no enumeration — so it enforces §2.2 over the
 /// closed [`KNOWN_GIT_VARS`] set only. `main()` calls [`parse_env`], which
 /// takes the present key names too; unit tests over a `HashMap` can use either.
-#[allow(dead_code)] // the `HashMap`-friendly entry point for tests; `main()` calls `parse_env`
+#[cfg(test)] // the `HashMap`-friendly entry point for tests; `main()` calls `parse_env`
 pub fn parse(get: impl Fn(&str) -> Option<String>) -> Result<Config, Vec<ConfigError>> {
     parse_env(KNOWN_GIT_VARS.iter().map(|s| s.to_string()), get)
 }
@@ -489,11 +189,61 @@ pub fn parse_env(
     let mut errors: Vec<ConfigError> = Vec::new();
     let mut warnings: Vec<ConfigWarning> = Vec::new();
 
-    // --- The gate (§2.1) + the closed namespace (§2.2) ----------------------
-    //
-    // One prefix scan does both jobs. Sorted so the error list is stable
-    // regardless of how the caller enumerates the environment (a `HashMap` in
-    // tests, `std::env::vars()` in `main`).
+    let any_git_var = scan_git_vars(names, &get, &mut errors);
+
+    let branch = non_empty(&get, BRANCH_ENV);
+    let origin = non_empty(&get, ORIGIN_ENV);
+
+    let (subdir, git, shape) = parse_git_family(any_git_var, &get, branch, &origin, &mut errors);
+
+    let (repo_root, bundle_root) = resolve_roots(shape, &get, &subdir, &mut warnings);
+
+    // --- Seed (§4.3) --------------------------------------------------------
+    let seed_from = non_empty(&get, SEED_FROM_ENV);
+    if let (Some(seed), Some(_)) = (&seed_from, &origin) {
+        // Fatal rather than log-and-ignore: this variable has no baked image
+        // default, so its presence is always an explicit operator act (§2.4).
+        errors.push(ConfigError::SeedWithOrigin { seed: seed.clone() });
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(Config {
+        shape,
+        git,
+        repo_root,
+        bundle_root,
+        seed_from: seed_from.map(PathBuf::from),
+        // Pre-existing and lenient, byte-identical to `main.rs`: empty is unset,
+        // but the value is passed through untrimmed — a secret's whitespace is
+        // part of the secret, and the Node hook mints against the raw value.
+        jwt_secret: get(crate::auth::SECRET_ENV)
+            .filter(|v| !v.is_empty())
+            .map(String::into_bytes),
+        // Pre-existing and lenient: `SUNSTONE_API_PORT=banana` falls back rather
+        // than refusing to boot. Knowingly inconsistent with the git family
+        // (§2.4) — making it fatal is a behaviour change for deployments that
+        // exist today.
+        api_port: get(API_PORT_ENV)
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(crate::DEFAULT_PORT),
+        warnings,
+    })
+}
+
+/// The gate (§2.1) + the closed namespace (§2.2).
+///
+/// One prefix scan does both jobs. Sorted so the error list is stable
+/// regardless of how the caller enumerates the environment (a `HashMap` in
+/// tests, `std::env::vars()` in `main`). Returns whether any *recognised*
+/// `SUNSTONE_GIT_*` variable is set (the gate).
+fn scan_git_vars(
+    names: impl IntoIterator<Item = String>,
+    get: &impl Fn(&str) -> Option<String>,
+    errors: &mut Vec<ConfigError>,
+) -> bool {
     let mut git_names: Vec<String> = names
         .into_iter()
         .filter(|n| n.starts_with(GIT_VAR_PREFIX))
@@ -506,7 +256,7 @@ pub fn parse_env(
         // `VAR=` is unset (§2.3), so it neither trips the gate nor — for an
         // unrecognised name — is an error: a blank line in an env file means
         // "default", uniformly.
-        if non_empty(&get, &name).is_none() {
+        if non_empty(get, &name).is_none() {
             continue;
         }
         if KNOWN_GIT_VARS.contains(&name.as_str()) {
@@ -518,18 +268,26 @@ pub fn parse_env(
             errors.push(ConfigError::UnknownGitVar { name });
         }
     }
+    any_git_var
+}
 
-    let branch = non_empty(&get, BRANCH_ENV);
-    let origin = non_empty(&get, ORIGIN_ENV);
-
-    // --- The git family (§2.3) — strict, and validated even when the branch is
-    // missing, so one boot reports every git problem at once ------------------
+/// The git family (§2.3) — strict, and validated even when the branch is
+/// missing, so one boot reports every git problem at once. Returns the
+/// (already escape-checked) bundle subdir, the git config when a branch was
+/// given, and the shape the gate + origin imply.
+fn parse_git_family(
+    any_git_var: bool,
+    get: &impl Fn(&str) -> Option<String>,
+    branch: Option<String>,
+    origin: &Option<String>,
+    errors: &mut Vec<ConfigError>,
+) -> (String, Option<GitConfig>, Shape) {
     let mut subdir = String::new();
     let mut git: Option<GitConfig> = None;
     let mut shape = Shape::Plain;
 
     if any_git_var {
-        subdir = non_empty(&get, SUBDIR_ENV).unwrap_or_default();
+        subdir = non_empty(get, SUBDIR_ENV).unwrap_or_default();
         if subdir_escapes(&subdir) {
             errors.push(ConfigError::BundleSubdirEscapes {
                 value: subdir.clone(),
@@ -539,7 +297,7 @@ pub fn parse_env(
             subdir = String::new();
         }
 
-        let sync_interval = match non_empty(&get, INTERVAL_ENV) {
+        let sync_interval = match non_empty(get, INTERVAL_ENV) {
             None => Duration::from_secs(DEFAULT_SYNC_INTERVAL_SECS),
             Some(value) => match value.parse::<u64>() {
                 Ok(secs) if secs > 0 => Duration::from_secs(secs),
@@ -551,7 +309,7 @@ pub fn parse_env(
             },
         };
 
-        let raw_key = non_empty(&get, SSH_KEY_ENV);
+        let raw_key = non_empty(get, SSH_KEY_ENV);
         let ssh_key_pem = match &raw_key {
             None => None,
             // Whitespace is stripped first: a key pasted across lines is still
@@ -590,25 +348,34 @@ pub fn parse_env(
                     bundle_subdir: subdir.clone(),
                     sync_interval,
                     sync_identity: CommitIdentity {
-                        name: non_empty(&get, SYNC_NAME_ENV)
+                        name: non_empty(get, SYNC_NAME_ENV)
                             .unwrap_or_else(|| DEFAULT_SYNC_NAME.to_string()),
-                        email: non_empty(&get, SYNC_EMAIL_ENV)
+                        email: non_empty(get, SYNC_EMAIL_ENV)
                             .unwrap_or_else(|| DEFAULT_SYNC_EMAIL.to_string()),
                     },
                     ssh_key_pem,
-                    known_hosts: non_empty(&get, KNOWN_HOSTS_ENV),
+                    known_hosts: non_empty(get, KNOWN_HOSTS_ENV),
                 });
             }
             None => errors.push(ConfigError::GitBranchRequired),
         }
     }
 
-    // --- Bundle root (§4.5) and the one log-and-ignore case (§2.4) ----------
-    //
-    // `SUNSTONE_BUNDLE` keeps `main.rs`'s exact leniency: whitespace-only counts
-    // as unset, but the surviving value is *not* trimmed.
+    (subdir, git, shape)
+}
+
+/// Bundle root (§4.5) and the one log-and-ignore case (§2.4).
+///
+/// `SUNSTONE_BUNDLE` keeps `main.rs`'s exact leniency: whitespace-only counts
+/// as unset, but the surviving value is *not* trimmed.
+fn resolve_roots(
+    shape: Shape,
+    get: &impl Fn(&str) -> Option<String>,
+    subdir: &str,
+    warnings: &mut Vec<ConfigWarning>,
+) -> (Option<PathBuf>, PathBuf) {
     let bundle_env = get(BUNDLE_ENV).filter(|v| !v.trim().is_empty());
-    let (repo_root, bundle_root) = if shape.is_git() {
+    if shape.is_git() {
         if let Some(value) = &bundle_env {
             // Not fatal: the image bakes `SUNSTONE_BUNDLE=/bundle` into its ENV,
             // so an operator's override is indistinguishable from that default.
@@ -617,7 +384,7 @@ pub fn parse_env(
             });
         }
         let repo_root = PathBuf::from(REPO_DIR);
-        let bundle_root = join_bundle_subdir(&repo_root, &subdir);
+        let bundle_root = join_bundle_subdir(&repo_root, subdir);
         (Some(repo_root), bundle_root)
     } else {
         (
@@ -626,41 +393,7 @@ pub fn parse_env(
                 .map(PathBuf::from)
                 .unwrap_or_else(default_dev_bundle_root),
         )
-    };
-
-    // --- Seed (§4.3) --------------------------------------------------------
-    let seed_from = non_empty(&get, SEED_FROM_ENV);
-    if let (Some(seed), Some(_)) = (&seed_from, &origin) {
-        // Fatal rather than log-and-ignore: this variable has no baked image
-        // default, so its presence is always an explicit operator act (§2.4).
-        errors.push(ConfigError::SeedWithOrigin { seed: seed.clone() });
     }
-
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    Ok(Config {
-        shape,
-        git,
-        repo_root,
-        bundle_root,
-        seed_from: seed_from.map(PathBuf::from),
-        // Pre-existing and lenient, byte-identical to `main.rs`: empty is unset,
-        // but the value is passed through untrimmed — a secret's whitespace is
-        // part of the secret, and the Node hook mints against the raw value.
-        jwt_secret: get(crate::auth::SECRET_ENV)
-            .filter(|v| !v.is_empty())
-            .map(String::into_bytes),
-        // Pre-existing and lenient: `SUNSTONE_API_PORT=banana` falls back rather
-        // than refusing to boot. Knowingly inconsistent with the git family
-        // (§2.4) — making it fatal is a behaviour change for deployments that
-        // exist today.
-        api_port: get(API_PORT_ENV)
-            .and_then(|v| v.parse::<u16>().ok())
-            .unwrap_or(crate::DEFAULT_PORT),
-        warnings,
-    })
 }
 
 /// Whether a `SUNSTONE_GIT_BUNDLE_SUBDIR` value would escape [`REPO_DIR`]:
@@ -1065,38 +798,7 @@ mod tests {
         assert_eq!(join_bundle_subdir(root, "/docs"), PathBuf::from("/srv/repo/docs"));
     }
 
-    // --- The one origin inspection, and the key it gates (§2.3, Spec 1 §7) --
-
-    #[test]
-    fn ssh_shaped_origins_are_recognised() {
-        for origin in [
-            "ssh://git@example.com/acme/wiki.git",
-            "SSH://git@example.com/acme/wiki.git",
-            "git+ssh://git@example.com/acme/wiki.git",
-            "git@example.com:acme/wiki.git",
-            "git@example.com:2222/acme/wiki.git",
-            "example.com:acme/wiki.git",
-            " git@example.com:acme/wiki.git ",
-        ] {
-            assert!(is_ssh_shaped(origin), "{origin} should be ssh-shaped");
-        }
-    }
-
-    #[test]
-    fn non_ssh_origins_are_not_ssh_shaped() {
-        for origin in [
-            "https://example.com/acme/wiki.git",
-            "http://example.com/acme/wiki.git",
-            "git://example.com/acme/wiki.git",
-            "file:///srv/mirror/wiki.git",
-            "/srv/mirror/wiki.git",
-            "../mirror/wiki.git",
-            "C:\\repos\\wiki",
-            "",
-        ] {
-            assert!(!is_ssh_shaped(origin), "{origin} should not be ssh-shaped");
-        }
-    }
+    // --- The key an ssh origin gates (§2.3, Spec 1 §7) -----------------------
 
     #[test]
     fn an_ssh_origin_requires_a_key() {
@@ -1340,88 +1042,5 @@ mod tests {
         assert_eq!(read, known, "a recognised git var must have a read site");
         assert!(known.iter().all(|k| k.starts_with(GIT_VAR_PREFIX)));
         assert!(!KNOWN_GIT_VARS.contains(&"SUNSTONE_GIT_MODE"));
-    }
-
-    #[test]
-    fn shape_serializes_kebab_case() {
-        assert_eq!(Shape::Plain.as_str(), "plain");
-        assert_eq!(Shape::GitLocal.as_str(), "git-local");
-        assert_eq!(Shape::GitSynced.as_str(), "git-synced");
-        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced] {
-            assert_eq!(
-                serde_json::to_string(&shape).unwrap(),
-                format!("\"{}\"", shape.as_str())
-            );
-        }
-    }
-
-    // --- Operator-facing messages (§4.1) ------------------------------------
-
-    #[test]
-    fn every_error_names_its_variable_and_a_fix() {
-        let cases: Vec<(ConfigError, &str)> = vec![
-            (ConfigError::GitBranchRequired, BRANCH_ENV),
-            (
-                ConfigError::UnknownGitVar {
-                    name: "SUNSTONE_GIT_ORGIN".to_string(),
-                },
-                "SUNSTONE_GIT_ORGIN",
-            ),
-            (
-                ConfigError::BundleSubdirEscapes {
-                    value: "/etc".to_string(),
-                },
-                SUBDIR_ENV,
-            ),
-            (
-                ConfigError::BadSyncInterval {
-                    value: "0".to_string(),
-                },
-                INTERVAL_ENV,
-            ),
-            (ConfigError::SshKeyRequired, SSH_KEY_ENV),
-            (ConfigError::SshKeyNotBase64, SSH_KEY_ENV),
-            (
-                ConfigError::SeedWithOrigin {
-                    seed: "/seed".to_string(),
-                },
-                SEED_FROM_ENV,
-            ),
-        ];
-        for (error, expected_var) in cases {
-            let text = error.to_string();
-            assert!(
-                text.contains(expected_var),
-                "{error:?} should name {expected_var}: {text}"
-            );
-            // A single line, since `docker logs` is the consumer, and no
-            // `sunstone-server: ` prefix — the caller adds it.
-            assert!(!text.contains('\n'), "{error:?} must be one line: {text}");
-            assert!(!text.starts_with("sunstone-server:"), "{text}");
-        }
-    }
-
-    #[test]
-    fn the_unknown_var_message_lists_the_closed_set_and_the_retired_names() {
-        let text = ConfigError::UnknownGitVar {
-            name: "SUNSTONE_GIT_ORGIN".to_string(),
-        }
-        .to_string();
-        for known in KNOWN_GIT_VARS {
-            assert!(text.contains(known), "{known} missing from: {text}");
-        }
-        assert!(text.contains("SUNSTONE_GIT_REPO"));
-    }
-
-    #[test]
-    fn the_bundle_warning_names_the_variable_and_the_real_root() {
-        let text = ConfigWarning::BundleIgnoredInGitShape {
-            value: "/bundle".to_string(),
-        }
-        .to_string();
-        assert!(text.contains(BUNDLE_ENV));
-        assert!(text.contains(REPO_DIR));
-        assert!(text.contains(SUBDIR_ENV));
-        assert!(!text.contains('\n'));
     }
 }

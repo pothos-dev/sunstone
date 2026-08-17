@@ -36,6 +36,7 @@ import {
   ALL_REGIONS,
   move,
 } from '$lib/regionGrid';
+import { retryFrames } from '$lib/retryFrames';
 
 /** What a Region supplies when it registers with the focus backbone. */
 export interface RegionRegistration {
@@ -251,16 +252,12 @@ class FocusStore {
    * number of frames so a reveal that never materialises can't spin forever.
    */
   #focusWhenVisible(id: RegionId): void {
-    let tries = 0;
-    const attempt = () => {
+    retryFrames(() => {
       const reg = this.#regions.get(id);
-      if (reg && reg.isVisible()) {
-        reg.focus();
-      } else if (tries++ < 10) {
-        requestAnimationFrame(attempt);
-      }
-    };
-    requestAnimationFrame(attempt);
+      if (!reg || !reg.isVisible()) return false;
+      reg.focus();
+      return true;
+    }, 10);
   }
 
   /**

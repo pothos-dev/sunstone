@@ -314,9 +314,6 @@ pub fn init(root: &Path, branch: &str) -> Result<(), String> {
     unit("init", git_out(root, &["init", "-q", &initial])?)
 }
 
-/// `git remote get-url origin`, or `None` when there is no `origin` remote / not
-/// a repo. §4.4 compares it against the configured origin: a **mismatch fails
-/// loudly and touches nothing.**
 /// The currently checked-out branch name, or `None` on a detached HEAD, an
 /// unborn branch, or a non-repo.
 ///
@@ -336,6 +333,9 @@ pub fn current_branch(root: &Path) -> Option<String> {
     }
 }
 
+/// `git remote get-url origin`, or `None` when there is no `origin` remote / not
+/// a repo. §4.4 compares it against the configured origin: a **mismatch fails
+/// loudly and touches nothing.**
 pub fn remote_url(root: &Path) -> Option<String> {
     let output = run_git(root, &["remote", "get-url", "origin"])?;
     if !output.status.success() {
@@ -426,7 +426,7 @@ pub fn rebase_head_timestamp(root: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::commit::{commit, CommitIdentity};
+    use crate::git::commit::commit;
     use crate::git::history::FileHistory;
     use crate::git::test_support::{git, git_available, ident, temp_dir};
     use std::path::PathBuf;

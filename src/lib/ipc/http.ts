@@ -1,5 +1,7 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
+import { loadBundleState, saveBundleState } from './bundleState';
+import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
 import type {
   TreeNode,
   FileChange,
@@ -32,7 +34,7 @@ import type {
  * SSR reads its data directly in `+page.ts`'s `load`, so this seam is primarily
  * the hydrated-island path.
  *
- * See ARCHITECTURE.md "The IPC seam" and the enable-web-writing effort.
+ * See docs/architecture/web-frontend.md "The IPC seam" and the enable-web-writing effort.
  */
 
 /** The web serves ONE fixed Bundle and has no launcher, so folder switching is
@@ -47,43 +49,14 @@ const NO_LAUNCHER = 'the web serves a single fixed Bundle: no folder switching';
  */
 const BUNDLE_STATE_KEY = 'sunstone:bundleState';
 
-/** Fresh-Bundle default (mirrors the Rust `BundleState::default`). */
-function defaultBundleState(): BundleState {
-  return { lastOpenConcept: null, expandedFolders: [], recentFiles: [] };
-}
-
-/**
- * Load the web Bundle's View state from `localStorage`. Returns the fresh
- * default on the server (SSR: no `localStorage`), a missing key, or corrupt
- * JSON — never rejects. Optional fields pass through untouched (the session
- * store defaults each on read).
- */
+/** Load/save the web Bundle's View state via the shared localStorage plumbing
+ * (`./bundleState`) — SSR-safe, corrupt-JSON-safe, best-effort on write. */
 function loadWebBundleState(): BundleState {
-  if (typeof localStorage === 'undefined') return defaultBundleState();
-  const raw = localStorage.getItem(BUNDLE_STATE_KEY);
-  if (raw === null) return defaultBundleState();
-  try {
-    const parsed = JSON.parse(raw) as Partial<BundleState>;
-    return {
-      ...parsed,
-      lastOpenConcept: parsed.lastOpenConcept ?? null,
-      expandedFolders: Array.isArray(parsed.expandedFolders) ? parsed.expandedFolders : [],
-      recentFiles: Array.isArray(parsed.recentFiles) ? parsed.recentFiles : [],
-    };
-  } catch {
-    return defaultBundleState();
-  }
+  return loadBundleState(BUNDLE_STATE_KEY);
 }
 
-/** Persist the web Bundle's View state to `localStorage`. A no-op on the server
- * or if storage is full/disabled (best-effort — never throws into the UI). */
 function saveWebBundleState(state: BundleState): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(BUNDLE_STATE_KEY, JSON.stringify(state));
-  } catch {
-    /* storage full / disabled — best-effort, never throw */
-  }
+  saveBundleState(BUNDLE_STATE_KEY, state);
 }
 
 /**
@@ -400,9 +373,6 @@ export const httpBackend: Backend = {
   listConceptPaths(): Promise<string[]> {
     return getJson<string[]>('/api/concept-paths');
   },
-  conceptExists(path: string): Promise<boolean> {
-    return getJson<boolean>(`/api/concept-exists?path=${encodeURIComponent(path)}`);
-  },
   backlinks(path: string): Promise<string[]> {
     return getJson<string[]>(`/api/backlinks?path=${encodeURIComponent(path)}`);
   },
@@ -462,22 +432,10 @@ export const httpBackend: Backend = {
     return getJson<RenderPayload>(`/api/render?path=${encodeURIComponent(path)}`);
   },
 
-  // The web viewer opens its own chrome-free print tab directly (no toolbar,
-  // relying on the browser's native print → Save-as-PDF UI), so this seam is
-  // unused on web; implemented for interface parity as a new tab WITH toolbar.
-  async openPrintWindow(path: string): Promise<void> {
-    window.open(`/?print=${encodeURIComponent(path)}&toolbar=1`, '_blank');
-  },
-
-  // The web viewer relies on the browser's native print → Save-as-PDF, so direct
-  // export has no server-side counterpart; resolve to `null` (no file written).
-  async savePdf(_defaultName: string): Promise<string | null> {
-    return null;
-  },
-
-  // On the web the app already runs in the browser, so a new tab IS the default
-  // application; open it directly.
-  async openExternal(url: string): Promise<void> {
-    window.open(url, '_blank', 'noopener,noreferrer');
-  },
+  // The web app already runs in a browser: the browser-shell fallbacks shared
+  // with the fake backend (see `./browserShell`). (The web viewer opens its own
+  // chrome-free print tab directly, so `openPrintWindow` is interface parity.)
+  openPrintWindow: openPrintTab,
+  savePdf: noSavePdf,
+  openExternal: openExternalTab,
 };

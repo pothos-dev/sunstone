@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'bun:test';
-import { buildEditorMenuItems } from './tileEditorMenu';
+import { buildEditorMenuItems, editorCommandFor } from './tileEditorMenu';
+import {
+  cutSelection,
+  toggleBold,
+  toggleItalic,
+  toggleStrikethrough,
+  toggleInlineCode,
+  insertOrEditLink,
+} from './editor/commands';
 
 describe('buildEditorMenuItems', () => {
   it('read-only with no annotate action opens no menu', () => {
@@ -104,5 +112,32 @@ describe('buildEditorMenuItems', () => {
       linkAction: 'insert',
     });
     expect(result.annotateUsesSelectionRange).toBe(false);
+  });
+});
+
+describe('editorCommandFor', () => {
+  it('maps the formatting/link ids straight to their editor commands', () => {
+    expect(editorCommandFor('bold')).toBe(toggleBold);
+    expect(editorCommandFor('italic')).toBe(toggleItalic);
+    expect(editorCommandFor('strike')).toBe(toggleStrikethrough);
+    expect(editorCommandFor('code')).toBe(toggleInlineCode);
+    expect(editorCommandFor('link')).toBe(insertOrEditLink);
+  });
+
+  it('maps the clipboard ids to fire-and-forget wrappers of the async commands', () => {
+    for (const id of ['cut', 'copy', 'paste']) {
+      const cmd = editorCommandFor(id);
+      expect(typeof cmd).toBe('function');
+    }
+    // Identity is intentionally NOT the async command itself: the wrapper
+    // discards the promise, exactly as Tile.svelte's old switch did.
+    expect(editorCommandFor('cut')).not.toBe(cutSelection);
+  });
+
+  it('returns null for annotate (Tile-owned) and unknown ids', () => {
+    expect(editorCommandFor('annotate')).toBeNull();
+    expect(editorCommandFor('nope')).toBeNull();
+    expect(editorCommandFor('toString')).toBeNull();
+    expect(editorCommandFor('hasOwnProperty')).toBeNull();
   });
 });

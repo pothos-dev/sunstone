@@ -1,7 +1,7 @@
 //! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
 //! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! `/api/concept-exists` and `/api/events` (SSE), plus the shared `ApiError`
+//! and `/api/events` (SSE), plus the shared `ApiError`
 //! HTTP-boundary error type and its `sunstone-native` string classifier.
 //!
 //! Split out of `main.rs` verbatim (ticket: split main.rs) — no behavior
@@ -145,15 +145,6 @@ pub(crate) async fn concept_paths_handler(
     Ok(Json(index.concept_paths()))
 }
 
-pub(crate) async fn concept_exists_handler(
-    State(state): State<Arc<ServerState>>,
-    Query(q): Query<ConceptQuery>,
-) -> Result<Json<bool>, ApiError> {
-    guard_rel_path(&q.path)?;
-    let index = read_index(&state)?;
-    Ok(Json(index.concept_exists(&q.path)))
-}
-
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.
 pub(crate) fn read_index(
     state: &ServerState,
@@ -240,11 +231,6 @@ pub(crate) fn classify(msg: &str) -> StatusCode {
         StatusCode::NOT_FOUND
     }
 }
-
-// Bundle-root resolution lives in `config::parse_env` (the `SUNSTONE_BUNDLE` read
-// and the `CARGO_MANIFEST_DIR`-relative dev fallback) plus
-// `boot::resolve_bundle_root` (the canonicalization and the git-shape join), so
-// the duplicate pair that used to sit here is gone rather than left to drift.
 
 #[cfg(test)]
 mod tests {
@@ -385,6 +371,97 @@ mod tests {
         assert!(index.concept_paths().contains(&"note.md".to_string()));
         assert!(index.concept_exists("note.md"));
         assert!(!index.concept_exists("nope.md"));
+    }
+
+    /// §10.3 wire contract of `/api/events`: a `FileChange` goes out **unnamed**
+    /// (no `event:` field, so it lands in `onmessage`), and a `SyncNotice` goes
+    /// out as a **named** `sync` event (dispatched only to
+    /// `addEventListener('sync', …)`), both as JSON `data:` payloads on the one
+    /// connection.
+    #[tokio::test]
+    async fn events_route_leaves_file_unnamed_and_names_sync() {
+        use crate::config::Config;
+        use crate::sync::{SyncNotice, SyncNoticeKind, SyncState};
+        use std::sync::{Arc, Mutex};
+        use sunstone_native::app_state::AppState;
+        use sunstone_native::watcher::FileChange;
+        use tokio::sync::broadcast;
+
+        let (events, _) = broadcast::channel::<ServerEvent>(8);
+        let cfg = Config::plain(temp_bundle());
+        let state = Arc::new(ServerState {
+            app: Arc::new(AppState::new(cfg.bundle_root.clone())),
+            events,
+            write_lock: Mutex::new(()),
+            jwt_secret: None,
+            cfg,
+            sync: SyncState::new(),
+        });
+
+        // Subscribe by opening the SSE response, then broadcast both payloads.
+        let resp = events_handler(State(state.clone())).await.into_response();
+        let mut body = resp.into_body().into_data_stream();
+
+        macro_rules! read_frame {
+            () => {{
+                let chunk = tokio::time::timeout(
+                    std::time::Duration::from_secs(1),
+                    StreamExt::next(&mut body),
+                )
+                .await
+                .expect("an SSE frame within 1s")
+                .expect("stream still open")
+                .expect("no body error");
+                String::from_utf8(chunk.to_vec()).unwrap()
+            }};
+        }
+
+        state
+            .events
+            .send(ServerEvent::File(FileChange {
+                kind: "modified".to_string(),
+                paths: vec!["note.md".to_string()],
+                origin: None,
+            }))
+            .unwrap();
+        let file_frame = read_frame!();
+        // Unnamed: no `event:` line at all, just the JSON `data:` payload.
+        assert!(
+            !file_frame.lines().any(|l| l.starts_with("event:")),
+            "FileChange must be unnamed, got: {file_frame}"
+        );
+        let data = file_frame
+            .lines()
+            .find_map(|l| l.strip_prefix("data:"))
+            .expect("a data line")
+            .trim();
+        assert!(data.contains(r#""kind":"modified""#), "got: {data}");
+        assert!(data.contains("note.md"), "got: {data}");
+
+        state
+            .events
+            .send(ServerEvent::Sync(SyncNotice {
+                kind: SyncNoticeKind::Forked,
+                path: "a.md".to_string(),
+                fork: Some("a (fork).md".to_string()),
+            }))
+            .unwrap();
+        let sync_frame = read_frame!();
+        // Named `sync` (the SYNC_EVENT constant is the wire name).
+        let name = sync_frame
+            .lines()
+            .find_map(|l| l.strip_prefix("event:"))
+            .expect("a named event")
+            .trim();
+        assert_eq!(name, SYNC_EVENT);
+        let data = sync_frame
+            .lines()
+            .find_map(|l| l.strip_prefix("data:"))
+            .expect("a data line")
+            .trim();
+        // camelCase kind, `fork` present for a Forked notice.
+        assert!(data.contains(r#""kind":"forked""#), "got: {data}");
+        assert!(data.contains(r#""fork":"a (fork).md""#), "got: {data}");
     }
 
     #[test]

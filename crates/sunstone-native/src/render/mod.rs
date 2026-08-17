@@ -35,6 +35,7 @@ mod critic;
 mod sentinel;
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use comrak::nodes::NodeValue;
 use comrak::{format_html, parse_document, Arena, Options};
@@ -47,7 +48,7 @@ use crate::index::Index;
 use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
 use sunstone_shared::paths::{is_external, resolve_internal};
-use sunstone_shared::url::concept_url;
+use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
@@ -180,7 +181,8 @@ pub fn render_body(
 /// tells us which `<hN>` to skip — a setext heading gets no id and consumes no
 /// outline slug, keeping the k-th ATX `<hN>` aligned with the k-th outline entry.
 fn inject_heading_ids(html: &str, outline: &[OutlineHeading], heading_is_setext: &[bool]) -> String {
-    let re = Regex::new(r"<(h[1-6])>").unwrap();
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<(h[1-6])>").unwrap());
+    let re = &*RE;
     let mut h_idx = 0usize; // index over ALL comrak headings (ATX + setext)
     let mut o_idx = 0usize; // index over the ATX-only outline
     re.replace_all(html, |caps: &regex::Captures| {
@@ -273,7 +275,9 @@ fn mark_link_url(
 
 /// Rewrite the marker hrefs comrak emitted into the final anchor attributes.
 fn rewrite_marker_hrefs(html: &str) -> String {
-    let re = Regex::new(r#"href="(sapint|sapbroken|sapext):([^"]*)""#).unwrap();
+    static RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#"href="(sapint|sapbroken|sapext):([^"]*)""#).unwrap());
+    let re = &*RE;
     re.replace_all(html, |caps: &regex::Captures| {
         let payload = caps.get(2).map(|m| m.as_str()).unwrap_or("");
         match &caps[1] {
@@ -331,28 +335,6 @@ fn attr_escape(s: &str) -> String {
         }
     }
     out
-}
-
-/// Decode `%XX` percent-escapes (comrak percent-encodes hrefs, e.g. space →
-/// `%20`). Invalid escapes are passed through verbatim.
-fn percent_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let hi = (bytes[i + 1] as char).to_digit(16);
-            let lo = (bytes[i + 2] as char).to_digit(16);
-            if let (Some(h), Some(l)) = (hi, lo) {
-                out.push((h * 16 + l) as u8);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 #[cfg(test)]

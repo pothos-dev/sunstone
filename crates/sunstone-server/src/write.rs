@@ -376,12 +376,9 @@ mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
     use std::process::Command;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use sunstone_native::git::{self, FileHistory};
 
     use crate::config::Shape;
-
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
 
     // The pre-§5 call shape, kept **only** here: every test below that predates
     // the shape gate exercises the git shape, so these read as `write_concept(…)`
@@ -439,25 +436,11 @@ mod tests {
         WriteShape::Git.rewrite_anchors(app, ident, target, renames)
     }
 
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
-    }
-
-    fn run(root: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-    }
+    use crate::testutil::{git as run, git_available, temp_dir};
 
     /// A temp bundle that IS a git repo, with an initial commit so HEAD exists.
     fn temp_repo() -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("sunstone-write-{}-{}", std::process::id(), n));
-        std::fs::create_dir_all(&dir).unwrap();
-        let dir = dir.canonicalize().unwrap();
+        let dir = temp_dir("write");
         run(&dir, &["init", "-q"]);
         run(&dir, &["config", "user.email", "seed@example.com"]);
         run(&dir, &["config", "user.name", "Seed"]);
@@ -705,10 +688,7 @@ mod tests {
     /// A bundle that is NOT a git repo (and, under the OS temp dir, not inside
     /// one) — the plain shape's deployment: "mount markdown, don't track it".
     fn temp_plain_dir() -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("sunstone-plain-{}-{}", std::process::id(), n));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.canonicalize().unwrap()
+        temp_dir("plain")
     }
 
     /// The gate is read from the declared [`Shape`], never sniffed from the

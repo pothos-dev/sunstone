@@ -9,12 +9,11 @@ import { treeGrowthEffect, treeProgressPlugin } from '@atomic-editor/editor';
 import {
   findMermaidBlocks,
   hasMermaidBlock,
-  mermaidCacheKey,
-  mermaidThemeConfig,
   selectionTouches,
   type MermaidBlock,
   type ResolvedTheme,
 } from './mermaidBlocks';
+import { renderDiagram } from './mermaidRender';
 
 // ---------------------------------------------------------------------------
 // Mermaid block rendering (slice: mermaid-block-render, ADR-0005)
@@ -32,195 +31,39 @@ import {
 //   - `edit` mode                        -> this field is NOT in the extension
 //                                           set at all, so the raw fence shows
 //
-// `mermaid` is LAZY-loaded via dynamic `import('mermaid')`, gated on the doc
-// actually containing a mermaid block, and initialised with
-// `securityLevel: 'strict'`. While the module imports / a diagram renders, a
-// muted placeholder is shown.
+// The render engine itself (lazy `import('mermaid')` gated on the doc actually
+// containing a block, `securityLevel: 'strict'`, muted loading placeholder,
+// bordered error panel on a failed render, app-palette theming via
+// `mermaidThemeConfig`, `(source, theme) → SVG` cache, per-host generation
+// token) is the SHARED `mermaidRender.ts` — also used by the web viewer's
+// island. This module is the CodeMirror side only: the StateField, the block
+// widget (with its hybrid edit-affordance), and the `cm-mermaid-*` styling.
 //
-// SEAMS LEFT FOR SIBLING SLICES (deliberately NOT built here):
-//   - error-state:   DONE (error-state slice). A failed `mermaid.render()` now
-//                    paints a bordered error panel (mermaid's message + raw
-//                    source) via `buildErrorPanel`, distinct from a code block.
-//   - theme-sync:    DONE (theme-sync slice). Diagrams are themed with the app's
-//                    OWN palette + font (`mermaidThemeConfig` → mermaid's `base`
-//                    theme with `themeVariables` resolved from CSS custom props
-//                    on the editor root), not mermaid's generic dark/default. On
-//                    a light/dark flip `App.svelte` calls `setEditorMermaidTheme`,
-//                    which RECONFIGURES the mode Compartment (cm.ts) — rebuilding
-//                    this field so every diagram re-renders. (A StateEffect was
-//                    insufficient: CodeMirror does not reconcile block-widget DOM
-//                    for an in-place decoration change.)
-//   - edit-affordance: DONE (edit-affordance slice). In hybrid the widget shows
-//                    a hover hint (cursor:pointer + "✎ edit") and a double-click
-//                    handler dispatches a selection INTO the fence to lift the
-//                    block-replace. The global `edit` toggle stays the fallback.
-//   - render-caching: DONE (render-caching slice). `WidgetType.eq()` is keyed on
-//                    `(source + theme)` (DOM reuse across unrelated edits); a
-//                    module-level `(source,theme)->SVG` cache paints identical
-//                    diagrams instantly; a per-host generation token discards a
-//                    stale in-flight render that resolves after a newer one.
+// Theme-sync (ADR-0005): diagrams bake the app's palette/font into the SVG at
+// render time, so on a light/dark flip `App.svelte` calls
+// `setEditorMermaidTheme`, which RECONFIGURES the mode Compartment (cm.ts) —
+// rebuilding this field so every diagram re-renders. (A StateEffect was
+// insufficient: CodeMirror does not reconcile block-widget DOM for an in-place
+// decoration change.)
 // ---------------------------------------------------------------------------
 
 /**
- * Lazily-resolved mermaid module + one-time `initialize`. The dynamic import is
- * only triggered when a document actually contains a mermaid block (the field's
- * builder calls `ensureMermaid()` only then), so diagram-free Concepts never
- * pull mermaid's large bundle. Cached as a promise so concurrent widgets share
- * one import.
+ * Render `source` into `host` via the shared engine, resolving the app
+ * palette/font from the THEMED editor root (`view.dom` already carries the
+ * current `data-theme` — App.svelte sets it before dispatching the theme flip,
+ * so `getComputedStyle` yields the active light/dark token values).
  */
-let mermaidPromise: Promise<typeof import('mermaid').default> | null = null;
-
-function ensureMermaid(): Promise<typeof import('mermaid').default> {
-  if (mermaidPromise) return mermaidPromise;
-  mermaidPromise = import('mermaid').then((mod) => {
-    const mermaid = mod.default;
-    mermaid.initialize({
-      // No auto-scan; we render each diagram explicitly via `render`.
-      startOnLoad: false,
-      // OKF bundles are shareable, so a diagram's source may be untrusted —
-      // strict sanitisation (no click callbacks, no raw HTML labels) is the
-      // safe default (ADR-0005). Interactivity is a later concern.
-      securityLevel: 'strict',
-    });
-    return mermaid;
-  });
-  return mermaidPromise;
-}
-
-/** Monotonic id source for unique mermaid render ids (mermaid requires one). */
-let renderSeq = 0;
-
-/**
- * Module-level `(source, theme) → SVG` cache (render-caching slice, ADR-0005
- * option 9a). The field rebuilds its decoration set on every doc change — even
- * edits BETWEEN diagrams — and `mermaid.render()` is async, so an identical
- * diagram (or one edited back to a prior state) should paint instantly from
- * memory rather than re-running mermaid. Keyed by `mermaidCacheKey` so the key
- * matches `WidgetType.eq()`: same `(source + theme)` → same SVG.
- */
-const svgCache = new Map<string, string>();
-
-/**
- * Build the error-state panel for a failed `mermaid.render()` (error-state
- * slice, ADR-0005 option 4a). A bordered panel surfaces mermaid's error
- * message, with the raw fence source rendered beneath it, so the user sees both
- * what is broken and what they typed without dropping into `edit` mode. The
- * `.cm-mermaid-error` class makes a broken diagram visibly distinct from a plain
- * code block (which has no renderer). DOM-only and pure; no async.
- */
-function buildErrorPanel(message: string, source: string): HTMLElement {
-  const panel = document.createElement('div');
-  panel.className = 'cm-mermaid-error';
-
-  const heading = document.createElement('div');
-  heading.className = 'cm-mermaid-error-heading';
-  heading.textContent = 'Diagram error';
-  panel.appendChild(heading);
-
-  const msg = document.createElement('div');
-  msg.className = 'cm-mermaid-error-message';
-  // mermaid's message is plain text; set as textContent (never innerHTML) so a
-  // malicious diagram source can't smuggle markup through the error path.
-  msg.textContent = message;
-  panel.appendChild(msg);
-
-  const raw = document.createElement('pre');
-  raw.className = 'cm-mermaid-error-source';
-  raw.textContent = source;
-  panel.appendChild(raw);
-
-  return panel;
-}
-
-/**
- * Render `source` into `host` as an SVG diagram in the given resolved app
- * `theme`. Shows a muted placeholder immediately, lazy-loads mermaid, applies
- * the theme via `initialize({ theme })`, then swaps in the SVG. On a
- * render/parse failure it replaces the placeholder with a bordered error panel
- * (mermaid's message + the raw source) — error-state slice (ADR-0005). The error
- * clears automatically when the source is fixed: the field rebuilds and
- * re-renders.
- *
- * A baked SVG cannot recolour via CSS inheritance (theme-sync, ADR-0005), so the
- * theme is applied at render time and the field rebuilds (re-rendering) on a
- * theme flip. Async and self-contained so the caching/generation-token slice can
- * wrap it without reshaping the widget.
- */
-/**
- * Per-host generation token (render-caching slice). Each `renderInto` call bumps
- * the host's generation; an async render only paints if its captured generation
- * is still the host's current one. So if CM6 reuses a host DOM and a NEWER
- * render is kicked off (e.g. a fast source-change-then-revert), the older
- * in-flight render — resolving later — is discarded rather than swapped in over
- * the newer result (no stale SVG ever displayed). Keyed by the host element via
- * a WeakMap so it is GC'd with the DOM.
- */
-const hostGeneration = new WeakMap<HTMLElement, number>();
-
 function renderInto(
   host: HTMLElement,
   source: string,
   theme: ResolvedTheme,
   view: EditorView,
 ): void {
-  // Claim a fresh generation for this render; any earlier in-flight render for
-  // this host is now stale and must not paint.
-  const generation = (hostGeneration.get(host) ?? 0) + 1;
-  hostGeneration.set(host, generation);
-  const current = () => hostGeneration.get(host) === generation;
-
-  const key = mermaidCacheKey(source, theme);
-
-  // Cache hit: an identical diagram (same source + theme) was rendered before —
-  // paint synchronously from memory, no fresh `mermaid.render()`.
-  const cached = svgCache.get(key);
-  if (cached !== undefined) {
-    host.innerHTML = cached;
-    return;
-  }
-
-  // Resolve the app palette/font from the THEMED editor root NOW (synchronously,
-  // before the async render). `view.dom` already carries the current `data-theme`
-  // (App.svelte sets it before dispatching the theme flip), so `getComputedStyle`
-  // yields the active light/dark token values. Concrete values are required —
-  // mermaid bakes colours into the SVG at render time (ADR-0005, theme-sync).
   const cs = getComputedStyle(view.dom);
-  const themeConfig = mermaidThemeConfig((name) => cs.getPropertyValue(name).trim(), theme);
-
-  const placeholder = document.createElement('div');
-  placeholder.className = 'cm-mermaid-loading';
-  placeholder.textContent = 'Rendering diagram…';
-  host.innerHTML = '';
-  host.appendChild(placeholder);
-
-  const id = `cm-mermaid-${renderSeq++}`;
-  ensureMermaid()
-    .then((mermaid) => {
-      // Theme the diagram with the app's own palette + font (mermaid's `base`
-      // theme with our `themeVariables`), not mermaid's generic dark/default.
-      // mermaid bakes colours in at `render` time, so re-`initialize` per render
-      // keeps the diagram in step with the app's light/dark scheme (option 5a).
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', ...themeConfig });
-      return mermaid.render(id, source);
-    })
-    .then(({ svg }) => {
-      // Cache the successful render for instant repaint of identical diagrams.
-      svgCache.set(key, svg);
-      // Discard a stale render: only paint if THIS render is still the newest
-      // for the host (generation unchanged) and the host is still mounted.
-      if (!host.isConnected || !current()) return;
-      host.innerHTML = svg;
-    })
-    .catch((err: unknown) => {
-      // Surface the failure as a bordered error panel (raw source beneath the
-      // message) rather than swallowing it — a half-typed diagram is invalid
-      // most of the time the cursor sits just outside it (ADR-0005, 4a).
-      // Errors are NOT cached: fixing the source must re-attempt the render.
-      if (!host.isConnected || !current()) return;
-      const message = err instanceof Error ? err.message : String(err);
-      host.innerHTML = '';
-      host.appendChild(buildErrorPanel(message, source));
-    });
+  void renderDiagram(host, source, theme, {
+    classPrefix: 'cm-mermaid',
+    read: (name) => cs.getPropertyValue(name).trim(),
+  });
 }
 
 /**

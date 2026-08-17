@@ -18,6 +18,7 @@ pub mod links;
 pub mod outline;
 pub mod paths;
 pub mod rewrite;
+pub mod scan;
 pub mod slug;
 pub mod url;
 pub mod wikilink;

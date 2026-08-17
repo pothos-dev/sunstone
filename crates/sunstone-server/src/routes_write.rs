@@ -6,7 +6,7 @@
 //! identity flows into the git commit author/committer; a stamped `FileChange`
 //! is broadcast so other browsers live-refresh while the writer drops its echo.
 //!
-//! All 7 handlers share one skeleton — `identity` → `write_shape` →
+//! All 7 handlers share one skeleton — identity → shape →
 //! `run_write` → `broadcast_write` — differing only in which `WriteShape`
 //! method they call and how they map the resulting `WriteResult` into an HTTP
 //! response. [`write_and_broadcast`] captures that skeleton once; each handler
@@ -197,30 +197,21 @@ where
         + Send
         + 'static,
 {
-    let ident = identity(user);
-    let shape = write_shape(state);
+    // The commit identity for the authenticated user (author == committer).
+    let ident = CommitIdentity {
+        name: user.name.clone(),
+        email: user.email.clone(),
+    };
+    // §5's write-path gate, read off the one parse of the environment — never
+    // off the environment itself and never by sniffing the filesystem for a
+    // `.git`. Taken BEFORE `run_write`, because the closure it hands to the
+    // blocking task sees only an `&AppState`; `WriteShape` is `Copy`, so the
+    // closure captures the decision rather than the whole `ServerState`.
+    let shape = WriteShape::for_config(&state.cfg);
     let result = run_write(state, move |app| op(app, shape, &ident)).await?;
     let response = to_response(&result);
     broadcast_write(state, result, headers, user);
     Ok(response)
-}
-
-/// §5's write-path gate, read off the one parse of the environment — never off
-/// the environment itself and never by sniffing the filesystem for a `.git`.
-///
-/// Taken **before** `run_write`, because the closure it hands to the blocking
-/// task sees only an `&AppState`; `WriteShape` is `Copy`, so the closure captures
-/// the decision rather than the whole `ServerState`.
-fn write_shape(state: &Arc<ServerState>) -> WriteShape {
-    WriteShape::for_config(&state.cfg)
-}
-
-/// The commit identity for the authenticated user (author == committer).
-fn identity(user: &AuthedUser) -> CommitIdentity {
-    CommitIdentity {
-        name: user.name.clone(),
-        email: user.email.clone(),
-    }
 }
 
 /// Run a write op on a blocking thread while holding the global write lock, so
@@ -347,15 +338,15 @@ mod tests {
     fn write_handlers_take_their_shape_from_the_parsed_config() {
         let root = temp_bundle();
         assert_eq!(
-            write_shape(&state_with(Config::plain(root.clone()))),
+            WriteShape::for_config(&state_with(Config::plain(root.clone())).cfg),
             WriteShape::Plain
         );
         let mut git_cfg = Config::plain(root.clone());
         git_cfg.shape = config::Shape::GitLocal;
-        assert_eq!(write_shape(&state_with(git_cfg)), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&state_with(git_cfg).cfg), WriteShape::Git);
         let mut synced = Config::plain(root);
         synced.shape = config::Shape::GitSynced;
-        assert_eq!(write_shape(&state_with(synced)), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&state_with(synced).cfg), WriteShape::Git);
     }
 
     /// §5's kick: the write path signals the loop once the write lock is free
@@ -392,5 +383,83 @@ mod tests {
         )
         .await
         .expect("the write left a wake-up permit for the loop");
+    }
+
+    /// Ticket 08 §1: a rename broadcasts exactly two change groups — `removed`
+    /// (old path) then `modified` (new path) — each stamped with the forwarded
+    /// `x-sunstone-client` id and the OIDC author name, so the writing tab drops
+    /// its echo and every other tab live-refreshes.
+    #[tokio::test]
+    async fn rename_broadcasts_removed_then_modified_with_the_forwarded_client_id() {
+        let state = state_with(Config::plain(temp_bundle()));
+        let user = AuthedUser {
+            name: "Ada Lovelace".to_string(),
+            email: "ada@example.com".to_string(),
+        };
+        let mut headers = HeaderMap::new();
+        headers.insert("x-sunstone-client", "tab-42".parse().unwrap());
+        let mut events = state.events.subscribe();
+
+        let result = rename_handler(
+            State(state.clone()),
+            user,
+            headers,
+            Json(RenameBody {
+                from: "note.md".to_string(),
+                to: "renamed.md".to_string(),
+            }),
+        )
+        .await;
+        if let Err(e) = result {
+            panic!("plain-shape rename failed: {}", e.0);
+        }
+
+        let ServerEvent::File(first) = events.recv().await.unwrap() else {
+            panic!("expected a File event");
+        };
+        assert_eq!(first.kind, "removed");
+        assert_eq!(first.paths, vec!["note.md".to_string()]);
+        let origin = first.origin.expect("the write stamps its origin");
+        assert_eq!(origin.client_id, "tab-42");
+        assert_eq!(origin.author.name, "Ada Lovelace");
+
+        let ServerEvent::File(second) = events.recv().await.unwrap() else {
+            panic!("expected a File event");
+        };
+        assert_eq!(second.kind, "modified");
+        assert!(second.paths.contains(&"renamed.md".to_string()));
+        let origin = second.origin.expect("the write stamps its origin");
+        assert_eq!(origin.client_id, "tab-42");
+        assert_eq!(origin.author.name, "Ada Lovelace");
+
+        // Exactly two groups — nothing else was broadcast.
+        assert!(events.try_recv().is_err());
+    }
+
+    /// A missing/absent `x-sunstone-client` header stamps an empty client id,
+    /// so no browser matches it and every tab treats the change as genuine.
+    #[test]
+    fn a_missing_client_header_yields_an_empty_client_id() {
+        assert_eq!(client_id(&HeaderMap::new()), "");
+    }
+
+    /// `WriteError::into_response` carries the write taxonomy onto HTTP:
+    /// 400 invalid path, 409 existing target, 404 missing referent, 500 default.
+    #[test]
+    fn write_error_maps_the_write_taxonomy_onto_http_statuses() {
+        let status = |msg: &str| WriteError(msg.to_string()).into_response().status();
+        assert_eq!(
+            status("path escapes the bundle: ../x"),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(status("already exists: a.md"), StatusCode::CONFLICT);
+        assert_eq!(
+            status("target folder does not exist: sub"),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status("git commit failed: boom"),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

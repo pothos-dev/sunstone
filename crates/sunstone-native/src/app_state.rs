@@ -10,7 +10,7 @@ use crate::index::Index;
 /// external edit landing right after our write still reloads.
 const SELF_WRITE_WINDOW: Duration = Duration::from_millis(1500);
 
-/// Application state shared across Tauri commands.
+/// Application state shared across the host command/route layers (Tauri commands and server routes).
 ///
 /// Holds the canonicalized Bundle root plus a self-write tracker: the set of
 /// absolute paths Sunstone itself just wrote, with the instant of the write.

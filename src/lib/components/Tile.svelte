@@ -29,11 +29,8 @@
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { minimalChange } from '$lib/minimalChange';
   import type { Tile } from '$lib/state/workspace.svelte';
-  import type { FileHistory } from '$lib/types';
   import {
     buildEditor,
-    buildReviewEditor,
-    setReviewText,
     setEditorConcept,
     setEditorMode,
     setEditorMermaidTheme,
@@ -45,15 +42,7 @@
     openSearch,
     annotate,
     annotateActionFor,
-    toggleBold,
-    toggleItalic,
-    toggleStrikethrough,
-    toggleInlineCode,
-    insertOrEditLink,
     linkActionFor,
-    copySelection,
-    cutSelection,
-    pasteFromClipboard,
     selectionForAnnotate,
     addAnnotationWithComment,
     updateAnnotationComment,
@@ -63,12 +52,10 @@
     type EditorMode,
     type CommentEditRequest,
   } from '$lib/editor/cm';
-  import { diffToCriticMarkup } from '$lib/diff/diffToCriticMarkup';
-  import { reviewAvailability } from '$lib/editor/review';
-  import { reviewStep, maxStep } from '$lib/editor/reviewStepper';
+  import { createTileReview } from '$lib/tileReview.svelte';
   import { parseProperties, type Property } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
-  import { buildEditorMenuItems, type EditorMenuItem } from '$lib/tileEditorMenu';
+  import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
   import { tileTitle } from '$lib/tileTitle';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
@@ -286,138 +273,35 @@
 
   function onEditorMenuSelect(id: string): void {
     if (!view) return;
-    switch (id) {
-      case 'cut':
-        void cutSelection(view);
-        break;
-      case 'copy':
-        void copySelection(view);
-        break;
-      case 'paste':
-        void pasteFromClipboard(view);
-        break;
-      case 'bold':
-        toggleBold(view);
-        break;
-      case 'italic':
-        toggleItalic(view);
-        break;
-      case 'strike':
-        toggleStrikethrough(view);
-        break;
-      case 'code':
-        toggleInlineCode(view);
-        break;
-      case 'link':
-        insertOrEditLink(view);
-        break;
-      case 'annotate': {
-        const range = editorMenu?.annotateRange;
-        if (range) {
-          annotationPopup = {
-            x: editorMenu?.x ?? 0,
-            y: editorMenu?.y ?? 0,
-            mode: 'add',
-            text: '',
-            from: range.from,
-            to: range.to,
-          };
-        } else {
-          annotate(view);
-        }
-        break;
+    if (id === 'annotate') {
+      const range = editorMenu?.annotateRange;
+      if (range) {
+        annotationPopup = {
+          x: editorMenu?.x ?? 0,
+          y: editorMenu?.y ?? 0,
+          mode: 'add',
+          text: '',
+          from: range.from,
+          to: range.to,
+        };
+      } else {
+        annotate(view);
       }
+      return;
     }
+    editorCommandFor(id)?.(view);
   }
 
   // --- Review changes: working-tree ↔ HEAD (per Tile) --------------------------
-  let reviewActive = $state(false);
-  let reviewParent = $state<HTMLDivElement | null>(null);
-  let reviewView: EditorView | null = null;
-  let reviewText = $state<string | null>(null);
-  let reviewHistory = $state<FileHistory | null>(null);
-  const reviewAvail = $derived(reviewAvailability(reviewHistory));
-  let reviewPosition = $state(0);
-  const reviewCommits = $derived(reviewHistory?.status === 'ok' ? reviewHistory.commits : []);
-  const reviewStepInfo = $derived(reviewStep(reviewCommits, reviewPosition));
-
-  // Load the git history for the open Concept; switching Concepts exits review.
-  $effect(() => {
-    const path = tile.activePath;
-    reviewActive = false;
-    reviewText = null;
-    reviewHistory = null;
-    reviewPosition = 0;
-    if (path === null) return;
-    let cancelled = false;
-    void backend.fileHistory(path).then((h) => {
-      if (!cancelled) reviewHistory = h;
-    });
-    return () => {
-      cancelled = true;
-    };
+  // The state machine (flag, history, stepper, review view) lives in
+  // tileReview.svelte.ts; this Tile only wires its path/content/theme in and
+  // binds the host element + header/stepper controls to it.
+  const review = createTileReview({
+    getPath: () => tile.activePath,
+    getContent: () => tile.content,
+    getTheme: () => theme.resolved,
+    focusEditor: () => view?.focus(),
   });
-
-  // Build / tear down the read-only review view as `reviewActive` flips.
-  $effect(() => {
-    if (reviewActive && reviewParent && reviewText !== null && !reviewView) {
-      reviewView = buildReviewEditor(reviewParent, reviewText);
-      reviewView.dom.setAttribute('data-theme', theme.resolved);
-      reviewView.focus();
-    } else if (!reviewActive && reviewView) {
-      reviewView.destroy();
-      reviewView = null;
-    }
-  });
-
-  async function renderReviewStep(pos: number): Promise<boolean> {
-    const path = tile.activePath;
-    if (path === null) return false;
-    const step = reviewStep(reviewCommits, pos);
-    const oldSide = await backend.fileAtRev(path, step.oldRev);
-    if (oldSide.status !== 'ok') return false;
-    let newContent: string;
-    if (step.newRev === null) {
-      newContent = tile.content;
-    } else {
-      const newSide = await backend.fileAtRev(path, step.newRev);
-      if (newSide.status !== 'ok') return false;
-      newContent = newSide.content;
-    }
-    if (tile.activePath !== path) return false;
-    reviewText = diffToCriticMarkup(oldSide.content, newContent);
-    if (reviewView) setReviewText(reviewView, reviewText);
-    return true;
-  }
-
-  async function enterReview(): Promise<void> {
-    const path = tile.activePath;
-    if (path === null || reviewActive || !reviewAvail.enabled) return;
-    reviewPosition = 0;
-    if (!(await renderReviewStep(0))) return;
-    if (tile.activePath !== path) return;
-    reviewActive = true;
-  }
-
-  function stepReview(delta: number): void {
-    if (!reviewActive) return;
-    const next = reviewPosition + delta;
-    if (next < 0 || next > maxStep(reviewCommits)) return;
-    reviewPosition = next;
-    void renderReviewStep(next);
-  }
-
-  function doExitReview(): void {
-    if (!reviewActive) return;
-    reviewActive = false;
-    reviewText = null;
-    queueMicrotask(() => view?.focus());
-  }
-
-  function toggleReview(): void {
-    if (reviewActive) doExitReview();
-    else void enterReview();
-  }
 
   async function exportPdf(): Promise<void> {
     const path = tile.activePath;
@@ -572,7 +456,7 @@
   $effect(() => {
     const resolved = theme.resolved;
     if (view) view.dom.setAttribute('data-theme', resolved);
-    if (reviewView) reviewView.dom.setAttribute('data-theme', resolved);
+    review.syncTheme(resolved);
   });
 
   // Mermaid theme-sync (ADR-0005).
@@ -586,8 +470,7 @@
     if (annotationPopupOverlayId !== null) focus.removeOverlay(annotationPopupOverlayId);
     view?.destroy();
     view = null;
-    reviewView?.destroy();
-    reviewView = null;
+    review.destroy();
   });
 
   // --- Exported API used by App for the ACTIVE Tile ----------------------------
@@ -623,10 +506,10 @@
     doRedo();
   }
   export function isReviewActive(): boolean {
-    return reviewActive;
+    return review.active;
   }
   export function exitReview(): void {
-    doExitReview();
+    review.exit();
   }
   export { handleSaved };
   /** Adopt a view mode imperatively, applying it to the live view if built. */
@@ -652,10 +535,10 @@
     canGoForward={tile.canGoForward}
     {canUndo}
     {canRedo}
-    {reviewActive}
+    reviewActive={review.active}
     {multipleTiles}
-    reviewEnabled={reviewAvail.enabled}
-    reviewTooltip={reviewAvail.tooltip}
+    reviewEnabled={review.avail.enabled}
+    reviewTooltip={review.avail.tooltip}
     onBack={() => void tile.back()}
     onForward={() => void tile.forward()}
     onClose={onClose}
@@ -663,7 +546,7 @@
     onSplitDown={onSplitDown}
     onUndo={doUndo}
     onRedo={doRedo}
-    onToggleReview={toggleReview}
+    onToggleReview={review.toggle}
     onExportPdf={exportPdf}
     onToggleEditing={toggleEditing}
     {showSave}
@@ -731,13 +614,13 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="editor-host"
-    class:hidden={!tile.activePath || reviewActive}
+    class:hidden={!tile.activePath || review.active}
     data-testid="editor"
     bind:this={editorParent}
     oncontextmenu={openEditorMenu}
   ></div>
 
-  {#if reviewActive}
+  {#if review.active}
     <div class="review-stepper" data-testid="review-stepper">
       <button
         type="button"
@@ -745,15 +628,15 @@
         data-testid="review-older"
         title="Compare the previous (older) commit pair"
         aria-label="Older change"
-        disabled={!reviewStepInfo.canOlder}
-        onclick={() => stepReview(1)}>← older</button
+        disabled={!review.stepInfo.canOlder}
+        onclick={() => review.step(1)}>← older</button
       >
       <div class="review-stepper-meta">
-        <span class="review-comparison" data-testid="review-stepper-label">{reviewStepInfo.label}</span>
-        {#if reviewStepInfo.newer}
-          <span class="review-hash" data-testid="review-stepper-hash">{reviewStepInfo.newer.hash}</span>
-          <span class="review-subject" data-testid="review-stepper-subject">{reviewStepInfo.newer.subject}</span>
-          <span class="review-date" data-testid="review-stepper-date">{reviewStepInfo.newer.relativeDate}</span>
+        <span class="review-comparison" data-testid="review-stepper-label">{review.stepInfo.label}</span>
+        {#if review.stepInfo.newer}
+          <span class="review-hash" data-testid="review-stepper-hash">{review.stepInfo.newer.hash}</span>
+          <span class="review-subject" data-testid="review-stepper-subject">{review.stepInfo.newer.subject}</span>
+          <span class="review-date" data-testid="review-stepper-date">{review.stepInfo.newer.relativeDate}</span>
         {/if}
       </div>
       <button
@@ -762,11 +645,11 @@
         data-testid="review-newer"
         title="Compare the next (newer) commit pair"
         aria-label="Newer change"
-        disabled={!reviewStepInfo.canNewer}
-        onclick={() => stepReview(-1)}>newer →</button
+        disabled={!review.stepInfo.canNewer}
+        onclick={() => review.step(-1)}>newer →</button
       >
     </div>
-    <div class="editor-host review-host" data-testid="review-editor" bind:this={reviewParent}></div>
+    <div class="editor-host review-host" data-testid="review-editor" bind:this={review.parent}></div>
   {/if}
 </div>
 

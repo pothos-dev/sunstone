@@ -36,7 +36,7 @@ interface TrackedHeading {
 }
 
 /** Effect: re-snapshot the baseline from the current document. */
-export const resetAnchorBaseline = StateEffect.define<null>();
+const resetAnchorBaseline = StateEffect.define<null>();
 
 /** Snapshot the current headings as tracked identities (line-start pos + slug). */
 function snapshot(state: EditorState): TrackedHeading[] {

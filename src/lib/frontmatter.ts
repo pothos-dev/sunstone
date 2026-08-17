@@ -243,7 +243,7 @@ export function serializeFrontmatter(props: Property[]): string {
  * (ADR 0003). We splice only the key portion of the first line (everything up to
  * and including the first `:`), leaving the value and any following block lines
  * untouched. If the entry shape is unexpected (no `:` on the first line), we
- * clear `entry` and fall back to the structured/raw form so the rename still
+ * rebuild `entry` from the new key plus the `raw` value so the rename still
  * applies without corrupting output.
  */
 export function renameProperty(prop: Property, newKey: string): Property {
@@ -256,8 +256,8 @@ export function renameProperty(prop: Property, newKey: string): Property {
   const firstLineEnd = nl === -1 ? entry.length : nl;
   const colon = entry.indexOf(':');
   if (colon === -1 || colon > firstLineEnd) {
-    // No usable key separator — drop the verbatim entry and let the serializer
-    // re-emit from `raw` instead (degrades gracefully; value still preserved).
+    // No usable key separator — rebuild the entry from the new key + `raw`
+    // value instead (degrades gracefully; value still preserved).
     const value = prop.raw ?? '';
     const rebuilt = `${serializeKey(newKey)}: ${value}`.replace(/\n*$/, '\n');
     return { ...prop, key: newKey, entry: rebuilt };
@@ -286,6 +286,9 @@ function serializeKey(key: string): string {
  * Serialize a scalar value the way YAML would, but minimally — we want clean
  * output without disturbing surrounding text. Quote only when necessary.
  */
+/** What YAML would parse as a number (int, float, or exponent form). */
+const YAML_NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+
 function serializeScalar(value: string, asBoolean: boolean, asNumber = false): string {
   if (asBoolean) {
     const v = value.trim().toLowerCase();
@@ -297,7 +300,7 @@ function serializeScalar(value: string, asBoolean: boolean, asNumber = false): s
     // parses as a number. If the user edited it to something non-numeric, fall
     // through to string handling (which will quote as needed).
     const v = value.trim();
-    if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(v)) return v;
+    if (YAML_NUMBER.test(v)) return v;
   }
   if (value === '') return "''";
   if (needsQuoting(value)) {
@@ -322,7 +325,7 @@ function needsQuoting(value: string): boolean {
     return true;
   }
   // Looks like a number.
-  if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(value)) return true;
+  if (YAML_NUMBER.test(value)) return true;
   return false;
 }
 

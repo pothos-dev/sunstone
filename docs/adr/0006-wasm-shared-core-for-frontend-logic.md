@@ -107,8 +107,9 @@ crosses the boundary — the handle owns both the set and the operations over it
 ### 5. Module init & load ordering
 
 `await init()` lives **inside `indexStore.refresh()`** via a memoized, `browser`-guarded
-`ensureWasm()` awaited before the handle is built — **not** in any `+layout`/`load`. Both
-client entry points (`App.svelte` and the dynamic-imported `WebEditorIsland`) already call
+`ensureWasm()` awaited before the handle is built — **not** in any `+layout`/`load`. The
+single client entry point (`App.svelte`, mounted on the web via `WebAppShellIsland`; the
+former `WebEditorIsland` has been removed) already calls
 `refresh()` first, so there is zero new wiring. SSR exclusion is by **dynamic `import()` +
 `browser`** guard (SSR renders native Rust; `WebViewer` imports neither the store nor
 `Tile`). The editor mounts eagerly; readers no-op on a null handle and the existing

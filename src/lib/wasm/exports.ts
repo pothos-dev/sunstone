@@ -161,16 +161,6 @@ export function conceptToUrl(path: string): string {
   return '/' + p.split('/').map(encodeURIComponent).join('/');
 }
 
-/**
- * GitHub-style slug for a single anchor/heading string (no de-duplication) —
- * the single source `sunstone_shared::slug::slugify`, consumed by the fake
- * backend's corpus-wide anchor rewriter. Degrades to `''` (no rewrite matches)
- * on a null module; the fake backend only runs after wasm has initialized.
- */
-export function slugify(text: string): string {
-  return mod ? mod.slugify(text) : '';
-}
-
 // --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
 //
 // The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE

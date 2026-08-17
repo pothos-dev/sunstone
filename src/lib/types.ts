@@ -1,6 +1,6 @@
 // Shared TypeScript types crossing the IPC seam.
 // Shapes must match the Rust serde structs (serde rename_all = "camelCase").
-// See ARCHITECTURE.md and docs/GLOSSARY.md.
+// See docs/architecture/overview.md and docs/GLOSSARY.md.
 
 import type { EditorMode } from '$lib/editor/cm';
 import type { StoredLayout } from '$lib/state/layoutPersist';

@@ -383,7 +383,8 @@ export class Workspace {
 
   /**
    * Follow a rename/move across EVERY Tile (each rewrites its own active path +
-   * history; the shared registry is re-keyed once). Returns the ACTIVE Tile's new
+   * history; each Tile's followRename also re-keys the shared registry — the
+   * re-key is idempotent, so repeats are harmless). Returns the ACTIVE Tile's new
    * path when anything was affected, else null — the surface App/treeActions use.
    */
   followRename(from: string, to: string): string | null {

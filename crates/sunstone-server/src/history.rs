@@ -117,9 +117,7 @@ pub async fn file_at_rev_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::{Path, PathBuf};
-    use std::process::Command;
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::path::PathBuf;
     use std::sync::Mutex;
 
     use axum::http::StatusCode;
@@ -130,33 +128,7 @@ mod tests {
     use crate::sync::SyncState;
     use crate::{ServerEvent, ServerState};
 
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    /// Skip cleanly when `git` is absent from PATH (the shared convention in
-    /// `write.rs` / `git.rs`).
-    fn git_available() -> bool {
-        Command::new("git").arg("--version").output().is_ok()
-    }
-
-    fn run(root: &Path, args: &[&str]) {
-        let out = Command::new("git")
-            .current_dir(root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(out.status.success(), "git {args:?} failed: {out:?}");
-    }
-
-    fn temp_dir(tag: &str) -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-history-{tag}-{}-{}",
-            std::process::id(),
-            n
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir.canonicalize().unwrap()
-    }
+    use crate::testutil::{git as run, git_available, temp_dir};
 
     /// A git repo with `a.md` committed, plus `sub/b.md` committed one level
     /// down (the bind-mounted-subdirectory case).

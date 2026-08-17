@@ -1,6 +1,6 @@
 // Bundle-relative path helpers (pure string ops; no DOM/IPC).
 //
-// Paths across the app are bundle-relative and '/'-separated (ARCHITECTURE.md).
+// Paths across the app are bundle-relative and '/'-separated (docs/architecture/overview.md).
 // These small functions consolidate the basename / dirname / strip-".md" /
 // join logic that was previously copy-pasted across components and the shell.
 

@@ -20,7 +20,8 @@
    * web backend, so an empty query browses ALL Concept paths instead.
    */
   import { backend } from '$lib/ipc';
-  import { fuzzyRank } from '$lib/fuzzy';
+  import { createLatestGuard } from '$lib/asyncGuard';
+  import { quickNavResults, type QuickNavResult as Result } from '$lib/quickNavResults';
   import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
 
@@ -48,44 +49,18 @@
   let loaded = false;
 
   // Tag drill-down: the tag whose Concepts the list is currently showing (null =
-  // normal search). `tagConcepts` holds the resolved paths; `tagToken` guards a
+  // normal search). `tagConcepts` holds the resolved paths; `tagGuard` guards a
   // slow resolve from landing after the user stepped back out / drilled another.
   let tagMode = $state<string | null>(null);
   let tagConcepts = $state<string[]>([]);
-  let tagToken = 0;
+  const tagGuard = createLatestGuard();
 
-  // Results. A tagged Concept is rendered exactly like a normal Concept row.
-  type Result = { kind: 'concept'; path: string } | { kind: 'tag'; tag: string };
-  const results = $derived.by<Result[]>(() => {
-    const q = query.trim();
-
-    // Drill-down: the Concepts carrying the active tag, fuzzy-filtered by query.
-    if (tagMode !== null) {
-      const filtered = q === '' ? tagConcepts : fuzzyRank(q, tagConcepts).map((m) => m.target);
-      return filtered.map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Empty query: browse all Concept paths (no recents on the read-only web).
-    if (q === '') {
-      return paths.map((path): Result => ({ kind: 'concept', path }));
-    }
-
-    // Mix Concept and tag matches, best score first (ties: shorter target).
-    const scored = [
-      ...fuzzyRank(q, paths).map((m) => ({
-        r: { kind: 'concept', path: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-      ...fuzzyRank(q, tags).map((m) => ({
-        r: { kind: 'tag', tag: m.target } as Result,
-        score: m.score,
-        len: m.target.length,
-      })),
-    ];
-    scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.len - b.len));
-    return scored.map((s) => s.r);
-  });
+  // Results (pure building shared with the desktop palette via
+  // `quickNavResults`). Empty query browses ALL Concept paths — no recents on
+  // the read-only web backend.
+  const results = $derived.by<Result[]>(() =>
+    quickNavResults({ query, tagMode, tagConcepts, paths, tags, emptyQueryPaths: paths }),
+  );
 
   // The effective selection, clamped to the current result set without writing
   // back to state (avoids an effect-update loop).
@@ -135,9 +110,9 @@
     query = '';
     selected = 0;
     tagConcepts = [];
-    const token = ++tagToken;
+    const token = tagGuard.next();
     void backend.conceptsByTag(tag).then((c) => {
-      if (token === tagToken) tagConcepts = c;
+      if (tagGuard.isLatest(token)) tagConcepts = c;
     });
     // A tag row reached by CLICK moves focus to the button (then removed from the
     // DOM as the list swaps); pull focus back to the input so typing filters and
@@ -149,7 +124,7 @@
   function exitTag() {
     tagMode = null;
     tagConcepts = [];
-    tagToken++;
+    tagGuard.next(); // invalidate any in-flight resolve
     query = '';
     selected = 0;
   }

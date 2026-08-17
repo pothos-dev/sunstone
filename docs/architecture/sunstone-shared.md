@@ -38,7 +38,8 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `outline` | ATX-only heading scan (`scan_headings` → `OutlineHeading`) and `find_heading_line`. |
 | `critic` | CriticMarkup parse/group — `parse_critic_marks`, `pair_annotations`, `annotation_at` (offset-span structs). |
 | `citations` | Inline citation scanning — `find_citation_refs`, `citation_def_pos`. |
-| `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`). |
+| `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
+| `scan` | The one code-aware markdown scanner (fences, inline code, `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, and sunstone-native's rename rewriter all walk — extraction and rewriting can never disagree on what counts as a link. |
 
 ## Two consumers, one source
 

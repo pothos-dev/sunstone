@@ -15,13 +15,15 @@
    * App's own state directly.
    */
   import type { TreeNode } from '$lib/types';
-  import { dirname, ensureMd, isMarkdownName, joinPath, stripMd } from '$lib/path';
+  import { dirname, ensureMd, isMarkdownName, joinPath } from '$lib/path';
+  import { isReservedFile, reservedPath, type ReservedKind } from '$lib/reserved';
   import {
-    isReservedFile,
-    reservedPath,
-    RESERVED_FILES,
-    type ReservedKind,
-  } from '$lib/reserved';
+    childDirOf,
+    folderPaths,
+    menuItemsFor,
+    nodeAt as nodeAtIn,
+    renameSeed,
+  } from '$lib/treeCrud';
   import { bundle } from '$lib/state/bundle.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
@@ -93,42 +95,20 @@
     }
   });
 
-  /**
-   * Folder a NEW child of `node` should live in: the node itself if it's a
-   * directory, else its containing folder.
-   */
-  function childDirOf(node: TreeNode): string {
-    return node.isDir ? node.path : dirname(node.path);
-  }
-
-  /** All folder paths in the tree (for the Move picker), '' = Bundle root. */
-  function folderPaths(node: TreeNode, out: string[] = []): string[] {
-    if (node.isDir) {
-      out.push(node.path);
-      for (const child of node.children ?? []) folderPaths(child, out);
-    }
-    return out;
-  }
+  // Move-picker targets: all folder paths in the live tree ('' = Bundle root).
+  // Falls back to a root-only tree while the Bundle is still loading.
+  const moveTargets = $derived(
+    folderPaths(bundle.tree ?? { name: '', path: '', isDir: true, children: [] }),
+  );
 
   /** Open the context menu at viewport (x, y), targeting `node`. */
   export function openMenu(node: TreeNode, x: number, y: number) {
     menu = { node, x, y };
   }
 
-  /** Find the tree node at bundle-relative `path` (the Bundle root is `''`). */
+  /** Find the tree node at bundle-relative `path` in the live tree. */
   function nodeAt(path: string): TreeNode | null {
-    const root = bundle.tree;
-    if (!root) return null;
-    if (path === root.path) return root;
-    const walk = (n: TreeNode): TreeNode | null => {
-      if (n.path === path) return n;
-      for (const c of n.children ?? []) {
-        const hit = walk(c);
-        if (hit) return hit;
-      }
-      return null;
-    };
-    return walk(root);
+    return nodeAtIn(bundle.tree, path);
   }
 
   // Keyboard CRUD entry points (slice: explorer-crud-keybindings): fire the SAME
@@ -136,14 +116,6 @@
   // path). They resolve the node from the live tree so the dialog state matches
   // exactly what a right-click would produce; the new-target rule is the shared
   // `childDirOf`. No-op when the path is gone (tree changed underfoot).
-  /**
-   * Initial text for the rename input. A `.md` concept is shown WITHOUT its
-   * extension — the `.md` is implicit and re-appended on confirm (mirrors the
-   * tree's display name). Folders and non-`.md` files keep their full name.
-   */
-  function renameSeed(node: TreeNode): string {
-    return node.isDir ? node.name : stripMd(node.name);
-  }
   export function requestRename(path: string) {
     const node = nodeAt(path);
     if (node) dialog = { kind: 'rename', node, value: renameSeed(node), viaKeyboard: true };
@@ -163,48 +135,6 @@
   export function requestMove(path: string) {
     const node = nodeAt(path);
     if (node) dialog = { kind: 'move', node, value: dirname(node.path), viaKeyboard: true };
-  }
-
-  /** Whether `dir` (a folder node) already contains the reserved file `kind`. */
-  function folderHasReserved(dir: TreeNode, kind: ReservedKind): boolean {
-    const target = reservedPath(dir.path, kind);
-    return (dir.children ?? []).some((c) => !c.isDir && c.path === target);
-  }
-
-  /**
-   * Context-menu items for `node`. A FOLDER additionally offers to create
-   * whichever reserved file (`index.md`/`log.md`) it is missing (slice:
-   * reserved-files). The Bundle root counts as a folder here too.
-   */
-  function menuItemsFor(node: TreeNode) {
-    const items: {
-      id: string;
-      label: string;
-      separated?: boolean;
-      danger?: boolean;
-    }[] = [
-      { id: 'newConcept', label: 'New Concept' },
-      { id: 'newFolder', label: 'New Folder' },
-    ];
-    if (node.isDir) {
-      const kinds: ReservedKind[] = ['index', 'log'];
-      let first = true;
-      for (const kind of kinds) {
-        if (folderHasReserved(node, kind)) continue;
-        items.push({
-          id: `createReserved:${kind}`,
-          label: `Create ${RESERVED_FILES[kind]}`,
-          separated: first,
-        });
-        first = false;
-      }
-    }
-    items.push(
-      { id: 'rename', label: 'Rename', separated: true },
-      { id: 'move', label: 'Move…' },
-      { id: 'delete', label: 'Delete', separated: true, danger: true },
-    );
-    return items;
   }
 
   const menuItems = $derived(menu ? menuItemsFor(menu.node) : []);
@@ -324,7 +254,7 @@
         data-testid="dialog-move-target"
         bind:value={dialog.value}
       >
-        {#each folderPaths(bundle.tree ?? { name: '', path: '', isDir: true, children: [] }) as dir (dir)}
+        {#each moveTargets as dir (dir)}
           <option value={dir}>{dir === '' ? '/ (Bundle root)' : dir}</option>
         {/each}
       </select>
