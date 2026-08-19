@@ -38,12 +38,23 @@ export type AppHotkeyIntent =
   | { kind: 'history-back' }
   | { kind: 'history-forward' }
   | { kind: 'exit-review' }
+  /** UI zoom: Ctrl/Cmd with `+`/`-`/`0`. Caller preventDefaults. */
+  | { kind: 'zoom'; step: 'in' | 'out' | 'reset' }
   /** The unified Escape peel: caller runs `focus.escape(localPeelActive)` and
    *  preventDefaults only when it reports having peeled a layer. */
   | { kind: 'escape'; localPeelActive: boolean }
   /** Alt+arrow Region/tile movement: caller preventDefaults, tries the editor
    *  tile grid first (when the editor Region is focused), then the backbone. */
   | { kind: 'move'; dir: Direction };
+
+/** Map a Ctrl/Cmd zoom chord to its step, or null when it isn't one. */
+function zoomStepForKey(e: KeyboardEvent): 'in' | 'out' | 'reset' | null {
+  if ((!e.ctrlKey && !e.metaKey) || e.altKey) return null;
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') return 'in';
+  if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') return 'out';
+  if (e.key === '0' || e.code === 'Numpad0') return 'reset';
+  return null;
+}
 
 const plainEscape = (e: KeyboardEvent): boolean =>
   e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
@@ -53,6 +64,12 @@ const plainEscape = (e: KeyboardEvent): boolean =>
  * (letting the browser / CodeMirror handle the key).
  */
 export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotkeyIntent | null {
+  // UI zoom. Layout-independent: `+` needs Shift on most layouts and `=` does
+  // not, so Shift is allowed here (unlike `matchesHotkey`'s exact matching).
+  // The numpad variants are accepted via `code`.
+  const zoomStep = zoomStepForKey(e);
+  if (zoomStep !== null) return { kind: 'zoom', step: zoomStep };
+
   if (matchesHotkey(e, { key: 'k' })) return { kind: 'toggle-quicknav' };
 
   if (matchesHotkey(e, { key: 'f', shift: true })) return { kind: 'toggle-search' };

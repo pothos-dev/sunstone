@@ -24,7 +24,9 @@
    The Export-as-PDF print container overrides this with its own inline
    `font-size` (PrintView), so this only pins the web viewer. */
 .rendered {
-  font-size: 14px;
+  /* `--rendered-body-size` is set on <html> by the UI-zoom store (Ctrl +/-);
+     the 14px literal is the un-zoomed default. */
+  font-size: var(--rendered-body-size, 14px);
 }
 
 .rendered h1,
@@ -149,16 +151,16 @@
 /* Dark paper: annotation-specific tints re-scoped so they stay legible on the
    charcoal background (data-theme lives on the app root, an ancestor of
    `.rendered`). */
-[data-theme='dark'] .rendered .critic-highlight {
+[data-theme="dark"] .rendered .critic-highlight {
   background-color: rgba(255, 196, 64, 0.22);
 }
 
-[data-theme='dark'] .rendered ins.critic-add {
+[data-theme="dark"] .rendered ins.critic-add {
   color: #7ee787;
   background-color: rgba(63, 185, 80, 0.2);
 }
 
-[data-theme='dark'] .rendered del.critic-del {
+[data-theme="dark"] .rendered del.critic-del {
   color: #f2b8b5;
   background-color: rgba(248, 81, 73, 0.2);
 }

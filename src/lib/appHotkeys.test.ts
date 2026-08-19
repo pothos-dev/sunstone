@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { routeAppHotkey, type AppHotkeyContext } from './appHotkeys';
+import { routeAppHotkey, type AppHotkeyContext, type AppHotkeyIntent } from './appHotkeys';
 
 function keydown(over: Partial<KeyboardEvent>): KeyboardEvent {
   return {
@@ -178,6 +178,23 @@ describe('routeAppHotkey', () => {
     ).toBeNull();
     // A non-movement key with Alt is ignored.
     expect(routeAppHotkey(keydown({ altKey: true, key: 'x' }), ctx())).toBeNull();
+  });
+
+  test('Ctrl/Cmd with +/-/0 routes UI zoom, on both the main row and the numpad', () => {
+    const zoom = (step: 'in' | 'out' | 'reset'): AppHotkeyIntent => ({ kind: 'zoom', step });
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: '=' }), ctx())).toEqual(zoom('in'));
+    // `+` arrives with Shift held on most layouts — still a zoom-in.
+    expect(routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: '+' }), ctx())).toEqual(
+      zoom('in'),
+    );
+    expect(routeAppHotkey(keydown({ metaKey: true, key: '-' }), ctx())).toEqual(zoom('out'));
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: '0' }), ctx())).toEqual(zoom('reset'));
+    expect(
+      routeAppHotkey(keydown({ ctrlKey: true, key: 'Unidentified', code: 'NumpadAdd' }), ctx()),
+    ).toEqual(zoom('in'));
+    // Without the primary modifier (or with Alt) it is not a zoom chord.
+    expect(routeAppHotkey(keydown({ key: '-' }), ctx())).toBeNull();
+    expect(routeAppHotkey(keydown({ ctrlKey: true, altKey: true, key: '-' }), ctx())).toBeNull();
   });
 
   test('unmodified ordinary keys route nothing', () => {

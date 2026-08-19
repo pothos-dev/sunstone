@@ -7,6 +7,8 @@
   import { session } from '$lib/state/session.svelte';
   import { suggestions } from '$lib/state/suggestions.svelte';
   import { applyTheme, theme } from '$lib/state/theme.svelte';
+  import { applyZoom, zoom } from '$lib/state/zoom.svelte';
+  import { wheelZoomStep } from '$lib/zoom';
   import type { TreeNode } from '$lib/types';
   import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
   import Tree from '$lib/components/Tree.svelte';
@@ -134,6 +136,8 @@
     editor.onSaved = (path) => activeTileRef?.handleSaved(path);
 
     const stopTheme = theme.start();
+    // Seed the persisted UI zoom before the first paint of the mounted app.
+    zoom.load();
     const stopFocus = focus.start();
     focus.onLeaveRegion = (entered) => session.clearTransientRevealsExcept(entered);
 
@@ -249,6 +253,12 @@
           e.preventDefault();
           void editor.forward();
           return;
+        case 'zoom':
+          e.preventDefault();
+          if (intent.step === 'in') zoom.in();
+          else if (intent.step === 'out') zoom.out();
+          else zoom.reset();
+          return;
         case 'exit-review':
           e.preventDefault();
           activeTileRef?.exitReview();
@@ -278,6 +288,17 @@
     };
     window.addEventListener('keydown', onKeydown, true);
 
+    // Ctrl/Cmd+wheel zoom. Non-passive + capture so the webview's own
+    // pinch/ctrl-wheel page zoom never fires — ours is the only zoom.
+    const onWheel = (e: WheelEvent) => {
+      const step = wheelZoomStep(e);
+      if (step === 0) return;
+      e.preventDefault();
+      if (step > 0) zoom.in();
+      else zoom.out();
+    };
+    window.addEventListener('wheel', onWheel, { passive: false, capture: true });
+
     const onMouseDown = (e: MouseEvent) => {
       if (e.button === 3 || e.button === 4) e.preventDefault();
     };
@@ -296,6 +317,7 @@
     return () => {
       unsubscribe?.();
       window.removeEventListener('keydown', onKeydown, true);
+      window.removeEventListener('wheel', onWheel, true);
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mouseup', onMouseUp);
       stopTheme();
@@ -311,6 +333,12 @@
   // background + the pre-hydration paint seeded in `app.html`).
   $effect(() => {
     applyTheme(appRoot, theme.resolved);
+  });
+
+  // Apply the UI zoom multiplier to <html> (root font-size + the two px-pinned
+  // prose sizes). Seeded from localStorage in `onMount` before this first runs.
+  $effect(() => {
+    applyZoom(zoom.scale);
   });
 
   // Persist the last-open Concept whenever active-Tile navigation changes it.
