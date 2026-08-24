@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sunstone — the markdown editor for git users</title>
-<meta name="description" content="The markdown editor for git users — the good parts of a knowledge base in plain files that live in your repo. Review changes against HEAD, publish a bundle as a web server, and collaborate through git commits. First-class Open Knowledge Format support." />
+<meta name="description" content="The markdown editor for git users. Live preview, wikilinks, backlinks, and full-text search over plain .md files in your repo. Diff against HEAD, run it as a web server, collaborate through commits. Implements the Open Knowledge Format." />
 <link rel="icon" href="assets/logo.svg" />
 <link rel="preload" href="assets/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin />
 <style>
@@ -333,10 +333,10 @@
     <span class="eyebrow">☀ A slimmed-down Obsidian</span>
     <h1>The markdown editor for <span class="grad">git users</span>.</h1>
     <p class="lead">
-      Live preview, wikilinks, backlinks, properties, full-text search — over
+      Live preview, wikilinks, backlinks, properties, and full-text search over
       plain <code style="font-family:var(--font-mono);font-size:0.9em">.md</code>
       files in your repo. Diff your edits against HEAD, step through history,
-      and collaborate through commits instead of a sync service.
+      collaborate through commits. No sync service.
     </p>
     <div class="cta-row">
       <a class="btn btn-primary" href="https://github.com/">
@@ -371,13 +371,12 @@
         <h3>Open any folder. No vault required.</h3>
         <p>
           No vault to create, import, or convert into. Point Sunstone at any
-          directory of markdown — <code>sunstone ./docs</code> — and start
-          editing.
+          directory of markdown and start editing: <code>sunstone ./docs</code>.
         </p>
         <p>
-          Files stay plain <code>.md</code> on disk. Nothing is indexed into a
-          database you can't grep; close the app and the folder is exactly what
-          it says it is.
+          Files stay plain <code>.md</code> on disk. Nothing gets indexed into
+          a database you can't grep. Close the app and you're left with a
+          folder of markdown.
         </p>
       </div>
       <div class="prop">
@@ -386,14 +385,14 @@
         </div>
         <h3>Built for the Open Knowledge Format</h3>
         <p>
-          First-class support for Google's <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/">Open Knowledge Format</a> —
-          an open standard for portable, agent-readable, vendor-neutral markdown bundles.
+          Sunstone implements Google's <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/">Open Knowledge Format</a>,
+          an open standard for markdown bundles that humans and agents read the
+          same way.
         </p>
         <p>
-          OKF is markdown with YAML frontmatter and wikilinks — if you can
-          <code>cat</code> a file you can read it, if you can
-          <code>git clone</code> you can ship it. Readable by humans, agents,
-          and any other editor; nothing to migrate.
+          OKF is markdown with YAML frontmatter and wikilinks. If you can
+          <code>cat</code> a file you can read it; if you can
+          <code>git clone</code> you can ship it. Nothing to migrate.
         </p>
       </div>
     </div>
@@ -406,63 +405,63 @@
 <section id="features">
   <div class="wrap">
     <div class="section-head">
-      <h2>Everything a knowledge base needs. Nothing it doesn't.</h2>
-      <p>No plugin ecosystem to assemble — these work out of the box.</p>
+      <h2>Everything you'd install plugins for, built in.</h2>
+      <p>Open a folder and all of it works.</p>
     </div>
     <div class="features">
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
         <h4>Live preview</h4>
-        <p>Obsidian-style hybrid editing — inactive lines render styled while the cursor line shows raw markup, with highlighted code, task lists, and interactive GFM tables.</p>
+        <p>Obsidian-style hybrid editing. Inactive lines render styled, the cursor line shows raw markup. Highlighted code, task lists, interactive GFM tables.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
         <h4>Wikilinks &amp; backlinks</h4>
-        <p>Navigate links between concepts, and see at a glance every other concept that links back to the one you're reading.</p>
+        <p>Follow links between concepts. The backlinks panel lists every concept that links to the one you're reading.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg></div>
         <h4>Properties panel</h4>
-        <p>Edit typed frontmatter as structured fields — scalars, lists, tags — with complex YAML round-tripped verbatim.</p>
+        <p>Edit frontmatter as typed fields: scalars, lists, tags. Complex YAML round-trips verbatim.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg></div>
         <h4>Full-text search</h4>
-        <p>Search across every concept with snippet results, plus a fuzzy quick-nav palette to jump anywhere instantly.</p>
+        <p>Search every concept with snippet results. A fuzzy quick-nav palette jumps to any concept by name.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 3.4a2 2 0 0 0-2.8 0l-1 1 2.8 2.8 1-1a2 2 0 0 0 0-2.8z"/><path d="M17.6 7.2 8 16.8 5.2 18l1.2-2.8 9.6-9.6"/></svg></div>
         <h4>Margin annotations</h4>
-        <p>Select text and add a margin comment — plain CriticMarkup in the file, so feedback travels in git and any tool can read it.</p>
+        <p>Select text and add a margin comment. Stored as CriticMarkup in the file, so feedback travels in git and any tool can read it.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="16.5" y1="4" x2="16.5" y2="20"/></svg></div>
         <h4>Tiling workspace</h4>
-        <p>Split the editor into columns and tiles to view several concepts side by side, with draggable dividers and a layout that persists across restarts.</p>
+        <p>Split the editor into columns and tiles to view several concepts side by side. The layout persists across restarts.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a3 3 0 0 0 3 3h6a3 3 0 0 1 3 3v6"/><circle cx="6" cy="3" r="1.6"/><circle cx="18" cy="21" r="1.6"/></svg></div>
         <h4>Review changes</h4>
-        <p>A working-tree ↔ HEAD review toggle backed by a git seam, with a history stepper — word edits render as CriticMarkup track-changes.</p>
+        <p>Toggle a diff of the working tree against HEAD, or step back through history. Word edits render as CriticMarkup track-changes.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
         <h4>Export as PDF</h4>
-        <p>Render the open concept to a print-quality preview with reader controls — save straight to PDF on macOS and Windows.</p>
+        <p>Render the open concept to a print preview and save it as PDF on macOS and Windows.</p>
       </div>
 
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
         <h4>Light + dark theming</h4>
-        <p>A warm amber palette that follows your OS color scheme, with an outline panel and a tag browser to keep large bundles navigable.</p>
+        <p>A warm amber palette that follows the OS color scheme. An outline panel and tag browser keep large bundles navigable.</p>
       </div>
 
     </div>
@@ -484,11 +483,11 @@
           history commit by commit.
         </p>
         <p>
-          For collaboration, run the server in git-synced mode: every save is
+          For collaboration, run the server in git-synced mode. Every save is
           a commit, and a sync loop fetches, rebases, and pushes against your
-          origin. Multiple people edit the same bundle — not realtime, but
-          conflict-safe: a clashing edit is forked beside the original instead
-          of silently overwritten.
+          origin. Several people edit the same bundle. It isn't realtime;
+          concurrent work reconciles through rebase, and a conflicting edit is
+          forked beside the original instead of silently overwritten.
         </p>
         <p>
           Sync state is git state. Anything the editor did, you can inspect,
@@ -517,15 +516,15 @@
       <div class="txt">
         <h2>Leave feedback right in the margin.</h2>
         <p>
-          Select text — in editing or reading mode — and choose
+          Select text in editing or reading mode and choose
           <strong>Add comment</strong>. The span is highlighted, a comment icon
           sits in the gutter, and hovering shows the note.
         </p>
         <p>
           On disk it's plain <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>
-          CriticMarkup, so comments live in the <code>.md</code> file, travel
-          in git, and survive every other tool — useful for reviewing an
-          agent's generated docs before the next pass.
+          CriticMarkup. Comments live in the <code>.md</code> file and travel
+          in git, which makes them useful for reviewing an agent's generated
+          docs before the next pass.
         </p>
         <a class="btn btn-ghost" href="#features">Explore all features</a>
       </div>
@@ -544,11 +543,11 @@
       <span class="eyebrow">Ships as a Docker image</span>
       <h2>Run it as a web server. Edit as a team.</h2>
       <p>
-        <strong>Sunstone Web</strong> serves any bundle in the browser — the same
-        explorer, backlinks, tags, outline, and full-text search as the desktop
-        app, plus authenticated editing. Every save is a git commit, so a team
-        works on one bundle and reconciles through git. External pushes and
-        edits reach every open browser over SSE.
+        <strong>Sunstone Web</strong> serves any bundle in the browser, with the
+        same explorer, backlinks, tags, outline, and full-text search as the
+        desktop app, plus authenticated editing. Every save is a git commit, so
+        a team works on one bundle and reconciles through git. External pushes
+        reach every open browser over SSE.
       </p>
       <div class="cta-row" style="margin-top:26px">
         <a class="btn btn-primary" href="https://github.com/">Read the deploy docs</a>
@@ -580,7 +579,7 @@
 <footer class="site">
   <div class="wrap foot">
     <div class="brand"><img src="assets/logo.svg" alt="" style="width:22px;height:22px;border-radius:6px" /> Sunstone</div>
-    <div>A fast, focused markdown editor with first-class OKF support.</div>
+    <div>The markdown editor for git users. OKF built in.</div>
     <div>
       <a href="https://github.com/">GitHub</a> ·
       <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md">OKF Spec</a>
