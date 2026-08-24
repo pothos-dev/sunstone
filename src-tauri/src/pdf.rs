@@ -61,9 +61,10 @@ pub(crate) async fn save_pdf(
 }
 
 /// WebKitGTK-backed PDF export: drive the webview's `WebKitPrintOperation` with
-/// GTK print settings pointed at a "Print to File" PDF output, so `print()`
-/// writes the file WITHOUT showing a dialog. Runs on the GTK main thread via
-/// `with_webview`.
+/// GTK print settings pointed at the "Print to File" backend, so `print()`
+/// writes the PDF WITHOUT showing a dialog. Runs on the GTK main thread via
+/// `with_webview`; this thread blocks until the operation reports `finished`
+/// (or `failed`), so success is only returned once the file actually exists.
 #[cfg(target_os = "linux")]
 fn export_webview_pdf(
     window: &tauri::WebviewWindow,
@@ -71,11 +72,17 @@ fn export_webview_pdf(
 ) -> Result<(), String> {
     use webkit2gtk::{PrintOperation, PrintOperationExt};
 
-    let uri = format!("file://{}", path.to_string_lossy());
+    let uri = gtk::glib::filename_to_uri(path, None)
+        .map_err(|e| e.to_string())?
+        .to_string();
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
     window
         .with_webview(move |platform| {
             let webview = platform.inner();
             let settings = gtk::PrintSettings::new();
+            // GTK's virtual file printer — without it WebKit targets the default
+            // REAL printer and silently ignores `output-uri`.
+            settings.set_printer("Print to File");
             settings.set("output-uri", Some(uri.as_str()));
             settings.set("output-file-format", Some("pdf"));
             let op = PrintOperation::new(&webview);
@@ -83,16 +90,31 @@ fn export_webview_pdf(
             // `print()` is asynchronous; keep the operation alive until it emits
             // `finished` (otherwise dropping the wrapper here cancels the export).
             // A self-reference held in the `finished` handler is released once the
-            // file is written, letting the operation drop.
+            // operation completes; `failed` (if any) fires before `finished`.
+            let failure = std::rc::Rc::new(std::cell::RefCell::new(None::<String>));
             let hold = std::rc::Rc::new(std::cell::RefCell::new(None));
+            let failure_in = failure.clone();
+            op.connect_failed(move |_, err| {
+                *failure_in.borrow_mut() = Some(err.to_string());
+            });
             let hold_in = hold.clone();
             op.connect_finished(move |_| {
                 hold_in.borrow_mut().take();
+                let _ = tx.send(match failure.borrow_mut().take() {
+                    Some(err) => Err(err),
+                    None => Ok(()),
+                });
             });
             *hold.borrow_mut() = Some(op.clone());
             op.print();
         })
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // `save_pdf` is an async command on a worker thread, so blocking here does
+    // not stall the GTK main loop driving the print operation.
+    match rx.recv_timeout(std::time::Duration::from_secs(60)) {
+        Ok(result) => result,
+        Err(_) => Err("PDF export timed out".into()),
+    }
 }
 
 /// macOS PDF export via `WKWebView.createPDFWithConfiguration:completionHandler:`

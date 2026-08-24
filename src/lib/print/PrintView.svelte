@@ -52,6 +52,14 @@
   let margin = $state<MarginKey>('normal');
   const marginValue = $derived(MARGINS[margin]);
 
+  // Optional on-screen page-break guides: dashed lines every A4 content-page
+  // height (297mm minus top+bottom margin), aligned to the content box. An
+  // approximation — real pagination also honours the break-avoid rules below —
+  // but close enough to see roughly where pages will turn.
+  let pageGuides = $state(false);
+  const PAGE_HEIGHTS = { narrow: '277mm', normal: '261mm', wide: '247mm' } as const;
+  const pageHeight = $derived(PAGE_HEIGHTS[margin]);
+
   // Reactive `@page { margin }` — @page can't read CSS custom props, so we keep
   // a live stylesheet element in sync with the chosen margin.
   let pageStyleEl: HTMLStyleElement | null = null;
@@ -187,6 +195,11 @@
         </select>
       </div>
 
+      <label class="pt-group pt-toggle">
+        <input type="checkbox" data-testid="page-guides" bind:checked={pageGuides} />
+        <span class="pt-label">Page guides</span>
+      </label>
+
       {#if savedMsg}
         <span class="pt-saved" data-testid="save-status">{savedMsg}</span>
       {/if}
@@ -202,9 +215,10 @@
          are handled by a delegated listener wired in `followLinks` (below). -->
     <article
       class="print-page rendered"
+      class:page-guides={pageGuides}
       data-testid="print-body"
       hidden={!!error}
-      style="font-size: {fontSize}px; padding: {marginValue};"
+      style="font-size: {fontSize}px; padding: {marginValue}; --page-height: {pageHeight};"
       bind:this={bodyEl}
     ></article>
   </div>
@@ -299,6 +313,15 @@
     white-space: nowrap;
   }
 
+  .pt-toggle {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .pt-toggle input {
+    cursor: pointer;
+  }
+
   .pt-select {
     height: 1.9rem;
     border: 1px solid var(--border, #ccc);
@@ -330,6 +353,21 @@
     color: #111;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
     box-sizing: border-box;
+  }
+
+  /* Page-break guides: a dashed line every content-page height, aligned to the
+     content box so line N marks the end of printed page N. Screen-only. */
+  .print-page.page-guides {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--page-height) - 1px),
+      rgba(200, 60, 60, 0.55) calc(var(--page-height) - 1px),
+      rgba(200, 60, 60, 0.55) var(--page-height)
+    );
+    background-origin: content-box;
+    background-clip: content-box;
+    background-repeat: repeat-y;
   }
 
   .print-error {
@@ -374,6 +412,8 @@
       box-shadow: none;
       /* Margin is owned by `@page` at print time; drop the on-screen padding. */
       padding: 0 !important;
+      /* Guides are a screen aid; print-color-adjust would otherwise keep them. */
+      background-image: none !important;
     }
 
     /* Don't strand a heading at a page bottom; don't split code blocks, tables
