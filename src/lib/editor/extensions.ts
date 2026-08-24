@@ -40,6 +40,7 @@ import { mermaidBlocks } from './mermaid';
 import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
+import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
 import { findExtensions, findPanelTheme } from './find';
@@ -213,6 +214,10 @@ export function modeExtensions(
     // the cursor. Placed after inlinePreview so the replace decoration overrides
     // the stray reference-link syntax colour on the middle number.
     citations(reading),
+    // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown
+    // keeps the hyphens). `reading` always renders; `editing` reveals the raw
+    // run under the cursor.
+    smartDashes(reading),
     // CriticMarkup annotations (highlight background, hidden delimiters/comment,
     // gutter icon + hover note). Cursor-inside reveals raw markup for editing.
     criticMarkupAnnotations(reading, onCommentEdit),
