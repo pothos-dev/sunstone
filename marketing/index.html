@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sunstone — a fast, focused markdown editor</title>
-<meta name="description" content="A lightweight desktop markdown editor — the good parts of a knowledge base without the plugin sprawl or vendor lock-in. Open any folder. First-class Open Knowledge Format support." />
+<title>Sunstone — the markdown editor for git users</title>
+<meta name="description" content="The markdown editor for git users — the good parts of a knowledge base in plain files that live in your repo. Review changes against HEAD, publish a bundle as a web server, and collaborate through git commits. First-class Open Knowledge Format support." />
 <link rel="icon" href="assets/logo.svg" />
 <link rel="preload" href="assets/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin />
 <style>
@@ -100,7 +100,7 @@
   }
   .btn-primary {
     background: var(--accent);
-    color: var(--accent-contrast);
+    color: #1a1109;
     box-shadow: 0 8px 22px -8px var(--accent);
   }
   .btn-primary:hover { transform: translateY(-2px); text-decoration: none; box-shadow: 0 14px 30px -10px var(--accent); }
@@ -319,6 +319,7 @@
     </div>
     <nav class="nav-links">
       <a href="#features" class="hide-sm">Features</a>
+      <a href="#git" class="hide-sm">Git</a>
       <a href="#okf" class="hide-sm">Open Knowledge Format</a>
       <a href="#web" class="hide-sm">Sunstone Web</a>
       <a class="btn btn-primary" style="padding:9px 18px;font-size:0.9rem" href="https://github.com/">Download</a>
@@ -330,11 +331,12 @@
 <div class="hero">
   <div class="wrap">
     <span class="eyebrow">☀ A slimmed-down Obsidian</span>
-    <h1>Your markdown, <span class="grad">fast and focused</span>.</h1>
+    <h1>The markdown editor for <span class="grad">git users</span>.</h1>
     <p class="lead">
       The good parts of a knowledge base — live preview, wikilinks, backlinks,
-      properties, instant search — without the plugin sprawl or the proprietary
-      lock-in. Open a plain folder of markdown and start writing.
+      properties, instant search — in plain files that live in your repo.
+      Review your edits against HEAD, step through history, and collaborate
+      through commits instead of a proprietary sync cloud.
     </p>
     <div class="cta-row">
       <a class="btn btn-primary" href="https://github.com/">
@@ -467,6 +469,45 @@
 
 <hr class="divider" />
 
+<!-- GIT SPLIT -->
+<section id="git">
+  <div class="wrap">
+    <div class="split">
+      <div class="txt">
+        <h2>Your repo is the sync layer.</h2>
+        <p>
+          A bundle is just a git repository. On the desktop, toggle
+          <strong>Review</strong> to see your working tree diffed against
+          <code>HEAD</code> as inline track-changes, and step back through
+          history commit by commit.
+        </p>
+        <p>
+          For collaboration, run Sunstone as a web server in git-synced mode:
+          every save becomes a commit, and a sync loop fetches, rebases, and
+          pushes against your origin. Multiple people edit the same bundle —
+          not realtime, but conflict-safe: a clashing edit is forked beside
+          the original instead of being lost.
+        </p>
+        <p>
+          No accounts, no sync service, no lock-in — just commits you can
+          read, revert, and review like any other change.
+        </p>
+        <a class="btn btn-ghost" href="#web">See Sunstone Web</a>
+      </div>
+      <div class="frame" style="padding:26px">
+        <pre style="font-family:var(--font-mono);font-size:0.86rem;line-height:1.8;color:var(--text-muted);overflow-x:auto;margin:0"><code>$ git log --oneline docs/
+<span style="color:var(--accent-deep)">a41f2c9</span> web: edit concepts/rollout-plan.md (dana)
+<span style="color:var(--accent-deep)">7be03d1</span> web: edit concepts/rollout-plan.md (jonas)
+<span style="color:var(--accent-deep)">f19c884</span> sync: rebase onto origin/main
+<span style="color:var(--accent-deep)">c02a7de</span> desktop edits, reviewed against HEAD
+<span style="color:var(--accent-deep)">918bb3a</span> agent pass over the architecture docs</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
 <!-- ANNOTATIONS SPLIT -->
 <section>
   <div class="wrap">
@@ -500,12 +541,14 @@
   <div class="wrap">
     <div class="section-head" style="margin-bottom:0">
       <span class="eyebrow">Ships as a Docker image</span>
-      <h2>Publish a bundle to the web, read-only.</h2>
+      <h2>Run it as a web server. Edit as a team.</h2>
       <p>
-        <strong>Sunstone Web</strong> is a server-rendered viewer for any bundle —
-        the same explorer, backlinks, tags, outline, and full-text search as the
-        desktop app, in any browser. External edits stream live to every viewer
-        over SSE.
+        <strong>Sunstone Web</strong> serves any bundle in the browser — the same
+        explorer, backlinks, tags, outline, and full-text search as the desktop
+        app, with authenticated editing on top. Every save is a git commit, so
+        multiple people work on one bundle and reconcile through git — not
+        realtime cursors, but real version control. External pushes and edits
+        stream live to every open browser over SSE.
       </p>
       <div class="cta-row" style="margin-top:26px">
         <a class="btn btn-primary" href="https://github.com/">Read the deploy docs</a>
