@@ -333,10 +333,10 @@
     <span class="eyebrow">☀ A slimmed-down Obsidian</span>
     <h1>The markdown editor for <span class="grad">git users</span>.</h1>
     <p class="lead">
-      The good parts of a knowledge base — live preview, wikilinks, backlinks,
-      properties, instant search — in plain files that live in your repo.
-      Review your edits against HEAD, step through history, and collaborate
-      through commits instead of a proprietary sync cloud.
+      Live preview, wikilinks, backlinks, properties, full-text search — over
+      plain <code style="font-family:var(--font-mono);font-size:0.9em">.md</code>
+      files in your repo. Diff your edits against HEAD, step through history,
+      and collaborate through commits instead of a sync service.
     </p>
     <div class="cta-row">
       <a class="btn btn-primary" href="https://github.com/">
@@ -370,13 +370,14 @@
         </div>
         <h3>Open any folder. No vault required.</h3>
         <p>
-          There is no proprietary "vault" to create, import, or convert into.
-          Point Sunstone at <strong>any</strong> directory of markdown — your
-          notes, a docs repo, a cloned knowledge base — and start editing.
+          No vault to create, import, or convert into. Point Sunstone at any
+          directory of markdown — <code>sunstone ./docs</code> — and start
+          editing.
         </p>
         <p>
-          Your files stay plain <code>.md</code> on disk, readable by every
-          other tool you already use, and portable the moment you close the app.
+          Files stay plain <code>.md</code> on disk. Nothing is indexed into a
+          database you can't grep; close the app and the folder is exactly what
+          it says it is.
         </p>
       </div>
       <div class="prop">
@@ -389,9 +390,10 @@
           an open standard for portable, agent-readable, vendor-neutral markdown bundles.
         </p>
         <p>
-          If you can <code>cat</code> a file you can read OKF; if you can
-          <code>git clone</code> a repo you can ship it. Equally consumable by
-          humans, by AI agents, and by any other editor — nothing to migrate.
+          OKF is markdown with YAML frontmatter and wikilinks — if you can
+          <code>cat</code> a file you can read it, if you can
+          <code>git clone</code> you can ship it. Readable by humans, agents,
+          and any other editor; nothing to migrate.
         </p>
       </div>
     </div>
@@ -405,7 +407,7 @@
   <div class="wrap">
     <div class="section-head">
       <h2>Everything a knowledge base needs. Nothing it doesn't.</h2>
-      <p>A focused set of tools that work the moment you open a folder.</p>
+      <p>No plugin ecosystem to assemble — these work out of the box.</p>
     </div>
     <div class="features">
 
@@ -482,15 +484,15 @@
           history commit by commit.
         </p>
         <p>
-          For collaboration, run Sunstone as a web server in git-synced mode:
-          every save becomes a commit, and a sync loop fetches, rebases, and
-          pushes against your origin. Multiple people edit the same bundle —
-          not realtime, but conflict-safe: a clashing edit is forked beside
-          the original instead of being lost.
+          For collaboration, run the server in git-synced mode: every save is
+          a commit, and a sync loop fetches, rebases, and pushes against your
+          origin. Multiple people edit the same bundle — not realtime, but
+          conflict-safe: a clashing edit is forked beside the original instead
+          of silently overwritten.
         </p>
         <p>
-          No accounts, no sync service, no lock-in — just commits you can
-          read, revert, and review like any other change.
+          Sync state is git state. Anything the editor did, you can inspect,
+          revert, or bisect from the command line.
         </p>
         <a class="btn btn-ghost" href="#web">See Sunstone Web</a>
       </div>
@@ -515,15 +517,14 @@
       <div class="txt">
         <h2>Leave feedback right in the margin.</h2>
         <p>
-          Select any text — in editing <em>or</em> reading mode — and choose
-          <strong>Add comment</strong>. No markup to type. The span is
-          highlighted, a comment icon sits in the gutter, and hovering reveals
-          the note.
+          Select text — in editing or reading mode — and choose
+          <strong>Add comment</strong>. The span is highlighted, a comment icon
+          sits in the gutter, and hovering shows the note.
         </p>
         <p>
-          Under the hood it's plain <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>
-          CriticMarkup, so your notes live in the <code>.md</code> file, travel
-          in git, and are readable by every other tool — ideal for reviewing an
+          On disk it's plain <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>
+          CriticMarkup, so comments live in the <code>.md</code> file, travel
+          in git, and survive every other tool — useful for reviewing an
           agent's generated docs before the next pass.
         </p>
         <a class="btn btn-ghost" href="#features">Explore all features</a>
@@ -545,10 +546,9 @@
       <p>
         <strong>Sunstone Web</strong> serves any bundle in the browser — the same
         explorer, backlinks, tags, outline, and full-text search as the desktop
-        app, with authenticated editing on top. Every save is a git commit, so
-        multiple people work on one bundle and reconcile through git — not
-        realtime cursors, but real version control. External pushes and edits
-        stream live to every open browser over SSE.
+        app, plus authenticated editing. Every save is a git commit, so a team
+        works on one bundle and reconciles through git. External pushes and
+        edits reach every open browser over SSE.
       </p>
       <div class="cta-row" style="margin-top:26px">
         <a class="btn btn-primary" href="https://github.com/">Read the deploy docs</a>
