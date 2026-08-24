@@ -131,6 +131,10 @@
   .nav-links { display: flex; align-items: center; gap: 28px; }
   .nav-links a { color: var(--text-muted); font-weight: 600; font-size: 0.95rem; }
   .nav-links a:hover { color: var(--text); text-decoration: none; }
+  /* .nav-links a is more specific than .btn-primary and would repaint the
+     header Download button muted-gray; pin the button color explicitly. */
+  .nav-links a.btn-primary { color: #1a1109; }
+  .nav-links a.btn-primary:hover { color: #1a1109; }
   @media (max-width: 720px) { .nav-links .hide-sm { display: none; } }
 
   /* ---- Hero ---- */
@@ -322,7 +326,7 @@
       <a href="#git" class="hide-sm">Git</a>
       <a href="#okf" class="hide-sm">Open Knowledge Format</a>
       <a href="#web" class="hide-sm">Sunstone Web</a>
-      <a class="btn btn-primary" style="padding:9px 18px;font-size:0.9rem" href="https://github.com/">Download</a>
+      <a class="btn btn-primary" style="padding:9px 18px;font-size:0.9rem" href="https://github.com/pothos-dev/sunstone/releases/latest">Download</a>
     </nav>
   </div>
 </header>
@@ -339,7 +343,7 @@
       collaborate through commits. No sync service.
     </p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/">
+      <a class="btn btn-primary" href="https://github.com/pothos-dev/sunstone/releases/latest">
         Download for macOS, Windows &amp; Linux
       </a>
       <a class="btn btn-ghost" href="#features">See what's inside</a>
@@ -550,7 +554,7 @@
         reach every open browser over SSE.
       </p>
       <div class="cta-row" style="margin-top:26px">
-        <a class="btn btn-primary" href="https://github.com/">Read the deploy docs</a>
+        <a class="btn btn-primary" href="https://github.com/pothos-dev/sunstone/blob/main/docs/architecture/sunstone-server.md">Read the deploy docs</a>
       </div>
     </div>
   </div>
@@ -563,8 +567,8 @@
       <h2>Point it at a folder. Start writing.</h2>
       <p>Free and open source under the MIT license. Built with Tauri, SvelteKit, and Rust.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/">Download Sunstone</a>
-        <a class="btn btn-ghost" href="https://github.com/">View on GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/pothos-dev/sunstone/releases/latest">Download Sunstone</a>
+        <a class="btn btn-ghost" href="https://github.com/pothos-dev/sunstone">View on GitHub</a>
       </div>
       <div class="badges">
         <span class="badge">macOS</span>
@@ -581,7 +585,7 @@
     <div class="brand"><img src="assets/logo.svg" alt="" style="width:22px;height:22px;border-radius:6px" /> Sunstone</div>
     <div>The markdown editor for git users. OKF built in.</div>
     <div>
-      <a href="https://github.com/">GitHub</a> ·
+      <a href="https://github.com/pothos-dev/sunstone">GitHub</a> ·
       <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md">OKF Spec</a>
     </div>
   </div>
