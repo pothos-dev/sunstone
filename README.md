@@ -6,6 +6,8 @@
 
 **The markdown editor for git users. A slimmed-down Obsidian.**
 
+[sunstone.pothos.dev](https://sunstone.pothos.dev)
+
 </div>
 
 Sunstone is a desktop markdown editor with the knowledge-base features you'd
