@@ -4,6 +4,23 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.5] - 2026-08-25
+
+### Added
+
+- UI zoom: Ctrl +/− and Ctrl+0 to reset, plus Ctrl+mouse-wheel.
+- The editor preview renders `--` and `---` as en and em dashes.
+- The print preview has an optional "Page guides" toggle that marks the
+  approximate page boundaries of the printed PDF.
+
+### Fixed
+
+- Save as PDF on Linux actually writes the file. It previously reported
+  success while silently sending the document to the default printer backend
+  instead of the chosen file; failures are now reported instead of swallowed.
+- A failed Mermaid diagram no longer injects Mermaid's own error graphic into
+  the document on desktop.
+
 ## [0.19.4] - 2026-07-28
 
 ### Added
