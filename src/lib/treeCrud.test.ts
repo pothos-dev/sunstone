@@ -110,7 +110,7 @@ describe('menuItemsFor', () => {
     expect(items[3].separated).toBe(false);
   });
 
-  test('a folder with index.md offers only the missing log.md, separated', () => {
+  test('a folder with index.md offers the missing log.md and delete for index.md', () => {
     const docs = nodeAt(root, 'docs')!;
     const items = menuItemsFor(docs);
     expect(items.map((i) => i.id)).toEqual([
@@ -120,9 +120,29 @@ describe('menuItemsFor', () => {
       'rename',
       'move',
       'delete',
+      'deleteReserved:index',
     ]);
     expect(items[2].separated).toBe(true);
     expect(items[2].label).toBe('Create log.md');
+    const delReserved = items.at(-1)!;
+    expect(delReserved.label).toBe('Delete index.md');
+    expect(delReserved.danger).toBe(true);
+    expect(delReserved.separated).toBeUndefined();
+  });
+
+  test('a folder with both reserved files offers delete for both, no creates', () => {
+    const items = menuItemsFor(
+      dir('full', [file('full/index.md'), file('full/log.md')]),
+    );
+    expect(items.map((i) => i.id)).toEqual([
+      'newConcept',
+      'newFolder',
+      'rename',
+      'move',
+      'delete',
+      'deleteReserved:index',
+      'deleteReserved:log',
+    ]);
   });
 
   test('delete is separated and danger', () => {

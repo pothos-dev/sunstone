@@ -149,6 +149,13 @@
       const path = reservedPath(node.path, kind);
       focusTypeForPath = null; // reserved files have no `type` to focus.
       void treeActions.createReservedFile(node.path, kind, path);
+    } else if (id.startsWith('deleteReserved:')) {
+      // Delete a folder's reserved file (slice: reserved-files): reuse the
+      // ordinary delete-confirm dialog, targeting the reserved file's node
+      // resolved from the live tree (no-op if it vanished underfoot).
+      const kind = id.slice('deleteReserved:'.length) as ReservedKind;
+      const target = nodeAt(reservedPath(node.path, kind));
+      if (target) dialog = { kind: 'delete', node: target, viaKeyboard: false };
     } else if (id === 'rename')
       dialog = { kind: 'rename', node, value: renameSeed(node), viaKeyboard: false };
     else if (id === 'move') dialog = { kind: 'move', node, value: dirname(node.path), viaKeyboard: false };

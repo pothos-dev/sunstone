@@ -68,19 +68,30 @@ export interface TreeMenuItem {
 
 /**
  * Context-menu items for `node`. A FOLDER additionally offers to create
- * whichever reserved file (`index.md`/`log.md`) it is missing (slice:
- * reserved-files). The Bundle root counts as a folder here too.
+ * whichever reserved file (`index.md`/`log.md`) it is missing, and to delete
+ * whichever it has (slice: reserved-files) — reserved files are not ordinary
+ * tree leaves (only their symbol shows on the folder row), so the folder menu
+ * is the only right-click surface that can reach them. The Bundle root counts
+ * as a folder here too.
  */
 export function menuItemsFor(node: TreeNode): TreeMenuItem[] {
   const items: TreeMenuItem[] = [
     { id: 'newConcept', label: 'New Concept' },
     { id: 'newFolder', label: 'New Folder' },
   ];
+  const deleteReserved: TreeMenuItem[] = [];
   if (node.isDir) {
     const kinds: ReservedKind[] = ['index', 'log'];
     let first = true;
     for (const kind of kinds) {
-      if (folderHasReserved(node, kind)) continue;
+      if (folderHasReserved(node, kind)) {
+        deleteReserved.push({
+          id: `deleteReserved:${kind}`,
+          label: `Delete ${RESERVED_FILES[kind]}`,
+          danger: true,
+        });
+        continue;
+      }
       items.push({
         id: `createReserved:${kind}`,
         label: `Create ${RESERVED_FILES[kind]}`,
@@ -93,6 +104,7 @@ export function menuItemsFor(node: TreeNode): TreeMenuItem[] {
     { id: 'rename', label: 'Rename', separated: true },
     { id: 'move', label: 'Move…' },
     { id: 'delete', label: 'Delete', separated: true, danger: true },
+    ...deleteReserved,
   );
   return items;
 }
