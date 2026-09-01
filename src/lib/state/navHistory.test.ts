@@ -3,14 +3,20 @@ import {
   EMPTY_HISTORY,
   canGoBack,
   canGoForward,
+  currentOffset,
   goBack,
   goForward,
   pushEntry,
   remapHistory,
+  setOffset,
   type NavHistory,
 } from './navHistory';
 
-const h = (entries: string[], index: number): NavHistory => ({ entries, index });
+const h = (entries: string[], index: number, offsets?: number[]): NavHistory => ({
+  entries,
+  offsets: offsets ?? entries.map(() => 0),
+  index,
+});
 
 describe('navHistory', () => {
   test('empty history has no moves', () => {
@@ -61,5 +67,33 @@ describe('navHistory', () => {
     const { history, changed } = remapHistory(before, 'x.md', 'y.md');
     expect(changed).toBe(false);
     expect(history).toEqual(before);
+  });
+
+  test('a fresh entry starts at the top; scrolling is remembered per entry', () => {
+    let hist = pushEntry(EMPTY_HISTORY, 'a.md');
+    hist = setOffset(hist, 420);
+    expect(currentOffset(hist)).toBe(420);
+
+    // Following a link lands at the top of the new Concept.
+    hist = pushEntry(hist, 'b.md');
+    expect(currentOffset(hist)).toBe(0);
+    hist = setOffset(hist, 90);
+
+    // Back restores a.md's offset; Forward restores b.md's.
+    hist = goBack(hist);
+    expect(currentOffset(hist)).toBe(420);
+    hist = goForward(hist);
+    expect(currentOffset(hist)).toBe(90);
+  });
+
+  test('setOffset on an empty history is a no-op', () => {
+    expect(setOffset(EMPTY_HISTORY, 10)).toBe(EMPTY_HISTORY);
+    expect(currentOffset(EMPTY_HISTORY)).toBe(0);
+  });
+
+  test('remapHistory keeps the remembered offsets', () => {
+    const { history } = remapHistory(h(['old/a.md', 'b.md'], 0, [12, 34]), 'old', 'new');
+    expect(history.entries).toEqual(['new/a.md', 'b.md']);
+    expect(history.offsets).toEqual([12, 34]);
   });
 });

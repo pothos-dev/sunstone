@@ -12,12 +12,19 @@ import { remapPath } from '$lib/path';
 export interface NavHistory {
   /** Visited Concept paths; `entries[index]` is the current Concept. */
   readonly entries: readonly string[];
+  /**
+   * Remembered scroll offset (px from the top of the editor viewport) per
+   * entry, parallel to `entries`. A fresh entry starts at 0 — following a link
+   * lands at the top of the new Concept — and is updated as the reader
+   * scrolls, so Back/Forward restores where they left off.
+   */
+  readonly offsets: readonly number[];
   /** Cursor into `entries` (-1 when empty). */
   readonly index: number;
 }
 
 /** The empty history (nothing visited yet). */
-export const EMPTY_HISTORY: NavHistory = { entries: [], index: -1 };
+export const EMPTY_HISTORY: NavHistory = { entries: [], offsets: [], index: -1 };
 
 /** True when there is a previous Concept to go Back to. */
 export function canGoBack(h: NavHistory): boolean {
@@ -35,17 +42,36 @@ export function canGoForward(h: NavHistory): boolean {
  */
 export function pushEntry(h: NavHistory, path: string): NavHistory {
   const entries = [...h.entries.slice(0, h.index + 1), path];
-  return { entries, index: entries.length - 1 };
+  const offsets = [...h.offsets.slice(0, h.index + 1), 0];
+  return { entries, offsets, index: entries.length - 1 };
+}
+
+/**
+ * Remember `offset` (px) as the current entry's scroll position. No-op on an
+ * empty history. Called as the reader scrolls and just before leaving a
+ * Concept, so Back/Forward can restore it.
+ */
+export function setOffset(h: NavHistory, offset: number): NavHistory {
+  if (h.index < 0) return h;
+  if (h.offsets[h.index] === offset) return h;
+  const offsets = [...h.offsets];
+  offsets[h.index] = offset;
+  return { entries: h.entries, offsets, index: h.index };
+}
+
+/** The remembered scroll offset of the current entry (0 when empty). */
+export function currentOffset(h: NavHistory): number {
+  return h.index < 0 ? 0 : (h.offsets[h.index] ?? 0);
 }
 
 /** Move the cursor back one entry, if possible (else unchanged). */
 export function goBack(h: NavHistory): NavHistory {
-  return canGoBack(h) ? { entries: h.entries, index: h.index - 1 } : h;
+  return canGoBack(h) ? { ...h, index: h.index - 1 } : h;
 }
 
 /** Move the cursor forward one entry, if possible (else unchanged). */
 export function goForward(h: NavHistory): NavHistory {
-  return canGoForward(h) ? { entries: h.entries, index: h.index + 1 } : h;
+  return canGoForward(h) ? { ...h, index: h.index + 1 } : h;
 }
 
 /**
@@ -64,5 +90,5 @@ export function remapHistory(
     if (next !== null) changed = true;
     return next ?? p;
   });
-  return { history: { entries, index: h.index }, changed };
+  return { history: { entries, offsets: h.offsets, index: h.index }, changed };
 }

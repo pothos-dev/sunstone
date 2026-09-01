@@ -4,9 +4,11 @@ import {
   EMPTY_HISTORY,
   canGoBack,
   canGoForward,
+  currentOffset,
   goBack,
   goForward,
   pushEntry,
+  setOffset,
   remapHistory,
   type NavHistory,
 } from '$lib/state/navHistory';
@@ -79,6 +81,19 @@ export class Tile {
   mode = $state<EditorMode>(DEFAULT_EDITOR_MODE);
   /** This Tile's navigation history (immutable value; see navHistory.ts). */
   #history = $state<NavHistory>(EMPTY_HISTORY);
+  /**
+   * Reader of the live scroll offset (px) of this Tile's editor, installed by
+   * the view (Tile.svelte). Consulted just before a navigation so the outgoing
+   * history entry remembers where the reader was.
+   */
+  scrollProbe: (() => number | null) | null = null;
+  /**
+   * Scroll offset the view should apply once the incoming Concept has been laid
+   * out: 0 for a freshly-opened Concept (link-follow lands at the top), the
+   * remembered offset for Back/Forward. The view consumes it and clears it.
+   * An explicit anchor/line target wins over this.
+   */
+  pendingScrollOffset = $state<number | null>(null);
 
   constructor(registry: DocumentRegistry, id: string = nextTileId()) {
     this.#registry = registry;
@@ -135,6 +150,7 @@ export class Tile {
     await this.#loadInto(path);
     if (this.activePath !== path) return; // load did not settle here; skip history
     this.#history = pushEntry(this.#history, path);
+    this.pendingScrollOffset = 0;
   }
 
   /**
@@ -155,7 +171,9 @@ export class Tile {
     if (!this.canGoBack) return;
     const target = this.#history.entries[this.#history.index - 1];
     await this.#loadInto(target);
-    if (this.activePath === target) this.#history = goBack(this.#history);
+    if (this.activePath !== target) return;
+    this.#history = goBack(this.#history);
+    this.pendingScrollOffset = currentOffset(this.#history);
   }
 
   /** Re-advance to the next Concept in history, if any. */
@@ -163,7 +181,9 @@ export class Tile {
     if (!this.canGoForward) return;
     const target = this.#history.entries[this.#history.index + 1];
     await this.#loadInto(target);
-    if (this.activePath === target) this.#history = goForward(this.#history);
+    if (this.activePath !== target) return;
+    this.#history = goForward(this.#history);
+    this.pendingScrollOffset = currentOffset(this.#history);
   }
 
   /**
@@ -187,6 +207,7 @@ export class Tile {
    */
   async #loadInto(path: string): Promise<void> {
     if (!(await this.requestLeave())) return;
+    this.recordScroll();
     const doc = this.#registry.get(path);
     await doc.load();
     this.activePath = path;
@@ -202,6 +223,16 @@ export class Tile {
   async close(): Promise<void> {
     if (!(await this.requestLeave())) return;
     this.activePath = null;
+  }
+
+  /**
+   * Snapshot the live scroll offset into the current history entry, so Back /
+   * Forward can restore it. Called by the view as the reader scrolls and by
+   * every navigation just before the Concept switches.
+   */
+  recordScroll(offset?: number): void {
+    const px = offset ?? this.scrollProbe?.();
+    if (px != null) this.#history = setOffset(this.#history, px);
   }
 
   /** Record a user edit into the active Document (schedules autosave). */

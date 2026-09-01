@@ -322,6 +322,14 @@
   // move up any further, so a heading in it would never light up. Report the
   // viewport's BOTTOM line there instead, which makes the final heading in view
   // the Current one (see the note in `outlineActive.ts`).
+  // The scroll listener does double duty: it drives the Outline highlight and
+  // snapshots the offset into the current history entry (nav-scroll-restore), so
+  // Back returns the reader to where they were.
+  function onEditorScroll(): void {
+    if (view) tile.recordScroll(view.scrollDOM.scrollTop);
+    reportViewportLine();
+  }
+
   function reportViewportLine(): void {
     if (!view || !onViewportLine) return;
     const sc = view.scrollDOM;
@@ -421,7 +429,8 @@
       syncHistoryDepths();
       // Natural scrolling drives the Outline highlight; the listener dies with
       // the view's DOM on destroy.
-      view.scrollDOM.addEventListener('scroll', reportViewportLine, { passive: true });
+      view.scrollDOM.addEventListener('scroll', onEditorScroll, { passive: true });
+      tile.scrollProbe = () => view?.scrollDOM.scrollTop ?? null;
     } else {
       setEditorConcept(view, body, props, tile.activePath);
     }
@@ -429,11 +438,25 @@
     if (pendingScrollLine !== null && view) {
       scrollToLine(view, pendingScrollLine);
       pendingScrollLine = null;
+      tile.pendingScrollOffset = null; // the search-result line wins
     }
     if (pendingScrollAnchor !== null && view) {
       const line = findHeadingLine(tile.content, pendingScrollAnchor);
       if (line !== null) scrollToOutlineLine(line);
       pendingScrollAnchor = null;
+      tile.pendingScrollOffset = null; // the anchor wins over the offset
+    }
+    // Apply the history entry's scroll offset (0 for a freshly-followed link,
+    // the remembered position for Back/Forward). Deferred a frame so CodeMirror
+    // has laid the new document out and scrollHeight can accommodate it.
+    if (tile.pendingScrollOffset !== null && view) {
+      const target = tile.pendingScrollOffset;
+      tile.pendingScrollOffset = null;
+      const sc = view.scrollDOM;
+      requestAnimationFrame(() => {
+        sc.scrollTop = target;
+        reportViewportLine();
+      });
     }
 
     // Re-probe after a build / Concept switch / edit: heading lines move even
@@ -466,6 +489,7 @@
   });
 
   onDestroy(() => {
+    tile.scrollProbe = null;
     if (editorMenuOverlayId !== null) focus.removeOverlay(editorMenuOverlayId);
     if (annotationPopupOverlayId !== null) focus.removeOverlay(annotationPopupOverlayId);
     view?.destroy();
