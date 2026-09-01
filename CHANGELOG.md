@@ -4,6 +4,15 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.7] - 2026-09-01
+
+### Fixed
+
+- Following a wikilink now scrolls to the top of the opened Concept instead of
+  inheriting the previous Concept's scroll position; links with an `#anchor`
+  still jump to that heading. Back / Forward restore the scroll position you
+  left each Concept at.
+
 ## [0.19.6] - 2026-08-26
 
 ### Added
