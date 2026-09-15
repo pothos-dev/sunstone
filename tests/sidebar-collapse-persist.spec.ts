@@ -32,7 +32,7 @@ test('sidebar + section collapse state persists across reload', async ({ page })
   // and the Explorer is expanded, but the Tags Section starts COLLAPSED (its
   // per-field default). Backlinks now lives in the right Sidebar
   // (right-sidebar-move-backlinks), so it is no longer here.
-  const sidebarToggle = page.getByTestId('left-sidebar-edge');
+  const sidebarToggle = page.getByTestId('rail-toggle-left');
   await expect(sidebarToggle).toHaveAttribute('aria-pressed', 'true');
 
   const explorerSection = page.getByTestId('explorer-section');
@@ -75,7 +75,7 @@ test('sidebar + section collapse state persists across reload', async ({ page })
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 
-  await expect(page.getByTestId('left-sidebar-edge')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('rail-toggle-left')).toHaveAttribute('aria-pressed', 'false');
   await expect(
     page.getByTestId('tags-section').locator('[aria-expanded]').first(),
   ).toHaveAttribute('aria-expanded', 'true');

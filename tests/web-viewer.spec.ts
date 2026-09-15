@@ -444,18 +444,18 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await expect(page.getByTestId('web-viewer')).toHaveAttribute('data-theme', 'dark');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
 
-  // Clicking the left edge collapses the left Sidebar; clicking again restores it.
+  // The left rail's toggle collapses the left Sidebar; clicking again restores it.
   await expect(page.getByTestId('left-side-bar')).toBeVisible();
-  await page.getByTestId('left-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-left').click();
   await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
-  await page.getByTestId('left-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-left').click();
   await expect(page.getByTestId('left-side-bar')).toBeVisible();
 
-  // Clicking the right edge collapses the right Sidebar; clicking again restores it.
+  // The right rail's toggle collapses the right Sidebar; clicking again restores it.
   await expect(page.getByTestId('right-side-bar')).toBeVisible();
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('right-side-bar')).not.toBeVisible();
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('right-side-bar')).toBeVisible();
 
   // Properties collapses (body removed) and re-expands.
@@ -499,7 +499,7 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   // Sidebar-collapse also persists.
-  await page.getByTestId('left-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-left').click();
   await expect(page.getByTestId('left-side-bar')).not.toBeVisible();
   await page.reload();
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');

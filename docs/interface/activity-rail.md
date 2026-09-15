@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Activity Rail and Concept header — where the controls live
-description: The two control surfaces that replaced the deleted global nav bar — the far-left Activity Rail for application-global controls, and the per-Tile Concept header for concept-scoped controls.
+description: The two control surfaces that replaced the deleted global nav bar — the left and right Activity Rails for application-global controls, and the per-Tile Concept header for concept-scoped controls.
 tags: [interface, activity-rail, concept-header, toolbar, chrome]
 timestamp: 2026-07-23
 ---
@@ -15,25 +15,27 @@ scoped to the open Concept. The rule is the same one the old header only
 gestured at — *global controls and concept controls never share a bar* — now
 enforced by giving each its own home.
 
-## Activity Rail
+## Activity Rails
 
-The **Activity Rail** (`ActivityRail.svelte`, aria-label "Activity rail") is a
-thin, always-visible vertical icon strip on the far-left edge of the [app
-shell](/interface/app-shell.md). It sits **outside** the collapsible left
-[Sidebar](/interface/sidebars.md), so it stays visible even when that Sidebar is
-collapsed. It holds only application-global controls — nothing scoped to a
-single Concept or Tile:
+An **Activity Rail** (`ActivityRail.svelte`) is a thin, always-visible vertical
+icon strip on one outer edge of the [app shell](/interface/app-shell.md). There
+are **two** — one per [Sidebar](/interface/sidebars.md) — and each sits
+**outside** its Sidebar, so it stays visible even when that Sidebar is collapsed.
+That is what lets a Sidebar collapse to a literal 0 width: the rail carries the
+only affordance needed to bring it back. A rail holds only application-global
+controls — nothing scoped to a single Concept or Tile:
 
-| Control | Position | Does |
-| ------- | -------- | ---- |
-| Menu | top | App menu — a stub today (no contents yet) |
-| Quick nav | top | Open [Quick nav](/GLOSSARY.md) (`Ctrl`/`Cmd`+`K`) |
-| Search | top | Open [Search](/GLOSSARY.md) (`Ctrl+Shift+F`) |
-| User slot | bottom | Reserved; empty on desktop, filled on the web anon surface with the Auth.js sign-in / sign-out affordance |
+| Control | Rail | Position | Does |
+| ------- | ---- | -------- | ---- |
+| Sidebar toggle | both | top (first) | Collapse / expand that side's [Sidebar](/interface/sidebars.md); the panel glyph is filled when it is shown, hollow when hidden |
+| Quick nav | left | top | Open [Quick nav](/GLOSSARY.md) (`Ctrl`/`Cmd`+`K`) |
+| Search | left | top | Open [Search](/GLOSSARY.md) (`Ctrl+Shift+F`) |
+| User slot | left | bottom | Reserved; empty on desktop, filled on the web anon surface with the Auth.js sign-in / sign-out affordance |
 
-The Rail is presentational: its buttons flip the **same** overlay-open flags the
-`Ctrl+K` / `Ctrl+Shift+F` keybindings flip, so button and keyboard converge on
-one code path.
+The left rail (aria-label "Activity rail") carries the global overlays; the right
+rail carries its Sidebar toggle alone. A rail is presentational: its buttons flip
+the **same** flags the `Ctrl+K` / `Ctrl+Shift+F` keybindings and the Sidebar
+collapse state use, so button and keyboard converge on one code path.
 
 ## Concept header
 
@@ -70,16 +72,16 @@ surfaces](/interface/app-shell.md)):
 - The **authenticated** surface mounts the full desktop `App.svelte` shell, so it
   inherits the Activity Rail and Concept header unchanged (with the web write
   path — explicit Save, concurrency gate).
-- The **anonymous** read-only SSR surface renders the same Activity Rail — with a
-  live **Quick nav** and **Search** island and a rail **Sign in** affordance —
+- The **anonymous** read-only SSR surface renders the same Activity Rails — with
+  a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
   but replaces the full Concept header with a **slim concept strip** over the
   centre: back/forward, the Properties toggle, export-PDF and a light/dark theme
   toggle. There is no Edit toggle until you sign in.
 
 ## Relationships
 
-- Both surfaces live in the [app shell](/interface/app-shell.md); the Rail flanks
-  the left [Sidebar](/interface/sidebars.md), the Concept header tops each
+- Both surfaces live in the [app shell](/interface/app-shell.md); a Rail flanks
+  each [Sidebar](/interface/sidebars.md), the Concept header tops each
   [Tile](/editor/editor-layout.md).
 - The Edit toggle's `editing`/`read` boolean is specified in
   [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md); the Properties flag is

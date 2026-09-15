@@ -56,7 +56,7 @@ test('Region focus: directional movement, sticky landing, Escape→Editor', asyn
   await page.getByTestId('edit-toggle').click();
 
   // Reveal the right Sidebar so Outline + Backlinks Regions become visible.
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('outline')).toBeVisible();
   await expect(page.getByTestId('backlinks')).toBeVisible();
 

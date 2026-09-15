@@ -268,12 +268,19 @@
   />
 {:else}
 <div class="app" data-testid="web-viewer" bind:this={appRoot}>
-  <!-- Far-left activity rail: quick-nav + search launcher + a bottom theme
-       toggle and a user slot wired to the REAL Auth.js sign-in / sign-out. The
-       quick-nav / search buttons flip the SAME flags as the Ctrl+K /
-       Ctrl+Shift+F keybindings, so both entry points converge. The rail lives
-       OUTSIDE the collapsing Sidebars, so it stays visible when they collapse. -->
+  <!-- Left activity rail: the left Sidebar's collapse toggle at the top, then
+       quick-nav + search launcher, plus a bottom theme toggle and a user slot
+       wired to the REAL Auth.js sign-in / sign-out. The quick-nav / search
+       buttons flip the SAME flags as the Ctrl+K / Ctrl+Shift+F keybindings, so
+       both entry points converge. The rail lives OUTSIDE the collapsing
+       Sidebars, so it stays visible when they collapse — which is what lets a
+       Sidebar go all the way to 0 width. -->
   <ActivityRail
+    side="left"
+    sidebarOpen={leftSidebarOpen}
+    sidebarLabel="sidebar"
+    toggleTestid="rail-toggle-left"
+    onToggleSidebar={() => (leftSidebarOpen = !leftSidebarOpen)}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
   >
@@ -365,18 +372,21 @@
     </div>
   </aside>
 
-  <!-- The left Sidebar's border: click to collapse/expand, drag to resize. -->
-  <SidebarEdge
-    side="left"
-    open={leftSidebarOpen}
-    width={leftSidebarWidth}
-    label="sidebar"
-    testid="left-sidebar-edge"
-    onToggle={() => (leftSidebarOpen = !leftSidebarOpen)}
-    onResize={(w) => (leftSidebarWidth = w)}
-    onResizeStart={() => (leftResizing = true)}
-    onResizeEnd={() => (leftResizing = false)}
-  />
+  <!-- The left Sidebar's border: drag to resize. Collapsing lives on the rail's
+       toggle button, so the border is absent while the Sidebar is collapsed. -->
+  <div class="edge-slot left-edge-slot">
+    {#if leftSidebarOpen}
+      <SidebarEdge
+        side="left"
+        width={leftSidebarWidth}
+        label="sidebar"
+        testid="left-sidebar-edge"
+        onResize={(w) => (leftSidebarWidth = w)}
+        onResizeStart={() => (leftResizing = true)}
+        onResizeEnd={() => (leftResizing = false)}
+      />
+    {/if}
+  </div>
 
   <div class="center">
     <!-- Slim "concept strip": the web analogue of the desktop concept header
@@ -494,20 +504,22 @@
   </div>
 
   {#if data.rendered}
-    <!-- The right Sidebar's border: click to collapse/expand, drag to resize.
-         Only present alongside a rendered Concept (no Outline/Backlinks without
-         one). -->
-    <SidebarEdge
-      side="right"
-      open={rightSidebarOpen}
-      width={rightSidebarWidth}
-      label="Outline & Backlinks"
-      testid="right-sidebar-edge"
-      onToggle={() => (rightSidebarOpen = !rightSidebarOpen)}
-      onResize={(w) => (rightSidebarWidth = w)}
-      onResizeStart={() => (rightResizing = true)}
-      onResizeEnd={() => (rightResizing = false)}
-    />
+    <!-- The right Sidebar's border: drag to resize. Only present alongside a
+         rendered Concept (no Outline/Backlinks without one), and only while the
+         Sidebar is expanded — the right rail's toggle owns collapse/expand. -->
+    <div class="edge-slot right-edge-slot">
+      {#if rightSidebarOpen}
+        <SidebarEdge
+          side="right"
+          width={rightSidebarWidth}
+          label="Outline & Backlinks"
+          testid="right-sidebar-edge"
+          onResize={(w) => (rightSidebarWidth = w)}
+          onResizeStart={() => (rightResizing = true)}
+          onResizeEnd={() => (rightResizing = false)}
+        />
+      {/if}
+    </div>
 
     <aside
       class="side-bar right"
@@ -536,6 +548,14 @@
         </SidebarSection>
       </div>
     </aside>
+
+    <ActivityRail
+      side="right"
+      sidebarOpen={rightSidebarOpen}
+      sidebarLabel="Outline & Backlinks"
+      toggleTestid="rail-toggle-right"
+      onToggleSidebar={() => (rightSidebarOpen = !rightSidebarOpen)}
+    />
   {/if}
 </div>
 
@@ -546,12 +566,13 @@
 
 <style>
   .app {
-    /* Far-left activity rail (fixed) | left Sidebar | its resize edge | centre |
-       right resize edge | right Sidebar. The rail and both edges sit OUTSIDE the
-       collapsing Sidebars, so an edge stays a click target to re-expand a Sidebar
-       collapsed to 0 (the edge border thickens) — mirrors the desktop shell grid. */
+    /* Left activity rail | left Sidebar | its resize edge | centre | right resize
+       edge | right Sidebar | right activity rail. Both rails sit OUTSIDE the
+       collapsing Sidebars and stay visible, so a Sidebar collapses to a true 0
+       width and its rail toggle is the way back — mirrors the desktop shell
+       grid. Each edge slot is empty while its Sidebar is collapsed. */
     display: grid;
-    grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto auto auto;
     height: 100vh;
     overflow: hidden;
     font-family: var(--font-ui, system-ui, sans-serif);
@@ -611,6 +632,32 @@
   .side-bar.right {
     grid-column: 6;
     justify-content: flex-start;
+  }
+
+  /* The rails are components, so pin their columns from here (everything else
+     in the shell grid is explicitly placed; leaving these to auto-placement
+     would make the layout depend on child order). */
+  .app > :global(.activity-rail.left) {
+    grid-column: 1;
+  }
+
+  .app > :global(.activity-rail.right) {
+    grid-column: 7;
+  }
+
+  /* A stable grid column for a Sidebar's resize edge. The edge is rendered only
+     while its Sidebar is expanded; the slot holds the column open either way. */
+  .edge-slot {
+    display: flex;
+    height: 100vh;
+  }
+
+  .left-edge-slot {
+    grid-column: 3;
+  }
+
+  .right-edge-slot {
+    grid-column: 5;
   }
 
   /* The inner keeps the FULL persisted width (via --side-w) while the outer

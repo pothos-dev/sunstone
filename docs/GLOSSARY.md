@@ -111,17 +111,18 @@ the three-Pane layout.
 **Sidebar**:
 A Pane docked to the left or right edge, holding a vertical stack of **Sections**. Both a left
 and a right Sidebar exist. The left holds **Explorer** and **Tags**; the right holds **Outline**
-and **Backlinks** and starts collapsed. A Sidebar is collapsed/expanded by clicking its inner
-border and resized by dragging it (the **Sidebar edge**); its width is remembered as View state.
+and **Backlinks** and starts collapsed. A Sidebar is collapsed/expanded from the toggle at the
+top of its own **Activity Rail** (collapsing it to 0 width) and resized by dragging its inner
+border (the **Sidebar edge**); its width is remembered as View state.
 See [Sidebars and Sections](/interface/sidebars.md).
 _Avoid_: "side panel" (use Sidebar).
 
 **Activity Rail**:
-The thin, always-visible icon strip on the far-left edge of the app shell, outside the left
-**Sidebar** (so it stays visible when the Sidebar is collapsed). Holds application-global
-controls — a menu, **Quick nav**, **Search**, and a bottom user/avatar slot (login/logout, web
-only) — none of which are scoped to the open Concept. See
-[Activity Rail and Concept header](/interface/activity-rail.md).
+A thin, always-visible icon strip on an outer edge of the app shell, outside the **Sidebar** it
+flanks (so it stays visible when that Sidebar is collapsed). There is one per Sidebar. Each
+carries that Sidebar's collapse toggle at the top; the left rail also holds **Quick nav**,
+**Search**, and a bottom user/avatar slot (login/logout, web only) — none of which are scoped to
+the open Concept. See [Activity Rail and Concept header](/interface/activity-rail.md).
 _Avoid_: "toolbar", "nav bar" (there is no global nav/tool bar; the Rail and the per-Tile
 **Concept header** replaced it).
 

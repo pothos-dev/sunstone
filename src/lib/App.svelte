@@ -618,6 +618,11 @@
 
 <div class="app" data-testid="app-root" bind:this={appRoot}>
   <ActivityRail
+    side="left"
+    sidebarOpen={session.leftSidebarVisible}
+    sidebarLabel="sidebar"
+    toggleTestid="rail-toggle-left"
+    onToggleSidebar={() => session.setLeftSidebarOpen(!session.leftSidebarVisible)}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
     user={account}
@@ -752,18 +757,21 @@
     </div>
   </aside>
 
-  <!-- The left Sidebar's border: click to collapse/expand, drag to resize. -->
-  <SidebarEdge
-    side="left"
-    open={session.leftSidebarVisible}
-    width={session.leftSidebarWidth}
-    label="sidebar"
-    testid="left-sidebar-edge"
-    onToggle={() => session.setLeftSidebarOpen(!session.leftSidebarVisible)}
-    onResize={(w) => session.setLeftSidebarWidth(w)}
-    onResizeStart={() => (leftResizing = true)}
-    onResizeEnd={() => (leftResizing = false)}
-  />
+  <!-- The left Sidebar's border: drag to resize. Collapsing lives on the rail's
+       toggle button, so the border is absent while the Sidebar is collapsed. -->
+  <div class="edge-slot">
+    {#if session.leftSidebarVisible}
+      <SidebarEdge
+        side="left"
+        width={session.leftSidebarWidth}
+        label="sidebar"
+        testid="left-sidebar-edge"
+        onResize={(w) => session.setLeftSidebarWidth(w)}
+        onResizeStart={() => (leftResizing = true)}
+        onResizeEnd={() => (leftResizing = false)}
+      />
+    {/if}
+  </div>
 
   <main class="editor-tile" aria-label="Concept">
     <!-- The editor area: a ROW OF COLUMNS, each a vertical STACK of tiled Tiles,
@@ -833,18 +841,20 @@
     </div>
   </main>
 
-  <!-- The right Sidebar's border: click to collapse/expand, drag to resize. -->
-  <SidebarEdge
-    side="right"
-    open={session.rightSidebarVisible}
-    width={session.rightSidebarWidth}
-    label="Outline & Backlinks"
-    testid="right-sidebar-edge"
-    onToggle={() => session.setRightSidebarOpen(!session.rightSidebarVisible)}
-    onResize={(w) => session.setRightSidebarWidth(w)}
-    onResizeStart={() => (rightResizing = true)}
-    onResizeEnd={() => (rightResizing = false)}
-  />
+  <!-- The right Sidebar's border: drag to resize (see the left edge above). -->
+  <div class="edge-slot">
+    {#if session.rightSidebarVisible}
+      <SidebarEdge
+        side="right"
+        width={session.rightSidebarWidth}
+        label="Outline & Backlinks"
+        testid="right-sidebar-edge"
+        onResize={(w) => session.setRightSidebarWidth(w)}
+        onResizeStart={() => (rightResizing = true)}
+        onResizeEnd={() => (rightResizing = false)}
+      />
+    {/if}
+  </div>
 
   <aside
     class="side-bar right-side-bar"
@@ -907,6 +917,14 @@
     </div>
   </aside>
 
+  <ActivityRail
+    side="right"
+    sidebarOpen={session.rightSidebarVisible}
+    sidebarLabel="Outline & Backlinks"
+    toggleTestid="rail-toggle-right"
+    onToggleSidebar={() => session.setRightSidebarOpen(!session.rightSidebarVisible)}
+  />
+
   <QuickNav
     open={quickNavOpen}
     paths={conceptPaths}
@@ -947,17 +965,27 @@
 <style>
   .app {
     display: grid;
-    /* Far-left activity rail (fixed) | collapsible left Sidebar | its resize edge
-       | editor | right resize edge | right Sidebar. The rail and both edges sit
-       OUTSIDE the collapsing Sidebars, so the edge stays a click target to
-       re-expand a Sidebar collapsed to 0 width (the edge border thickens). */
-    grid-template-columns: auto auto auto 1fr auto auto;
+    /* Left activity rail (fixed) | collapsible left Sidebar | its resize edge |
+       editor | right resize edge | right Sidebar | right activity rail. Both
+       rails sit OUTSIDE the collapsing Sidebars and are always visible, so a
+       Sidebar can collapse to a true 0 width: its rail toggle is the way back.
+       Each resize edge is rendered only while its Sidebar is expanded. */
+    grid-template-columns: auto auto auto 1fr auto auto auto;
     height: 100vh;
     overflow: hidden;
     color: var(--text);
     /* Warm sunlit gradient behind the shell; tiles paint their own solid
        surfaces on top, so it reads through gutters and translucent chrome. */
     background: var(--bg-gradient, var(--bg));
+  }
+
+  /* A stable grid column for a Sidebar's resize edge. The edge itself is
+     rendered only while its Sidebar is expanded (a 0-width Sidebar has nothing
+     to resize), and this empty 0-width slot keeps the remaining shell children
+     in their own columns either way. */
+  .edge-slot {
+    display: flex;
+    height: 100vh;
   }
 
   .side-bar {

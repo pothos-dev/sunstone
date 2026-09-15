@@ -44,7 +44,7 @@ async function twoTiles(page: Page) {
   await expect(page.getByTestId('editor').first()).toContainText('CodeMirror 6 is the editor core');
 
   // Reveal the right Sidebar so Outline + Backlinks are on screen.
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('outline')).toBeVisible();
 
   // Split into a second tile, then open bundle.md in it (the split leaves the new

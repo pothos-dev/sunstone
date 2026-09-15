@@ -1,12 +1,13 @@
-// Pure geometry for the edge-toggle + resizable sidebars (slice:
-// edge-sidebars-delete-navbar). The `.svelte` edge component wires pointer /
-// keyboard events to these helpers; keeping the arithmetic here (no DOM, no
-// runes) makes the clamp + click-vs-drag rules unit-testable in isolation.
+// Pure geometry for the resizable sidebars (slices:
+// edge-sidebars-delete-navbar, rail-sidebar-toggles). The `.svelte` edge
+// component wires pointer / keyboard events to these helpers; keeping the
+// arithmetic here (no DOM, no runes) makes the clamp rules unit-testable in
+// isolation.
 //
 // A sidebar is measured by its content WIDTH in CSS pixels (unlike the tiling
-// dividers, which use fractional weights — see `tileLayout.ts`). Each sidebar's
-// border doubles as a collapse/expand click target and a drag-to-resize handle;
-// which of the two a gesture is depends purely on how far the pointer travelled.
+// dividers, which use fractional weights — see `tileLayout.ts`). A sidebar's
+// border is a pure drag-to-resize handle; collapse/expand lives on the always-
+// visible ActivityRail's toggle button, not on the border.
 
 /** Smallest width a sidebar may be dragged to (still comfortably usable). */
 export const MIN_SIDEBAR_WIDTH = 180;
@@ -16,12 +17,6 @@ export const MAX_SIDEBAR_WIDTH = 560;
 export const DEFAULT_SIDEBAR_WIDTH = 280;
 /** Keyboard-resize step (Arrow keys on a focused edge). */
 export const KEYBOARD_RESIZE_STEP = 24;
-/**
- * Pointer travel (px, either axis) past which a border gesture counts as a
- * RESIZE rather than a click: under it a pointerup toggles collapse/expand; at
- * or over it the gesture resized and the toggle is suppressed.
- */
-export const DRAG_THRESHOLD_PX = 4;
 
 /** Which side of the editor a sidebar sits on (drives the drag direction). */
 export type SidebarSide = 'left' | 'right';
@@ -55,17 +50,4 @@ export function resizeSidebarWidth(
 ): number {
   const raw = side === 'left' ? base + deltaX : base - deltaX;
   return clampSidebarWidth(raw, min, max);
-}
-
-/**
- * Whether a border gesture moved far enough (on either axis) to be a resize
- * drag rather than a click. Used at pointerup: below the threshold the border
- * click toggles collapse/expand; at or above it the drag already resized.
- */
-export function isDragGesture(
-  deltaX: number,
-  deltaY: number,
-  threshold: number = DRAG_THRESHOLD_PX,
-): boolean {
-  return Math.abs(deltaX) >= threshold || Math.abs(deltaY) >= threshold;
 }

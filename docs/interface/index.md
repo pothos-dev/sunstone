@@ -5,7 +5,7 @@ How the Sunstone window is laid out, how keyboard focus moves across it, and whi
 ## Concepts
 
 - [App shell](app-shell.md) - The top-level layout: the Activity Rail, the left Sidebar, the central Editor pane, and the right Sidebar; plus the two web surfaces.
-- [Activity Rail and Concept header](activity-rail.md) - The two control surfaces that replaced the deleted nav bar: the far-left Rail (app-global controls) and the per-Tile Concept header (concept-scoped controls, incl. the Edit toggle).
+- [Activity Rail and Concept header](activity-rail.md) - The two control surfaces that replaced the deleted nav bar: the two Activity Rails (app-global controls, incl. each Sidebar's collapse toggle) and the per-Tile Concept header (concept-scoped controls, incl. the Edit toggle).
 - [Sidebars and Sections](sidebars.md) - The left/right Sidebars, edge-driven collapse/resize, their collapsible Sections and Accordion height-sharing, and transient focus-driven reveal.
 - [Focus model](focus-model.md) - The six-Region 3×2 grid, directional movement, and the Focused item within a Region.
 - [View state](view-state.md) - The per-user UI state restored on relaunch (last-open Concept, expanded folders, sidebar flags, tiling layout, window geometry) — never written into the Bundle.

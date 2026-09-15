@@ -1,15 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Regression: clicking a Sidebar's edge must collapse it even when the Sidebar
+ * Regression: the rail's Sidebar toggle must collapse the Sidebar even when it
  * is on screen because of a transient auto-reveal (Alt+dir), not a persisted
  * open.
  *
- * The bug: the edge was fed `rightSidebarOpen` while the aside was sized by
+ * The bug: the toggle was fed `rightSidebarOpen` while the aside was sized by
  * `rightSidebarVisible` (`open || revealed`). After an Alt+Right peek,
  * `revealed` stayed latched (the focus backbone preserves the flag for the
  * Region you just entered), so `visible` was pinned to `true` — clicking the
- * edge flipped `open` and merely restyled the border while the Sidebar itself
+ * toggle flipped `open` and merely swapped the icon while the Sidebar itself
  * never moved. The left Sidebar was unaffected only because nothing had
  * revealed it.
  */
@@ -43,11 +43,11 @@ async function openConcept(page: Page) {
   await expect.poll(() => activeRegion(page)).toBe('editor');
 }
 
-test('right Sidebar edge collapses a transiently-revealed Sidebar', async ({ page }) => {
+test('right rail toggle collapses a transiently-revealed Sidebar', async ({ page }) => {
   await openConcept(page);
 
   const aside = page.getByTestId('right-side-bar');
-  const edge = page.getByTestId('right-sidebar-edge');
+  const toggle = page.getByTestId('rail-toggle-right');
 
   // Fresh default: the right Sidebar is collapsed.
   await expect(aside).toHaveClass(/collapsed/);
@@ -58,14 +58,14 @@ test('right Sidebar edge collapses a transiently-revealed Sidebar', async ({ pag
   await expect(aside).not.toHaveClass(/collapsed/);
   expect((await aside.boundingBox())?.width).toBeGreaterThan(0);
 
-  // THE REGRESSION: one click on the edge must actually collapse it, not just
-  // restyle the border while the reveal keeps the Sidebar on screen.
-  await edge.click();
+  // THE REGRESSION: one click on the rail toggle must actually collapse it, not
+  // just swap the icon while the reveal keeps the Sidebar on screen.
+  await toggle.click();
   await expect(aside).toHaveClass(/collapsed/);
   await expect.poll(async () => (await aside.boundingBox())?.width).toBe(0);
 
-  // And it expands again from the collapsed edge.
-  await edge.click();
+  // And it expands again from the rail toggle.
+  await toggle.click();
   await expect(aside).not.toHaveClass(/collapsed/);
   await expect.poll(async () => (await aside.boundingBox())?.width).toBeGreaterThan(0);
 });

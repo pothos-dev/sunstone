@@ -147,18 +147,18 @@ test('no NavBar: Properties toggle moved to the header; sidebars toggle from the
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // The sidebar collapse/expand affordances are now each sidebar's edge — a
-  // click target that reflects the open state via aria-pressed.
-  const leftEdge = page.getByTestId('left-sidebar-edge');
-  const rightEdge = page.getByTestId('right-sidebar-edge');
-  await expect(leftEdge).toHaveAttribute('aria-pressed', 'true');
-  await expect(rightEdge).toHaveAttribute('aria-pressed', 'false');
-  // Clicking the left edge collapses the left Sidebar.
-  await leftEdge.click();
-  await expect(leftEdge).toHaveAttribute('aria-pressed', 'false');
+  // The sidebar collapse/expand affordances are the toggle button at the top of
+  // each activity rail — it reflects the open state via aria-pressed.
+  const leftToggle = page.getByTestId('rail-toggle-left');
+  const rightToggle = page.getByTestId('rail-toggle-right');
+  await expect(leftToggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(rightToggle).toHaveAttribute('aria-pressed', 'false');
+  // Clicking the left rail's toggle collapses the left Sidebar.
+  await leftToggle.click();
+  await expect(leftToggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('side-bar')).not.toBeVisible();
   // Clicking it again re-expands.
-  await leftEdge.click();
-  await expect(leftEdge).toHaveAttribute('aria-pressed', 'true');
+  await leftToggle.click();
+  await expect(leftToggle).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('side-bar')).toBeVisible();
 });

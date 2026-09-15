@@ -25,7 +25,7 @@ test('the Outline marks the heading whose section is being read', async ({ page 
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await page.getByTestId('tree').locator('[data-path="concepts/outline-demo.md"]').click();
 
   const editor = page.getByTestId('editor');

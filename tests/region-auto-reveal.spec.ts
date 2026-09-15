@@ -95,7 +95,7 @@ test('a manually-expanded Section stays open after focus leaves', async ({ page 
 
   // Manually expand the right Sidebar (the persisted `expanded` state). Outline
   // + Backlinks Sections default to open within it.
-  await page.getByTestId('right-sidebar-edge').click();
+  await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('right-side-bar')).not.toHaveClass(/collapsed/);
   await expect(page.getByTestId('backlinks')).toBeVisible();
 

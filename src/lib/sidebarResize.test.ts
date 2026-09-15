@@ -2,11 +2,9 @@ import { describe, it, expect } from 'bun:test';
 import {
   clampSidebarWidth,
   resizeSidebarWidth,
-  isDragGesture,
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   DEFAULT_SIDEBAR_WIDTH,
-  DRAG_THRESHOLD_PX,
 } from './sidebarResize';
 
 describe('clampSidebarWidth', () => {
@@ -54,18 +52,5 @@ describe('resizeSidebarWidth', () => {
     expect(resizeSidebarWidth(base, 50, 'left')).toBe(350);
     expect(resizeSidebarWidth(base, 0, 'left')).toBe(base);
     expect(resizeSidebarWidth(base, -50, 'left')).toBe(250);
-  });
-});
-
-describe('isDragGesture', () => {
-  it('is a click below the threshold on both axes', () => {
-    expect(isDragGesture(0, 0)).toBe(false);
-    expect(isDragGesture(DRAG_THRESHOLD_PX - 1, DRAG_THRESHOLD_PX - 1)).toBe(false);
-  });
-
-  it('is a drag at or beyond the threshold on either axis', () => {
-    expect(isDragGesture(DRAG_THRESHOLD_PX, 0)).toBe(true);
-    expect(isDragGesture(0, DRAG_THRESHOLD_PX)).toBe(true);
-    expect(isDragGesture(-100, 0)).toBe(true);
   });
 });
