@@ -57,7 +57,7 @@
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
-  import { tileTitle } from '$lib/tileTitle';
+  import { tileHeaderLabel } from '$lib/tileTitle';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
@@ -146,7 +146,9 @@
     if (await tile.requestLeave()) session.setEditorMode('read');
   }
 
-  const currentTileTitle = $derived(tileTitle(tile.activePath, frontmatterProps));
+  // Header label: the bundle-relative folder prefix plus the Concept name, so
+  // the header says WHERE the Concept lives (concept-header-path).
+  const headerLabel = $derived(tileHeaderLabel(tile.activePath, frontmatterProps));
 
   // --- Unified undo/redo over the Tile's single body+frontmatter history -------
   let canUndo = $state(false);
@@ -552,7 +554,9 @@
   onpointerdown={onActivate}
 >
   <TileHeader
-    title={currentTileTitle}
+    title={headerLabel.name}
+    titleDir={headerLabel.dir}
+    titlePath={tile.activePath}
     hasOpenConcept={tile.activePath !== null}
     {editing}
     canGoBack={tile.canGoBack}

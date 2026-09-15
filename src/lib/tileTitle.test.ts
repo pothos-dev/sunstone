@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { tileTitle } from './tileTitle';
+import { tileTitle, tileHeaderLabel } from './tileTitle';
 import type { Property } from './frontmatter';
 
 const scalar = (key: string, value: string): Property => ({ key, kind: 'scalar', scalar: value });
@@ -29,4 +29,26 @@ test('tileTitle: ignores a non-scalar title property', () => {
 
 test('tileTitle: root-level Concept uses its stem', () => {
   expect(tileTitle('index.md', [])).toBe('index');
+});
+
+test('tileHeaderLabel: folder prefix carries a trailing slash', () => {
+  expect(tileHeaderLabel('concepts/editor/live-preview.md', [])).toEqual({
+    dir: 'concepts/editor/',
+    name: 'live-preview',
+  });
+});
+
+test('tileHeaderLabel: prefix is the PATH even when the name comes from frontmatter', () => {
+  expect(tileHeaderLabel('concepts/codemirror.md', [scalar('title', 'CodeMirror 6')])).toEqual({
+    dir: 'concepts/',
+    name: 'CodeMirror 6',
+  });
+});
+
+test('tileHeaderLabel: a root-level Concept has no prefix', () => {
+  expect(tileHeaderLabel('index.md', [])).toEqual({ dir: '', name: 'index' });
+});
+
+test('tileHeaderLabel: empty Tile has neither prefix nor name', () => {
+  expect(tileHeaderLabel(null, [])).toEqual({ dir: '', name: '' });
 });

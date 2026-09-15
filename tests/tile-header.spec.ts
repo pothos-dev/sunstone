@@ -41,11 +41,18 @@ test('tile header: Edit toggle, undo/redo, review + export live in the header', 
 }) => {
   await openCodemirror(page);
 
-  // The header renders with a derived title (frontmatter `title`) and its
-  // controls, above the editor.
+  // The header renders with a derived title (frontmatter `title`) behind its
+  // bundle-relative folder prefix (concept-header-path), plus its controls,
+  // above the editor.
   const header = page.getByTestId('tile-header');
   await expect(header).toBeVisible();
-  await expect(page.getByTestId('tile-title')).toHaveText('CodeMirror');
+  await expect(page.getByTestId('tile-title')).toHaveText('concepts/CodeMirror');
+  await expect(page.getByTestId('tile-title-dir')).toHaveText('concepts/');
+  // The tooltip carries the exact path, title-derived label or not.
+  await expect(page.getByTestId('tile-title')).toHaveAttribute(
+    'title',
+    'concepts/codemirror.md',
+  );
 
   // The per-Tile controls all live inside the header. The single view-mode
   // control is the Edit toggle here (there is no NavBar segmented control now).

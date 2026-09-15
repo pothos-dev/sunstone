@@ -16,6 +16,14 @@
   interface Props {
     /** The active Concept's derived header label ('' when the Tile is empty). */
     title: string;
+    /**
+     * The Concept's bundle-relative FOLDER prefix, trailing slash included
+     * (`'concepts/editor/'`), shown dimmed ahead of the label so the header says
+     * where the Concept lives. `''` for a root-level Concept or an empty Tile.
+     */
+    titleDir?: string;
+    /** The Concept's bundle-relative path, used as the label's hover tooltip. */
+    titlePath?: string | null;
     /** Whether a Concept is open (gates the per-Concept controls). */
     hasOpenConcept: boolean;
     /** Whether the editor is in live-editing mode (vs read-only reading). */
@@ -66,6 +74,8 @@
 
   let {
     title,
+    titleDir = '',
+    titlePath = null,
     hasOpenConcept,
     editing,
     multipleTiles,
@@ -116,7 +126,12 @@
         onclick={onForward}>→</button
       >
     </div>
-    <span class="tile-title" data-testid="tile-title" title={title}>{title}</span>
+    <!-- Folder prefix + name. The prefix is dimmed so the Concept still reads as
+         the label's subject, and the tooltip carries the exact path. -->
+    <span class="tile-title" data-testid="tile-title" title={titlePath ?? title}
+      >{#if titleDir}<span class="tile-title-dir" data-testid="tile-title-dir">{titleDir}</span
+        >{/if}{title}</span
+    >
   </div>
 
   <div class="tile-controls">
@@ -356,6 +371,11 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text);
+  }
+
+  .tile-title-dir {
+    font-weight: 400;
+    color: var(--text-muted);
   }
 
   .tile-controls {
