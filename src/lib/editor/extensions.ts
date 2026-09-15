@@ -44,6 +44,7 @@ import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
 import { findExtensions, findPanelTheme } from './find';
+import { readOnlyTables } from './tableReadOnly';
 import { inlineWrapCommand, headingCommand, annotateCommand } from './commands';
 
 /**
@@ -202,6 +203,10 @@ export function modeExtensions(
   const reading = mode === 'read';
   return [
     tables({ onLinkClick }),
+    // atomic-editor's table cells are raw `contenteditable` DOM that commits via
+    // `view.dispatch`, so `EditorState.readOnly` below does NOT reach them —
+    // reading mode locks them here instead.
+    readOnlyTables(reading),
     imageBlocks(),
     // Render ` ```mermaid ` fences as Diagrams (ADR-0005). `reading` (read):
     // always rendered; `editing`: cursor inside reveals the raw fence.
