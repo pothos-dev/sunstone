@@ -106,7 +106,7 @@
 
   // The open Concept's frontmatter, mirrored out of the editor's frontmatter
   // field (the single source of truth — ADR 0003) so this Tile's Properties panel
-  // and header title can render it.
+  // can render it.
   let frontmatterProps = $state<Property[]>([]);
 
   // The editing/read view mode is GLOBAL (session.editorMode), driven by the Edit
@@ -148,7 +148,15 @@
 
   // Header label: the bundle-relative folder prefix plus the Concept name, so
   // the header says WHERE the Concept lives (concept-header-path).
-  const headerLabel = $derived(tileHeaderLabel(tile.activePath, frontmatterProps));
+  //
+  // Parsed straight off `tile.content` rather than the `frontmatterProps` mirror.
+  // That mirror is pushed out of the editor by `onFrontmatterChange`, so a missed
+  // callback leaves it stale FOREVER — `setEditorConcept`'s no-op early return
+  // compares the editor's own frontmatter field, not the mirror, so nothing ever
+  // re-pushes it. The header then falls back to the filename stem while the body
+  // shows the right Concept (a rare flake in tile-header.spec.ts). `tile.content`
+  // is the source both halves derive from, so reading it here cannot go stale.
+  const headerLabel = $derived(tileHeaderLabel(tile.activePath, parseProperties(tile.content)));
 
   // --- Unified undo/redo over the Tile's single body+frontmatter history -------
   let canUndo = $state(false);
