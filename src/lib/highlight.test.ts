@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { highlightParts } from './highlight';
+import { highlightParts, highlightPositions } from './highlight';
 
 describe('highlightParts', () => {
   test('empty query yields a single unmatched run', () => {
@@ -37,5 +37,39 @@ describe('highlightParts', () => {
     expect(highlightParts('nothing', 'zzz')).toEqual([
       { text: 'nothing', match: false },
     ]);
+  });
+});
+
+describe('highlightPositions', () => {
+  test('returns one unmatched run when nothing matched', () => {
+    expect(highlightPositions('/a/b', [])).toEqual([{ text: '/a/b', match: false }]);
+  });
+
+  test('splits into alternating unmatched and matched runs', () => {
+    expect(highlightPositions('abcd', [1, 2])).toEqual([
+      { text: 'a', match: false },
+      { text: 'bc', match: true },
+      { text: 'd', match: false },
+    ]);
+  });
+
+  test('handles a hit at the first and last character', () => {
+    expect(highlightPositions('abc', [0, 2])).toEqual([
+      { text: 'a', match: true },
+      { text: 'b', match: false },
+      { text: 'c', match: true },
+    ]);
+  });
+
+  test('ignores out-of-range positions', () => {
+    expect(highlightPositions('ab', [-1, 5])).toEqual([{ text: 'ab', match: false }]);
+  });
+
+  test('a fully matched string is a single matched run', () => {
+    expect(highlightPositions('ab', [0, 1])).toEqual([{ text: 'ab', match: true }]);
+  });
+
+  test('empty text yields no runs', () => {
+    expect(highlightPositions('', [])).toEqual([]);
   });
 });

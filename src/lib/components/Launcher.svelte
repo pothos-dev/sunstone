@@ -5,16 +5,27 @@
   import { errMessage } from '$lib/errors';
   import type { KnownBundle } from '$lib/types';
   import { relativeTime } from '$lib/relativeTime';
+  import { launcherRows } from '$lib/launcherRows';
+  import { highlightPositions } from '$lib/highlight';
+  import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
 
   // The launcher: shown when Sunstone starts with no Bundle (`sunstone` alone).
-  // Lists previously-opened folders (most-recent first, each removable) and an
-  // "Open folder…" native picker. Picking a folder opens it in-process, then we
-  // reload so `DesktopShell` re-decides and lands on the editor `<App/>`.
+  // A palette over the previously-opened folders — an auto-focused filter box on
+  // top, then one single-line row per folder path (most-recent first, each
+  // removable), plus an "Open folder…" native picker. Typing fuzzy-filters the
+  // list (matched chars highlighted), ↑/↓ step the selection and Enter opens it.
+  // Opening a folder opens it in-process, then we reload so `DesktopShell`
+  // re-decides and lands on the editor `<App/>`.
 
   let bundles = $state<KnownBundle[]>([]);
   let loading = $state(true);
   let busy = $state(false);
   let error = $state<string | null>(null);
+
+  let query = $state('');
+  let selected = $state(0);
+  let filterInput = $state<HTMLInputElement | null>(null);
+  let list = $state<HTMLUListElement | null>(null);
 
   let launcherRoot = $state<HTMLDivElement | null>(null);
 
@@ -28,6 +39,21 @@
   // `body:has([data-theme=dark])` rule) resolve correctly in either scheme.
   $effect(() => {
     applyTheme(launcherRoot, theme.resolved);
+  });
+
+  // The visible rows (pure; see `launcherRows`). Empty query → the backend's
+  // recency order; otherwise the fuzzy matches, best first.
+  const rows = $derived(launcherRows(query, bundles));
+
+  // The effective selection, clamped to the current rows without writing back to
+  // state (avoids an effect-update loop), exactly like the quick-nav palette.
+  const activeIndex = $derived(clampIndex(selected, rows.length));
+
+  // Keep the highlighted row inside the scrollable list as ↑/↓ move (and wrap).
+  $effect(() => {
+    void activeIndex;
+    void rows;
+    list?.querySelector<HTMLElement>('.row.selected')?.scrollIntoView({ block: 'nearest' });
   });
 
   async function refresh() {
@@ -75,8 +101,34 @@
     } catch (e) {
       error = errMessage(e);
     }
+    // The X now holds focus (and may even be gone); hand it back to the filter so
+    // ↑/↓/Enter keep driving the list.
+    filterInput?.focus();
   }
 
+  // Typing re-ranks the list, so the selection restarts at the best match.
+  function onInput() {
+    selected = 0;
+  }
+
+  function onKeydown(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selected = nextIndex(activeIndex, rows.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selected = prevIndex(activeIndex, rows.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const row = rows[activeIndex];
+      if (row) void open(row.bundle.path);
+    } else if (e.key === 'Escape' && query !== '') {
+      // Escape clears the filter (there is nothing to close behind the launcher).
+      e.preventDefault();
+      query = '';
+      selected = 0;
+    }
+  }
 </script>
 
 <div class="launcher" data-testid="launcher" bind:this={launcherRoot}>
@@ -90,6 +142,26 @@
       <p class="error" role="alert" data-testid="launcher-error">{error}</p>
     {/if}
 
+    <!-- svelte-ignore a11y_autofocus -->
+    <input
+      bind:this={filterInput}
+      bind:value={query}
+      class="filter"
+      type="text"
+      placeholder="Filter folders…"
+      aria-label="Filter folders"
+      role="combobox"
+      aria-expanded="true"
+      aria-controls="launcher-list"
+      aria-activedescendant={rows.length > 0 ? `launcher-row-${activeIndex}` : undefined}
+      data-testid="launcher-filter"
+      autocomplete="off"
+      spellcheck="false"
+      autofocus
+      oninput={onInput}
+      onkeydown={onKeydown}
+    />
+
     {#if loading}
       <p class="status">Loading…</p>
     {:else if bundles.length === 0}
@@ -97,37 +169,50 @@
         No recent folders yet. Open one to get started.
       </p>
     {:else}
-      <ul class="list" data-testid="launcher-list">
-        {#each bundles as b (b.path)}
-          <li class="item" class:missing={!b.exists}>
+      <ul id="launcher-list" class="list" role="listbox" data-testid="launcher-list">
+        {#each rows as row, i (row.bundle.path)}
+          <li
+            id={`launcher-row-${i}`}
+            class="item"
+            class:missing={!row.bundle.exists}
+            role="option"
+            aria-selected={i === activeIndex}
+          >
             <button
               type="button"
               class="row"
+              class:selected={i === activeIndex}
               data-testid="launcher-item"
-              data-path={b.path}
-              title={b.path}
+              data-path={row.bundle.path}
+              title={row.bundle.path}
               disabled={busy}
-              onclick={() => open(b.path)}
+              onmousemove={() => (selected = i)}
+              onclick={() => open(row.bundle.path)}
             >
-              <span class="name">
-                {b.name}
-                {#if !b.exists}<span class="badge" title="Folder not found on disk">missing</span>{/if}
-              </span>
-              <span class="path">{b.path}</span>
-              {#if relativeTime(b.lastOpened)}
-                <span class="when">{relativeTime(b.lastOpened)}</span>
+              <span class="path"
+                >{#each highlightPositions(row.bundle.path, row.positions) as seg}<span
+                    class:hit={seg.match}>{seg.text}</span
+                  >{/each}</span
+              >
+              {#if !row.bundle.exists}
+                <span class="badge" title="Folder not found on disk">missing</span>
+              {/if}
+              {#if relativeTime(row.bundle.lastOpened)}
+                <span class="when">{relativeTime(row.bundle.lastOpened)}</span>
               {/if}
             </button>
             <button
               type="button"
               class="forget"
               data-testid="launcher-forget"
-              data-path={b.path}
+              data-path={row.bundle.path}
               title="Forget this folder"
-              aria-label={`Forget ${b.name}`}
-              onclick={(e) => forget(b.path, e)}
+              aria-label={`Forget ${row.bundle.name}`}
+              onclick={(e) => forget(row.bundle.path, e)}
             >×</button>
           </li>
+        {:else}
+          <li class="status" data-testid="launcher-no-matches">No folders match</li>
         {/each}
       </ul>
     {/if}
@@ -158,11 +243,11 @@
   }
 
   .card {
-    width: min(520px, 92vw);
+    width: min(620px, 92vw);
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 1.75rem;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
@@ -187,12 +272,31 @@
     font-size: 0.9rem;
   }
 
+  .filter {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+  }
+
+  .filter:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
   .status {
     margin: 0;
     padding: 1rem 0;
     text-align: center;
     color: var(--text-muted);
     font-size: 0.9rem;
+    list-style: none;
   }
 
   .error {
@@ -210,29 +314,26 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.1rem;
     overflow-y: auto;
   }
 
   .item {
     display: flex;
     align-items: stretch;
-    gap: 0.25rem;
+    gap: 0.15rem;
     border-radius: var(--radius-md);
   }
 
+  /* One folder = one line: the path stretches, the badges/timestamp stay put. */
   .row {
     flex: 1 1 auto;
     min-width: 0;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'name when'
-      'path path';
-    gap: 0.1rem 0.5rem;
+    display: flex;
     align-items: baseline;
-    padding: 0.55rem 0.7rem;
-    border: 1px solid var(--border);
+    gap: 0.5rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid transparent;
     border-radius: var(--radius-md);
     background: none;
     color: inherit;
@@ -242,7 +343,7 @@
     transition: background 0.12s ease, border-color 0.12s ease;
   }
 
-  .row:hover:not(:disabled) {
+  .row.selected {
     background: var(--hover);
     border-color: var(--border-strong);
   }
@@ -252,50 +353,45 @@
     opacity: 0.6;
   }
 
-  .name {
-    grid-area: name;
-    font-weight: 600;
+  .path {
+    flex: 1 1 auto;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 0.9rem;
+  }
+
+  /* Fuzzy-match hits inside the path. */
+  .path .hit {
+    color: var(--accent);
+    font-weight: 700;
   }
 
   .when {
-    grid-area: when;
+    flex: none;
     color: var(--text-faint);
     font-size: 0.78rem;
     white-space: nowrap;
   }
 
-  .path {
-    grid-area: path;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    direction: rtl; /* keep the tail (the folder itself) visible when truncated */
-    text-align: left;
-  }
-
   .badge {
-    margin-left: 0.4rem;
+    flex: none;
     padding: 0.05rem 0.35rem;
     border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--danger) 18%, transparent);
     color: var(--danger);
     font-size: 0.68rem;
     font-weight: 600;
-    vertical-align: middle;
   }
 
-  .item.missing .name {
+  .item.missing .path {
     color: var(--text-muted);
   }
 
   .forget {
     flex: none;
-    width: 2rem;
+    width: 1.8rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
