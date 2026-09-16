@@ -760,6 +760,13 @@
     padding-inline: 1.5rem;
   }
 
+  /* Chromium treats contenteditable="false" descendants as unselectable
+     unless user-select is re-asserted; read mode sets contenteditable="false"
+     on .cm-content, which otherwise blocks mouse-selecting code block text. */
+  .editor-host :global(.cm-editor .cm-content[contenteditable='false'] *) {
+    user-select: text;
+  }
+
   .placeholder,
   .status {
     padding: 1rem;
