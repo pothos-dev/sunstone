@@ -11,13 +11,21 @@ A `resource` is not always a link: it is an absolute URL, a bundle-relative path
 
 Per-claim attribution joins on `id`: the body cites with a markdown footnote whose label equals a `sources[].id`, and consumers resolve through the matching entry rather than parsing the footnote prose. Labels are keyed rather than positional precisely because agents reorder these lists.
 
+**Decision — adopt the sanctioned footnote syntax, deprecate `[n]`.** Sunstone's own per-claim convention today is a bare `[n]` superscript joining to a `[n] …` row in a body citation table. That is a bespoke form no other markdown renderer understands, and it is positional into the body — exactly the silent-misattribution failure §5.1 keys on `id` to avoid. Sunstone switches to the standard `[^label]` markdown footnote (PHP Markdown Extra / GFM / pandoc / Obsidian), with the label joining to a `sources[].id`. Reading is rendered by turning on comrak's `extension.footnotes` rather than by extending Sunstone's sentinel path; comrak emits the superscript, the footnote section and the back-references itself.
+
+The `[n]` form is **deprecated, not removed**: `find_citation_refs` / `citation_def_pos` and the `citations` CodeMirror extension keep working so v0.1 Bundles still read correctly, alongside the legacy `# Citations` list. Nothing new should be authored in that form, and the docs must say so. `[n]` is digits-only, so it cannot collide with a `[^label]` footnote.
+
+Editing `sources` itself is not this ticket's problem — nested Frontmatter is [02](02-properties-panel-nested-frontmatter.md), and this ticket consumes it.
+
 This ticket also carries the v0.1 migration it supersedes: the body `# Citations` list becomes `sources`, and a consumer SHOULD read `sources` while MAY still parsing a legacy `# Citations` list.
 
 - [ ] `sources` parses, renders and edits as a list of maps, with `resource` enforced as required within an entry
 - [ ] `usage_window` is edited as a sibling of `sources`, and a per-entry override is respected when present
 - [ ] A `resource` that is a URL or an in-Bundle path is followable; a scope descriptor renders as plain text and is never styled as a broken link
-- [ ] A footnote whose label matches a `sources[].id` resolves to that entry, and reordering the list does not change what a claim attributes to
+- [ ] A `[^label]` footnote renders through comrak's `extension.footnotes`, and a label matching a `sources[].id` resolves to that entry — reordering the list does not change what a claim attributes to
 - [ ] Credibility signals render as the objective values they are — no credibility score is computed or stored
 - [ ] A legacy `# Citations` body list still displays as provenance, and the recommended-keys vocabulary offers `sources`
-- [ ] Unit tests cover entry parsing, the three `resource` kinds, footnote joining and the legacy fallback
+- [ ] The `[n]` superscript form still reads for v0.1 Bundles but is documented as deprecated everywhere it is described (`docs/okf/linking.md`, `docs/okf/concept.md`, `docs/editor/custom-extensions.md`, `docs/editor/atomic-editor-patch.md`)
+- [ ] An ADR records the move to `[^label]` footnotes and the deprecated-not-removed posture of `[n]`, in the shape of ADR 0004's optional-secondary-form decision
+- [ ] Unit tests cover entry parsing, the three `resource` kinds, footnote joining, and both legacy fallbacks (`# Citations`, `[n]`)
 - [ ] All four gates green

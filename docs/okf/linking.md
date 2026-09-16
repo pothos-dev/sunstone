@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Linking — how Concepts connect
-description: The link model in Sunstone — path-based markdown links, name-based Wikilink fallback, anchors/slugs, citations, backlinks, and rename-rewrite, with the pure-logic seam mirrored in Rust and TS.
+description: The link model in Sunstone — path-based markdown links, name-based Wikilink fallback, anchors/slugs, citations, backlinks, and rename-rewrite, with the pure-logic seam living once in sunstone-shared.
 tags: [linking, wikilink, citation, backlinks, anchor, slug, rewrite]
 timestamp: 2026-07-22
 ---
@@ -19,18 +19,19 @@ Both are tolerated when broken: a link whose target does not exist is styled dis
 
 ## The pure-logic seam
 
-All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-tested, and it is implemented **twice** — once in TypeScript and once in Rust — with the invariant that the two agree byte-for-byte. The frontend's broken-link decoration and the web renderer both trust the Rust [Bundle](/GLOSSARY.md) index precisely because the algorithms are mirrored.
+All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-tested, and since [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md) it is implemented **once** — in [sunstone-shared](/architecture/sunstone-shared.md), compiled to both the native host and `wasm32`. The frontend runs the *same* code the desktop backend and the web renderer run, in-process and synchronously against the live editor buffer, so the two sides can no longer drift; the TypeScript twins that used to live in `src/lib/` were deleted.
 
-| Concern | TypeScript (pure) | Rust (`sunstone-native`) | Mirrors |
-|---------|-------------------|------------------------|---------|
-| Markdown link resolution | `src/lib/links.ts` (`resolveLink`) | `paths.rs` (`resolve_internal`), `index/links.rs` | ✅ exact |
-| Wikilink parse + resolve | `src/lib/links.ts` (`resolveWikilink`, `splitWikilinkTarget`) | `wikilink.rs` (`resolve_wikilink`) | ✅ exact |
-| Heading slugs | `src/lib/slug.ts` (`slugify`, `slugifyHeadings`) | `slug.rs` (`slugify`) | ✅ exact |
-| Rename/move rewrite | `src/lib/ipc/fake/links.ts` (`planRewrites`) | `rewrite/engine.rs`, `rewrite/paths.rs` | ✅ exact |
-| Anchor rewrite | `src/lib/anchorRewrite.ts` (`rewriteAnchorsIn`) | `rewrite/anchors.rs` | ✅ exact |
-| Citation refs | `src/lib/citations.ts` | — (frontend-only widget) | n/a |
+| Concern | `sunstone-shared` | Frontend entry point (`src/lib/wasm/exports.ts`) |
+|---------|-------------------|--------------------------------------------------|
+| Markdown link resolution | `links.rs` (`resolve_link`), `paths.rs` (`is_external`, `normalize_segments`) | `resolveLinkIn` |
+| Bundle root detection | `links.rs` (`find_bundle_root`) | via the index store |
+| Wikilink parse + resolve | `wikilink.rs` (`resolve_wikilink`, `parse_target`, `parse_target_parts`) | `resolveWikilinkIn`, `splitWikilinkTarget` |
+| Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
+| Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
+| Citation refs | `citations.rs` (`find_citation_refs`, `citation_def_pos`) | `findCitationRefs`, `citationDefPos` |
+| Rename/move rewrite | — (host-side path math: `sunstone-native/src/rewrite/{engine,paths}.rs`) | `planRewrites` in `src/lib/ipc/fake/links.ts` |
 
-The `.ts` helpers stay pure; the CodeMirror extensions (`src/lib/editor/*.ts`) and the fake backend (`src/lib/ipc/fake/*.ts`) sit thinly over them, and the real desktop/web backends use the Rust twin. The Rust duplication in `ipc/fake/links.ts` exists so the exact same behaviour runs under Chromium/Playwright.
+Rename/move rewrite is the **one remaining twin**: the fake backend's `planRewrites` ports the Rust `rewrite` path math into TS so the exact same behaviour runs under Chromium/Playwright. Everything else has a single implementation. The CodeMirror extensions (`src/lib/editor/*.ts`) are the thin **view/authoring** layer over those wasm exports, never a second copy of the logic.
 
 ```mermaid
 flowchart TD
@@ -55,7 +56,7 @@ flowchart TD
 
 ## Markdown links (the OKF link structure)
 
-`resolveLink(currentPath, href, opts?)` in `src/lib/links.ts` classifies every markdown link `href` into a `ResolvedLink`:
+`resolve_link(current_path, href, …)` in `sunstone-shared/src/links.rs` — reached from the frontend as `resolveLinkIn` — classifies every markdown link `href` into a `ResolvedLink`:
 
 ```ts
 type ResolvedLink =
@@ -64,16 +65,16 @@ type ResolvedLink =
   | { kind: 'none' };
 ```
 
-- **External** — anything matching a URL scheme (`http:`, `https:`, `mailto:`, `tel:`, any `scheme:`). Detected by `isExternalLink`; never navigated in-app — the caller hands it to the OS/browser.
+- **External** — anything matching a URL scheme (`http:`, `https:`, `mailto:`, `tel:`, any `scheme:`). Detected by `paths::is_external`; never navigated in-app — the caller hands it to the OS/browser.
 - **Bundle-absolute** — begins with `/`, resolved from the Bundle root (leading slash stripped). The **recommended** form because it survives a Concept moving within its subdirectory.
 - **Relative** — `./x.md`, `../y.md`, or a bare `x.md`, resolved against the *directory of the current Concept*.
 - **Pure anchor** (`#heading`) or empty → `kind: 'none'`: there is no target Concept to open; the caller scrolls within the current Concept instead.
 
-Path math is done by `normalizeSegments`, which collapses `.`/`..` and refuses to escape above the root (leading `..` that would escape are dropped, matching the backend's escape rejection). A `path#anchor` is split: the path resolves and the `#anchor` rides along on the result so the caller can scroll to that heading after navigating.
+Path math is done by `paths::normalize_segments`, which collapses `.`/`..` and refuses to escape above the root (leading `..` that would escape are dropped, matching the backend's escape rejection). A `path#anchor` is split: the path resolves and the `#anchor` rides along on the result so the caller can scroll to that heading after navigating.
 
 ### Nested bundle root
 
-The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `findBundleRoot(allPaths)` identifies the root **structurally** (paths only, never frontmatter):
+The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths)` identifies the root **structurally** (paths only, never frontmatter):
 
 1. Any top-level `.md` (a root `index.md` or a root-level Concept) → the opened folder **is** the root (`''`). Never redirect down; a Bundle at the opened root is the common case.
 2. Otherwise the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
@@ -117,12 +118,12 @@ Upstream styles *all* aliased links (`[[target|label]]`) as resolved and never r
 
 ## Anchors and heading slugs
 
-An anchor is the `#fragment` of a link (`/page.md#deep-section`, `[[page#deep-section]]`). Anchor targets are **GitHub-style heading slugs**, computed by `slugify` in `src/lib/slug.ts` (mirrored by Rust `slug::slugify`):
+An anchor is the `#fragment` of a link (`/page.md#deep-section`, `[[page#deep-section]]`). Anchor targets are **GitHub-style heading slugs**, computed by `slugify` in `sunstone-shared/src/slug.rs`:
 
 - lowercase (Unicode-aware);
 - drop everything that is not a letter, digit, hyphen, or underscore;
 - turn each whitespace character into a hyphen (runs of spaces → runs of hyphens; not collapsed);
-- `slugifyHeadings` de-duplicates repeated slugs in document order by appending `-1`, `-2`, … (two `## Notes` → `notes`, `notes-1`), so it must run over the whole ordered heading list, never per-heading.
+- `slugify_headings` de-duplicates repeated slugs in document order by appending `-1`, `-2`, … (two `## Notes` → `notes`, `notes-1`), so it must run over the whole ordered heading list, never per-heading.
 
 `slugify` trims first, so a hand-typed literal anchor (`#Deep Section`) and the canonical slug (`#deep-section`) compare equal — matching is backward-compatible and migrates older literal anchors to the canonical slug on the first heading change.
 
@@ -133,20 +134,20 @@ Sunstone recognises two related but distinct things under the citation banner:
 - **OKF citation links** — entries under a `# Citations` heading (a v0.1 form, superseded in v0.2 by the `sources` frontmatter family — OKF [§13.1](/okf/spec.md#131-breaking-changes)), numbered `[n]` at line start, whose targets may be external URLs, bundle-relative paths, or pages in a `references/` subdirectory. These are ordinary markdown links; nothing special beyond the convention.
 - **Citation references** — inline `[n]` tokens that *follow a word* (`…deep umami and body.[6][7][8]`), which render as clickable **superscripts** that jump to the matching row of the citation table.
 
-`src/lib/citations.ts` is the pure detector:
+`sunstone-shared/src/citations.rs` is the pure detector, exposed to the frontend through the wasm seam:
 
-- `findCitationRefs(text)` finds every inline `[n]` that is immediately preceded by a non-whitespace character (a word, punctuation, or the `]` of an adjacent `[6][7]`) and not followed by `]` (a `[[wikilink]]` close), `(` (a real markdown link `[6](url)`), or `:` (a reference-link definition `[6]:`). Line-start `[n]` — the table rows — fail the "preceded by non-space" test and are skipped, so they stay literal and act as jump targets.
-- `citationDefPos(text, num)` returns the offset of the definition row (first line whose first non-blank content is `[num]`), or `null` for a dangling reference.
+- `find_citation_refs(text)` (`findCitationRefs`) finds every inline `[n]` that is immediately preceded by a non-whitespace character (a word, punctuation, or the `]` of an adjacent `[6][7]`) and not followed by `]` (a `[[wikilink]]` close), `(` (a real markdown link `[6](url)`), or `:` (a reference-link definition `[6]:`). Line-start `[n]` — the table rows — fail the "preceded by non-space" test and are skipped, so they stay literal and act as jump targets.
+- `citation_def_pos(text, num)` (`citationDefPos`) returns the offset of the definition row (first line whose first non-blank content is `[num]`), or `null` for a dangling reference.
 
 `src/lib/editor/citations.ts` is the thin CodeMirror layer: a `CitationWidget` superscript, a click handler that scrolls to the definition and briefly flashes it, active in hybrid + reading modes (in hybrid the raw token is revealed under the cursor for editing; absent in source `edit` mode).
 
 ## Broken links
 
-Broken links are **tolerated**, never blocked (OKF [§6.1](/okf/spec.md#61-links-between-concepts)). `src/lib/editor/broken-links.ts` walks the syntax tree, resolves each `Link` node's URL with `resolveLink`, and marks it `cm-broken-link` (dashed/red) when it resolves to an internal target absent from the index — styling only; the link stays clickable. The check is synchronous against the frontend index store's cached path set (CodeMirror decorations cannot await IPC) and re-runs on doc changes and on an explicit `refreshBrokenLinks` effect (fired on the `file-changed` watcher event and on Concept switch, so created/removed targets restyle without a reload).
+Broken links are **tolerated**, never blocked (OKF [§6.1](/okf/spec.md#61-links-between-concepts)). `src/lib/editor/broken-links.ts` walks the syntax tree, resolves each `Link` node's URL with `resolveLinkIn`, and marks it `cm-broken-link` (dashed/red) when it resolves to an internal target absent from the index — styling only; the link stays clickable. The check is synchronous against the frontend index store's cached path set (CodeMirror decorations cannot await IPC) and re-runs on doc changes and on an explicit `refreshBrokenLinks` effect (fired on the `file-changed` watcher event and on Concept switch, so created/removed targets restyle without a reload).
 
 ## Backlinks
 
-The inverse of an outbound link. The Rust `backlinks(path)` command (`src-tauri/src/lib.rs`) returns every Concept that links *to* a given Concept, powering the **Backlinks** [Section](/GLOSSARY.md). It is built from outbound-link extraction — `index/links.rs` (markdown) plus `wikilink.rs` (wikilinks) in Rust, mirrored by `outboundLinks` in `src/lib/ipc/fake/links.ts`. Both markdown links and wikilinks feed backlinks; self-edges (e.g. a pure same-file `[[#heading]]`) are dropped. Extraction masks fenced code blocks and inline code first (`maskCode`) so `[[ … ]]` written inside code is never picked up.
+The inverse of an outbound link. `Index::backlinks(path)` in `sunstone-native/src/index.rs` returns every Concept that links *to* a given Concept, powering the **Backlinks** [Section](/GLOSSARY.md) — reached as the `backlinks` Tauri command (`src-tauri/src/commands.rs`) on the desktop and `GET /api/backlinks` on the server. It is built from outbound-link extraction in `sunstone-native/src/index/links.rs` over the `sunstone-shared` link/wikilink kernels, mirrored by `outboundLinks` in `src/lib/ipc/fake/links.ts`. Both markdown links and wikilinks feed backlinks; self-edges (e.g. a pure same-file `[[#heading]]`) are dropped. Extraction masks fenced code blocks and inline code first (`maskCode`) so `[[ … ]]` written inside code is never picked up.
 
 ## Rename & move rewrite
 
@@ -158,7 +159,7 @@ When a Concept or folder is renamed/moved, Sunstone **automatically rewrites the
 - **Partial-path wikilinks** (`[[a/old]]`) rewrite to the **shortest suffix that still resolves** to the new path in the new Bundle.
 - `|alias`, `#anchor`, `?query`, link titles, link text and external links are all preserved verbatim; only links whose resolved target actually moved change.
 
-Separately, `rewriteAnchorsIn` (`src/lib/anchorRewrite.ts`, mirroring `rewrite/anchors.rs`) rewrites the `#anchor` of every link pointing at a heading whose slug changed — both cross-file inbound links (via the backend) and same-file `[[#slug]]` links in the open editor buffer (`source === target`). Both sides are slugged before comparison, so an older literal anchor is migrated to the canonical slug on the first heading rename.
+Separately, `rewrite_anchors_in` (`sunstone-shared/src/rewrite/anchors.rs`, exposed as `rewriteAnchors`) rewrites the `#anchor` of every link pointing at a heading whose slug changed — both cross-file inbound links (via the backend) and same-file `[[#slug]]` links in the open editor buffer (`source === target`). Both sides are slugged before comparison, so an older literal anchor is migrated to the canonical slug on the first heading rename.
 
 ## Out of scope
 
@@ -166,7 +167,7 @@ Deferred per [ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md): e
 
 ## Related
 
-- [Open Knowledge Format (OKF) Specification](/okf/spec.md) — §5 cross-linking, §8 citations, the format Sunstone's links conform to.
+- [Open Knowledge Format (OKF) Specification](/okf/spec.md) — §6 cross-linking and paths, §5.1 provenance, the format Sunstone's links conform to.
 - [Concept](/okf/concept.md) and [Bundle](/okf/bundle.md) — how Sunstone models the units these links connect, and where it extends the spec.
 - [Glossary](/GLOSSARY.md) — the **Wikilink**, **Backlinks**, and **Diagram** (graph sense) terms.
 - [ADR 0004 — Wikilinks as an optional, name-based secondary link format](/adr/0004-wikilinks-optional-secondary-name-based.md).
