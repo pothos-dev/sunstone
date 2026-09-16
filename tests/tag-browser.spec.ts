@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /** Expand a collapsible sidebar Section if it is currently collapsed (idempotent). */
 async function expandSection(page: import('@playwright/test').Page, name: string) {

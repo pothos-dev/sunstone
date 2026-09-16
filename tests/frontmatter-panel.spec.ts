@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { type Page } from '@playwright/test';
 
 /**
  * Slice: frontmatter-properties-panel (ADR 0002, flat key/value model).

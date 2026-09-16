@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * Expand the right Sidebar (idempotent) so its Backlinks Section is interactable.

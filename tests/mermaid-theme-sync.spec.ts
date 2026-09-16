@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * Slice: mermaid-theme-sync (ADR-0005, option 5a).

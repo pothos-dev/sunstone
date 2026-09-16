@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { type Page } from '@playwright/test';
 
 /**
  * Regression: the rail's Sidebar toggle must collapse the Sidebar even when it

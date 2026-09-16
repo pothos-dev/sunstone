@@ -1,4 +1,5 @@
-import { test, expect, type Locator } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { type Locator } from '@playwright/test';
 
 /**
  * Slice: full-text-search (keyboard-navigation scroll-into-view).

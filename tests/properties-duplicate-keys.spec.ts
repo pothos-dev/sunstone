@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { type Page } from '@playwright/test';
 
 /**
  * Bug fix: value edits in the Properties panel are keyed by the row's positional
