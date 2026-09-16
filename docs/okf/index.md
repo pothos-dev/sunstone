@@ -4,7 +4,7 @@ The format Sunstone reads and writes, plus how Sunstone's handling of it differs
 
 ## Concepts
 
-- [Open Knowledge Format (OKF) Specification](spec.md) - Vendored, verbatim copy of the upstream OKF v0.1 spec.
+- [Open Knowledge Format (OKF) Specification](spec.md) - Vendored, verbatim copy of the upstream OKF v0.2 spec.
 - [Concept](concept.md) - What OKF says a Concept is, and how Sunstone models its frontmatter and body.
 - [Bundle](bundle.md) - What OKF says a Bundle is, and how Sunstone opens, roots, indexes, and commits one.
 - [Linking](linking.md) - The link model (markdown + wikilink, anchors, citations, backlinks, rewrite) over a Bundle.

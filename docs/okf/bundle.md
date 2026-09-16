@@ -16,11 +16,11 @@ From [spec §3](/okf/spec.md#3-bundle-structure) and [§2](/okf/spec.md#2-termin
 
 - A Bundle is a **directory tree of markdown files**, organised however the producer likes; the directory layout is independent of the domain.
 - It is the **unit of distribution** — shippable as a git repository (recommended, for history/attribution/diffs), a tarball/zip, or a subdirectory within a larger repo.
-- **Reserved filenames** ([§3.1](/okf/spec.md#31-reserved-filenames)) have defined meaning at any level and are **not** Concepts: `index.md` (a progressive-disclosure directory listing, [§6](/okf/spec.md#6-index-files)) and `log.md` (a dated change history, [§7](/okf/spec.md#7-log-files-optional)). Every other `.md` is a Concept.
-- **Bundle-absolute links** (`/tables/orders.md`) are resolved relative to the **bundle root** ([§5.1](/okf/spec.md#51-absolute-bundle-relative-links)).
-- Consumers **MAY synthesize** an `index.md`, a tag view, or a graph on the fly; the format mandates no tooling ([§6](/okf/spec.md#6-index-files), [§3.1](/okf/spec.md#31-reserved-filenames)).
+- **Reserved filenames** ([§3.1](/okf/spec.md#31-reserved-filenames)) have defined meaning at any level and are **not** Concepts: `index.md` (a progressive-disclosure directory listing, [§8](/okf/spec.md#8-index-files)) and `log.md` (a dated change history, [§9](/okf/spec.md#9-log-files)). Every other `.md` is a Concept.
+- **Bundle-absolute links** (`/tables/orders.md`) are resolved relative to the **bundle root** ([§6.1](/okf/spec.md#61-links-between-concepts)).
+- Consumers **MAY synthesize** an `index.md`, a tag view, or a graph on the fly; the format mandates no tooling ([§8](/okf/spec.md#8-index-files), [§3.1](/okf/spec.md#31-reserved-filenames)).
 
-A Bundle is [conformant](/okf/spec.md#9-conformance) if every non-reserved `.md` parses its frontmatter and carries a non-empty `type`, and reserved files follow their structure. Everything else is soft guidance — missing indexes, broken links, and unknown fields must never make a consumer reject the Bundle.
+A Bundle is [conformant](/okf/spec.md#11-conformance) if every non-reserved `.md` parses its frontmatter and carries a non-empty `type`, and reserved files follow their structure. Everything else is soft guidance — missing indexes, broken links, and unknown fields must never make a consumer reject the Bundle.
 
 ## How Sunstone treats a Bundle
 
@@ -28,26 +28,26 @@ A Bundle is [conformant](/okf/spec.md#9-conformance) if every non-reserved `.md`
 
 ### Finding the bundle root (Sunstone extension)
 
-The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `findBundleRoot(allPaths)` in `src/lib/links.ts` infers the root **structurally, from paths only** (never frontmatter):
+The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `find_bundle_root(all_paths)` in [`sunstone-shared`](/architecture/sunstone-shared.md) (`crates/sunstone-shared/src/links.rs`) infers the root **structurally, from paths only** (never frontmatter). The frontend runs that same code through the wasm seam rather than a TS twin ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)):
 
 1. Any top-level `.md` (a root `index.md` or root-level Concept) ⇒ the opened folder **is** the root. A Bundle at the opened root is the common case; never redirect down.
 2. Otherwise, the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
 3. No `index.md` anywhere ⇒ the sole shared top-level segment if every Concept has one, else `''` (don't guess).
 
-`applyBundleRoot` then prepends that root to a bundle-absolute target **only when the rewritten path actually exists**, so a mis-identified root can never mis-navigate a link that would otherwise have worked. This is the one bundle-level rule Sunstone _adds_ to the spec — see [Linking → Nested bundle root](/okf/linking.md#nested-bundle-root).
+`apply_bundle_root` then prepends that root to a bundle-absolute target **only when the rewritten path actually exists**, so a mis-identified root can never mis-navigate a link that would otherwise have worked. This is the one bundle-level rule Sunstone _adds_ to the spec — see [Linking → Nested bundle root](/okf/linking.md#nested-bundle-root).
 
 ### Indexes Sunstone synthesizes
 
-Per [§6](/okf/spec.md#6-index-files), a consumer may synthesize views the Bundle doesn't ship. Sunstone builds several at load time and keeps them live under the file watcher:
+Per [§8](/okf/spec.md#8-index-files), a consumer may synthesize views the Bundle doesn't ship. Sunstone builds several at load time and keeps them live under the file watcher:
 
 | Index | Powers | Where |
 | --- | --- | --- |
-| Path set | broken-link styling, `applyBundleRoot` existence checks | frontend index store (mirrors the Rust path list) |
-| Name → path | [Wikilink](/GLOSSARY.md) resolution, rename-rewrite | `wikilink.rs` (Rust) + `src/lib/ipc/fake/links.ts` (TS twin) |
-| Backlinks | the **Backlinks** [Section](/GLOSSARY.md) | `backlinks(path)` in `src-tauri/src/lib.rs`, from `index/links.rs` + `wikilink.rs` |
+| Path set | broken-link styling, `apply_bundle_root` existence checks | frontend index store (mirrors the Rust path list) |
+| Name → path | [Wikilink](/GLOSSARY.md) resolution, rename-rewrite | `sunstone-shared/src/wikilink.rs` (native **and** wasm) |
+| Backlinks | the **Backlinks** [Section](/GLOSSARY.md) | `Index::backlinks(path)` in `sunstone-native/src/index.rs`, over the `sunstone-shared` link/wikilink kernels |
 | Tags | the **Tags** [Section](/GLOSSARY.md) (hidden when the Bundle has none) | server/backend frontmatter scan |
 
-The link/backlink logic is implemented **twice** — pure Rust and pure TS — kept byte-for-byte identical so the desktop backend, web renderer, and Playwright fake all agree. See [Linking → the pure-logic seam](/okf/linking.md#the-pure-logic-seam).
+The link/backlink logic is implemented **once**, in [sunstone-shared](/architecture/sunstone-shared.md), and compiled to both native and wasm, so the desktop backend, web renderer, and Playwright fake cannot drift ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)). See [Linking → the pure-logic seam](/okf/linking.md#the-pure-logic-seam).
 
 ### Reserved files
 
@@ -65,8 +65,8 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 
 | Topic | Pure OKF | Sunstone |
 | --- | --- | --- |
-| Bundle root | Known a priori; absolute links resolve from it | **Inferred** via `findBundleRoot`, with a safe existence-gated fallback ([Linking](/okf/linking.md#nested-bundle-root)) |
-| Link forms | Standard markdown links only ([§5](/okf/spec.md#5-cross-linking)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
+| Bundle root | Known a priori; absolute links resolve from it | **Inferred** via `find_bundle_root`, with a safe existence-gated fallback ([Linking](/okf/linking.md#nested-bundle-root)) |
+| Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
 | Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git.rs`) |
 | `okf_version` | May be declared in root `index.md` | Recognised on the root `index.md` only; not required |
@@ -74,7 +74,7 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 ## Related
 
 - [Concept](/okf/concept.md) — the per-file unit inside a Bundle, and how Sunstone edits one.
-- [OKF Specification](/okf/spec.md) — the vendored spec, §2–§3, §6–§7, §9.
+- [OKF Specification](/okf/spec.md) — the vendored spec, §2–§3, §6, §8–§9, §11.
 - [Linking](/okf/linking.md) — bundle root detection, the name/path resolution seam, backlinks, rewrite-on-move.
 - [Glossary](/GLOSSARY.md) — **Bundle**, **Reserved file**, **View state**.
 - [Testing](/architecture/testing.md) — the git-write path over a Bundle and its test strategy.

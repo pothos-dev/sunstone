@@ -40,7 +40,7 @@ the same files, with nothing to migrate.
 Sunstone's frontmatter model (the typed-concept `type` / `title` / `tags`
 fields, reserved files, and bundle structure) conforms to the OKF spec:
 
-- Upstream spec: <https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md>
+- Upstream spec: <https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md>
 - Vendored copy in this repo: [`docs/okf/spec.md`](docs/okf/spec.md)
 
 ## Features

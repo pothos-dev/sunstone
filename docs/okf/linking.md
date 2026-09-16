@@ -12,10 +12,10 @@ Links are what turn a [Bundle](/GLOSSARY.md) of [Concepts](/GLOSSARY.md) into a 
 
 The governing split — introduced by [ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md):
 
-- **Standard markdown links** (`[text](target)`) are the **primary/canonical** format and resolve by **path**. This is the only link form [OKF](/okf/spec.md#5-cross-linking) itself defines.
+- **Standard markdown links** (`[text](target)`) are the **primary/canonical** format and resolve by **path**. This is the only link form [OKF](/okf/spec.md#6-cross-linking-and-paths) itself defines.
 - **[Wikilinks](/GLOSSARY.md)** (`[[name]]`) are an **optional, secondary fallback** format, supported *in addition to* — never replacing — markdown links, and resolve by **name**. They exist purely as an Obsidian-compatibility affordance for Bundles that originate as Obsidian vaults.
 
-Both are tolerated when broken: a link whose target does not exist is styled distinct but stays clickable and never blocks editing (OKF [§5.3](/okf/spec.md#53-link-semantics)).
+Both are tolerated when broken: a link whose target does not exist is styled distinct but stays clickable and never blocks editing (OKF [§6.1](/okf/spec.md#61-links-between-concepts)).
 
 ## The pure-logic seam
 
@@ -130,7 +130,7 @@ An anchor is the `#fragment` of a link (`/page.md#deep-section`, `[[page#deep-se
 
 Sunstone recognises two related but distinct things under the citation banner:
 
-- **OKF citation links** — entries under a `# Citations` heading (OKF [§8](/okf/spec.md#8-citations)), numbered `[n]` at line start, whose targets may be external URLs, bundle-relative paths, or pages in a `references/` subdirectory. These are ordinary markdown links; nothing special beyond the convention.
+- **OKF citation links** — entries under a `# Citations` heading (a v0.1 form, superseded in v0.2 by the `sources` frontmatter family — OKF [§13.1](/okf/spec.md#131-breaking-changes)), numbered `[n]` at line start, whose targets may be external URLs, bundle-relative paths, or pages in a `references/` subdirectory. These are ordinary markdown links; nothing special beyond the convention.
 - **Citation references** — inline `[n]` tokens that *follow a word* (`…deep umami and body.[6][7][8]`), which render as clickable **superscripts** that jump to the matching row of the citation table.
 
 `src/lib/citations.ts` is the pure detector:
@@ -142,7 +142,7 @@ Sunstone recognises two related but distinct things under the citation banner:
 
 ## Broken links
 
-Broken links are **tolerated**, never blocked (OKF [§5.3](/okf/spec.md#53-link-semantics)). `src/lib/editor/broken-links.ts` walks the syntax tree, resolves each `Link` node's URL with `resolveLink`, and marks it `cm-broken-link` (dashed/red) when it resolves to an internal target absent from the index — styling only; the link stays clickable. The check is synchronous against the frontend index store's cached path set (CodeMirror decorations cannot await IPC) and re-runs on doc changes and on an explicit `refreshBrokenLinks` effect (fired on the `file-changed` watcher event and on Concept switch, so created/removed targets restyle without a reload).
+Broken links are **tolerated**, never blocked (OKF [§6.1](/okf/spec.md#61-links-between-concepts)). `src/lib/editor/broken-links.ts` walks the syntax tree, resolves each `Link` node's URL with `resolveLink`, and marks it `cm-broken-link` (dashed/red) when it resolves to an internal target absent from the index — styling only; the link stays clickable. The check is synchronous against the frontend index store's cached path set (CodeMirror decorations cannot await IPC) and re-runs on doc changes and on an explicit `refreshBrokenLinks` effect (fired on the `file-changed` watcher event and on Concept switch, so created/removed targets restyle without a reload).
 
 ## Backlinks
 
