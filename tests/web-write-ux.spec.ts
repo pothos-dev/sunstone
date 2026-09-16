@@ -9,8 +9,8 @@ import { mountShell, openFromTree, cmContent, headCommit, commitCount, typeAtEnd
  * `feat/enable-web-writing`). Three explicit-Save behaviours that the base
  * `web-write` happy-path spec does not cover:
  *
- *  1. **Property → Save.** A Properties-panel frontmatter edit stays IN-MEMORY
- *     (shows `web-save`, lands NO commit) until an explicit Save folds body +
+ *  1. **Frontmatter → Save.** A Frontmatter YAML edit stays IN-MEMORY
+ *     (shows `save-concept`, lands NO commit) until an explicit Save folds body +
  *     frontmatter into ONE `edit <path> via web` commit. Proves the web-gated
  *     suppression of Tile's eager `flush()` on a property edit.
  *  2. **Nav gating.** A dirty buffer's own in-editor navigations — a wikilink
@@ -29,7 +29,7 @@ function diskContent(rel: string): string {
   return readFileSync(join(WEB_BUNDLE_DIR, rel), 'utf8');
 }
 
-test('a Properties edit stays in-memory (shows Save, NO commit) until Save folds it into one commit', async ({
+test('a Frontmatter edit stays in-memory (shows Save, NO commit) until Save folds it into one commit', async ({
   page,
 }) => {
   const rel = 'prop-target.md';
@@ -42,33 +42,35 @@ test('a Properties edit stays in-memory (shows Save, NO commit) until Save folds
     const content = await openFromTree(page, rel);
     await expect(content).toContainText('Body line');
 
-    // Turn the global Properties panel on, then edit the `title` scalar value.
-    // (The Properties toggle lives in the per-Tile header — `properties-toggle` —
+    // Turn the global Frontmatter Region on, then edit the `title` line in the
+    // YAML. (The toggle lives in the per-Tile header — `frontmatter-toggle` —
     // after the layout rework moved it out of the old concept strip.)
-    await page.getByTestId('properties-toggle').click();
-    const props = page.getByTestId('properties');
-    await expect(props).toBeVisible();
-    const titleInput = props.getByTestId('scalar-title');
-    await expect(titleInput).toBeVisible();
+    await page.getByTestId('frontmatter-toggle').click();
+    await page.getByTestId('edit-toggle').click();
+    const yaml = page.getByTestId('frontmatter').locator('.cm-content');
+    await expect(yaml).toContainText('title: Prop Target');
 
     const before = commitCount();
-    await titleInput.fill(newTitle);
-    // Scalars commit through the input's native `change` (blur/Enter), not on
-    // every keystroke — blur it (staying in this tile, so no Concept switch).
-    await titleInput.blur();
+    // Replace the `title:` line (line 1 of the block) with the new value.
+    await yaml.click();
+    await page.keyboard.press('Control+Home');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('End');
+    await page.keyboard.press('Shift+Home');
+    await page.keyboard.type(`title: ${newTitle}`);
 
-    // The property edit marks the buffer dirty WITHOUT eager-committing: the
+    // The frontmatter edit marks the buffer dirty WITHOUT eager-committing: the
     // header Save button appears (its presence IS the dirty indicator), and NO
     // new commit landed (explicit-save only).
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
     await page.waitForTimeout(800);
     expect(commitCount()).toBe(before);
     // The old title is still what is on disk — nothing was persisted yet.
     expect(diskContent(rel)).toContain('title: Prop Target');
 
     // Explicit Save folds the frontmatter change into ONE commit.
-    await page.getByTestId('web-save').click();
-    await expect(page.getByTestId('web-save')).toHaveCount(0);
+    await page.getByTestId('save-concept').click();
+    await expect(page.getByTestId('save-concept')).toHaveCount(0);
     await expect.poll(() => commitCount(), { timeout: 10_000 }).toBe(before + 1);
     const head = headCommit();
     expect(head.subject).toBe(`edit ${rel} via web`);
@@ -101,7 +103,7 @@ test('a dirty wikilink navigation gates on the leave modal: Cancel stays, Save c
 
     // Dirty the buffer, then click the in-editor wikilink to navdst.
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
 
     const wikilink = page
       .getByTestId('editor')
@@ -118,7 +120,7 @@ test('a dirty wikilink navigation gates on the leave modal: Cancel stays, Save c
     await page.getByTestId('web-leave-cancel').click();
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     await expect(content).toContainText('Nav Source');
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
     expect(commitCount()).toBe(before);
 
     // Click the wikilink again, this time Save & navigate: one commit lands, then
@@ -158,7 +160,7 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
 
     // Dirty B, then press Back — the leave modal must block the history nav.
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
 
     const before = commitCount();
     const back = page.getByTestId('nav-back');
@@ -170,7 +172,7 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     // Cancel keeps us on the dirty B (no nav to A), and lands no commit.
     await expect(content).toContainText('Concept B body');
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
     expect(commitCount()).toBe(before);
     expect(diskContent(bRel)).not.toContain(marker);
 
@@ -218,11 +220,11 @@ test('renaming a referenced heading + Save rewrites the inbound anchor on disk, 
     await headingLine.click();
     await page.keyboard.press('End');
     await page.keyboard.type('er');
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
 
     const before = commitCount();
-    await page.getByTestId('web-save').click();
-    await expect(page.getByTestId('web-save')).toHaveCount(0);
+    await page.getByTestId('save-concept').click();
+    await expect(page.getByTestId('save-concept')).toHaveCount(0);
 
     // The inbound anchor in the OTHER Concept is rewritten on disk to the new slug.
     await expect
@@ -258,7 +260,7 @@ test('toggling Edit off with a dirty buffer routes through the leave modal (Canc
 
     // Dirty the buffer → the header Save button appears (the dirty indicator).
     await typeAtEnd(page, content, `\n\n${marker}`);
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
 
     const before = commitCount();
 
@@ -269,7 +271,7 @@ test('toggling Edit off with a dirty buffer routes through the leave modal (Canc
     await page.getByTestId('web-leave-cancel').click();
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     await expect(editToggle).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('web-save')).toBeVisible();
+    await expect(page.getByTestId('save-concept')).toBeVisible();
     expect(commitCount()).toBe(before);
 
     // Toggle again, this time Save & exit: one commit lands and the editor drops
@@ -279,7 +281,7 @@ test('toggling Edit off with a dirty buffer routes through the leave modal (Canc
     await page.getByTestId('web-leave-save').click();
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);
     await expect(editToggle).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByTestId('web-save')).toHaveCount(0);
+    await expect(page.getByTestId('save-concept')).toHaveCount(0);
     await expect.poll(() => commitCount(), { timeout: 10_000 }).toBe(before + 1);
     expect(headCommit().subject).toBe(`edit ${rel} via web`);
     expect(diskContent(rel)).toContain(marker);

@@ -6,7 +6,7 @@
 // single pure source of truth for detecting them, reused by:
 //   - Tree filtering (strip reserved files from the ordinary leaf listing),
 //   - per-folder affordances (icons that open the reserved files directly),
-//   - the Properties panel's required-`type` exemption,
+//   - the Frontmatter Region's required-`type` exemption,
 //   - new-Concept scaffolding (skip the `type` stub for reserved files).
 //
 // Operates purely on bundle-relative, forward-slash paths — no IPC dependency.

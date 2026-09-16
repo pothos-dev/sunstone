@@ -55,7 +55,7 @@ describe('move: up/down within a column', () => {
   test('down moves to the lower row, up to the upper row', () => {
     expect(move('explorer', 'down', allVisible, noMemory)).toBe('tags');
     expect(move('tags', 'up', allVisible, noMemory)).toBe('explorer');
-    expect(move('properties', 'down', allVisible, noMemory)).toBe('editor');
+    expect(move('frontmatter', 'down', allVisible, noMemory)).toBe('editor');
     expect(move('outline', 'down', allVisible, noMemory)).toBe('backlinks');
   });
 
@@ -73,9 +73,9 @@ describe('move: up/down within a column', () => {
 
 describe('move: left/right across columns', () => {
   test('right/left change column, landing on the same row by default', () => {
-    expect(move('explorer', 'right', allVisible, noMemory)).toBe('properties');
-    expect(move('properties', 'right', allVisible, noMemory)).toBe('outline');
-    expect(move('outline', 'left', allVisible, noMemory)).toBe('properties');
+    expect(move('explorer', 'right', allVisible, noMemory)).toBe('frontmatter');
+    expect(move('frontmatter', 'right', allVisible, noMemory)).toBe('outline');
+    expect(move('outline', 'left', allVisible, noMemory)).toBe('frontmatter');
     expect(move('editor', 'left', allVisible, noMemory)).toBe('tags');
   });
 
@@ -96,8 +96,8 @@ describe('move: left/right across columns', () => {
   test('falls to the nearest visible row when the preferred row is hidden', () => {
     // From Tags (row 1) moving right; Editor (row 1) hidden, Properties (row 0)
     // visible → land on Properties.
-    const vis = visibleSet('tags', 'properties');
-    expect(move('tags', 'right', vis, noMemory)).toBe('properties');
+    const vis = visibleSet('tags', 'frontmatter');
+    expect(move('tags', 'right', vis, noMemory)).toBe('frontmatter');
   });
 });
 
@@ -106,13 +106,13 @@ describe('sticky per-column landing memory', () => {
     // Coming from Properties (col 1, row 0) into the right column whose memory
     // is Backlinks (row 1) → land on Backlinks, not the same-row Outline.
     const memory: ReadonlyArray<RegionId | null> = [null, null, 'backlinks'];
-    expect(move('properties', 'right', allVisible, memory)).toBe('backlinks');
+    expect(move('frontmatter', 'right', allVisible, memory)).toBe('backlinks');
   });
 
   test('ignores stale memory for a now-hidden Region', () => {
     const memory: ReadonlyArray<RegionId | null> = [null, null, 'backlinks'];
-    const vis = visibleSet('properties', 'outline'); // backlinks hidden
-    expect(move('properties', 'right', vis, memory)).toBe('outline');
+    const vis = visibleSet('frontmatter', 'outline'); // backlinks hidden
+    expect(move('frontmatter', 'right', vis, memory)).toBe('outline');
   });
 });
 

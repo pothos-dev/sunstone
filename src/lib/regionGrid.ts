@@ -23,7 +23,7 @@
 export type RegionId =
   | 'explorer'
   | 'tags'
-  | 'properties'
+  | 'frontmatter'
   | 'editor'
   | 'outline'
   | 'backlinks';
@@ -35,7 +35,7 @@ export type Direction = 'left' | 'right' | 'up' | 'down';
 export const REGION_CELL: Record<RegionId, readonly [col: number, row: number]> = {
   explorer: [0, 0],
   tags: [0, 1],
-  properties: [1, 0],
+  frontmatter: [1, 0],
   editor: [1, 1],
   outline: [2, 0],
   backlinks: [2, 1],
@@ -45,7 +45,7 @@ export const REGION_CELL: Record<RegionId, readonly [col: number, row: number]> 
 export const ALL_REGIONS: readonly RegionId[] = [
   'explorer',
   'tags',
-  'properties',
+  'frontmatter',
   'editor',
   'outline',
   'backlinks',

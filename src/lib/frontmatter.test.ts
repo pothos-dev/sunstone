@@ -1,121 +1,112 @@
-// Unit tests for frontmatter parse / serialize / round-trip (ADR 0003).
-// Run with `bun test src/lib`. Pins the structured Property model behavior,
-// including verbatim round-tripping of complex entries and key renaming.
 import { describe, expect, test } from 'bun:test';
 import {
-  isTypeMissing,
+  DEFAULT_FENCES,
+  formatYaml,
+  isParseable,
   joinConcept,
-  parseProperties,
-  renameProperty,
   scaffoldConcept,
-  serializeFrontmatter,
   titleFromFilename,
-  type Property,
+  titleFromYaml,
+  yamlError,
 } from './frontmatter';
-// `splitFrontmatter` migrated to a wasm FREE export (ADR 0006 §11-B); the kept
-// property-model round-trip tests consume it from the shared source. Its own
-// goldens moved to `sunstone-shared` (cargo).
+// `splitFrontmatter` is a wasm FREE export (ADR 0006 §11-B); the round-trip
+// tests below consume it from the shared source so join/split stay inverses.
 import { splitFrontmatter } from '$lib/wasm/exports';
 
-describe('parseProperties', () => {
-  test('classifies scalars, lists, and missing type', () => {
-    const props = parseProperties('---\ntype: note\ntitle: Hi\ntags: [a, b]\n---\nx\n');
-    expect(props).toEqual([
-      { key: 'type', kind: 'scalar', scalar: 'note' },
-      { key: 'title', kind: 'scalar', scalar: 'Hi' },
-      { key: 'tags', kind: 'list', list: ['a', 'b'] },
-    ]);
+describe('joinConcept', () => {
+  test('re-fences a block around the body', () => {
+    expect(joinConcept('type: Concept\n', '# Body\n')).toBe('---\ntype: Concept\n---\n# Body\n');
   });
 
-  test('no frontmatter yields no properties', () => {
-    expect(parseProperties('plain body')).toEqual([]);
+  test('adds the missing trailing newline after the block', () => {
+    expect(joinConcept('type: Concept', '# Body\n')).toBe('---\ntype: Concept\n---\n# Body\n');
   });
 
-  test('nested map is captured as a complex entry', () => {
-    const props = parseProperties('---\nnested:\n  x: 1\n---\nbody\n');
-    expect(props).toHaveLength(1);
-    expect(props[0].key).toBe('nested');
-    expect(props[0].kind).toBe('complex');
-    expect(props[0].entry).toBeDefined();
-  });
-});
-
-describe('serializeFrontmatter / joinConcept round-trip', () => {
-  test('simple frontmatter round-trips byte-for-byte', () => {
-    const content = '---\ntype: note\ntitle: Hi\ntags: [a, b]\n---\nBody text\n';
-    const { body } = splitFrontmatter(content);
-    const props = parseProperties(content);
-    expect(joinConcept(props, body)).toBe(content);
+  test('empty or whitespace-only frontmatter emits NO fences', () => {
+    expect(joinConcept('', '# Body\n')).toBe('# Body\n');
+    expect(joinConcept('  \n\n', '# Body\n')).toBe('# Body\n');
   });
 
-  test('a complex entry re-emits verbatim', () => {
-    const content = '---\nnested:\n  x: 1\n  y: 2\n---\nbody\n';
-    const { body } = splitFrontmatter(content);
-    const props = parseProperties(content);
-    expect(joinConcept(props, body)).toBe(content);
+  test('re-emits the verbatim fences it was given', () => {
+    const fences = { open: '--- \n', close: '...\n' };
+    expect(joinConcept('a: 1\n', 'body', fences)).toBe('--- \na: 1\n...\nbody');
   });
 
-  test('empty property list emits no block', () => {
-    expect(serializeFrontmatter([])).toBe('');
+  test('round-trips a Concept byte-for-byte through split', () => {
+    const content = `---\n# a comment\ntype: Concept\ntags: [a, b]\ngenerated: { by: agent, at: 2026-01-01T00:00:00Z }\n---\n\n# Body\n`;
+    const s = splitFrontmatter(content);
+    expect(joinConcept(s.yaml, s.body, { open: s.open, close: s.close })).toBe(content);
   });
 
-  test('unnamed (uncommitted) rows are omitted', () => {
-    const props: Property[] = [
-      { key: '', kind: 'scalar', scalar: 'x' },
-      { key: 'type', kind: 'scalar', scalar: 'note' },
-    ];
-    expect(serializeFrontmatter(props)).toBe('---\ntype: note\n---\n');
+  test('round-trips a Concept with no frontmatter', () => {
+    const content = '# Just a body\n';
+    const s = splitFrontmatter(content);
+    expect(joinConcept(s.yaml, s.body, { open: s.open, close: s.close })).toBe(content);
   });
 
-  test('empty scalar serializes as a bare key', () => {
-    expect(serializeFrontmatter([{ key: 'type', kind: 'scalar', scalar: '' }])).toBe(
-      '---\ntype:\n---\n',
-    );
-  });
-
-  test('numeric scalars round-trip as numbers, not quoted strings', () => {
-    // Regression: re-serializing parsed frontmatter (which happens on every
-    // autosave under ADR 0003) must not change an integer/float into a quoted
-    // string, which would mutate its YAML type on disk.
-    const content = '---\ntype: note\norder: 3\nweight: 1.5\n---\nBody\n';
-    const { body } = splitFrontmatter(content);
-    const props = parseProperties(content);
-    expect(joinConcept(props, body)).toBe(content);
-  });
-
-  test('an originally-quoted numeric string stays a quoted string', () => {
-    // The inverse guarantee: a value the author quoted on purpose keeps its
-    // string type across the round-trip.
-    const content = '---\ntype: note\nid: "3"\n---\nBody\n';
-    const { body } = splitFrontmatter(content);
-    const props = parseProperties(content);
-    expect(joinConcept(props, body)).toBe(content);
+  test('defaults to the canonical fences', () => {
+    expect(DEFAULT_FENCES).toEqual({ open: '---\n', close: '---\n' });
   });
 });
 
-describe('isTypeMissing', () => {
-  test('true when absent or empty, false when present', () => {
-    expect(isTypeMissing([])).toBe(true);
-    expect(isTypeMissing([{ key: 'type', kind: 'scalar', scalar: '' }])).toBe(true);
-    expect(isTypeMissing([{ key: 'type', kind: 'scalar', scalar: 'note' }])).toBe(false);
+describe('yamlError / isParseable (the save gate)', () => {
+  test('well-formed YAML has no error', () => {
+    expect(yamlError('type: Concept\ntags: [a, b]\n')).toBeNull();
+    expect(isParseable('generated: { by: agent, at: 2026-01-01T00:00:00Z }\n')).toBe(true);
+  });
+
+  test('an empty block is well-formed', () => {
+    expect(isParseable('')).toBe(true);
+  });
+
+  test('a broken block reports an error with in-block offsets', () => {
+    const yaml = 'type: Concept\n  bad: [1, 2\n';
+    const err = yamlError(yaml);
+    expect(err).not.toBeNull();
+    expect(err!.message.length).toBeGreaterThan(0);
+    expect(err!.from).toBeGreaterThanOrEqual(0);
+    expect(err!.to).toBeGreaterThan(err!.from);
+    expect(err!.to).toBeLessThanOrEqual(yaml.length);
+    expect(isParseable(yaml)).toBe(false);
+  });
+
+  test('a duplicate key is NOT a well-formedness failure (it is a lint rule, ADR 0009)', () => {
+    expect(isParseable('type: A\ntype: B\n')).toBe(true);
   });
 });
 
-describe('renameProperty', () => {
-  test('scalar/list rename just changes the key', () => {
-    expect(renameProperty({ key: 'a', kind: 'scalar', scalar: '1' }, 'b')).toEqual({
-      key: 'b',
-      kind: 'scalar',
-      scalar: '1',
-    });
+describe('titleFromYaml', () => {
+  test('reads a scalar title', () => {
+    expect(titleFromYaml('type: Concept\ntitle: My note\n')).toBe('My note');
+    expect(titleFromYaml("title: 'Quoted'\n")).toBe('Quoted');
   });
 
-  test('complex rename rewrites the key in the verbatim entry, preserving the value', () => {
-    const [prop] = parseProperties('---\nnested:\n  x: 1\n---\nbody\n');
-    const renamed = renameProperty(prop, 'renamed');
-    expect(renamed.key).toBe('renamed');
-    expect(renamed.entry!.startsWith('renamed:')).toBe(true);
-    expect(renamed.entry).toContain('  x: 1');
+  test('trims surrounding whitespace', () => {
+    expect(titleFromYaml('title: "  padded  "\n')).toBe('padded');
+  });
+
+  test('falls back to null for a missing, empty, non-string or unparseable title', () => {
+    expect(titleFromYaml('type: Concept\n')).toBeNull();
+    expect(titleFromYaml('title: "   "\n')).toBeNull();
+    expect(titleFromYaml('title: [a, b]\n')).toBeNull();
+    expect(titleFromYaml('title: { a: 1 }\n')).toBeNull();
+    expect(titleFromYaml('')).toBeNull();
+    expect(titleFromYaml('type: Concept\n  bad: [1, 2\n')).toBeNull();
+    expect(titleFromYaml('- a\n- b\n')).toBeNull();
+  });
+});
+
+describe('formatYaml', () => {
+  test('preserves comments while reflowing', () => {
+    const out = formatYaml('# keep me\ntype:    Concept\n');
+    expect(out).not.toBeNull();
+    expect(out).toContain('# keep me');
+    expect(out).toContain('type: Concept');
+  });
+
+  test('returns null when the block is already formatted or does not parse', () => {
+    expect(formatYaml('type: Concept')).toBeNull();
+    expect(formatYaml('type: Concept\n  bad: [1, 2')).toBeNull();
   });
 });
 

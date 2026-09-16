@@ -26,7 +26,7 @@ Concept; that is now just the one-Tile case.
 
 The **Concept header** carries every concept-scoped control — back/forward, the
 **Edit** toggle (which flips the Tile between `read` and `editing`), the
-Properties toggle, undo/redo (only while editing), review, export-PDF, split and
+Frontmatter toggle, undo/redo (only while editing), review, export-PDF, split and
 close. There is no global nav bar; app-global controls live on the
 [Activity Rail](/interface/activity-rail.md) instead.
 
@@ -36,7 +36,7 @@ close. There is no global nav bar; app-global controls live on the
 ## The active Tile and shared buffers
 
 Exactly one Tile is the **active Tile** — the focused editor cell. The
-[Outline, Backlinks and Properties](/GLOSSARY.md) all describe the active Tile.
+[Outline, Backlinks and Frontmatter](/GLOSSARY.md) all describe the active Tile.
 
 The same Concept may be open in **multiple Tiles at once**, and they share **one
 underlying buffer**: edits and autosave in one Tile are reflected in the others.

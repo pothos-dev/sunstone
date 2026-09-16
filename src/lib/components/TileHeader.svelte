@@ -57,19 +57,20 @@
     onExportPdf: () => void;
     /** Toggle live editing on/off for this Concept. */
     onToggleEditing: () => void;
-    /** WEB only: show the explicit Save button (editing + unsaved changes). On
-     *  desktop this stays false (autosave), so the button never renders. */
+    /** Show the explicit Save button. On WEB: editing + unsaved changes. On
+     *  desktop: only when the save gate is HOLDING the write because the
+     *  frontmatter does not parse (ADR 0008) — autosave covers the rest. */
     showSave?: boolean;
-    /** WEB only: commit the active buffer (flush the Document). */
+    /** Save the active buffer explicitly — through the save gate. */
     onSave?: () => void;
-    /** Whether the Properties panel is shown (global `session.propertiesShown`). */
-    propertiesShown: boolean;
+    /** Whether the Frontmatter Region is shown (global `session.frontmatterShown`). */
+    frontmatterShown: boolean;
     /**
-     * Toggle the Properties panel, which shows the open Concept's frontmatter.
-     * Drives the global `session.propertiesShown` flag (the control moved here
+     * Toggle the Frontmatter Region, which shows the open Concept's frontmatter
+     * as YAML. Drives the global `session.frontmatterShown` flag (moved here
      * from the deleted NavBar; the flag's scope is unchanged — app-wide).
      */
-    onToggleProperties: () => void;
+    onToggleFrontmatter: () => void;
   }
 
   let {
@@ -98,8 +99,8 @@
     onToggleEditing,
     showSave = false,
     onSave,
-    propertiesShown,
-    onToggleProperties,
+    frontmatterShown,
+    onToggleFrontmatter,
   }: Props = $props();
 </script>
 
@@ -165,16 +166,18 @@
       </div>
     {/if}
 
-    <!-- WEB explicit Save (ticket 08 §4): sits between undo/redo and the Edit
-         toggle, shown ONLY while editing with unsaved changes. Its presence IS
-         the dirty indicator (no separate dot). Desktop autosaves → never shown.
-         The mousedown-prevent keeps the click from blurring a frontmatter edit
-         before the flush runs. -->
+    <!-- Explicit Save (ticket 08 §4): sits between undo/redo and the Edit
+         toggle. On WEB it shows while editing with unsaved changes and its
+         presence IS the dirty indicator (no separate dot). On DESKTOP autosave
+         covers the normal case, so it shows only while the save gate holds a
+         write back — there it is both the held-write indicator and the way to
+         force the write through (ADR 0008). The mousedown-prevent keeps the
+         click from blurring a frontmatter edit before the save runs. -->
     {#if showSave}
       <button
         type="button"
         class="text-btn save-btn"
-        data-testid="web-save"
+        data-testid="save-concept"
         title="Save (Ctrl/Cmd+S)"
         aria-label="Save"
         onmousedown={(e) => e.preventDefault()}
@@ -210,18 +213,18 @@
       Edit</button
     >
 
-    <!-- Properties toggle: shows/hides the open Concept's frontmatter inline.
+    <!-- Frontmatter toggle: shows/hides the open Concept's frontmatter inline.
          Moved here from the deleted NavBar; drives the global
-         `session.propertiesShown` flag (app-wide preference). -->
+         `session.frontmatterShown` flag (app-wide preference). -->
     <button
       type="button"
       class="icon-btn"
-      class:active={propertiesShown}
-      data-testid="properties-toggle"
-      title={propertiesShown ? 'Hide Properties' : 'Show Properties'}
-      aria-label="Properties"
-      aria-pressed={propertiesShown}
-      onclick={onToggleProperties}
+      class:active={frontmatterShown}
+      data-testid="frontmatter-toggle"
+      title={frontmatterShown ? 'Hide Frontmatter' : 'Show Frontmatter'}
+      aria-label="Frontmatter"
+      aria-pressed={frontmatterShown}
+      onclick={onToggleFrontmatter}
     >
       <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
         <!-- sliders glyph: two horizontal rails with knobs (properties/settings). -->

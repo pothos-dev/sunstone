@@ -9,7 +9,7 @@
 // DELETE (its tracked position no longer sits on a heading — identity dropped, so
 // its inbound links are meant to break, not silently repoint).
 //
-// The editor doc holds only the BODY (frontmatter is split off, ADR 0003), so
+// The editor doc holds only the BODY (frontmatter is split off, ADR 0008), so
 // `scanHeadings` runs with a zero frontmatter offset and its 1-based lines map
 // straight onto the CodeMirror document.
 //

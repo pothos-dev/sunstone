@@ -13,7 +13,8 @@ import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
 // existing autosave (`onChange`) and CM undo/redo with no new persistence path.
 //
 // Scope is the body only: the CodeMirror doc holds only the body (frontmatter
-// lives in `frontmatterField`, ADR 0003), so find/replace never touch it.
+// lives in `frontmatterField` and its own editor, ADR 0008), so find/replace
+// never touch it.
 //
 // `Ctrl/Cmd+F` is owned by App.svelte (so it grabs focus app-wide); the search
 // keymap here still provides in-panel bindings (Enter = next, Esc = close, etc.)

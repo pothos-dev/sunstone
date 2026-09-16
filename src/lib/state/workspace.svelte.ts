@@ -120,6 +120,15 @@ export class Tile {
     return this.activeDocument?.dirty ?? false;
   }
 
+  /**
+   * True when the active Concept's write is HELD by the save gate — unsaved
+   * edits the autosave refuses to write because the frontmatter does not parse
+   * (ADR 0008). Drives the Save affordance on desktop.
+   */
+  get writeHeld(): boolean {
+    return this.activeDocument?.writeHeld ?? false;
+  }
+
   /** Visited Concept paths of this Tile (current entry at `index`). */
   get history(): readonly string[] {
     return this.#history.entries;
@@ -243,6 +252,14 @@ export class Tile {
   /** Flush the active Document's pending autosave to disk immediately. */
   async flush(): Promise<void> {
     await this.activeDocument?.flush();
+  }
+
+  /**
+   * EXPLICIT save of the active Document: writes through the save gate, so an
+   * unparseable frontmatter block is persisted rather than lost (ADR 0008).
+   */
+  async save(): Promise<void> {
+    await this.activeDocument?.saveNow();
   }
 
   /**

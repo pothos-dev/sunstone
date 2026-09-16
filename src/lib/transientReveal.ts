@@ -53,7 +53,7 @@ export function revealFlagsFor(region: RegionId): readonly TransientFlag[] {
       return ['rightSidebarRevealed', 'outlineRevealed'];
     case 'backlinks':
       return ['rightSidebarRevealed', 'backlinksRevealed'];
-    case 'properties':
+    case 'frontmatter':
     case 'editor':
       return [];
   }

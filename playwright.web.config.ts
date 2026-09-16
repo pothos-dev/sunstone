@@ -27,7 +27,11 @@ import {
   TEST_AUTH_EMAIL,
 } from './tests/web-bundle';
 
-const RUST_PORT = 8787;
+// The Rust API port. Overridable because 8787 is a popular default and a
+// developer machine may already have something on it — the suite then fails at
+// "webServer was not able to start" with a bind error that looks like a Sunstone
+// bug rather than a busy port.
+const RUST_PORT = Number(process.env.SUNSTONE_TEST_API_PORT ?? 8787);
 const WEB_PORT = 5199;
 
 export default defineConfig({

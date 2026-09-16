@@ -2,6 +2,8 @@ import { backend } from '$lib/ipc';
 import { createDebouncer } from '$lib/debounce';
 import { errMessage } from '$lib/errors';
 import { remapPath } from '$lib/path';
+import { isParseable } from '$lib/frontmatter';
+import { splitFrontmatter } from '$lib/wasm/exports';
 
 /** Autosave debounce: save this long after the user stops typing. */
 const AUTOSAVE_DEBOUNCE_MS = 300;
@@ -23,6 +25,14 @@ const AUTOSAVE_DEBOUNCE_MS = 300;
  * solely through `flush()`, driven by the Edit-toggle's explicit "Save" click.
  * `#save`/`flush` are otherwise identical across targets.
  *
+ * The SAVE GATE (ADR 0008): frontmatter is edited as YAML text, which is
+ * unparseable for as long as it takes to type a key — and on the web every write
+ * is a commit. So the DEBOUNCED autosave writes only while the block parses;
+ * while it does not the write is HELD (`writeHeld`), the buffer stays dirty, and
+ * the UI offers an explicit Save. An EXPLICIT save (`saveNow`) writes regardless:
+ * losing the author's text is worse than a momentarily broken file. The gate is
+ * whole-file, so a held frontmatter write holds body edits with it.
+ *
  * External changes: `reloadExternal()` refreshes the buffer from disk when the
  * file changed on disk by another tool — but never clobbers unsaved local
  * edits. Sunstone's own writes are suppressed by the backend, so they never
@@ -38,6 +48,12 @@ export class Document {
   dirty = $state<boolean>(false);
   /** Last open/save error, if any. */
   error = $state<string | null>(null);
+  /**
+   * True while there are unsaved edits the debounced autosave REFUSES to write
+   * because the frontmatter block does not parse (ADR 0008). Drives the Save
+   * affordance on desktop, where there is otherwise no save button at all.
+   */
+  writeHeld = $derived(this.dirty && !isParseable(splitFrontmatter(this.content).yaml));
 
   /**
    * Optional hook invoked after a successful autosave, once the write has
@@ -85,14 +101,32 @@ export class Document {
     if (!__SUNSTONE_WEB__) this.#autosave.schedule();
   }
 
-  /** Write the current content to disk immediately (cancels the debounce). */
+  /**
+   * Write the current content to disk immediately (cancels the debounce), but
+   * still SUBJECT to the save gate: this is the implicit path (blur, navigation,
+   * tile close), so it must not persist frontmatter that does not parse.
+   */
   async flush(): Promise<void> {
     this.#autosave.cancel();
     if (this.dirty) await this.#save();
   }
 
-  async #save(): Promise<void> {
+  /**
+   * EXPLICIT save (the Save affordance / the web Save-on-leave choice): writes
+   * through the save gate, unparseable frontmatter and all. The author asked for
+   * their text to be on disk; refusing would lose it.
+   */
+  async saveNow(): Promise<void> {
+    this.#autosave.cancel();
+    if (this.dirty) await this.#save(true);
+  }
+
+  async #save(force = false): Promise<void> {
     if (!this.dirty) return;
+    // The save gate: hold the write while the frontmatter does not parse, unless
+    // this is an explicit save. Re-checked here (not at `edit`) so the gate is
+    // one choke point for the debounce, the blur flush and navigation alike.
+    if (!force && !isParseable(splitFrontmatter(this.content).yaml)) return;
     const content = this.content;
     const path = this.path;
     try {

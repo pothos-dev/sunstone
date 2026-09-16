@@ -12,7 +12,7 @@ import { signInAsTestUser } from './web-auth';
  * specs drive the REAL App surface: the interactive `Tree` (`data-testid="tree"`
  * with `[data-path]` file rows), the CodeMirror buffer inside each Tile's editor
  * host (`[data-testid="editor"] .cm-content`), and the explicit-Save affordance
- * (`web-save`, shown in the tile header while editing + dirty — its presence is
+ * (`save-concept`, shown in the tile header while editing + dirty — its presence is
  * the dirty indicator). Persistence is explicit-only (Cmd/Ctrl+S or the Save
  * button); blur does NOT commit on web.
  */
@@ -58,7 +58,7 @@ export async function mountShell(page: Page, path = '/'): Promise<void> {
 }
 
 /** The active Tile's live CodeMirror content surface (body text; frontmatter is
- *  split into the Properties panel). */
+ *  split into the Frontmatter Region). */
 export function cmContent(page: Page): Locator {
   return page.locator('[data-testid="editor"] .cm-content').first();
 }

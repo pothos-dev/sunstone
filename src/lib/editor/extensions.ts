@@ -16,7 +16,7 @@ import { indentOnInput } from '@codemirror/language';
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { backend } from '$lib/ipc';
-import { joinConcept, type Property } from '$lib/frontmatter';
+import { joinConcept, type Fences } from '$lib/frontmatter';
 import {
   inlinePreview,
   imageBlocks,
@@ -33,6 +33,7 @@ import '@atomic-editor/editor/styles.css';
 import {
   setFrontmatter,
   frontmatterField,
+  fencesField,
   frontmatterUndo,
 } from './frontmatter-field';
 import { brokenLinks, brokenLinkTheme, type BrokenLinkContext } from './broken-links';
@@ -75,8 +76,10 @@ export interface BuildEditorOptions {
   parent: HTMLElement;
   /** The markdown BODY (no frontmatter) to seed the document with. */
   doc: string;
-  /** The Concept's initial frontmatter properties (ADR 0003). */
-  frontmatter?: Property[];
+  /** The Concept's initial frontmatter YAML — the inner block, no fences (ADR 0008). */
+  frontmatter?: string;
+  /** The verbatim `---` lines the block was read with, so writes re-fence exactly. */
+  fences?: Fences;
   /**
    * Bundle-relative path of the Concept this view starts on. Recorded so
    * `setEditorConcept` can detect a Concept SWITCH (path change) and rebuild the
@@ -86,24 +89,33 @@ export interface BuildEditorOptions {
   /** The view mode to build the editor in (default `read`). */
   initialMode?: EditorMode;
   /**
-   * Called with the new FULL Concept markdown (`serialize(frontmatter) + body`)
-   * after a user edit to either the body or the frontmatter, for autosave.
+   * Called with the new FULL Concept markdown (frontmatter block + body) after a
+   * user edit to either the body or the frontmatter, for autosave.
    */
   onChange?: (content: string) => void;
   /**
-   * Called whenever the frontmatter field changes (user edit, Concept switch, or
-   * external reload), so the Properties panel can render the current properties.
+   * Called whenever the frontmatter field changes (user edit, undo/redo, Concept
+   * switch, or external reload), so the Frontmatter Region's YAML editor can
+   * mirror the current block.
    */
-  onFrontmatterChange?: (props: Property[]) => void;
+  onFrontmatterChange?: (yaml: string) => void;
   /** called when the editor loses focus */
   onBlur?: () => void;
   /**
    * Called after any transaction that may change the undo/redo history depth
    * (body edit, frontmatter edit, programmatic replacement) and after a state
    * rebuild on Concept switch. Lets the host mirror `undoDepth`/`redoDepth` into
-   * reactive UI state for the Properties-panel undo/redo buttons.
+   * reactive UI state for the Tile header's undo/redo buttons.
    */
   onHistory?: () => void;
+  /**
+   * Called when an UNDO or REDO lands, with the surface it changed. With
+   * frontmatter and body on one history (ADR 0008) a step can revert content the
+   * user cannot see — the Frontmatter Region is collapsed by default — so the
+   * host moves focus to whichever surface the step touched, expanding the Region
+   * when that is the frontmatter.
+   */
+  onHistoryStep?: (target: 'frontmatter' | 'body') => void;
   /**
    * Called when the user clicks a rendered link in the live preview (inline
    * links and table-cell links). See the slice-5 seam below.
@@ -271,7 +283,7 @@ export function editorExtensions(
   mode: EditorMode,
   theme: ResolvedTheme,
 ): Extension[] {
-  const { onChange, onFrontmatterChange, onBlur, onHistory, onLinkClick, brokenLinkContext, wikiLinkContext, onCommentEdit } = opts;
+  const { onChange, onFrontmatterChange, onBlur, onHistory, onHistoryStep, onLinkClick, brokenLinkContext, wikiLinkContext, onCommentEdit } = opts;
 
   // Notify on user edits to the body OR the frontmatter. Frontmatter edits are
   // carried by `setFrontmatter` effects (no doc change), so we watch for both.
@@ -282,16 +294,28 @@ export function editorExtensions(
     );
     if (!update.docChanged && !fmChanged) return;
     // History depth may have changed (body/frontmatter edit, undo, redo); keep
-    // the host's reactive undo/redo state in sync for the panel buttons.
+    // the host's reactive undo/redo state in sync for the header buttons.
     onHistory?.();
+    // An undo/redo step: tell the host WHICH surface it changed so focus can
+    // follow it (ADR 0008). Frontmatter wins when a step touched both.
+    const fromHistory = update.transactions.some(
+      (tr) => tr.isUserEvent('undo') || tr.isUserEvent('redo'),
+    );
+    if (fromHistory) onHistoryStep?.(fmChanged ? 'frontmatter' : 'body');
     // Mirror the frontmatter out on every field change (incl. programmatic
-    // Concept switches / reloads) so the Properties panel stays in sync.
+    // Concept switches / reloads) so the Frontmatter editor stays in sync.
     if (fmChanged) onFrontmatterChange?.(update.state.field(frontmatterField));
     if (!onChange) return;
     // Skip programmatic replacements (Concept switch / external reload).
     const isProgrammatic = update.transactions.some((tr) => tr.annotation(programmatic));
     if (isProgrammatic) return;
-    onChange(joinConcept(update.state.field(frontmatterField), update.state.doc.toString()));
+    onChange(
+      joinConcept(
+        update.state.field(frontmatterField),
+        update.state.doc.toString(),
+        update.state.field(fencesField),
+      ),
+    );
   });
 
   // Save-on-blur: flush any pending autosave when focus leaves the editor.

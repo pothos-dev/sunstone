@@ -7,7 +7,8 @@ import { type Page } from '@playwright/test';
  * The unified `Escape` model + overlay focus-return, layering over the basic
  * Region→Editor peel:
  *   Escape peels EXACTLY ONE layer per press, innermost first —
- *     1. in-field edit (Properties draft / chip text-edit) → cancel locally, STAY,
+ *     1. in-field edit (YAML editing in the Frontmatter Region) → leave the
+ *        text, STAY in the Region,
  *     2. overlay open (QuickNav, Search, context menu, TreeCrud dialog) → close it,
  *     3. non-Editor Region focused → home to the Editor,
  *     4. Editor focused / nothing open → no-op.
@@ -54,7 +55,7 @@ async function altPress(page: Page, key: string) {
 async function freshLoad(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], propertiesShown: true })));
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], frontmatterShown: true })));
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 }
@@ -134,13 +135,12 @@ test('Search from the Explorer: cancel restores the opener row', async ({ page }
   await expect.poll(() => focusedRow(page)).toBe('concepts/codemirror.md');
 });
 
-test('Properties: Escape peels EXACTLY one layer per press (chip text-edit → chip sub-nav → grid nav → Editor)', async ({
+test('Frontmatter: Escape peels EXACTLY one layer per press (YAML editing → Region → Editor)', async ({
   page,
 }) => {
   await freshLoad(page);
-  // codemirror.md has a `tags` list value cell (row 3, col 1).
   await page.getByTestId('tree').locator('[data-path="concepts/codemirror.md"]').click();
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
   // Read is the default; enter editing so the Editor takes click focus.
@@ -148,57 +148,43 @@ test('Properties: Escape peels EXACTLY one layer per press (chip text-edit → c
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 
-  // Move the grid cursor into Properties and onto the `tags` value cell.
-  await page.keyboard.press('Alt+ArrowUp'); // Properties, nav mode, row 0 key
-  await page.keyboard.press('ArrowRight'); // row 0 value
-  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown'); // row 3 value
+  // Alt-in lands in the YAML editor itself — the Region's entry point.
+  await page.keyboard.press('Alt+ArrowUp');
+  await expectActive(page, 'frontmatter');
   await expect
     .poll(() =>
-      page.evaluate(() => {
-        const el = document.activeElement;
-        return el instanceof HTMLElement && el.classList.contains('cell')
-          ? { row: Number(el.dataset.cellRow), col: Number(el.dataset.cellCol) }
-          : null;
-      }),
+      page.evaluate(() =>
+        Boolean(document.activeElement?.closest('[data-region="frontmatter"] .cm-editor')),
+      ),
     )
-    .toEqual({ row: 3, col: 1 });
+    .toBe(true);
 
-  // Enter chip sub-nav, arrow to the new-tag input, Enter → text edit, type a draft.
-  await page.keyboard.press('Enter'); // → chip sub-nav (first chip)
-  const chipCount = await page.locator('[data-testid="chip-tags"]').count();
-  for (let i = 0; i < chipCount; i++) await page.keyboard.press('ArrowRight'); // → new-tag input
-  await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe(
-    'chip-add-tags',
-  );
-  await page.keyboard.press('Enter'); // → text edit
-  await page.keyboard.type('peel-draft');
-
-  // LAYER 1 (in-field edit): Escape abandons the draft, STAYS in the strip (chip
-  // sub-nav). Does NOT bubble to the overlay/Region peel.
+  // LAYER 1 (YAML editing): Escape leaves the text, STAYS in the Region — it
+  // does NOT bubble to the Region→Editor peel.
   await page.keyboard.press('Escape');
-  await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-testid'))).toBe(
-    'chip-add-tags',
-  );
-  const chips = await page
-    .locator('[data-testid="chip-tags"]')
-    .evaluateAll((els) => els.map((e) => (e.textContent ?? '').replace(/×\s*$/, '').trim()));
-  expect(chips).not.toContain('peel-draft');
-
-  // LAYER 1 again (chip sub-nav → grid nav): one more layer, still in Properties.
-  await page.keyboard.press('Escape');
+  await expectActive(page, 'frontmatter');
   await expect
     .poll(() =>
-      page.evaluate(() => {
-        const el = document.activeElement;
-        return el instanceof HTMLElement && el.classList.contains('cell')
-          ? { row: Number(el.dataset.cellRow), col: Number(el.dataset.cellCol) }
-          : null;
-      }),
+      page.evaluate(() =>
+        Boolean(document.activeElement?.closest('[data-region="frontmatter"] .cm-editor')),
+      ),
     )
-    .toEqual({ row: 3, col: 1 });
-  await expectActive(page, 'properties');
+    .toBe(false);
 
-  // LAYER 3 (non-Editor Region → Editor): now in grid nav, Escape homes to Editor.
+  // Enter re-enters the YAML (the Region container's only key).
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(document.activeElement?.closest('[data-region="frontmatter"] .cm-editor')),
+      ),
+    )
+    .toBe(true);
+  await page.keyboard.press('Escape');
+  await expectActive(page, 'frontmatter');
+
+  // LAYER 3 (non-Editor Region → Editor): on the container, Escape homes to the
+  // Editor.
   await page.keyboard.press('Escape');
   await expectActive(page, 'editor');
 

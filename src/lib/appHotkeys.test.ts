@@ -18,7 +18,7 @@ function ctx(over: Partial<AppHotkeyContext> = {}): AppHotkeyContext {
     inCmEditor: false,
     reviewActive: false,
     focusedRegion: null,
-    propertiesEditing: false,
+    frontmatterEditing: false,
     quickNavOpen: false,
     quickNavTagActive: false,
     ...over,
@@ -129,15 +129,16 @@ describe('routeAppHotkey', () => {
       kind: 'escape',
       localPeelActive: true,
     });
-    // Properties Region + non-nav mode → local peel; nav mode → not.
+    // Frontmatter Region + focus in the YAML editor → local peel; on the Region
+    // container itself → not.
     expect(
       routeAppHotkey(
         keydown({ key: 'Escape' }),
-        ctx({ focusedRegion: 'properties', propertiesEditing: true }),
+        ctx({ focusedRegion: 'frontmatter', frontmatterEditing: true }),
       ),
     ).toEqual({ kind: 'escape', localPeelActive: true });
     expect(
-      routeAppHotkey(keydown({ key: 'Escape' }), ctx({ focusedRegion: 'properties' })),
+      routeAppHotkey(keydown({ key: 'Escape' }), ctx({ focusedRegion: 'frontmatter' })),
     ).toEqual({ kind: 'escape', localPeelActive: false });
     // Quick-nav tag drill-down open → local peel (needs BOTH flags).
     expect(

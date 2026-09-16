@@ -192,7 +192,8 @@ export interface Backend {
 
   /**
    * All distinct top-level frontmatter keys used across the Bundle, sorted.
-   * Feeds the Properties panel's key-name autocomplete (key-and-tag
+   * Fed the Properties panel's key-name autocomplete; awaiting the
+   * marker-gated completion of ADR 0009 (key-and-tag
    * autocomplete slice). The OKF recommended keys are merged in client-side, so
    * this is bundle-sourced only (distinct keys from every Concept's frontmatter).
    */

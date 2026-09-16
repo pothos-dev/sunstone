@@ -47,11 +47,12 @@ Tile's Concept:
 | ------- | ---- |
 | Back / forward | Move through the Tile's own navigation history |
 | **Edit** toggle | Switch the Tile between `read` and `editing` — the boolean view mode (see [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md)) |
-| Properties toggle | Show/hide inline frontmatter chrome (drives the app-wide `propertiesShown` flag) |
-| Undo / redo | Over the Tile's Document history — **shown only while editing** |
+| Frontmatter toggle | Show/hide the inline frontmatter YAML editor (drives the app-wide `frontmatterShown` flag) |
+| Undo / redo | Over the Tile's single body+frontmatter history — **shown only while editing** |
 | Review | Toggle the working-tree ↔ HEAD diff |
 | Export PDF | Export the Concept |
 | Split | Split Right (new Column) / Split Down (new Tile in this Column) |
+| Save | Persist explicitly. On the web: while editing with unsaved changes. On desktop: only while the [save gate](/adr/0008-raw-yaml-frontmatter-editing.md) is holding a write because the frontmatter does not parse |
 | Close | Clear the Tile (shown only when more than one Tile is on screen) |
 
 A single open Concept therefore shows just its Concept header — there is no
@@ -59,10 +60,10 @@ second global bar above it. The **Edit** toggle is the sole view-mode control:
 the old tri-state Source / Live / Reading segmented control is gone, undo/redo
 appear here only in `editing` mode, and a Concept **opens in `read`**.
 
-The Properties toggle drives one app-wide flag (`propertiesShown`): on, every
+The Frontmatter toggle drives one app-wide flag (`frontmatterShown`): on, every
 visible Tile renders its own Concept's frontmatter inline; off, no Tile shows any
-Properties chrome. Its scope is unchanged from the old header — only its home
-moved.
+Frontmatter chrome — and no Tile builds a YAML editor or fetches its grammar. It
+is **off by default**, and its scope is unchanged from the old header.
 
 ## On the web
 
@@ -75,8 +76,8 @@ surfaces](/interface/app-shell.md)):
 - The **anonymous** read-only SSR surface renders the same Activity Rails — with
   a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
   but replaces the full Concept header with a **slim concept strip** over the
-  centre: back/forward, the Properties toggle, export-PDF and a light/dark theme
-  toggle. There is no Edit toggle until you sign in.
+  centre: back/forward, a read-only properties view of the frontmatter,
+  export-PDF and a light/dark theme toggle. There is no Edit toggle until you sign in.
 
 ## Relationships
 
@@ -84,7 +85,7 @@ surfaces](/interface/app-shell.md)):
   each [Sidebar](/interface/sidebars.md), the Concept header tops each
   [Tile](/editor/editor-layout.md).
 - The Edit toggle's `editing`/`read` boolean is specified in
-  [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md); the Properties flag is
+  [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md); the Frontmatter flag is
   [View state](/interface/view-state.md).
 - **Activity Rail**, **Concept header**, **Quick nav** and **Search** are indexed
   in the [glossary](/GLOSSARY.md).

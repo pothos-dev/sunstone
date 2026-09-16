@@ -116,6 +116,14 @@ class EditorStore {
     return this.#tile.flush();
   }
 
+  /**
+   * EXPLICIT save: writes through the save gate, so frontmatter that does not
+   * parse is persisted rather than lost (ADR 0008).
+   */
+  save(): Promise<void> {
+    return this.#tile.save();
+  }
+
   /** Follow the open Concept + history across a rename/move (ALL Tiles). */
   followRename(from: string, to: string): string | null {
     return this.#workspace.followRename(from, to);

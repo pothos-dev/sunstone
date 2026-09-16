@@ -161,11 +161,16 @@ export type BundleState = {
   leftSidebarWidth?: number;
   rightSidebarWidth?: number;
   /**
-   * GLOBAL Properties show/hide flag (slice: multi-concept-tiling). When `true`,
+   * GLOBAL Frontmatter show/hide flag (slice: multi-concept-tiling). When `true`,
    * every visible tile renders its Concept's frontmatter inline; when `false`
-   * (the default on read) no tile shows any Properties chrome. Persisted so the
-   * choice survives a relaunch. Replaces the old per-panel `propertiesOpen`
-   * collapse flag.
+   * (the default on read) no tile shows any Frontmatter chrome. Persisted so the
+   * choice survives a relaunch.
+   */
+  frontmatterShown?: boolean;
+  /**
+   * The pre-ADR-0008 name of `frontmatterShown`, back when the Region was the
+   * Properties panel. Read-only compatibility: an existing user's choice
+   * survives the rename, but nothing writes it any more.
    */
   propertiesShown?: boolean;
   /**

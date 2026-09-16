@@ -16,7 +16,7 @@ Family-specific rules are not all this ticket's job. It builds the service, the 
 - [ ] OKF rules and OKF completions are both active only when the bundle-root `index.md` declares `okf_version`, and both go quiet when it does not
 - [ ] In OKF mode, fields the spec marks REQUIRED are errors — `type`, a `sources` entry's `resource`, `generated.by` — and everything else is a warning or info
 - [ ] Diagnostics are scoped to families the author opted into: a Concept with no `sources` key gets no provenance diagnostics
-- [ ] A duplicate key is reported, restoring the rejection the Properties panel used to enforce (the `yaml` parser does not warn by default)
+- [ ] A duplicate key is reported, restoring the rejection the Properties panel used to enforce — the `yaml` parser flags it, but `yamlError` asks with `uniqueKeys: false` so it can never hold a write back ([02a](02a-frontmatter-yaml-editor.md))
 - [ ] Completion offers OKF's recommended top-level keys and the keys of any family already present, replacing the panel's `OKF_KEYS` autocomplete
 - [ ] An explicit format command preserves comments and quoting
 - [ ] The save gate asks only whether the YAML parses and never consults the lint, so an OKF error never blocks a write

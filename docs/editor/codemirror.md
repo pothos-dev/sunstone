@@ -47,7 +47,7 @@ flowchart TD
   P --> M --> F --> B --> W --> S --> A --> H --> E --> K --> L
 ```
 
-The `frontmatterField` (see [custom-extensions](/editor/custom-extensions.md)) is seeded _separately_ by each caller via `frontmatterField.init(...)` because its value differs per Concept, but every other extension's behaviour lives in the shared `editorExtensions()` so the two build paths cannot diverge.
+The `frontmatterField` / `fencesField` (see [custom-extensions](/editor/custom-extensions.md)) are seeded _separately_ by each caller via `.init(...)` because their values differ per Concept, but every other extension's behaviour lives in the shared `editorExtensions()` so the two build paths cannot diverge.
 
 ## Compartments — runtime reconfiguration without a rebuild
 
@@ -77,7 +77,7 @@ Because the imperative API operates on a bare `EditorView`, `cm.ts` keeps its si
 
 ## Autosave and history listeners
 
-An `EditorView.updateListener` fires `onChange` (debounced by the store) on any body edit or `setFrontmatter` effect, skipping transactions carrying the `programmatic` annotation; it also mirrors frontmatter to the Properties panel and calls `onHistory` so the panel's undo/redo buttons track `undoDepth`/`redoDepth`. A `blur` DOM handler flushes a pending save when focus leaves the editor.
+An `EditorView.updateListener` fires `onChange` (debounced by the store) on any body edit or `setFrontmatter` effect, skipping transactions carrying the `programmatic` annotation; it also mirrors the frontmatter YAML out to the Frontmatter Region's editor and calls `onHistory` so the header's undo/redo buttons track `undoDepth`/`redoDepth`. On an undo/redo it additionally reports WHICH surface the step changed (`onHistoryStep`), so focus can follow it into the frontmatter or the body — with two surfaces on one stack a step can otherwise revert something the user cannot see ([ADR-0008](/adr/0008-raw-yaml-frontmatter-editing.md)). A `blur` DOM handler flushes a pending save when focus leaves the editor.
 
 ## Review buffers
 

@@ -6,9 +6,12 @@ import { type Page } from '@playwright/test';
  *
  * A new Concept created from the tree opens spec-valid:
  *  - frontmatter STUB with an empty `type` and a `title` derived from the filename,
- *  - the `type` Properties input is FOCUSED so the user lands there,
- *  - the `type` field autocompletes against existing Bundle types (a datalist),
- *    while still allowing a brand-new type to be typed freely.
+ *  - the Frontmatter Region is shown, editing is on, and the cursor lands at the
+ *    end of the `type:` line so the author can fill in the one REQUIRED field,
+ *  - typing a value there persists it.
+ *
+ * (Type autocomplete came with the Properties panel and returns as marker-gated
+ * completion — ticket 02b, ADR 0009.)
  */
 
 /** Open the context menu for a tree node by right-clicking its row. */
@@ -18,17 +21,11 @@ async function openRowMenu(page: Page, path: string) {
   await expect(page.getByTestId('context-menu')).toBeVisible();
 }
 
-test('new concept: scaffolds type/title, focuses type, autocompletes types', async ({
-  page,
-}) => {
+test('new concept: scaffolds type/title and lands the cursor on `type`', async ({ page }) => {
   await page.goto('/');
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  // Properties is hidden by default (global toggle); switch it on so the
-  // scaffolded stub + focused `type` field render.
-  await page.getByTestId('properties-toggle').click();
-
   // --- Create a new Concept "my-note" under concepts/ ---
   await openRowMenu(page, 'concepts');
   await page.getByTestId('context-menu').locator('[data-action="newConcept"]').click();
@@ -38,31 +35,26 @@ test('new concept: scaffolds type/title, focuses type, autocompletes types', asy
   const created = 'concepts/my-note.md';
   await expect(tree.locator(`[data-path="${created}"]`)).toBeVisible();
 
-  // --- The Properties panel shows the scaffolded stub ---
-  const properties = page.getByTestId('properties');
-  await expect(properties).toBeVisible();
+  // --- The Frontmatter Region is revealed and shows the scaffolded stub ---
+  const yaml = page.getByTestId('frontmatter').locator('.cm-content');
+  await expect(yaml).toBeVisible();
   // title is humanized from the filename: "my-note" -> "My note".
-  await expect(page.getByTestId('scalar-title')).toHaveValue('My note');
-  // type is present but EMPTY.
-  await expect(page.getByTestId('scalar-type')).toHaveValue('');
+  await expect(yaml).toContainText('title: My note');
+  // type is present but EMPTY — and editing is on so it can be filled in.
+  await expect(yaml).toContainText('type:');
+  await expect(yaml).toHaveAttribute('contenteditable', 'true');
 
-  // --- The type input is FOCUSED (the user lands there) ---
-  await expect(page.getByTestId('scalar-type')).toBeFocused();
+  // --- The cursor is at the end of the `type:` line (the user lands there) ---
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Boolean(document.activeElement?.closest('[data-region="frontmatter"] .cm-editor')),
+      ),
+    )
+    .toBe(true);
 
-  // --- type autocomplete: datalist lists existing Bundle types ---
-  await expect(page.getByTestId('type-suggestions')).toHaveCount(1);
-  const options = await page
-    .getByTestId('type-suggestions')
-    .locator('option')
-    .evaluateAll((els) => els.map((e) => (e as HTMLOptionElement).value));
-  // Fixture distinct types include concept, index, log.
-  expect(options).toContain('concept');
-  expect(options).toContain('index');
-
-  // --- A brand-new type can still be typed freely ---
-  const typeInput = page.getByTestId('scalar-type');
-  await typeInput.fill('reference');
-  await typeInput.blur();
+  // --- Typing there fills the required field ---
+  await page.keyboard.type(' reference');
   await expect
     .poll(() =>
       page.evaluate(

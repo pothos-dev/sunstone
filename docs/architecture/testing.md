@@ -93,6 +93,11 @@ bunx playwright test -c playwright.web.config.ts
 
 `reuseExistingServer` also lets you pre-build/pre-start either server by hand (e.g. build to a temp dir where in-repo build dirs are protected) and have Playwright reuse it.
 
+> **Reuse cuts both ways.** A `vite preview` left running from an earlier run is reused
+> **as-is** — it serves the build from *that* run, so source edits since then are invisible and
+> the specs silently test stale code. After changing `src/`, stop the preview server (nothing is
+> listening on 1420) before re-running, or you will debug a build you no longer have.
+
 ## Web write testing strategy
 
 The web write path is tested **by the seam**: the frontend never observes a commit (write methods return `204`/`RewriteSummary`), so the pieces are proven where they are actually observable. See `.scratch/enable-web-writing/issues/09-web-write-test-strategy.md` for the full decision.

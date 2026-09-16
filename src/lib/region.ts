@@ -1,7 +1,7 @@
 // `use:region` Svelte action — wires a Region container to the focus backbone.
 //
 // Attaching `use:region={{ id, isVisible }}` to a Region's container element
-// (a Section body, the Properties panel, etc.) does three things:
+// (a Section body, the Frontmatter Region, etc.) does three things:
 //   1. registers the Region with `focus` (state/focus.svelte.ts), so directional
 //      movement and the active-Region mirror know it exists,
 //   2. remembers the Region's last Focused item (the element inside the
@@ -44,6 +44,19 @@ export interface RegionParams {
    * Region can never be collapse-hidden.
    */
   reveal?: () => void;
+  /**
+   * Whether this container is the one that OWNS the Region right now. Defaults
+   * to `true`. Passed as a VALUE (not a getter) so a change re-runs the action's
+   * `update` and re-registers — a getter would read nothing at evaluation time
+   * and the action would never hear about the change.
+   *
+   * The Frontmatter Region needs this: every visible Tile renders its own
+   * frontmatter, but only the ACTIVE Tile's is the Region. Gating registration
+   * here (rather than with an `{#if active}` around the markup) keeps the
+   * container — and the CodeMirror inside it — from being torn down and rebuilt
+   * every time the user clicks into a background Tile.
+   */
+  enabled?: boolean;
 }
 
 /** CSS selector for natively-focusable / tabindexed descendants. */
@@ -88,13 +101,23 @@ export const region: Action<HTMLElement, RegionParams> = (node, params) => {
     return true;
   };
 
-  const dispose = focus.register(id, {
-    container: node,
-    focus: focusEntry,
-    isPresent: () => isPresent(),
-    isVisible: () => isVisible(),
-    reveal: () => reveal?.(),
-  });
+  let dispose: (() => void) | null = null;
+  const register = () => {
+    if (dispose) return;
+    dispose = focus.register(id, {
+      container: node,
+      focus: focusEntry,
+      isPresent: () => isPresent(),
+      isVisible: () => isVisible(),
+      reveal: () => reveal?.(),
+    });
+  };
+  const unregister = () => {
+    dispose?.();
+    dispose = null;
+  };
+
+  if (params.enabled ?? true) register();
 
   return {
     update(next: RegionParams) {
@@ -104,10 +127,12 @@ export const region: Action<HTMLElement, RegionParams> = (node, params) => {
       isPresent = next.isPresent;
       isVisible = next.isVisible;
       reveal = next.reveal;
+      if (next.enabled ?? true) register();
+      else unregister();
     },
     destroy() {
       node.removeEventListener('focusin', onFocusIn);
-      dispose();
+      unregister();
     },
   };
 };

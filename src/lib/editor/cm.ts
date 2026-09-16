@@ -1,9 +1,14 @@
 import { EditorView } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
-import { serializeFrontmatter, type Property } from '$lib/frontmatter';
+import { DEFAULT_FENCES, type Fences } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
 
-import { setFrontmatter, frontmatterField } from './frontmatter-field';
+import {
+  setFrontmatter,
+  setFences,
+  frontmatterField,
+  fencesField,
+} from './frontmatter-field';
 import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension } from './wiki-links';
 import {
@@ -36,8 +41,16 @@ import {
 export {
   setFrontmatter,
   frontmatterField,
+  fencesField,
   dispatchFrontmatter,
+  commitFrontmatterGroup,
 } from './frontmatter-field';
+export {
+  buildFrontmatterEditor,
+  formatFrontmatter,
+  type FrontmatterEditor,
+  type FrontmatterEditorOptions,
+} from './frontmatterEditor';
 export {
   refreshBrokenLinks,
   refreshBrokenLinkDecorations,
@@ -144,7 +157,7 @@ export function buildReviewEditor(parent: HTMLElement, reviewText: string): Edit
   return buildEditor({
     parent,
     doc: reviewText,
-    frontmatter: [],
+    frontmatter: '',
     // No `path` and no `onChange`/`onBlur`: this buffer is in-memory only and
     // must never autosave. `read` mode = read-only + marks visible + no reveal.
     path: null,
@@ -163,11 +176,11 @@ export function buildReviewEditor(parent: HTMLElement, reviewText: string): Edit
  * so this never triggers a state rebuild, and the empty frontmatter is a no-op.
  */
 export function setReviewText(view: EditorView, reviewText: string): void {
-  setEditorConcept(view, reviewText, [], null);
+  setEditorConcept(view, reviewText, '', DEFAULT_FENCES, null);
 }
 
 export function buildEditor(options: BuildEditorOptions): EditorView {
-  const { parent, doc, frontmatter = [] } = options;
+  const { parent, doc, frontmatter = '', fences = DEFAULT_FENCES } = options;
   const wikiCompartment = new Compartment();
   const livePreviewCompartment = new Compartment();
   const mode = options.initialMode ?? DEFAULT_EDITOR_MODE;
@@ -177,8 +190,9 @@ export function buildEditor(options: BuildEditorOptions): EditorView {
   const state = EditorState.create({
     doc,
     extensions: [
-      // Seed the frontmatter field with the open Concept's properties.
+      // Seed the frontmatter field with the open Concept's YAML block.
       frontmatterField.init(() => frontmatter),
+      fencesField.init(() => fences),
       ...editorExtensions(options, wikiCompartment, livePreviewCompartment, mode, theme),
     ],
   });
@@ -215,7 +229,8 @@ export function buildEditor(options: BuildEditorOptions): EditorView {
 export function setEditorConcept(
   view: EditorView,
   body: string,
-  props: Property[],
+  yaml: string,
+  fences: Fences = DEFAULT_FENCES,
   path: string | null = null,
 ): void {
   const prevPath = getViewPath(view);
@@ -238,7 +253,8 @@ export function setEditorConcept(
       EditorState.create({
         doc: body,
         extensions: [
-          frontmatterField.init(() => props),
+          frontmatterField.init(() => yaml),
+          fencesField.init(() => fences),
           ...(options
             ? editorExtensions(options, wikiCompartment, livePreviewCompartment, mode, theme)
             : []),
@@ -246,18 +262,20 @@ export function setEditorConcept(
       }),
     );
     // Mirror the new frontmatter out: a state rebuild fires no update listener,
-    // so push it to the Properties panel explicitly. History was reset to empty,
-    // so refresh the host's undo/redo state too.
-    options?.onFrontmatterChange?.(props);
+    // so push it to the Frontmatter editor explicitly. History was reset to
+    // empty, so refresh the host's undo/redo state too.
+    options?.onFrontmatterChange?.(yaml);
     options?.onHistory?.();
     return;
   }
 
   const current = view.state.doc.toString();
   const docChanged = current !== body;
-  const fmChanged =
-    serializeFrontmatter(view.state.field(frontmatterField)) !== serializeFrontmatter(props);
-  if (!docChanged && !fmChanged) return;
+  const fmChanged = view.state.field(frontmatterField) !== yaml;
+  const fencesChanged =
+    view.state.field(fencesField).open !== fences.open ||
+    view.state.field(fencesField).close !== fences.close;
+  if (!docChanged && !fmChanged && !fencesChanged) return;
   // Apply a MINIMAL change (common prefix/suffix trimmed) rather than a whole-doc
   // replace, so CodeMirror maps the selection/cursor through it. This matters for
   // multi-tile sync: when a SECOND tile shows the same Concept, an edit in the
@@ -267,7 +285,10 @@ export function setEditorConcept(
   // guards that case, so the change is only omitted when there's no doc edit at all.
   view.dispatch({
     changes: docChanged ? (minimalChange(current, body) ?? undefined) : undefined,
-    effects: fmChanged ? [setFrontmatter.of(props)] : [],
+    effects: [
+      ...(fmChanged ? [setFrontmatter.of(yaml)] : []),
+      ...(fencesChanged ? [setFences.of(fences)] : []),
+    ],
     annotations: programmatic.of(true),
   });
 }

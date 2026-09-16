@@ -84,14 +84,14 @@ See also [CodeMirror](./codemirror.md) (relative link) and the
 [Knowledge Base](/index.md) entry point (bundle-absolute link).
 `,
 
-  // A Concept exercising the frontmatter Properties panel: scalars, a `tags`
-  // flat list, an EMPTY required `type` (flag case), an unknown/extra key, and
-  // — critically — complex values (a nested map and a multi-line block scalar)
-  // that must round-trip BYTE-FOR-BYTE when an unrelated scalar is edited.
+  // A Concept exercising the Frontmatter YAML editor: scalars, a `tags` flat
+  // list, an EMPTY required `type` (flag case), an unknown/extra key, and —
+  // critically — NESTED values (a map and a multi-line block scalar) that must be
+  // editable in place and round-trip BYTE-FOR-BYTE when the body is edited.
   'concepts/complex-frontmatter.md': `---
 type:
 title: Complex Frontmatter
-description: Exercises the Properties panel.
+description: Exercises the Frontmatter editor.
 tags: [okf, complex]
 custom_field: keep me intact
 nested:
@@ -158,9 +158,9 @@ but stay clickable (never blocked, per the OKF spec):
 An external link is never treated as broken: [Example](https://example.com).
 `,
 
-  // A Concept with NO frontmatter block at all. Exercises adding the first
-  // property to a frontmatter-less doc (slice: add-property-text-or-list): the
-  // serializer must synthesize a valid `---…---` block on the first commit.
+  // A Concept with NO frontmatter block at all. Exercises authoring the first
+  // frontmatter of a block-less doc: the Region shows an empty editor and the
+  // `---…---` fences materialise on the first save (ADR 0008).
   'concepts/no-frontmatter.md': `# No Frontmatter
 
 This Concept has no YAML frontmatter block. Adding a property must synthesize

@@ -37,13 +37,27 @@ good text editor serves better than a form.
 
 **Unified undo.** ADR-0003's real win was that frontmatter edits ride CodeMirror's
 transaction/history machinery, so undo crosses frontmatter and body on one timeline. That
-mechanism survives unchanged in shape: `frontmatterField` + `setFrontmatter` + `frontmatterUndo`
-(`invertedEffects`) stay, with the effect payload changed from `Property[]` to the YAML `string`.
+survives — but it cannot survive *unchanged*, because the YAML now has a document of its own.
+The body editor's `history()` stays the **single** undo stack; the YAML editor runs with **no
+history of its own** and forwards its undo/redo bindings to that stack. `frontmatterField` keeps
+holding the frontmatter (payload changed from `Property[]` to the YAML `string`), the YAML
+editor's document mirrors that field, and every edit is dispatched back into the body editor as a
+`setFrontmatter` effect whose inverse `frontmatterUndo` records.
 
-What changes is granularity. `dispatchFrontmatter` currently fires `isolateHistory.of('full')`
-because a panel edit is one discrete act; a text editor is not. Keystrokes are **grouped into one
-effect per idle pause**, on the same boundary as the lint debounce, so undo steps match what was
-typed rather than reverting the whole block at a time.
+Two things follow from putting a second document on one stack.
+
+**Grouping is ours to do.** CodeMirror's history only coalesces two events when *both* carry
+document changes, so effect-only frontmatter transactions would each become their own undo step —
+one per keystroke. Intermediate keystrokes are therefore dispatched with `addToHistory: false`,
+and a single history entry is opened per **idle pause**, carrying the value the group started
+from. The group also closes on blur, on an explicit save, before an undo or redo, and on a
+Concept switch, so a frontmatter step can never land in the timeline after a body edit that
+followed it.
+
+**Undo moves the cursor to what it undid.** With two surfaces on one stack an undo step can
+change content the user cannot see — the Region is collapsed by default. So after an undo or
+redo, focus follows the change: into the YAML editor, expanding the Region if it is collapsed,
+when the step carried a `setFrontmatter`; into the body otherwise.
 
 ## Shape
 
@@ -60,6 +74,13 @@ typed rather than reverting the whole block at a time.
   re-formatted, so what is read matches what is on disk.
 - **Escape peels two layers**: YAML editing → Region focus → body editor, keeping the
   one-layer-per-press contract uniform across Regions.
+- **Clearing the YAML removes the block.** Frontmatter that is empty or whitespace-only writes a
+  file with no `---` fences at all — the inverse of the materialise-on-first-save rule, so the two
+  directions agree and no Concept is left carrying an empty pair of fences.
+- **Whatever needs one field parses the YAML for it.** With `Property[]` gone there is no
+  structured mirror to read `title` off, so the Tile header (`tileTitle`) parses the frontmatter
+  it is handed. Parsing is cheap, failure is tolerated (an unparseable block falls back to the
+  filename stem), and it keeps the YAML text the single source of truth.
 - **Formatting is an explicit command, never on save.** The `yaml` library preserves comments and
   quoting across a parse/stringify round-trip but normalises whitespace, so formatting on save
   would reflow every file merely on being edited.
@@ -88,9 +109,10 @@ way to persist half a Concept.
   `frontmatter.ts`, and roughly thirty Playwright specs.
 - **Capabilities lost:** tag chips and tag autocomplete, `type` value suggestions, the
   spreadsheet grid navigation over properties, and duplicate-key *rejection* — the panel refused
-  them outright, and `yaml` does not even warn by default, so it returns as a lint rule.
-  Completion restores the suggestions, but only in a bundle that declares `okf_version`
-  ([ADR-0009](0009-marker-gated-okf-language-service.md)).
+  them outright. The `yaml` parser does report a duplicate, but the save gate asks with
+  `uniqueKeys: false` on purpose: a duplicate still yields a document (last wins), so it is a
+  lint finding, not a reason to refuse a write. Completion restores the suggestions, but only in
+  a bundle that declares `okf_version` ([ADR-0009](0009-marker-gated-okf-language-service.md)).
 - Authors now need to know YAML. That is the trade: a form that cannot express the format, versus
   a text editor that can express all of it and lints what it cannot prevent.
 - The Region is renamed from **Properties** to **Frontmatter**, matching the Glossary term and

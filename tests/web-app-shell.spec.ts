@@ -53,7 +53,7 @@ test('authed user gets the full App shell: CodeMirror editor + interactive tree'
   // The Save affordance lives in the tile header and shows ONLY while editing
   // with unsaved changes; a freshly-opened clean buffer has no Save button (and
   // there is no separate dirty dot).
-  await expect(page.getByTestId('web-save')).toHaveCount(0);
+  await expect(page.getByTestId('save-concept')).toHaveCount(0);
 
   await page.screenshot({ path: 'tests/screenshots/web-app-shell.png', fullPage: true });
 });

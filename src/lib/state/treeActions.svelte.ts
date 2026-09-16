@@ -81,7 +81,7 @@ class TreeActionsStore {
    *
    * Ordinary Concepts open with a spec-valid frontmatter STUB (slice:
    * new-concept-scaffolding): an empty required `type` (the user lands there via
-   * the Properties panel) and a `title` humanized from the filename. We compose
+   * the Frontmatter Region) and a `title` humanized from the filename. We compose
    * the stub on the frontend — where the filename is known — and write it via
    * `writeConcept` immediately after the empty file is created, so the backend
    * `createConcept` stays a thin "make an empty .md" op.

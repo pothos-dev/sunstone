@@ -84,17 +84,15 @@ class SessionStore {
    */
   outlineOpen = $state<boolean>(true);
   /**
-   * GLOBAL Properties show/hide flag (slice: multi-concept-tiling). A single
-   * app-wide preference driven by the concept-header Properties toggle: when `true`,
-   * EVERY visible tile renders its own Concept's frontmatter inline; when
-   * `false` (the fresh/older-Bundle DEFAULT), no tile shows any Properties
-   * chrome at all (zero height cost). Persisted via `setPropertiesShown` so the
-   * choice survives a relaunch, mirroring the other sticky UI flags. Replaces the
-   * old single-tile `propertiesOpen` collapse flag: with the panel now gated by
-   * this global toggle, the per-panel collapse chevron (and its transient
-   * auto-reveal) no longer exist.
+   * GLOBAL Frontmatter show/hide flag (slice: multi-concept-tiling). A single
+   * app-wide preference driven by the concept-header Frontmatter toggle: when
+   * `true`, EVERY visible tile renders its own Concept's frontmatter inline;
+   * when `false` (the fresh/older-Bundle DEFAULT), no tile shows any Frontmatter
+   * chrome at all — and no tile builds a YAML editor or fetches its grammar
+   * (ADR 0008). Persisted via `setFrontmatterShown` so the choice survives a
+   * relaunch, mirroring the other sticky UI flags.
    */
-  propertiesShown = $state<boolean>(false);
+  frontmatterShown = $state<boolean>(false);
   /**
    * Editor view mode (persist-editor-mode) — the boolean `editing`/`read` shared
    * by every tile. Seeds `buildEditor`'s `initialMode` on launch and is written
@@ -172,8 +170,10 @@ class SessionStore {
       this.tagsOpen = state.tagsOpen ?? false;
       this.backlinksOpen = state.backlinksOpen ?? true;
       this.outlineOpen = state.outlineOpen ?? true;
-      // Global Properties toggle defaults to HIDDEN (`false`) when absent.
-      this.propertiesShown = state.propertiesShown ?? false;
+      // Global Frontmatter toggle defaults to HIDDEN (`false`) when absent.
+      // `propertiesShown` is the pre-ADR-0008 name for the same flag; reading it
+      // keeps an existing user's choice across the rename.
+      this.frontmatterShown = state.frontmatterShown ?? state.propertiesShown ?? false;
       // Migrate the legacy tri-state ('edit'/'hybrid'/'view') to the boolean
       // 'editing'/'read'; an absent value defaults to 'read'.
       this.editorMode = migrateEditorMode(state.editorMode);
@@ -285,7 +285,7 @@ class SessionStore {
   }
 
   /** Assign `this[key] = value` and schedule a persist, unless unchanged. */
-  #setIfChanged<K extends 'explorerOpen' | 'tagsOpen' | 'backlinksOpen' | 'outlineOpen' | 'propertiesShown' | 'editorMode'>(
+  #setIfChanged<K extends 'explorerOpen' | 'tagsOpen' | 'backlinksOpen' | 'outlineOpen' | 'frontmatterShown' | 'editorMode'>(
     key: K,
     value: this[K],
   ): void {
@@ -339,9 +339,9 @@ class SessionStore {
     this.#setIfChanged('outlineOpen', open);
   }
 
-  /** Record the global Properties show/hide flag and schedule a persist. */
-  setPropertiesShown(shown: boolean): void {
-    this.#setIfChanged('propertiesShown', shown);
+  /** Record the global Frontmatter show/hide flag and schedule a persist. */
+  setFrontmatterShown(shown: boolean): void {
+    this.#setIfChanged('frontmatterShown', shown);
   }
 
   /** Record the editor view mode and schedule a persist. */
@@ -453,7 +453,7 @@ class SessionStore {
       leftSidebarWidth: this.leftSidebarWidth,
       rightSidebarWidth: this.rightSidebarWidth,
       outlineOpen: this.outlineOpen,
-      propertiesShown: this.propertiesShown,
+      frontmatterShown: this.frontmatterShown,
       editorMode: this.editorMode,
       layout: this.layout,
       window: this.#window,

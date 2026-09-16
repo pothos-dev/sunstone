@@ -19,13 +19,13 @@ A **Region** is an interactive surface that can hold keyboard focus and defines
 its own keyboard semantics. Regions are orthogonal to Pane/Section: a Region may
 *be* a Pane (the **Editor** — see [editor layout](/editor/editor-layout.md)), live *as* a
 Section (**Explorer**, **Tags**, **Outline**, **Backlinks**), or be neither
-(**Properties**, which is chrome inside the Editor pane).
+(**Frontmatter**, which is chrome inside the Editor pane).
 
 The six Regions form a **fixed 3×2 grid**:
 
 |        | col 0 (left) | col 1 (editor) | col 2 (right) |
 | ------ | ------------ | -------------- | ------------- |
-| row 0  | Explorer     | Properties     | Outline       |
+| row 0  | Explorer     | Frontmatter    | Outline       |
 | row 1  | Tags         | Editor         | Backlinks     |
 
 Exactly one Region is active at a time. **DOM focus is the single source of
@@ -44,7 +44,7 @@ reactively style the active Region.
 Two predicates split "can I go here?":
 
 - **`isPresent()`** — is there content to focus? False for genuinely empty
-  Regions (Properties with no open Concept, Tags with no tags). These are
+  Regions (Frontmatter with no open Concept, Tags with no tags). These are
   skipped and never revealed.
 - **`isVisible()`** — is the Region shown right now? A Region hidden only by a
   collapse is *present but not visible*; moving into it **reveals** it (flips the
@@ -61,18 +61,21 @@ Focused item without opening anything; Enter opens the Focused Concept into the
 Editor. The open Concept keeps its own marker; the Focused item shows a separate
 focus ring. They coincide only until you arrow away.
 
-### Focus depths in Properties
+### Focus depths in Frontmatter
 
-The **Properties** Region is a spreadsheet-style 2-column grid (key | value)
-where the Focused item is a *cell*, and the cell has **three modes** (see
-[ADR 0003](/adr/0003-structured-frontmatter-reserialization.md) for why
-frontmatter is edited here rather than in the document):
+The **Frontmatter** Region hosts a small YAML editor (see
+[ADR 0008](/adr/0008-raw-yaml-frontmatter-editing.md) for why frontmatter is
+edited as text, in its own editor rather than in the document). It has **two
+depths**, so Escape peels exactly one layer per press like everywhere else:
 
-- **NAV** — the cell wrapper holds focus (spotlight ring); arrows navigate, the
-  inner input is not focused.
-- **CHIPS** — sub-navigation for a list value: focus rides a roving index across
-  the strip `[chip]…[+ new-tag input]` (←/→ move, `d` deletes the focused chip).
-- **EDIT** — the cell's input is focused for ordinary text editing.
+- **Region** — the Region container holds focus; `Enter` drops into the YAML.
+- **Editing** — the YAML editor holds focus and owns the keyboard; `Escape`
+  returns to the container, and a second `Escape` homes to the Editor.
+
+Alt-in from the Editor lands directly in the YAML (the Region's entry point).
+Undo and redo are forwarded to the **body** editor's history, so one timeline
+spans both surfaces; a step that changes the frontmatter moves focus back here,
+expanding the Region if it was collapsed.
 
 ## Relationships
 

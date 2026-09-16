@@ -8,7 +8,7 @@ import { backend } from '$lib/ipc';
 const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'timestamp'];
 
 /**
- * Index-derived autocomplete sources for the Properties panel (`type`/key/tag
+ * Index-derived autocomplete sources (`type`/key/tag
  * fields) and the quick-nav palette (Concept paths). Rune-backed; the app shell
  * calls `refresh()` from a single `$effect` keyed on `indexStore.version`, so a
  * file change on disk re-fetches all of these together and newly-introduced

@@ -4,9 +4,9 @@ import { test, expect, type Page } from './fixtures';
  * Slice: multi-concept-tiling (ticket 05 — satellite views follow the active tile).
  *
  * With two tiles open on DIFFERENT Concepts:
- *  - the GLOBAL Properties toggle shows/hides Properties in EVERY visible tile at
+ *  - the GLOBAL Frontmatter toggle shows/hides Frontmatter in EVERY visible tile at
  *    once; when on, each tile shows ITS OWN Concept's frontmatter inline; when
- *    off, no tile shows any Properties chrome (zero height cost),
+ *    off, no tile shows any Frontmatter chrome (zero height cost),
  *  - Outline and Backlinks (right Sidebar) describe the ACTIVE tile's Concept and
  *    update as focus moves between tiles.
  */
@@ -62,7 +62,7 @@ async function twoTiles(page: Page) {
   );
 }
 
-test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own frontmatter', async ({
+test('two tiles: the global Frontmatter toggle shows/hides EVERY tile\'s own frontmatter', async ({
   page,
 }) => {
   await twoTiles(page);
@@ -70,16 +70,18 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   const tile0 = page.getByTestId('tile').nth(0);
   const tile1 = page.getByTestId('tile').nth(1);
 
-  // Default HIDDEN: no Properties chrome in either tile.
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  // Default HIDDEN: no Frontmatter chrome in either tile.
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
   // Toggle ON: BOTH tiles render their OWN Concept's frontmatter inline. The
-  // Properties toggle now lives in EACH tile's header (one per tile), so target
+  // Frontmatter toggle now lives in EACH tile's header (one per tile), so target
   // the first — it drives the shared global flag for every tile.
-  await page.getByTestId('properties-toggle').first().click();
-  await expect(page.getByTestId('properties')).toHaveCount(2);
-  await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
-  await expect(tile1.getByTestId('scalar-title')).toHaveValue('Bundle');
+  await page.getByTestId('frontmatter-toggle').first().click();
+  await expect(page.getByTestId('frontmatter')).toHaveCount(2);
+  const yaml0 = tile0.getByTestId('frontmatter').locator('.cm-content');
+  const yaml1 = tile1.getByTestId('frontmatter').locator('.cm-content');
+  await expect(yaml0).toContainText('title: CodeMirror');
+  await expect(yaml1).toContainText('title: Bundle');
 
   await page.screenshot({
     path: 'tests/screenshots/satellite-views-follow-active-tile.png',
@@ -87,11 +89,14 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
   });
 
   // Editing one tile's frontmatter targets THAT tile's Document (per-tile). Click
-  // into tile 1's field first — the Properties toggle above left tile 0 active, so
+  // into tile 1's YAML first — the Frontmatter toggle above left tile 0 active, so
   // interacting with tile 1 activates it (a real mousedown, as a user would do).
-  await tile1.getByTestId('scalar-title').click();
-  await tile1.getByTestId('scalar-title').fill('Bundle Renamed');
-  await tile1.getByTestId('scalar-title').blur();
+  // (`twoTiles` already restored `editorMode: 'editing'`, so the YAML is writable.)
+  await yaml1.click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('ArrowDown'); // the `title:` line
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Renamed');
   await expect
     .poll(() =>
       page.evaluate(
@@ -102,11 +107,12 @@ test('two tiles: the global Properties toggle shows/hides EVERY tile\'s own fron
     )
     .toContain('title: Bundle Renamed');
   // Tile 0's Concept is untouched.
-  await expect(tile0.getByTestId('scalar-title')).toHaveValue('CodeMirror');
+  await expect(yaml0).toContainText('title: CodeMirror');
+  await expect(yaml0).not.toContainText('Renamed');
 
-  // Toggle OFF: NO tile shows any Properties chrome.
-  await page.getByTestId('properties-toggle').first().click();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  // Toggle OFF: NO tile shows any Frontmatter chrome.
+  await page.getByTestId('frontmatter-toggle').first().click();
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 });
 
 test('two tiles: Outline and Backlinks follow the ACTIVE tile', async ({ page }) => {

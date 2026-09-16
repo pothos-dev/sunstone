@@ -12,11 +12,11 @@ import { type Page } from '@playwright/test';
  *   - Leaving the Region re-collapses it — UNLESS it was manually expanded
  *     before the visit (no in-visit pin).
  *   - A peek survives an overlay (QuickNav) open/cancel round-trip.
- *   - Absent (no Concept → Properties) and empty (no tags → Tags) Regions stay
+ *   - Absent (no Concept → Frontmatter) and empty (no tags → Tags) Regions stay
  *     SKIPPED, never revealed.
  *
  *        col 0 (left)   col 1 (editor)   col 2 (right)
- *   row0  Explorer       Properties       Outline
+ *   row0  Explorer       Frontmatter       Outline
  *   row1  Tags           Editor           Backlinks
  */
 
@@ -139,10 +139,10 @@ test('a peeked Region survives an overlay (QuickNav) open/cancel round-trip', as
   await expect(page.getByTestId('right-side-bar')).not.toHaveClass(/collapsed/);
 });
 
-test('absent (no Concept → Properties/Editor) and empty (no tags → Tags) Regions are skipped, not revealed', async ({
+test('absent (no Concept → Frontmatter/Editor) and empty (no tags → Tags) Regions are skipped, not revealed', async ({
   page,
 }) => {
-  // Fresh load with NO Concept open: the centre column (Properties + Editor) is
+  // Fresh load with NO Concept open: the centre column (Frontmatter + Editor) is
   // ABSENT, and the right column (Outline + Backlinks) is absent too.
   await page.goto('/');
   let tree = page.getByTestId('tree');
@@ -156,7 +156,7 @@ test('absent (no Concept → Properties/Editor) and empty (no tags → Tags) Reg
   await page.getByTestId('explorer-section-body').locator('.row').first().focus();
   await expectActive(page, 'explorer');
 
-  // Alt+Right: Properties/Editor are absent (no Concept) and so is the right
+  // Alt+Right: Frontmatter/Editor are absent (no Concept) and so is the right
   // column → movement CLAMPS, no Region is revealed (the right Sidebar stays
   // collapsed; nothing in the centre appears).
   await altPress(page, 'ArrowRight');
@@ -178,51 +178,54 @@ test('absent (no Concept → Properties/Editor) and empty (no tags → Tags) Reg
   await expect(page.getByTestId('tags-section')).toHaveCount(0);
 });
 
-test('Properties hidden by the global toggle is ABSENT: Alt-in clamps, nothing revealed', async ({
+test('Frontmatter hidden by the global toggle is ABSENT: Alt-in clamps, nothing revealed', async ({
   page,
 }) => {
   await openConcept(page);
 
-  // Properties is HIDDEN by default now (global toggle), so the centre-column
-  // Properties Region is genuinely ABSENT — like an empty Region, it is skipped,
+  // Frontmatter is HIDDEN by default now (global toggle), so the centre-column
+  // Frontmatter Region is genuinely ABSENT — like an empty Region, it is skipped,
   // never revealed. Alt+Up from the Editor (row1) has no row0 target in the
   // column, so it clamps and focus stays in the Editor.
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   await altPress(page, 'ArrowUp');
   await expectActive(page, 'editor');
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 });
 
-test('Properties shown by the global toggle: Alt-in lands focus, Escape returns, stays shown', async ({
+test('Frontmatter shown by the global toggle: Alt-in lands focus, Escape returns, stays shown', async ({
   page,
 }) => {
   await openConcept(page);
 
-  // Turn Properties ON globally — its panel renders inline in the tile and the
-  // 'properties' Region becomes present + visible. Re-focus the Editor after the
+  // Turn Frontmatter ON globally — its panel renders inline in the tile and the
+  // 'frontmatter' Region becomes present + visible. Re-focus the Editor after the
   // toggle click so the next Alt+Up is a real cross-Region move.
-  await page.getByTestId('properties-toggle').click();
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await page.getByTestId('frontmatter-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
   await page.getByTestId('editor').locator('.cm-content').click();
   await expectActive(page, 'editor');
 
-  // Alt+Up toward Properties (row0, col1): present + visible → focus lands in the
+  // Alt+Up toward Frontmatter (row0, col1): present + visible → focus lands in the
   // grid, no transient reveal needed (the global toggle is the only show/hide).
   await altPress(page, 'ArrowUp');
-  await expectActive(page, 'properties');
-  await expect(page.getByTestId('scalar-type')).toBeVisible();
+  await expectActive(page, 'frontmatter');
+  await expect(page.getByTestId('frontmatter').locator('.cm-content')).toContainText('type:');
   expect(
     await page.evaluate(() => {
-      const region = document.querySelector('[data-region="properties"]');
+      const region = document.querySelector('[data-region="frontmatter"]');
       return region?.contains(document.activeElement) ?? false;
     }),
   ).toBe(true);
 
-  // Leave the Region (Escape → Editor). Properties is globally shown, not a
-  // transient peek, so it STAYS shown.
+  // Leave the Region. Escape peels ONE layer per press (ADR 0008): out of the
+  // YAML first, then home to the Editor. Frontmatter is globally shown, not a
+  // transient peek, so it STAYS shown throughout.
+  await page.keyboard.press('Escape');
+  await expectActive(page, 'frontmatter');
   await page.keyboard.press('Escape');
   await expectActive(page, 'editor');
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 });
 
 test('Section-collapsed Tags (left Sidebar open) is transiently revealed on Alt-Down from the Explorer', async ({

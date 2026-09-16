@@ -240,7 +240,7 @@
   // --- Deleted state actions (ticket 08 §2) ----------------------------------
   async function deletedRecreate(): Promise<void> {
     // Save on a deleted path re-creates it (`create … via web`); buffer clean.
-    await editor.flush();
+    await editor.save();
     deleted = null;
   }
   function deletedDiscard(): void {
@@ -253,7 +253,7 @@
   // --- Three-way leave modal (ticket 08 §4) — resolves the workspace gate ------
   async function leaveSave(): Promise<void> {
     const s = leave;
-    await s?.doc.flush();
+    await s?.doc.saveNow();
     leave = null;
     s?.resolve(true);
   }
@@ -272,7 +272,7 @@
   // --- Three-way structural-op modal (ticket 08 §5) — resolves treeActions gate -
   async function structuralSave(): Promise<void> {
     const s = structural;
-    await s?.doc.flush();
+    await s?.doc.saveNow();
     structural = null;
     s?.resolve(true);
   }
@@ -290,7 +290,7 @@
 
   // --- Explicit Save (ticket 08 §4) ------------------------------------------
   function save(): void {
-    if (editor.dirty) void editor.flush();
+    if (editor.dirty) void editor.save();
   }
 
   onMount(() => {

@@ -43,8 +43,12 @@ A file with OKF-defined special meaning: `index.md` (progressive-disclosure list
 **Frontmatter**:
 The leading YAML block (delimited by `---`) on a Concept. Only `type` is required;
 `title`, `description`, `resource`, `tags`, `timestamp` are recommended; unknown keys must
-be preserved. See [Concept → frontmatter](/okf/concept.md#frontmatter) for Sunstone's
-structured-`Property[]` model.
+be preserved. Sunstone edits it as YAML **text**, in the **Frontmatter** Region — the
+collapsible surface above the body, named after this term
+([ADR-0008](/adr/0008-raw-yaml-frontmatter-editing.md)). See
+[Concept → frontmatter](/okf/concept.md#frontmatter).
+_Avoid_: "Properties", "the Properties panel" (the structured `Property[]` model that name
+came from is gone), "the YAML panel".
 
 **Live preview**:
 Obsidian-style hybrid editing — markdown source is the source of truth, but inactive lines
@@ -128,7 +132,7 @@ _Avoid_: "toolbar", "nav bar" (there is no global nav/tool bar; the Rail and the
 
 **Concept header**:
 The per-**Tile** control bar above each open Concept, carrying the controls scoped to that
-Concept/Tile: back/forward, the **Edit** toggle, the **Properties** toggle, undo/redo (shown
+Concept/Tile: back/forward, the **Edit** toggle, the **Frontmatter** toggle, undo/redo (shown
 only while editing), review, export-PDF, split, and close. A single open Concept therefore
 shows just its Concept header — there is no second global bar above it. See
 [Activity Rail and Concept header](/interface/activity-rail.md).
@@ -189,8 +193,9 @@ _Avoid_: using "search" for the in-editor operation (use **Find**).
 
 **Find** (Find & Replace):
 The in-Concept, editor-local find/replace panel (`Ctrl+F`) docked above the Editor pane. Scoped
-to the open Concept's body only (frontmatter lives outside the document — see ADR 0003 — and is
-edited via the Properties Section, not Find). Always means the single-Concept operation.
+to the open Concept's body only (frontmatter lives outside the document — see
+[ADR 0008](/adr/0008-raw-yaml-frontmatter-editing.md) — and is edited in the **Frontmatter**
+Region, not Find). Always means the single-Concept operation.
 _Avoid_: calling this "search" (reserved for the cross-Bundle **Search**).
 
 **Quick nav**:
@@ -243,7 +248,7 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
 - "search" referred to both the cross-Bundle full-text modal and the in-editor operation —
   resolved to **Search** (cross-Bundle only) vs **Find** (single-Concept only).
 - "pane" was used loosely for "the thing keyboard focus moves between" — but focus targets
-  (Editor, Explorer, Properties, ...) don't map to Panes (Properties is neither Pane nor
+  (Editor, Explorer, Frontmatter, ...) don't map to Panes (Frontmatter is neither Pane nor
   Section). Resolved: the focus unit is a **Region**, orthogonal to Pane/Section.
 - The code's workspace layer once named each editor cell a **`Pane`**, colliding with the
   domain **Pane** (a top-level app-shell region). Resolved: the cell is now the **`Tile`**
@@ -257,10 +262,3 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
   (desktop: OS config dir; web: the browser, e.g. `localStorage`), never written into the
   Bundle. See [View state](/interface/view-state.md). _Avoid_: "Bundle state". (Code not yet
   renamed — flagged for a later rename slice.)
-- The **Properties** Region is named after the `Property[]` type that models Frontmatter, which
-  [ADR-0008](/adr/0008-raw-yaml-frontmatter-editing.md) removes in favour of editing the YAML
-  directly. Once the type is gone the name points at nothing, and "Properties" would mean only
-  "the place Frontmatter is edited" — which is what **Frontmatter** already means. Resolved term:
-  the Region is **Frontmatter**. _Avoid_: "Properties panel", "Properties Section" (it is neither
-  a Pane nor a Section — see the entry above), "the YAML panel". (Not yet renamed — the rename
-  lands with the editor itself; UI, `data-testid`s and docs still say "Properties".)

@@ -5,10 +5,10 @@
   // toggle + history stepper, PDF export, the formatting context menu +
   // annotation popup, link / wikilink click navigation (within THIS Tile, pushing
   // THIS Tile's history), broken-link decorations, mermaid theme-sync, and the
-  // Properties panel (rendered inline in EVERY visible tile when the global
-  // `session.propertiesShown` toggle is on, showing THIS tile's Concept's
-  // frontmatter; only the ACTIVE tile's panel is wired to the 'properties' Region
-  // + grid cursor — multi-concept-tiling).
+  // Frontmatter Region (rendered inline in EVERY visible tile when the global
+  // `session.frontmatterShown` toggle is on, showing THIS tile's Concept's
+  // frontmatter as YAML; only the ACTIVE tile's is wired to the 'frontmatter'
+  // Region — multi-concept-tiling, ADR 0008).
   //
   // App.svelte owns the tiling layout and the single 'editor' Region; it renders
   // one <Tile> per tile and delegates active-Tile editor concerns here via a few
@@ -23,7 +23,6 @@
   import { backend } from '$lib/ipc';
   import { indexStore } from '$lib/state/index.svelte';
   import { session } from '$lib/state/session.svelte';
-  import { suggestions } from '$lib/state/suggestions.svelte';
   import { theme } from '$lib/state/theme.svelte';
   import { focus } from '$lib/state/focus.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
@@ -34,7 +33,6 @@
     setEditorConcept,
     setEditorMode,
     setEditorMermaidTheme,
-    dispatchFrontmatter,
     refreshBrokenLinkDecorations,
     reconfigureWikiLinks,
     scrollToLine,
@@ -53,7 +51,7 @@
     type CommentEditRequest,
   } from '$lib/editor/cm';
   import { createTileReview } from '$lib/tileReview.svelte';
-  import { parseProperties, type Property } from '$lib/frontmatter';
+  import { DEFAULT_FENCES } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
@@ -61,15 +59,15 @@
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
-  import Properties from '$lib/components/Properties.svelte';
+  import Frontmatter from '$lib/components/Frontmatter.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import AnnotationPopup from '$lib/components/AnnotationPopup.svelte';
 
   interface Props {
     /** The Tile state object (active Concept, history, shared Document). */
     tile: Tile;
-    /** Whether this tile is the focused/active Tile (owns the 'properties' Region
-     *  + grid cursor when Properties is globally shown). */
+    /** Whether this tile is the focused/active Tile (owns the 'frontmatter'
+     *  Region when Frontmatter is globally shown). */
     active: boolean;
     /** Whether more than one tile is on screen (gates the Close affordance). */
     multipleTiles: boolean;
@@ -103,11 +101,23 @@
 
   let editorParent = $state<HTMLDivElement | null>(null);
   let view: EditorView | null = null;
+  // `view` itself is deliberately NOT reactive (it is built once and mutated
+  // through CodeMirror's own API). This flag is: the Frontmatter Region needs to
+  // re-read `view` the moment it exists, because the YAML editor hangs off the
+  // body editor's state (ADR 0008).
+  let viewReady = $state(false);
 
-  // The open Concept's frontmatter, mirrored out of the editor's frontmatter
-  // field (the single source of truth — ADR 0003) so this Tile's Properties panel
-  // can render it.
-  let frontmatterProps = $state<Property[]>([]);
+  // The open Concept's frontmatter YAML, mirrored out of the editor's
+  // frontmatter field (the single source of truth — ADR 0008) so this Tile's
+  // Frontmatter Region can render it.
+  let frontmatterYaml = $state<string>('');
+  let frontmatterRef = $state<ReturnType<typeof Frontmatter> | null>(null);
+  let frontmatterHost = $state<HTMLDivElement | null>(null);
+  // A pending request to put focus in the YAML: `'yaml'` after an undo/redo
+  // reverted the FRONTMATTER (the step is invisible otherwise), or a key name
+  // after a Concept is scaffolded (land the author on `type`). Deferred because
+  // expanding the Region has to render the editor first.
+  let focusFrontmatterPending = $state<string | null>(null);
 
   // The editing/read view mode is GLOBAL (session.editorMode), driven by the Edit
   // toggle in this tile's header and applied to EVERY tile at once — it is not a
@@ -131,8 +141,12 @@
 
   // WEB (ticket 08 §4): the explicit Save button shows only while editing with
   // unsaved changes; its presence IS the dirty indicator (no separate dot).
-  // Desktop autosaves, so it never shows there.
-  const showSave = $derived(__SUNSTONE_WEB__ && editing && tile.dirty);
+  //
+  // DESKTOP autosaves, so it shows only when the save gate is HOLDING the write
+  // because the frontmatter does not parse (ADR 0008) — there the button is the
+  // way to force the write through, and its presence is what makes a held write
+  // visible at all.
+  const showSave = $derived(editing && (__SUNSTONE_WEB__ ? tile.dirty : tile.writeHeld));
 
   // Toggle live editing. Turning it OFF resolves a dirty buffer first via the
   // Tile's leave path: on web that runs the SAME three-way Save/Discard/Cancel
@@ -156,7 +170,7 @@
   // re-pushes it. The header then falls back to the filename stem while the body
   // shows the right Concept (a rare flake in tile-header.spec.ts). `tile.content`
   // is the source both halves derive from, so reading it here cannot go stale.
-  const headerLabel = $derived(tileHeaderLabel(tile.activePath, parseProperties(tile.content)));
+  const headerLabel = $derived(tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml));
 
   // --- Unified undo/redo over the Tile's single body+frontmatter history -------
   let canUndo = $state(false);
@@ -167,36 +181,79 @@
   }
   function doUndo() {
     if (!view) return;
+    // Close any open frontmatter typing group first, so the step about to be
+    // undone is the one the user just typed (ADR 0008).
+    frontmatterRef?.commitGroup();
     undo(view);
-    view.focus();
+    // `onHistoryStep` moves focus to whichever surface the step changed; only
+    // default to the body when it did not fire (nothing to undo).
+    if (focusFrontmatterPending === null) view.focus();
     syncHistoryDepths();
   }
   function doRedo() {
     if (!view) return;
+    frontmatterRef?.commitGroup();
     redo(view);
-    view.focus();
+    if (focusFrontmatterPending === null) view.focus();
     syncHistoryDepths();
   }
 
-  // --- Properties panel (per tile, gated by the global toggle) -----------------
-  // The Properties panel renders inline in EVERY visible tile when the global
-  // `session.propertiesShown` toggle is on (default off → no chrome at all). Only
-  // the ACTIVE tile's panel is wired to the single 'properties' Region + the
-  // singleton grid cursor; a non-active tile's panel is mouse-editable but takes
-  // no part in keyboard grid nav (see the `active` prop on <Properties>).
-  const focusTypeNow = $derived(focusTypeForPath !== null && focusTypeForPath === tile.activePath);
-  function onPropertiesChange(props: Property[]) {
-    if (!view) return;
-    dispatchFrontmatter(view, props);
-    // WEB (ticket 08 §4): a Properties edit stays IN-MEMORY until the explicit
-    // Save — it must NOT eager-commit here (a commit-per-property-edit would
-    // defeat the explicit-Save model, exactly like the blur-flush at the editor
-    // build below). `dispatchFrontmatter` fires the CM change listener
-    // (→ tile.edit → Document.edit), so the Document is already marked dirty and
-    // the next Save commits body + frontmatter together as ONE commit. Desktop
-    // keeps the eager flush, so its behaviour is byte-identical.
-    if (!__SUNSTONE_WEB__) void tile.flush();
+  // --- Frontmatter Region (per tile, gated by the global toggle) ---------------
+  // The Region renders inline in EVERY visible tile when the global
+  // `session.frontmatterShown` toggle is on (default off → no chrome at all, and
+  // no YAML editor built). Only the ACTIVE tile's is wired to the single
+  // 'frontmatter' Region; a non-active tile's is mouse-editable but takes no
+  // part in Region navigation.
+  //
+  // Edits do NOT come back through a callback: the YAML editor dispatches them
+  // straight into this view's frontmatter field, which fires the CM change
+  // listener (→ tile.edit → Document.edit) exactly like a body edit.
+
+  /** Inner Escape layer: leave the YAML, land on the Region container. */
+  function escapeFrontmatter(): void {
+    frontmatterHost?.focus();
   }
+
+  /** Enter the YAML from the Region container (the old panel's Enter-to-edit). */
+  function onFrontmatterKeydown(e: KeyboardEvent): void {
+    if (e.key !== 'Enter' || e.target !== frontmatterHost) return;
+    e.preventDefault();
+    frontmatterRef?.focus();
+  }
+
+  /**
+   * An undo/redo landed: move focus to the surface it changed (ADR 0008). A
+   * frontmatter step expands the Region first — the step is invisible otherwise —
+   * and focus is deferred to `$effect` below, since the editor may not exist yet.
+   */
+  function onHistoryStep(target: 'frontmatter' | 'body'): void {
+    if (target === 'body') {
+      view?.focus();
+      return;
+    }
+    session.setFrontmatterShown(true);
+    focusFrontmatterPending = 'yaml';
+  }
+
+  // New Concept just scaffolded: show the Frontmatter and land the author on
+  // `type`, the one field OKF requires (new-concept-scaffolding; it used to be
+  // the Properties panel's `type` input). The panel was editable in either mode;
+  // the YAML editor is not (read mode shows the block verbatim, read-only), so
+  // landing the author there means switching to editing as well.
+  const focusTypeNow = $derived(focusTypeForPath !== null && focusTypeForPath === tile.activePath);
+  $effect(() => {
+    if (!focusTypeNow || !active) return;
+    session.setFrontmatterShown(true);
+    session.setEditorMode('editing');
+    focusFrontmatterPending = 'type';
+  });
+
+  $effect(() => {
+    const pending = focusFrontmatterPending;
+    if (pending === null || !frontmatterRef) return;
+    frontmatterRef.focus(pending === 'yaml' ? undefined : pending);
+    focusFrontmatterPending = null;
+  });
 
   // --- Editor formatting context menu ------------------------------------------
   let editorMenu = $state<{
@@ -402,20 +459,30 @@
   // --- Build / update this Tile's CodeMirror view ------------------------------
   $effect(() => {
     const content = tile.content;
+    // `splitFrontmatter` is a wasm free export: before the module registers it
+    // no-ops to "no frontmatter", which would leave the block in the BODY and
+    // the Frontmatter Region empty. `indexStore.version` bumps once wasm is
+    // ready (see `wasm/exports.ts`), so re-run and re-split then.
+    void indexStore.version;
     if (!editorParent) return;
 
-    const { body } = splitFrontmatter(content);
-    const props = parseProperties(content);
+    const split = splitFrontmatter(content);
+    const body = split.body;
+    const yaml = split.yaml;
+    const fences = split.hasFrontmatter
+      ? { open: split.open, close: split.close }
+      : DEFAULT_FENCES;
 
     if (!view) {
       view = buildEditor({
         parent: editorParent,
         doc: body,
-        frontmatter: props,
+        frontmatter: yaml,
+        fences,
         path: tile.activePath,
         initialMode: session.editorMode,
         onChange: (full) => tile.edit(full),
-        onFrontmatterChange: (p) => (frontmatterProps = p),
+        onFrontmatterChange: (y) => (frontmatterYaml = y),
         // WEB (ticket 08 §4): persistence is EXPLICIT (Save affordance / Cmd+S /
         // the three-way modal Save path), so the blur auto-flush is suppressed —
         // a commit-per-blur would defeat the explicit-Save model. Desktop keeps
@@ -424,6 +491,7 @@
           if (!__SUNSTONE_WEB__) void tile.flush();
         },
         onHistory: syncHistoryDepths,
+        onHistoryStep,
         onLinkClick: handleLinkClick,
         onCommentEdit: openCommentPopup,
         brokenLinkContext: {
@@ -434,7 +502,8 @@
           open: handleWikiLinkOpen,
         },
       });
-      frontmatterProps = props;
+      frontmatterYaml = yaml;
+      viewReady = true;
       view.dom.setAttribute('data-theme', theme.resolved);
       syncHistoryDepths();
       // Natural scrolling drives the Outline highlight; the listener dies with
@@ -442,7 +511,7 @@
       view.scrollDOM.addEventListener('scroll', onEditorScroll, { passive: true });
       tile.scrollProbe = () => view?.scrollDOM.scrollTop ?? null;
     } else {
-      setEditorConcept(view, body, props, tile.activePath);
+      setEditorConcept(view, body, yaml, fences, tile.activePath);
     }
 
     if (pendingScrollLine !== null && view) {
@@ -504,6 +573,7 @@
     if (annotationPopupOverlayId !== null) focus.removeOverlay(annotationPopupOverlayId);
     view?.destroy();
     view = null;
+    viewReady = false;
     review.destroy();
   });
 
@@ -586,9 +656,12 @@
     onExportPdf={exportPdf}
     onToggleEditing={toggleEditing}
     {showSave}
-    onSave={() => void tile.flush()}
-    propertiesShown={session.propertiesShown}
-    onToggleProperties={() => session.setPropertiesShown(!session.propertiesShown)}
+    onSave={() => {
+      frontmatterRef?.commitGroup();
+      void tile.save();
+    }}
+    frontmatterShown={session.frontmatterShown}
+    onToggleFrontmatter={() => session.setFrontmatterShown(!session.frontmatterShown)}
   />
 
   {#if tile.error}
@@ -598,53 +671,47 @@
     <p class="placeholder" data-testid="placeholder">Select a Concept from the tree.</p>
   {/if}
 
-  {#if session.propertiesShown && tile.activePath && !isReservedFile(tile.activePath)}
-    {#if active}
-      <!-- Active tile: the single 'properties' Region lives here (grid nav +
-           spotlight + Alt-arrow entry). -->
-      <div
-        class="region-host properties-host"
-        class:region-active={focus.focusedRegion === 'properties'}
-        data-region="properties"
-        use:region={{
-          id: 'properties',
-          isPresent: () =>
-            session.propertiesShown &&
-            tile.activePath !== null &&
-            !isReservedFile(tile.activePath),
-          isVisible: () =>
-            session.propertiesShown &&
-            tile.activePath !== null &&
-            !isReservedFile(tile.activePath),
+  {#if session.frontmatterShown && tile.activePath && !isReservedFile(tile.activePath)}
+    <!-- ONE container per visible tile, but only the ACTIVE tile's is the
+         'frontmatter' Region: `enabled` gates the registration and `data-region`
+         the DOM marker. Deliberately NOT an `{#if active}` branch — clicking into
+         a background tile activates it, and swapping branches would tear down and
+         rebuild this tile's YAML editor (losing the caret) every time.
+
+         In the active tile, Alt-in lands in the YAML, Escape peels back to this
+         container and Enter re-enters — the two layers of the unified peel. -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      class="region-host frontmatter-host"
+      class:region-active={active && focus.focusedRegion === 'frontmatter'}
+      data-region={active ? 'frontmatter' : undefined}
+      tabindex="-1"
+      bind:this={frontmatterHost}
+      onkeydown={onFrontmatterKeydown}
+      use:region={{
+        id: 'frontmatter',
+        enabled: active,
+        isPresent: () =>
+          session.frontmatterShown &&
+          tile.activePath !== null &&
+          !isReservedFile(tile.activePath),
+        isVisible: () =>
+          session.frontmatterShown &&
+          tile.activePath !== null &&
+          !isReservedFile(tile.activePath),
+      }}
+    >
+      <Frontmatter
+        bind:this={frontmatterRef}
+        host={viewReady ? view : null}
+        yaml={frontmatterYaml}
+        readOnly={!editing}
+        onEscape={escapeFrontmatter}
+        onBlur={() => {
+          if (!__SUNSTONE_WEB__) void tile.flush();
         }}
-      >
-        <Properties
-          properties={frontmatterProps}
-          path={tile.activePath}
-          types={suggestions.types}
-          keys={suggestions.keys}
-          tags={suggestions.tags}
-          focusType={focusTypeNow}
-          onchange={onPropertiesChange}
-          active
-        />
-      </div>
-    {:else}
-      <!-- Non-active tile: its own Concept's frontmatter, mouse-editable but not
-           part of the Region / keyboard grid nav (active={false}). -->
-      <div class="properties-host">
-        <Properties
-          properties={frontmatterProps}
-          path={tile.activePath}
-          types={suggestions.types}
-          keys={suggestions.keys}
-          tags={suggestions.tags}
-          focusType={false}
-          onchange={onPropertiesChange}
-          active={false}
-        />
-      </div>
-    {/if}
+      />
+    </div>
   {/if}
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -726,7 +793,7 @@
     background: var(--region-active);
   }
 
-  .properties-host.region-active :global(.properties) {
+  .frontmatter-host.region-active :global(.frontmatter) {
     background:
       linear-gradient(var(--region-active), var(--region-active)), var(--bg-sunken);
   }

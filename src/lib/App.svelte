@@ -33,7 +33,6 @@
     reservedChildren,
   } from '$lib/treeNav';
   import { outlineNav, backlinksNav } from '$lib/state/listFocusNav.svelte';
-  import { propertiesNav } from '$lib/state/propertiesNav.svelte';
   import { routeAppHotkey } from '$lib/appHotkeys';
   import {
     resizeColumns as layoutResizeColumns,
@@ -215,7 +214,9 @@
         inCmEditor: !!(document.activeElement as HTMLElement | null)?.closest('.cm-editor'),
         reviewActive: activeTileRef?.isReviewActive() ?? false,
         focusedRegion: focus.focusedRegion,
-        propertiesEditing: propertiesNav.mode !== 'nav',
+        frontmatterEditing: !!(document.activeElement as HTMLElement | null)?.closest(
+          '[data-region="frontmatter"] .cm-editor',
+        ),
         quickNavOpen,
         quickNavTagActive,
       });

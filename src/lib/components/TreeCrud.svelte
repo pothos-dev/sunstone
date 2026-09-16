@@ -6,7 +6,7 @@
    * `treeActions` store, which this component drives.
    *
    * Cross-feature coupling — `focusTypeForPath`: a freshly-created (non-reserved)
-   * Concept should open with the Properties panel focused on its `type` field
+   * Concept should open with the Frontmatter Region focused on its `type` line
    * (OKF validity), while a reserved file (index.md / log.md) is exempt and must
    * NOT focus-the-type. App owns the `focusTypeForPath` $state (plain navigation
    * also clears it); this component writes through the `$bindable` prop:

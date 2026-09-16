@@ -211,6 +211,12 @@ broken/wiki-link contexts), `editor/broken-links.ts`, `editor/wiki-links.ts`, an
   per-keystroke in `cm.ts`.
 - **(D)** `stripTagsFromFrontmatter` **stays TS** (test-only, no twin) — folded into 12.
 
+> **(C) note:** [ADR-0008](0008-raw-yaml-frontmatter-editing.md) removed the property model
+> itself. The carve-out still holds and its reasoning is unchanged — the members are now the
+> YAML text helpers (`joinConcept`, `isParseable`/`yamlError`, `titleFromYaml`, `formatYaml`,
+> `scaffoldConcept`, `titleFromFilename`), which ride the same `yaml` CST `serde_yaml` cannot
+> provide and run per-keystroke.
+
 **Family 13 — render-derived + CM-decoration seam (maximalist single-source).** Pure kernels
 (outline scan incl. the 3rd `fake/render.ts` copy; CriticMarkup parse/group; citation parse;
 `conceptToUrl`) → `sunstone-shared` + wasm, delete TS. Native `render.rs` (SSR) is

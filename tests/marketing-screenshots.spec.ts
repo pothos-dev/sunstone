@@ -11,7 +11,7 @@ import { mkdirSync } from 'node:fs';
  * Each shot drives a REAL run of the production build against the fake backend's
  * seeded Bundle: we open a content-rich Concept (live preview with a fenced code
  * block, a GFM table and task list), and expand BOTH sidebars so the Explorer
- * tree, frontmatter Properties, Outline, Tags and Backlinks are all on screen —
+ * tree, the frontmatter YAML, Outline, Tags and Backlinks are all on screen —
  * an attractive, full-featured frame.
  *
  * Theme follows the OS color scheme (theme.svelte.ts), so each mode is driven via
@@ -39,9 +39,9 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(tree).toBeVisible();
     await expect(page.getByTestId('app-root')).toHaveAttribute('data-theme', scheme);
 
-    // Properties is hidden by default (global toggle); switch it on so the
-    // frontmatter panel appears in the marketing shot.
-    await page.getByTestId('properties-toggle').click();
+    // Frontmatter is collapsed by default (global toggle); switch it on so the
+    // YAML editor appears in the marketing shot.
+    await page.getByTestId('frontmatter-toggle').click();
 
     // Expand the right Sidebar (starts collapsed) so Backlinks is on screen.
     const rightToggle = page.getByTestId('rail-toggle-right');
@@ -59,7 +59,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(editor).toContainText('Obsidian-style hybrid editing');
 
     // Make sure the supporting panels have populated before we snap.
-    await expect(page.getByTestId('properties')).toBeVisible();
+    await expect(page.getByTestId('frontmatter')).toBeVisible();
     await expect(page.getByTestId('outline')).toBeVisible();
 
     // Let fonts/syntax-highlight settle for a crisp frame.

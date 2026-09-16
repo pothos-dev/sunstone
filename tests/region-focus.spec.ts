@@ -8,7 +8,7 @@ import { type Page } from '@playwright/test';
  * directional movement across the 3×2 Region grid
  *
  *        col 0 (left)   col 1 (editor)   col 2 (right)
- *   row0  Explorer       Properties       Outline
+ *   row0  Explorer       Frontmatter      Outline
  *   row1  Tags           Editor           Backlinks
  *
  * Drives Alt-movement (arrows + hjkl) across the visible Regions, asserts the
@@ -42,12 +42,12 @@ test('Region focus: directional movement, sticky landing, Escape→Editor', asyn
 
   // Reset to a deterministic state: concepts/ + concepts/editor/ expanded (concepts/
   // now defaults COLLAPSED as it holds an index.md), everything else at defaults.
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], propertiesShown: true })));
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], frontmatterShown: true })));
   await page.reload();
   tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
 
-  // Open a Concept that has frontmatter (Properties), headings (Outline) and
+  // Open a Concept that has frontmatter, headings (Outline) and
   // backlinks (Backlinks), so all six Regions can be populated.
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
   const editor = page.getByTestId('editor');
@@ -84,13 +84,13 @@ test('Region focus: directional movement, sticky landing, Escape→Editor', asyn
   await expectActive(page, 'tags');
 
   // Alt+l (hjkl right) → editor column. The column's memory is the Editor
-  // (row1), so sticky landing returns to the Editor (NOT same-row Properties).
+  // (row1), so sticky landing returns to the Editor (NOT same-row Frontmatter).
   await altPress(page, 'l');
   await expectActive(page, 'editor');
 
-  // Alt+k (up) within the editor column → Properties (col1,row0).
+  // Alt+k (up) within the editor column → Frontmatter (col1,row0).
   await altPress(page, 'k');
-  await expectActive(page, 'properties');
+  await expectActive(page, 'frontmatter');
 
   // Alt+l → right column. Same-row (row0) → Outline (no right-column memory yet).
   await altPress(page, 'l');
@@ -134,12 +134,12 @@ test('absent Regions are skipped; movement clamps at grid edges', async ({ page 
   // NOTE: collapse-hidden Regions are now transiently REVEALED, not skipped
   // (slice: transient-region-auto-reveal — see region-auto-reveal.spec.ts). The
   // skip/clamp behaviour now applies only to GENUINELY ABSENT Regions (nothing
-  // to focus). With NO Concept open, the centre column (Properties + Editor) and
+  // to focus). With NO Concept open, the centre column (Frontmatter + Editor) and
   // the right column (Outline + Backlinks) are all absent.
   await page.goto('/');
   let tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], propertiesShown: true })));
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], frontmatterShown: true })));
   await page.reload();
   tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
@@ -163,7 +163,7 @@ test('history is on Ctrl+Alt+arrows; plain Alt+arrows no longer navigates; copy/
   await page.goto('/');
   let tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], propertiesShown: true })));
+  await page.evaluate(() => window.localStorage.setItem('sunstone:bundleState:/fake/bundle', JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'], frontmatterShown: true })));
   await page.reload();
   tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();

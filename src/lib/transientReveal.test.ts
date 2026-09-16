@@ -28,13 +28,13 @@ describe('revealFlagsFor', () => {
   test('the never-collapse-hidden Regions (Properties, Editor) keep no flags', () => {
     // Properties is now gated by the global show/hide toggle (not a collapse),
     // so it has no transient reveal flag; the Editor never collapses either.
-    expect(revealFlagsFor('properties')).toEqual([]);
+    expect(revealFlagsFor('frontmatter')).toEqual([]);
     expect(revealFlagsFor('editor')).toEqual([]);
   });
 
   test('every named flag is one of the known flags', () => {
     const known = new Set(ALL_TRANSIENT_FLAGS);
-    for (const id of ['explorer', 'tags', 'outline', 'backlinks', 'properties'] as const) {
+    for (const id of ['explorer', 'tags', 'outline', 'backlinks', 'frontmatter'] as const) {
       for (const f of revealFlagsFor(id)) expect(known.has(f)).toBe(true);
     }
   });
@@ -50,7 +50,7 @@ describe('flagsToClearOnEnter', () => {
   test('entering the Properties Region clears every peek (it has no flag of its own)', () => {
     // Properties is gated by the global toggle now, not a transient reveal, so
     // landing focus there simply snaps back every OTHER peeked Region.
-    const cleared = flagsToClearOnEnter('properties');
+    const cleared = flagsToClearOnEnter('frontmatter');
     expect(cleared).toContain('leftSidebarRevealed');
     expect(cleared).toContain('rightSidebarRevealed');
   });
@@ -74,7 +74,7 @@ describe('flagsToClearOnEnter', () => {
       'outline',
       'backlinks',
       'editor',
-      'properties',
+      'frontmatter',
     ] as const) {
       const keep = new Set(revealFlagsFor(id));
       const clear = new Set(flagsToClearOnEnter(id));

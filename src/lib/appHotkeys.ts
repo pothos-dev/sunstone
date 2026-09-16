@@ -19,9 +19,9 @@ export interface AppHotkeyContext {
   reviewActive: boolean;
   /** `focus.focusedRegion` at keydown time. */
   focusedRegion: string | null;
-  /** `propertiesNav.mode !== 'nav'` — the Properties Region has a local layer
-   *  to peel before the Region backbone acts. */
-  propertiesEditing: boolean;
+  /** DOM focus is inside the Frontmatter Region's YAML editor — a local layer
+   *  to peel (back to the Region container) before the Region backbone acts. */
+  frontmatterEditing: boolean;
   /** The quick-nav overlay is open. */
   quickNavOpen: boolean;
   /** The quick-nav tag drill-down is active (a local peel layer). */
@@ -110,10 +110,10 @@ export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotk
 
   // Escape: the UNIFIED peel — one layer per press, innermost first.
   if (plainEscape(e)) {
-    const propertiesPeel = ctx.focusedRegion === 'properties' && ctx.propertiesEditing;
+    const frontmatterPeel = ctx.focusedRegion === 'frontmatter' && ctx.frontmatterEditing;
     const editorPeel = ctx.focusedRegion === 'editor';
     const quickNavTagPeel = ctx.quickNavOpen && ctx.quickNavTagActive;
-    return { kind: 'escape', localPeelActive: propertiesPeel || editorPeel || quickNavTagPeel };
+    return { kind: 'escape', localPeelActive: frontmatterPeel || editorPeel || quickNavTagPeel };
   }
 
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;

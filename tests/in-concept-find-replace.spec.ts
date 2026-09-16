@@ -154,7 +154,7 @@ test('Replace (single) and Replace-all edit the body and persist via autosave', 
   expect(after).toContain('Sunstone 6 is the editor core');
 
   // --- Frontmatter is untouched: the YAML block (incl. `title: CodeMirror`
-  // and the `description: ... used by Sunstone.`) survives intact (ADR 0003). ---
+  // and the `description: ... used by Sunstone.`) survives intact (ADR 0008). ---
   expect(after).toContain('title: CodeMirror');
   expect(after).toContain('used by Sunstone.');
   expect(after.startsWith('---\n')).toBe(true);

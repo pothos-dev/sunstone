@@ -89,10 +89,10 @@ test('sidebar + section collapse state persists across reload', async ({ page })
 /**
  * Slice: multi-concept-tiling.
  *
- * The GLOBAL Properties show/hide flag (NavBar toggle) is persisted in the
+ * The GLOBAL Frontmatter show/hide flag (Concept-header toggle) is persisted in the
  * session store, so the choice survives a reload — it defaults to HIDDEN.
  */
-test('global Properties show/hide flag persists across reload', async ({ page }) => {
+test('global Frontmatter show/hide flag persists across reload', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
 
@@ -102,31 +102,31 @@ test('global Properties show/hide flag persists across reload', async ({ page })
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
 
-  // Open a Concept. Properties is HIDDEN by default: no chrome.
+  // Open a Concept. Frontmatter is HIDDEN by default: no chrome.
   await page.locator('[data-path="concepts/bundle.md"]').click();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
   // Turn it ON via the NavBar toggle — a non-default state whose restoration
   // proves persistence.
-  const toggle = page.getByTestId('properties-toggle');
+  const toggle = page.getByTestId('frontmatter-toggle');
   await toggle.click();
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
-  // The debounced save flushes `propertiesShown: true` to localStorage.
+  // The debounced save flushes `frontmatterShown: true` to localStorage.
   await expect
     .poll(() =>
       page.evaluate(() => {
         const raw = window.localStorage.getItem('sunstone:bundleState:/fake/bundle');
         if (!raw) return null;
-        return (JSON.parse(raw) as { propertiesShown?: boolean }).propertiesShown ?? null;
+        return (JSON.parse(raw) as { frontmatterShown?: boolean }).frontmatterShown ?? null;
       }),
     )
     .toBe(true);
 
-  // RELOAD: the last Concept reopens and the Properties panel stays SHOWN.
+  // RELOAD: the last Concept reopens and the Frontmatter Region stays SHOWN.
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 });
 
 /**

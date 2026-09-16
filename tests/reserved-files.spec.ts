@@ -29,9 +29,9 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  // Turn Properties ON globally, so "reserved files hide Properties" is a real
+  // Turn Frontmatter ON globally, so "reserved files hide Frontmatter" is a real
   // assertion (a reserved file must hide it even when it would otherwise show).
-  await page.getByTestId('properties-toggle').click();
+  await page.getByTestId('frontmatter-toggle').click();
 
   // --- Reserved files are NOT ordinary leaves anywhere ---
   await expect(tree.locator('[data-path="index.md"]')).toHaveCount(0);
@@ -44,9 +44,9 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   await expect(rootReserved.locator('[data-reserved-path="log.md"]')).toBeVisible();
 
   await rootReserved.locator('[data-reserved-path="index.md"]').click();
-  // It opens body-only — reserved files hide the Properties panel entirely
-  // (slice: hide-properties-for-reserved-files). The body still renders.
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  // It opens body-only — reserved files hide the Frontmatter Region entirely
+  // (slice: hide-frontmatter-for-reserved-files). The body still renders.
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   await expect(page.getByTestId('editor')).toContainText('Knowledge Base');
 
   // --- Subfolder index: concepts/ has index.md, reached by CLICKING THE FOLDER
@@ -54,7 +54,7 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   // body-only, exactly like the root affordance. ---
   await expect(tree.locator('[data-reserved-path="concepts/index.md"]')).toHaveCount(0);
   await tree.locator('[data-row-path="concepts"] .name-toggle').click();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   await expect(page.getByTestId('editor')).toContainText('Concepts');
 
   await page.screenshot({ path: 'tests/screenshots/reserved-files.png', fullPage: true });
@@ -101,19 +101,19 @@ test('reserved files: folder name opens index, then toggles; the twisty always t
   await expect(page.getByTestId('editor')).toContainText('Concepts');
 });
 
-test('reserved files: no Properties panel, body editing still works', async ({ page }) => {
+test('reserved files: no Frontmatter Region, body editing still works', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
-  // Properties ON globally so the reserved-file hide + the normal-Concept show
+  // Frontmatter ON globally so the reserved-file hide + the normal-Concept show
   // at the end are both real assertions.
-  await page.getByTestId('properties-toggle').click();
+  await page.getByTestId('frontmatter-toggle').click();
 
-  // Open the root log.md via its affordance — body only, no Properties panel
-  // (slice: hide-properties-for-reserved-files).
+  // Open the root log.md via its affordance — body only, no Frontmatter Region
+  // (slice: hide-frontmatter-for-reserved-files).
   await page.getByTestId('root-reserved').locator('[data-reserved-path="log.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
   // Read is the default; enter editing so the body becomes editable.
   await page.getByTestId('edit-toggle').click();
@@ -144,11 +144,11 @@ test('reserved files: no Properties panel, body editing still works', async ({ p
     fake.simulateExternalChange('modified', 'log.md', '# Just a heading\n');
   });
   await expect(editor).toContainText('Just a heading');
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
-  // A normal Concept STILL shows the Properties panel.
+  // A normal Concept STILL shows the Frontmatter Region.
   await page.getByTestId('tree').locator('[data-path="concepts/bundle.md"]').click();
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 });
 
 test('reserved files: right-click a folder offers to create the missing one', async ({
@@ -158,8 +158,8 @@ test('reserved files: right-click a folder offers to create the missing one', as
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  // Properties ON globally so the created reserved file's "no Properties" is real.
-  await page.getByTestId('properties-toggle').click();
+  // Frontmatter ON globally so the created reserved file's "no Frontmatter" is real.
+  await page.getByTestId('frontmatter-toggle').click();
 
   // concepts/ has index.md but NOT log.md -> only "Create log.md" is offered.
   await openRowMenu(page, 'concepts');
@@ -176,9 +176,9 @@ test('reserved files: right-click a folder offers to create the missing one', as
     tree.locator('[data-reserved-path="concepts/log.md"]'),
   ).toHaveCount(1);
 
-  // Created reserved file opened body-only — no Properties panel.
+  // Created reserved file opened body-only — no Frontmatter Region.
   await expect(page.getByTestId('editor')).toBeVisible();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
   // The created log.md has a minimal stub (a heading), no `type` field.
   const content = await page.evaluate(

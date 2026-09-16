@@ -8,7 +8,7 @@ import { test, expect } from './fixtures';
  * active Concept: the title + close, the Edit toggle (read ⇄ live editing; the
  * single view-mode control after editing-boolean-edit-toggle), Split Right /
  * Split Down, undo/redo over the Tile's Document history (shown only while
- * editing), the review-diff toggle, and Export-PDF. The Properties toggle also
+ * editing), the review-diff toggle, and Export-PDF. The Frontmatter toggle also
  * lives here now (moved from the deleted NavBar); the sidebars toggle from their
  * own edges.
  *
@@ -86,12 +86,15 @@ test('tile header: Edit toggle, undo/redo, review + export live in the header', 
   expect(order.indexOf('undo')).toBeLessThan(order.indexOf('edit-toggle'));
   expect(order.indexOf('redo')).toBeLessThan(order.indexOf('edit-toggle'));
 
-  // Edit a property; the header undo enables. Properties is hidden by default
-  // (global toggle) — switch it on so the frontmatter inputs are available.
-  await page.getByTestId('properties-toggle').click();
-  const titleInput = page.getByTestId('scalar-title');
-  await titleInput.fill('CodeMirror Renamed');
-  await titleInput.blur();
+  // Edit the frontmatter; the header undo enables. The Region is collapsed by
+  // default (global toggle) — switch it on so the YAML editor is available.
+  await page.getByTestId('frontmatter-toggle').click();
+  const yaml = page.getByTestId('frontmatter').locator('.cm-content');
+  await yaml.click();
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('ArrowDown'); // the `title:` line
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Renamed');
   await expect
     .poll(() => persisted(page, 'concepts/codemirror.md'))
     .toContain('title: CodeMirror Renamed');
@@ -99,10 +102,10 @@ test('tile header: Edit toggle, undo/redo, review + export live in the header', 
 
   // Header undo reverts; redo re-applies — proving they drive the shared history.
   await undoBtn.click();
-  await expect(page.getByTestId('scalar-title')).toHaveValue('CodeMirror');
+  await expect(yaml).not.toContainText('Renamed');
   await expect(redoBtn).toBeEnabled();
   await redoBtn.click();
-  await expect(page.getByTestId('scalar-title')).toHaveValue('CodeMirror Renamed');
+  await expect(yaml).toContainText('title: CodeMirror Renamed');
 
   // --- Review toggle (reuses existing enablement) ---------------------------
   const reviewToggle = page.getByTestId('review-toggle');
@@ -130,7 +133,7 @@ test('tile header: close affordance is hidden when only one tile is on screen', 
   await expect(page.getByTestId('tile-close')).toHaveCount(0);
 });
 
-test('no NavBar: Properties toggle moved to the header; sidebars toggle from their edges', async ({
+test('no NavBar: Frontmatter toggle moved to the header; sidebars toggle from their edges', async ({
   page,
 }) => {
   await openCodemirror(page);
@@ -139,20 +142,20 @@ test('no NavBar: Properties toggle moved to the header; sidebars toggle from the
   // only its concept header, no bar above it.
   await expect(page.locator('nav[aria-label="Global controls"]')).toHaveCount(0);
 
-  // The Properties toggle now lives in the concept header, next to Edit. It
-  // starts OFF (default hidden): no Properties chrome in the tile.
+  // The Frontmatter toggle now lives in the concept header, next to Edit. It
+  // starts OFF (default hidden): no Frontmatter chrome in the tile.
   const header = page.getByTestId('tile-header');
-  const propsToggle = header.getByTestId('properties-toggle');
+  const propsToggle = header.getByTestId('frontmatter-toggle');
   await expect(propsToggle).toBeVisible();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   // Toggling it ON reveals the tile's frontmatter inline; OFF hides it again.
   await propsToggle.click();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
   await propsToggle.click();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
 
   // The sidebar collapse/expand affordances are the toggle button at the top of
   // each activity rail — it reflects the open state via aria-pressed.

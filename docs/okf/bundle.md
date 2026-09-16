@@ -51,7 +51,7 @@ The link/backlink logic is implemented **once**, in [sunstone-shared](/architect
 
 ### Reserved files
 
-`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and show **no Properties panel** (they carry no frontmatter — the sole exception is a bundle-root `index.md`, which may declare `okf_version`). See [Concept → frontmatter](/okf/concept.md#frontmatter) for the panel that this exemption turns off.
+`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and show **no Frontmatter Region** (they carry no frontmatter — the sole exception is a bundle-root `index.md`, which may declare `okf_version`). See [Concept → frontmatter](/okf/concept.md#frontmatter) for the Region that this exemption turns off.
 
 ### The Bundle is git-committed content
 
