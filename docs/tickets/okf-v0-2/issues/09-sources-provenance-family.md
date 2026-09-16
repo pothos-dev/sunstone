@@ -1,6 +1,6 @@
 ---
 status: ready-for-agent
-blocked-by: [01, 02, 03]
+blocked-by: [01, 02a, 02b, 03]
 ---
 
 # 09: Provenance family — `sources`, credibility signals, and per-claim attribution
@@ -15,7 +15,7 @@ Per-claim attribution joins on `id`: the body cites with a markdown footnote who
 
 The `[n]` form is **deprecated, not removed**: `find_citation_refs` / `citation_def_pos` and the `citations` CodeMirror extension keep working so v0.1 Bundles still read correctly, alongside the legacy `# Citations` list. Nothing new should be authored in that form, and the docs must say so. `[n]` is digits-only, so it cannot collide with a `[^label]` footnote.
 
-Editing `sources` itself is not this ticket's problem — nested Frontmatter is [02](02-properties-panel-nested-frontmatter.md), and this ticket consumes it.
+Editing `sources` itself is not this ticket's problem — the YAML Frontmatter editor is [02a](02a-frontmatter-yaml-editor.md) and its OKF lint/completion is [02b](02b-okf-language-service.md); this ticket consumes both, and contributes the `sources` rules to the second.
 
 This ticket also carries the v0.1 migration it supersedes: the body `# Citations` list becomes `sources`, and a consumer SHOULD read `sources` while MAY still parsing a legacy `# Citations` list.
 

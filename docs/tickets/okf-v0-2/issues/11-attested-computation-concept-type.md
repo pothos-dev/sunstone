@@ -1,6 +1,6 @@
 ---
 status: ready-for-agent
-blocked-by: [01, 02, 09]
+blocked-by: [01, 02a, 02b, 09]
 ---
 
 # 11: The `Attested Computation` Concept type
@@ -12,7 +12,7 @@ The contract is five keys: `runtime` names the execution environment, `parameter
 Scope note: v0.2 explicitly defers the runtime protocol, receipt and verdict wire formats, and the attester ABI. Sunstone models and displays the contract; it does not execute or verify anything.
 
 - [ ] `Attested Computation` is recognised as a Concept type, and its contract keys parse, render and edit
-- [ ] `parameters` edits as a list of maps, with `name` and `type` present and `required` optional per entry
+- [ ] `parameters` is authorable as a list of maps, with `name` and `type` present and `required` optional per entry
 - [ ] `executor.resource`, `attester.resource` and a path-valued `computation` resolve through the same link resolution as any in-Bundle link, including bundle-absolute form under the detected root
 - [ ] `executor.receipt` edits as a list of names
 - [ ] A Concept of this type missing optional contract keys renders without warning, per permissive conformance

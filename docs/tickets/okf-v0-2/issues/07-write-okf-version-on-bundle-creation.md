@@ -13,6 +13,6 @@ The marker is the sole exception to "Reserved files carry no Frontmatter", so th
 - [ ] Adding the marker to an existing root `index.md` preserves its body and any other Frontmatter keys
 - [ ] An `index.md` that already declares `okf_version` is never rewritten, including when it names a different version
 - [ ] No non-root `index.md` ever gains Frontmatter
-- [ ] The Properties panel stays hidden for Reserved files, with the root `index.md` marker handled as the documented exception
+- [ ] The Frontmatter Region stays hidden for Reserved files, with the root `index.md` marker handled as the documented exception
 - [ ] Unit tests cover create, add-to-existing and leave-alone; a Playwright case covers a freshly created Bundle rooting on its own marker
 - [ ] All four gates green

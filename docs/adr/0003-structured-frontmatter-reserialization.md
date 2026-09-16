@@ -1,5 +1,11 @@
 # Structured frontmatter model with whole-block re-serialization
 
+> **Status: Superseded by [ADR-0008](0008-raw-yaml-frontmatter-editing.md).**
+> The `Property[]` model, the Properties panel over it, and whole-block re-serialization are
+> removed — frontmatter is edited as YAML text instead, so it round-trips byte-for-byte and the
+> nested OKF v0.2 families become authorable. The unified-undo mechanism described below survives,
+> with the effect payload changed from `Property[]` to a YAML string.
+
 **Supersedes:** [ADR-0002](0002-flat-frontmatter-model.md)
 
 Frontmatter is now held as **structured `Property[]` state in a CodeMirror `StateField`** — the

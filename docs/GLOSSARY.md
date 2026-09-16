@@ -257,3 +257,10 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
   (desktop: OS config dir; web: the browser, e.g. `localStorage`), never written into the
   Bundle. See [View state](/interface/view-state.md). _Avoid_: "Bundle state". (Code not yet
   renamed — flagged for a later rename slice.)
+- The **Properties** Region is named after the `Property[]` type that models Frontmatter, which
+  [ADR-0008](/adr/0008-raw-yaml-frontmatter-editing.md) removes in favour of editing the YAML
+  directly. Once the type is gone the name points at nothing, and "Properties" would mean only
+  "the place Frontmatter is edited" — which is what **Frontmatter** already means. Resolved term:
+  the Region is **Frontmatter**. _Avoid_: "Properties panel", "Properties Section" (it is neither
+  a Pane nor a Section — see the entry above), "the YAML panel". (Not yet renamed — the rename
+  lands with the editor itself; UI, `data-testid`s and docs still say "Properties".)
