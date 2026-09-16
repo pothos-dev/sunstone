@@ -64,20 +64,22 @@ Playwright is the primary **behavioural** test for components. There are two run
 The static SPA (`bun run build && bun run preview`) + the in-memory **`fake` backend** on port 1420. This is the default runner and covers the desktop editor and all shared components. It `testIgnore`s the web specs.
 
 ```bash
-bunx playwright test -c playwright.local.config.ts             # all desktop specs
-bunx playwright test -c playwright.local.config.ts tree-crud   # a subset (by spec name)
+bunx playwright test -c playwright.config.ts             # all desktop specs
+bunx playwright test -c playwright.config.ts tree-crud   # a subset (by spec name)
 ```
 
-`playwright.local.config.ts` is a sandbox override: it points the launcher at a
-system Chromium and runs `--no-sandbox`. On a normal machine use
-`playwright.config.ts` directly. Override the binary with
-`CHROMIUM_BIN=/path/to/chromium` — `/tmp/chromium` is the historical default but
-`/tmp` gets wiped; the ms-playwright cache is a durable fallback:
+### Running inside an ax agent sandbox
 
-```bash
-CHROMIUM_BIN=~/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome \
-  bunx playwright test -c playwright.local.config.ts
-```
+Every spec in both suites imports `test`/`expect` from `tests/fixtures.ts`
+instead of `@playwright/test` directly. Its `browser` fixture auto-detects an
+ax agent (casket) sandbox via the `CASKET_NAME` env var (see `/casket`'s
+sessions topic) and, when present, connects over CDP to the container's
+already-running Chromium on `:9222` instead of launching a new one — sandboxed
+Chromium launches are unreliable (OOM alongside the build/preview servers, or
+missing shared libs depending on the image). `PW_CDP=<url>` overrides the
+endpoint explicitly. Outside a sandbox (CI, a normal machine) neither is set,
+so Playwright launches its own browser as usual — `CHROMIUM_BIN=/path/to/chromium`
+still overrides that binary if needed.
 
 ### 2. Web e2e suite — `playwright.web.config.ts`
 
@@ -87,12 +89,6 @@ The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over t
 mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start
                                     # watching it before globalSetup seeds it
 bunx playwright test -c playwright.web.config.ts
-```
-
-In a resource-constrained sandbox, launching a second Chromium alongside the two servers can OOM. Connect to an already-running Chromium over CDP instead:
-
-```bash
-PW_CDP=http://localhost:9222 bunx playwright test -c playwright.web.config.ts
 ```
 
 `reuseExistingServer` also lets you pre-build/pre-start either server by hand (e.g. build to a temp dir where in-repo build dirs are protected) and have Playwright reuse it.

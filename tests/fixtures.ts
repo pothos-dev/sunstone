@@ -1,21 +1,23 @@
 import { test as base, expect, chromium } from '@playwright/test';
 
 /**
- * Test fixtures with an OPT-IN "connect over CDP" mode.
+ * Test fixtures that auto-detect an ax agent (casket) sandbox and connect over
+ * CDP instead of launching a fresh browser.
  *
- * When `PW_CDP` is set (to a CDP endpoint, e.g. `http://localhost:9222`), the
- * `browser` fixture connects to an ALREADY-RUNNING Chromium over the Chrome
- * DevTools Protocol instead of launching a fresh one. This is for
- * resource-constrained sandboxes where launching a second Chromium alongside the
- * `vite build`/preview server exhausts memory and the launch is OOM-killed —
- * reusing the running browser sidesteps that. CI (and normal machines) leave
- * `PW_CDP` unset, so the standard launch path (playwright.config.ts) is used and
- * nothing changes.
+ * `CASKET_NAME` is only set inside a casket sandbox (see `/casket`'s sessions
+ * topic), where the container already runs a Chromium reachable at
+ * `http://localhost:9222` — launching a second one either exhausts memory
+ * (OOM-killed alongside the `vite build`/preview server) or fails outright
+ * (missing shared libs in some images). Reusing the running browser sidesteps
+ * both. `PW_CDP` overrides the endpoint explicitly (e.g. a different port);
+ * outside a sandbox (CI, a normal host machine) neither is set, so the
+ * standard launch path (playwright.config.ts, the host's own Chrome) is used
+ * and nothing changes.
  *
  * Specs that need to run in-sandbox import `{ test, expect }` from here instead
  * of directly from `@playwright/test`.
  */
-const CDP_ENDPOINT = process.env.PW_CDP;
+const CDP_ENDPOINT = process.env.PW_CDP ?? (process.env.CASKET_NAME ? 'http://localhost:9222' : undefined);
 
 export const test = CDP_ENDPOINT
   ? base.extend({
