@@ -1,3 +1,6 @@
+diff --git a/node_modules/@atomic-editor/editor/.bun-tag-8b5ba6dc9b98f0e3 b/.bun-tag-8b5ba6dc9b98f0e3
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/@atomic-editor/editor/.bun-tag-911766f951a9017e b/.bun-tag-911766f951a9017e
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -30,7 +33,7 @@ index 955ad2f60d19dc8619d5a35fa1778f15c2e1ef15..0577bf5f3093fcff15679fab28a2ef3a
  //# sourceMappingURL=index.js.map
 \ No newline at end of file
 diff --git a/dist/inline-preview.d.ts b/dist/inline-preview.d.ts
-index 4951e264cdf8f9e1c2f52936ed6e4cb6558769e1..fbf13f0ec66ab9d62a205de2447af577f6ab9c66 100644
+index 4951e264cdf8f9e1c2f52936ed6e4cb6558769e1..f643219c6564a54e18261e644ed9d11da0e730ba 100644
 --- a/dist/inline-preview.d.ts
 +++ b/dist/inline-preview.d.ts
 @@ -8,6 +8,12 @@ export interface InlinePreviewConfig {
@@ -47,7 +50,7 @@ index 4951e264cdf8f9e1c2f52936ed6e4cb6558769e1..fbf13f0ec66ab9d62a205de2447af577
  /**
   * Assemble the inline-preview extension set. Call once per editor and
 diff --git a/dist/inline-preview.js b/dist/inline-preview.js
-index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f894832b2ed2ee 100644
+index 94d48d196e21fac09a774cd97b61ed5274ab48b9..398840c8a2c5fd19e624099ec20e695b1a6a8df1 100644
 --- a/dist/inline-preview.js
 +++ b/dist/inline-preview.js
 @@ -1,5 +1,5 @@
@@ -99,7 +102,28 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
                      // Let the follow-up click open the link, but stop CM6 from
                      // interpreting the icon press as a text-editing click. Without
                      // this, pointerdown moves the selection into the Link node and
-@@ -289,7 +300,11 @@ function buildInlineDecorations(view) {
+@@ -178,6 +189,20 @@ const HIDEABLE_SYNTAX = new Set([
+ // The same token names can appear under an Image node — those stay
+ // on the line-based rule because images are a different UX surface.
+ const LINK_CHILD_SYNTAX = new Set(['LinkMark', 'URL', 'LinkTitle']);
++/**
++ * The `URL` child that is a Link's DESTINATION, or `null` when it has none.
++ *
++ * GFM autolinking also turns a bare URL / email address in the link LABEL into
++ * its own `URL` node, so `[a@b.c](mailto:a@b.c)` has TWO direct `URL` children
++ * and `getChild('URL')` returns the label one. Destination vs label is a
++ * positional question: the label ends at the closing `]` (the Link's second
++ * `LinkMark`), so only a `URL` starting after it is the destination.
++ */
++function destinationUrlNode(link) {
++    const marks = link.getChildren('LinkMark');
++    const labelEnd = marks.length > 1 ? marks[1].to : link.from;
++    return link.getChildren('URL').find((u) => u.from >= labelEnd) ?? null;
++}
+ const INLINE_MARK_CLASS = {
+     StrongEmphasis: 'cm-atomic-strong',
+     Emphasis: 'cm-atomic-em',
+@@ -289,7 +314,11 @@ function buildInlineDecorations(view) {
      const { doc } = state;
      const ranges = [];
      const activeLines = new Set();
@@ -112,7 +136,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
          for (const r of state.selection.ranges) {
              const firstLine = doc.lineAt(r.from).number;
              const lastLine = doc.lineAt(r.to).number;
-@@ -322,6 +337,12 @@ function buildInlineDecorations(view) {
+@@ -322,6 +351,12 @@ function buildInlineDecorations(view) {
      // aren't included; they already have their own widget UX and the
      // line-based reveal is the right fit for `![alt](url)`.
      const activeLinkStarts = new Set();
@@ -125,7 +149,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
      // Single pre-order walk. A tree walk visits a parent before its
      // children, which lets us compute two pieces of look-ahead state on
      // the way in — right before the children that depend on them:
-@@ -353,14 +374,21 @@ function buildInlineDecorations(view) {
+@@ -353,14 +388,21 @@ function buildInlineDecorations(view) {
                          activeLines.add(n);
                  }
              }
@@ -140,7 +164,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
 +            if (node.name === 'Link') {
 +                // A Link with no URL child has no destination — treat it as
 +                // plain bracketed text (`[1]`), not a link (see urllessLinkStarts).
-+                if (!node.node.getChild('URL')) {
++                if (!destinationUrlNode(node.node)) {
 +                    urllessLinkStarts.add(node.from);
 +                }
 +                else if (view.hasFocus && !alwaysRender) {
@@ -155,7 +179,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
                      }
                  }
              }
-@@ -374,7 +402,8 @@ function buildInlineDecorations(view) {
+@@ -374,7 +416,8 @@ function buildInlineDecorations(view) {
                  }
              }
              const markClass = INLINE_MARK_CLASS[node.name];
@@ -165,11 +189,20 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
                  ranges.push(Decoration.mark({ class: markClass }).range(node.from, node.to));
              }
              if (HIDEABLE_SYNTAX.has(node.name) && node.from < node.to) {
-@@ -390,7 +419,19 @@ function buildInlineDecorations(view) {
+@@ -389,8 +432,27 @@ function buildInlineDecorations(view) {
+                     while (parent && parent.name !== 'Link' && parent.name !== 'Image') {
                          parent = parent.parent;
                      }
-                     if (parent && parent.name === 'Link') {
+-                    if (parent && parent.name === 'Link') {
 -                        shouldHide = !activeLinkStarts.has(parent.from);
++                    if (parent && parent.name === 'Link' &&
++                        node.name === 'URL' && destinationUrlNode(parent)?.from !== node.from) {
++                        // An autolinked URL / email address in the link LABEL
++                        // (`[a@b.c](mailto:a@b.c)`) is the link's visible TEXT,
++                        // not its destination — hiding it leaves an empty anchor.
++                        shouldHide = false;
++                    }
++                    else if (parent && parent.name === 'Link') {
 +                        // Keep the brackets of a url-less Link (`[1]`) visible —
 +                        // it renders as literal text, not a hidden-mark link.
 +                        shouldHide = !urllessLinkStarts.has(parent.from) &&
@@ -186,7 +219,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
                      }
                      else {
                          shouldHide = !activeLines.has(lineNum);
-@@ -788,7 +829,7 @@ function makeLinkClickHandler(onLinkClick) {
+@@ -788,7 +850,7 @@ function makeLinkClickHandler(onLinkClick) {
                  return false;
              if (event.button !== 0)
                  return false;
@@ -195,7 +228,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
              if (!linkEl)
                  return false;
              const pos = view.posAtDOM(linkEl);
-@@ -796,11 +837,13 @@ function makeLinkClickHandler(onLinkClick) {
+@@ -796,11 +858,19 @@ function makeLinkClickHandler(onLinkClick) {
                  return false;
              const tree = syntaxTree(view.state);
              let node = tree.resolveInner(pos, 1);
@@ -207,11 +240,17 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
              if (!node)
                  return false;
 -            const urlNode = node.getChild('URL');
-+            const urlNode = node.name === 'URL' ? node : node.getChild('URL');
++            // A click landing on an autolinked label (`[a@b.c](mailto:a@b.c)`)
++            // resolves to the LABEL's URL node; open the Link's destination, not
++            // the label text.
++            if (node.name === 'URL' && node.parent?.name === 'Link') {
++                node = node.parent;
++            }
++            const urlNode = node.name === 'URL' ? node : destinationUrlNode(node);
              if (!urlNode)
                  return false;
              const url = view.state.doc.sliceString(urlNode.from, urlNode.to);
-@@ -821,8 +864,9 @@ function makeLinkClickHandler(onLinkClick) {
+@@ -821,8 +891,9 @@ function makeLinkClickHandler(onLinkClick) {
   * browser, etc.) instead of the default `window.open`.
   */
  export function inlinePreview(config = {}) {
@@ -223,7 +262,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..864b2038174712c7968dcfdf24f89483
          inlinePreviewPlugin,
          freezeMousePlugin,
 diff --git a/dist/styles/inline-preview.css b/dist/styles/inline-preview.css
-index de6e2618e9b0bd8c788aea16f95d6a9181f84e67..6f23542fc98af8a9b6b495195b6e5312c37f96d8 100644
+index de6e2618e9b0bd8c788aea16f95d6a9181f84e67..c7898c0bcb907a5c6ee3f32db2e249bc97042cc5 100644
 --- a/dist/styles/inline-preview.css
 +++ b/dist/styles/inline-preview.css
 @@ -195,6 +195,14 @@

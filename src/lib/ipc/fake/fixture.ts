@@ -156,6 +156,9 @@ but stay clickable (never blocked, per the OKF spec):
 - [Missing Page](/does-not-exist.md) — broken (bundle-absolute)
 
 An external link is never treated as broken: [Example](https://example.com).
+
+A mail link whose label IS the address keeps that address visible:
+[hello@example.com](mailto:hello@example.com).
 `,
 
   // A Concept with NO frontmatter block at all. Exercises authoring the first

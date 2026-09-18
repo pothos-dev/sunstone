@@ -8,6 +8,7 @@ import {
 import { StateEffect, RangeSetBuilder, type Extension } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { indexStore } from '$lib/state/index.svelte';
+import { destinationUrlNode } from './linkTarget';
 
 // ---------------------------------------------------------------------------
 // Broken-link decoration (slice: bundle-index-broken-links)
@@ -69,19 +70,13 @@ function computeBrokenLinks(view: EditorView, ctx: BrokenLinkContext): Decoratio
       to,
       enter(node) {
         if (node.name !== 'Link') return;
-        // A markdown Link node spans `[text](url)`. Find the `URL` child for the
-        // href, and mark the whole link range so the styling covers the text.
-        let href: string | null = null;
-        const cursor = node.node.cursor();
-        if (cursor.firstChild()) {
-          do {
-            if (cursor.name === 'URL') {
-              href = view.state.sliceDoc(cursor.from, cursor.to);
-              break;
-            }
-          } while (cursor.nextSibling());
-        }
-        if (href === null) return;
+        // A markdown Link node spans `[text](url)`. Take the DESTINATION `URL`
+        // child for the href — an autolinked label (`[a@b.c](mailto:a@b.c)`)
+        // contributes a `URL` child of its own — and mark the whole link range
+        // so the styling covers the text.
+        const urlNode = destinationUrlNode(node.node);
+        if (!urlNode) return;
+        const href = view.state.sliceDoc(urlNode.from, urlNode.to);
         // Resolve synchronously through the wasm handle; the `internal` variant
         // carries `exists`, so a broken internal link is `!resolved.exists`.
         const resolved = indexStore.resolveLink(currentPath, href);
