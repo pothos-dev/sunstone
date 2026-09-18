@@ -121,6 +121,23 @@ fn rewrite_links_in(
     // The shared code-aware scanner (`sunstone_shared::scan`) skips fenced /
     // inline code for wikilinks and hands markdown-link inners through with
     // their original code-agnostic behaviour. Embeds / images arrive flagged.
+    //
+    // # The `!`-asymmetry is DELIBERATE (ei-1) — site 2 of 4
+    //
+    // REWRITE does NOT drop `!`; EXTRACTION (`index/links.rs`) does. Do not
+    // "restore symmetry" here. The two questions are different:
+    //
+    //  * an Embed is not a Concept-to-Concept relationship -> no Backlinks edge
+    //    (extraction drops it);
+    //  * a PATH-resolved Embed is still a path, and moving the Concept that
+    //    writes it invalidates that path exactly as it invalidates a link ->
+    //    rewrite it (`![a](./assets/x.png)` must follow its author).
+    //
+    // The wikilink callback below keeps skipping `![[ … ]]` — the shared scanner
+    // never hands embeds to it — because a NAME-resolved Embed resolves
+    // bundle-wide by name and suffix, so a Concept move can never invalidate it.
+    // `sunstone-shared`'s "one scanner for extraction and rewrite" invariant
+    // therefore survives intact; see the module note in `shared/src/embed.rs`.
     let count = std::cell::Cell::new(0usize);
     let out = sunstone_shared::scan::scan_replace_links(
         content,
@@ -131,10 +148,7 @@ fn rewrite_links_in(
             }
             None => format!("[[{raw}]]"),
         },
-        |inner, is_image| {
-            if is_image {
-                return None;
-            }
+        |inner, _is_image| {
             let replacement = rewrite_target(old_source, new_source, moved, inner, moves)?;
             count.set(count.get() + 1);
             Some(replacement)
@@ -471,14 +485,64 @@ mod tests {
         assert_eq!(summary.links_changed, 1);
     }
 
+    // --- Embeds: the deliberate `!`-asymmetry (ei-1) --------------------------
+
     #[test]
-    fn images_are_not_rewritten() {
+    fn a_moved_concepts_relative_embed_follows_it() {
+        // THE case the asymmetry exists for: `x.md` moves into a folder, so its
+        // relative Embed path must be recomputed or the image 404s. Extraction
+        // still gives the Attachment no Backlinks edge (see `index/links.rs`).
+        let files = &[("x.md", "![dot](./assets/dot.png)")];
+        let m = moves(&[("x.md", "sub/x.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["sub/x.md"], "![dot](../assets/dot.png)");
+        assert_eq!(summary.links_changed, 1);
+    }
+
+    #[test]
+    fn an_embeds_bundle_absolute_path_is_left_alone() {
+        // A bundle-absolute Embed is move-invariant, exactly like a link.
+        let files = &[("x.md", "![dot](/assets/dot.png)")];
+        let m = moves(&[("x.md", "sub/x.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["sub/x.md"], "![dot](/assets/dot.png)");
+        assert_eq!(summary.links_changed, 0);
+    }
+
+    #[test]
+    fn embed_alt_text_and_size_survive_the_rewrite() {
+        // The `!` and the alt text (which may carry a SIZE, e.g. `![300]`) are
+        // outside the rewritten span — only the target changes.
+        let files = &[("x.md", "![300x200](./assets/wide.png) tail")];
+        let m = moves(&[("x.md", "sub/x.md")]);
+        let (result, _summary) = run(files, &m);
+        assert_eq!(result["sub/x.md"], "![300x200](../assets/wide.png) tail");
+    }
+
+    #[test]
+    fn name_resolved_embed_untouched_while_path_embed_is_rewritten() {
+        // Pins the shared-scanner invariant: `![[x.png]]` resolves bundle-wide
+        // by name and suffix, so a Concept move can NEVER invalidate it and the
+        // wikilink scanner must keep skipping embeds. The path-model Embed on
+        // the same line is rewritten.
+        let files = &[("x.md", "![[dot.png]] and ![a](./dot.png)")];
+        let m = moves(&[("x.md", "sub/x.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["sub/x.md"], "![[dot.png]] and ![a](../dot.png)");
+        assert_eq!(summary.links_changed, 1);
+    }
+
+    #[test]
+    fn an_embed_of_a_moved_concept_is_rewritten_too() {
+        // Formerly `images_are_not_rewritten`, inverted by ei-1: the rewrite
+        // side no longer drops `!`. Rewriting a path that moved is right for an
+        // Embed for the same reason it is right for a link.
         let files = &[("a.md", "![img](/b.md)"), ("b.md", "# B")];
         let m = moves(&[("b.md", "folder/b.md")]);
         let (result, summary) = run(files, &m);
         assert_eq!(result["folder/b.md"], "# B"); // moved
-        assert_eq!(result["a.md"], "![img](/b.md)"); // image left alone
-        assert_eq!(summary.links_changed, 0);
+        assert_eq!(result["a.md"], "![img](/folder/b.md)");
+        assert_eq!(summary.links_changed, 1);
     }
 
     // --- Wikilink rename-rewrite (spec §4) -----------------------------------

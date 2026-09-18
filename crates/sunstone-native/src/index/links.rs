@@ -25,16 +25,27 @@ pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
 }
 
 /// Find every markdown inline-link `href`: the `target` in `[text](target)`.
-/// Image links `![alt](src)` are skipped (images are not Concept links).
-/// Handles a trailing `"title"` inside the parens. Reference-style links are
-/// out of scope (the fixtures and OKF Concepts use inline links).
+/// Embeds `![alt](src)` are skipped. Handles a trailing `"title"` inside the
+/// parens. Reference-style links are out of scope (the fixtures and OKF
+/// Concepts use inline links).
+///
+/// # The `!`-asymmetry is DELIBERATE (ei-1) — site 1 of 4
+///
+/// EXTRACTION drops `!`; REWRITE (`rewrite/engine.rs`) does not. Do not
+/// "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
+/// so it must never create a Backlinks edge — which is what this drop
+/// guarantees. That an Embed's *path* is still rewritten on a move is a
+/// different question with a different answer; see the twin comment in
+/// `rewrite/engine.rs::rewrite_links_in` (and `src/lib/ipc/fake/links.ts` for
+/// the TS twin of both halves).
 fn markdown_link_hrefs(body: &str) -> Vec<String> {
     let bytes = body.as_bytes();
     let mut hrefs = Vec::new();
     let mut i = 0usize;
     while i < bytes.len() {
         if bytes[i] == b'[' {
-            // Skip image links: a `!` immediately before `[`.
+            // Skip Embeds: a `!` immediately before `[`. No Backlinks edge —
+            // see the asymmetry note on this function.
             let is_image = i > 0 && bytes[i - 1] == b'!';
             // Find the matching `]` (no nested brackets in OKF link text).
             if let Some(close) = find_byte(bytes, i + 1, b']') {
@@ -104,5 +115,14 @@ mod tests {
         let body = "See [A](./a.md) and ![img](./pic.png) and [ext](https://x).";
         let links = extract_links("dir/cur.md", body);
         assert_eq!(links, vec!["dir/a.md"]);
+    }
+
+    #[test]
+    fn an_embed_of_a_concept_still_creates_no_edge() {
+        // The extraction half of the ei-1 asymmetry, pinned: even when an Embed
+        // target IS a Concept path, it contributes no link (hence no backlink).
+        // The rewrite half deliberately behaves the OTHER way.
+        let links = extract_links("a.md", "![x](/b.md) ![[c.png]] [real](/b.md)");
+        assert_eq!(links, vec!["b.md"]);
     }
 }

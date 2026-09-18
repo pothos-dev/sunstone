@@ -1,6 +1,14 @@
 import { backend } from '$lib/ipc';
 import { ensureWasm, type BundleIndex, type ResolvedLink } from '$lib/wasm';
 import type { AnchorRename } from '$lib/types';
+import {
+  attachmentCorpus,
+  resolveEmbedIn,
+  EMPTY_CORPUS,
+  type AttachmentCorpus,
+  type EmbedModel,
+  type EmbedResolution,
+} from './embedResolve';
 
 /**
  * The frontend's link-resolution engine (ADR 0006 §3/§4): a thin store over the
@@ -30,6 +38,16 @@ class IndexStore {
    */
   #handle: BundleIndex | null = null;
 
+  /**
+   * The **Attachment** corpus (ei-1), held BESIDE the handle's concept-path set
+   * rather than inside it. An Attachment is never a Concept: folding the two
+   * together would put images into quick-nav, the Explorer tree and the
+   * structural bundle-root inference (see the Attachment-index note in
+   * `crates/sunstone-native/src/index.rs`). The editor needs it synchronously,
+   * to resolve `![[name.png]]` while building decorations.
+   */
+  #attachments: AttachmentCorpus = EMPTY_CORPUS;
+
   /** Best-effort OKF bundle root within the opened tree (`''` = opened root). */
   bundleRoot(): string {
     return this.#handle?.bundleRoot() ?? '';
@@ -46,6 +64,31 @@ class IndexStore {
    */
   conceptPaths(): string[] {
     return this.#handle?.conceptPaths() ?? [];
+  }
+
+  /**
+   * Every Attachment path (bundle-relative), sorted — the name model's
+   * candidate set. `[]` before the first refresh or on a backend without
+   * Attachment listing.
+   */
+  attachmentPaths(): string[] {
+    return this.#attachments.paths;
+  }
+
+  /** Synchronous existence check for a path-model Embed target. */
+  attachmentExists(path: string): boolean {
+    return this.#attachments.has(path);
+  }
+
+  /**
+   * Resolve one Embed's `target` to `{ path, exists }`, or `null` when there is
+   * nothing to render (a `data:`/remote/anchor target for the path model, no
+   * matching Attachment for the name model). The Embed counterpart of
+   * `resolveLink` / `resolveWikilink`: synchronous, total, and degrading to
+   * `null` while wasm is unavailable. See `./embedResolve.ts`.
+   */
+  resolveEmbed(currentPath: string, target: string, kind: EmbedModel): EmbedResolution | null {
+    return resolveEmbedIn(this.#attachments, currentPath, target, kind);
   }
 
   /**
@@ -88,12 +131,34 @@ class IndexStore {
       // previous handle untouched.
       this.#handle?.free();
       this.#handle = wasm ? new wasm.BundleIndex(paths) : null;
+      this.#attachments = attachmentCorpus(await loadAttachmentPaths());
       this.version += 1;
     } catch {
       // Index unavailable: leave the previous handle in place. Broken-link
       // styling is best-effort and must never block; a stale set just means a
       // link may briefly look (un)broken until the next refresh.
     }
+  }
+}
+
+/**
+ * The Attachment path list from the backend, or `[]`.
+ *
+ * Feature-detected on purpose: `listAttachmentPaths` is the LAST piece of the
+ * Attachment seam to land (the native index and the fake both hold the list
+ * already), and this store must not break the shells that predate it. Its own
+ * try/catch keeps an Attachment-listing failure from taking the concept-path
+ * refresh — the far more important half — down with it.
+ */
+async function loadAttachmentPaths(): Promise<string[]> {
+  const source = backend as { listAttachmentPaths?: () => Promise<string[]> };
+  if (typeof source.listAttachmentPaths !== 'function') return [];
+  try {
+    return await source.listAttachmentPaths();
+  } catch {
+    // No Attachments listed: Embeds resolve to `null` and render their error
+    // placeholder, exactly as an unresolvable Embed does. Never throws.
+    return [];
   }
 }
 

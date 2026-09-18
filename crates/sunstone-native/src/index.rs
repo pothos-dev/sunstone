@@ -19,7 +19,8 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::paths::md_files;
+use crate::paths::{bundle_walker, md_files};
+use sunstone_shared::paths::to_rel_string;
 use sunstone_shared::wikilink;
 
 pub mod frontmatter;
@@ -67,6 +68,10 @@ pub struct Index {
     concepts: HashMap<String, ConceptEntry>,
     /// target path -> set of source paths linking TO it (backlinks).
     reverse: HashMap<String, BTreeSet<String>>,
+    /// Every **Attachment** path in the Bundle (ei-1), a set SEPARATE from
+    /// `concepts` — see [`Index::attachment_paths`] for why it is not a
+    /// type-tagged single list. Sorted by construction (`BTreeSet`).
+    attachments: BTreeSet<String>,
 }
 
 impl Index {
@@ -77,6 +82,9 @@ impl Index {
         for (path, rel) in md_files(root) {
             let content = std::fs::read_to_string(&path).unwrap_or_default();
             index.insert_concept(&rel, &content);
+        }
+        for rel in attachment_files(root) {
+            index.insert_attachment(&rel);
         }
         index.rebuild_reverse();
         index
@@ -198,6 +206,60 @@ impl Index {
         v
     }
 
+    // --- Attachments (ei-1) -------------------------------------------------
+    //
+    // An **Attachment** (docs/GLOSSARY.md) is a non-`.md` file stored in the
+    // Bundle that a Concept can **Embed**. It is indexed in its own set, NEVER
+    // folded into `concepts`:
+    //
+    //  * `find_bundle_root` infers the Bundle root STRUCTURALLY from the path
+    //    set it is handed; a top-level `assets/logo.png` mixed into that input
+    //    is exactly the shape that could shift the inferred root and break every
+    //    bundle-absolute link in the Bundle. Keeping the two sets apart makes
+    //    the "`.md`-only" guarantee hold BY CONSTRUCTION instead of by
+    //    remembering a filter at each call site (`concept_paths` feeds the tree,
+    //    quick-nav, wikilink resolution and the wasm `BundleIndex`).
+    //  * An Attachment is not a Backlinks endpoint either, so it never enters
+    //    `reverse` / `rebuild_reverse` (that is the extraction half of the
+    //    `!`-asymmetry documented in `index/links.rs`).
+
+    /// Whether `rel` names a file the index tracks as an Attachment.
+    ///
+    /// The predicate lives HERE, in one place, delegating to the Embed kernel:
+    /// widening Attachments to non-image files (ticket `al-1`) is then a
+    /// one-line change at this single site, not a hunt through the walker, the
+    /// watcher and the query methods.
+    pub fn is_attachment_path(rel: &str) -> bool {
+        sunstone_shared::embed::is_image_path(rel)
+    }
+
+    /// Record an Attachment at `rel` (created/modified — idempotent). Ignores a
+    /// path that is not an Attachment, so callers can pass any changed path.
+    pub fn insert_attachment(&mut self, rel: &str) {
+        if Self::is_attachment_path(rel) {
+            self.attachments.insert(rel.to_string());
+        }
+    }
+
+    /// Drop an Attachment that disappeared from disk. No-op when unknown.
+    pub fn remove_attachment(&mut self, rel: &str) {
+        self.attachments.remove(rel);
+    }
+
+    /// Every Attachment path in the Bundle, sorted. The Attachment counterpart
+    /// of [`Index::concept_paths`] — a SEPARATE list by design (see above); an
+    /// Embed's name model (`![[name.png]]`) resolves against THIS corpus.
+    pub fn attachment_paths(&self) -> Vec<String> {
+        self.attachments.iter().cloned().collect()
+    }
+
+    /// True if an Attachment exists at `path` (an exact bundle-relative key).
+    /// The Attachment counterpart of [`Index::concept_exists`]; a path-model
+    /// Embed (`![alt](x.png)`) is "broken" exactly when this is false.
+    pub fn attachment_exists(&self, path: &str) -> bool {
+        self.attachments.contains(path)
+    }
+
     /// Sources linking TO `path` (backlinks), sorted. Empty when none.
     pub fn backlinks(&self, path: &str) -> Vec<String> {
         self.reverse
@@ -262,6 +324,26 @@ impl Index {
         }
         set.into_iter().collect()
     }
+}
+
+/// Walk the Bundle and yield every **Attachment**'s bundle-relative path.
+///
+/// Deliberately a sibling of `paths::md_files` rather than a variant of it: the
+/// two corpora are separate by design (see the Attachment section of `Index`),
+/// and sharing `bundle_walker` is what keeps the hidden/gitignore rules — hence
+/// bundle membership — identical for Concepts and Attachments.
+fn attachment_files(root: &Path) -> impl Iterator<Item = String> + '_ {
+    bundle_walker(root).build().filter_map(move |result| {
+        let entry = result.ok()?;
+        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+            return None;
+        }
+        let rel = to_rel_string(entry.path().strip_prefix(root).ok()?);
+        if rel.is_empty() || !Index::is_attachment_path(&rel) {
+            return None;
+        }
+        Some(rel)
+    })
 }
 
 #[cfg(test)]
@@ -368,6 +450,120 @@ mod tests {
             idx.all_keys(),
             vec!["description", "tags", "title", "type"]
         );
+    }
+
+    // --- Attachments (ei-1) -------------------------------------------------
+
+    /// An index with two Concepts (one Embedding both Attachments) and two
+    /// Attachments, one of them at the Bundle's top level.
+    fn indexed_with_attachments() -> Index {
+        let mut idx = Index::default();
+        idx.insert_concept(
+            "docs/index.md",
+            "![dot](/assets/dot.png) and ![mark](./assets/mark.svg) and [b](./b.md)",
+        );
+        idx.insert_concept("docs/b.md", "# B");
+        idx.insert_attachment("assets/dot.png");
+        idx.insert_attachment("docs/assets/mark.svg");
+        idx.rebuild_reverse();
+        idx
+    }
+
+    #[test]
+    fn attachments_are_listed_and_queried_separately() {
+        let idx = indexed_with_attachments();
+        assert_eq!(
+            idx.attachment_paths(),
+            vec!["assets/dot.png", "docs/assets/mark.svg"]
+        );
+        assert!(idx.attachment_exists("assets/dot.png"));
+        assert!(!idx.attachment_exists("assets/missing.png"));
+        // The two corpora never overlap: a Concept is not an Attachment and an
+        // Attachment is not a Concept.
+        assert!(!idx.attachment_exists("docs/b.md"));
+        assert!(!idx.concept_exists("assets/dot.png"));
+    }
+
+    #[test]
+    fn attachments_stay_out_of_concept_paths() {
+        let idx = indexed_with_attachments();
+        assert_eq!(idx.concept_paths(), vec!["docs/b.md", "docs/index.md"]);
+        assert!(!idx.concept_paths().iter().any(|p| p.ends_with(".png")));
+    }
+
+    #[test]
+    fn attachments_get_no_backlinks_edge() {
+        // `docs/index.md` Embeds both Attachments. An Embed is not a
+        // Concept-to-Concept relationship, so neither Attachment gains a
+        // backlink — and the Concept link in the same body still does.
+        let idx = indexed_with_attachments();
+        assert!(idx.backlinks("assets/dot.png").is_empty());
+        assert!(idx.backlinks("docs/assets/mark.svg").is_empty());
+        assert_eq!(idx.backlinks("docs/b.md"), vec!["docs/index.md"]);
+    }
+
+    #[test]
+    fn rebuild_reverse_ignores_attachments() {
+        // `rebuild_reverse` resolves wikilinks against the CONCEPT set only. An
+        // Attachment whose basename collides with a Concept must not become a
+        // wikilink target (and must not displace the Concept that is one).
+        let mut idx = Index::default();
+        idx.insert_concept("a.md", "see [[mark]]");
+        idx.insert_concept("mark.md", "# Mark");
+        idx.insert_attachment("mark.svg");
+        idx.rebuild_reverse();
+        assert_eq!(idx.backlinks("mark.md"), vec!["a.md"]);
+        assert!(idx.backlinks("mark.svg").is_empty());
+    }
+
+    #[test]
+    fn attachment_predicate_is_the_embed_kernel() {
+        // One predicate, one place: widening Attachments beyond images (al-1)
+        // must be a single-line change here, not a hunt across modules.
+        assert!(Index::is_attachment_path("a/b/Diagram.PnG"));
+        assert!(Index::is_attachment_path("mark.svg"));
+        assert!(!Index::is_attachment_path("notes.md"));
+        assert!(!Index::is_attachment_path("README"));
+
+        let mut idx = Index::default();
+        idx.insert_attachment("notes.md");
+        idx.insert_attachment("data.json");
+        assert!(idx.attachment_paths().is_empty());
+    }
+
+    #[test]
+    fn find_bundle_root_input_is_unchanged_by_attachments() {
+        // THE reason the Attachment index is separate (ei-1 "Attachment index"):
+        // `find_bundle_root` infers the root structurally, and `concept_paths()`
+        // is what feeds it. A top-level `assets/` folder is the hazard shape —
+        // with the Attachments folded in, `assets` would be a second top-level
+        // segment beside `docs`, which is the "ambiguous -> root is ''" case.
+        let idx = indexed_with_attachments();
+        let concept_paths = idx.concept_paths();
+        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths), "docs");
+
+        // Belt and braces: even handed the union, `find_bundle_root` filters to
+        // `.md` itself today, so the result is identical. The separate index is
+        // what keeps that a REDUNDANT defence rather than the only one.
+        let mut union = concept_paths.clone();
+        union.extend(idx.attachment_paths());
+        union.sort();
+        assert_eq!(
+            sunstone_shared::find_bundle_root(&union),
+            sunstone_shared::find_bundle_root(&concept_paths)
+        );
+    }
+
+    #[test]
+    fn removed_attachment_leaves_the_index() {
+        let mut idx = indexed_with_attachments();
+        idx.remove_attachment("assets/dot.png");
+        assert!(!idx.attachment_exists("assets/dot.png"));
+        assert_eq!(idx.attachment_paths(), vec!["docs/assets/mark.svg"]);
+        // Removing an unknown path is a no-op, not a panic (the watcher fires
+        // removals for paths the index may never have seen).
+        idx.remove_attachment("nope.png");
+        assert_eq!(idx.attachment_paths(), vec!["docs/assets/mark.svg"]);
     }
 
     #[test]

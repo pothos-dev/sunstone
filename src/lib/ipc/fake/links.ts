@@ -71,8 +71,9 @@ const WIKILINK_RE = /(!?)\[\[([^\]]*)\]\]/g;
 
 /**
  * Resolve every wikilink in a (code-masked) body to bundle paths via §1.
- * Embeds `![[ … ]]` are skipped (out of scope for v1). Returns resolved
- * targets (may include `sourcePath` for `[[#heading]]`).
+ * Embeds `![[ … ]]` are skipped — they point at an Attachment, which is not a
+ * Backlinks endpoint (ei-1). Returns resolved targets (may include
+ * `sourcePath` for `[[#heading]]`).
  */
 function wikilinkTargets(sourcePath: string, body: string): string[] {
   const masked = maskCode(body);
@@ -81,23 +82,36 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
   let m: RegExpExecArray | null;
   WIKILINK_RE.lastIndex = 0;
   while ((m = WIKILINK_RE.exec(masked)) !== null) {
-    if (m[1] === '!') continue; // embed, not a link (deferred)
+    // An Embed never creates a Backlinks edge (ei-1, the extraction half of
+    // the deliberate `!`-asymmetry documented on `outboundLinks`).
+    if (m[1] === '!') continue;
     const resolved = resolveWikilinkIn(allPaths, sourcePath, m[2]);
     if (resolved) targets.push(resolved.path);
   }
   return targets;
 }
 
-/** Extract outbound internal link targets from a Concept's body, resolved. */
+/**
+ * Extract outbound internal link targets from a Concept's body, resolved.
+ *
+ * ## The `!`-asymmetry is DELIBERATE (ei-1) — site 3 of 4
+ *
+ * EXTRACTION drops `!`; REWRITE (`rewriteLinksIn` below) does not. Do not
+ * "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
+ * so it must never create a Backlinks edge — which is what this drop
+ * guarantees. That an Embed's *path* is still rewritten on a move is a
+ * different question with a different answer. Twin of
+ * `crates/sunstone-native/src/index/links.rs::markdown_link_hrefs`.
+ */
 export function outboundLinks(path: string, content: string): string[] {
   const { body } = splitFrontmatter(content);
   const paths = conceptPaths();
   const targets = new Set<string>();
-  // [text](target) but NOT images ![alt](src): require no `!` before `[`.
+  // [text](target) but NOT Embeds ![alt](src): require no `!` before `[`.
   const re = /(!?)\[[^\]]*\]\(([^)]*)\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) {
-    if (m[1] === '!') continue; // image, not a Concept link
+    if (m[1] === '!') continue; // Embed — no Backlinks edge (see above)
     // Drop a trailing "title" inside the parens.
     const href = m[2].trim().split(/\s+/)[0];
     const resolved = resolveLinkIn(path, href, paths);
@@ -162,6 +176,21 @@ function buildMoveMap(from: string, to: string): Map<string, string> {
  * pre-move path (resolution base as authored); `newSource` is its post-move path
  * (used to re-resolve + recompute relative links). Returns the new content and
  * the count of links changed.
+ *
+ * ## The `!`-asymmetry is DELIBERATE (ei-1) — site 4 of 4
+ *
+ * REWRITE does NOT drop `!`; EXTRACTION (`outboundLinks` above) does. Do not
+ * "restore symmetry" here. The two questions are different:
+ *
+ *  - an Embed is not a Concept-to-Concept relationship -> no Backlinks edge
+ *    (extraction drops it);
+ *  - a PATH-resolved Embed is still a path, and moving the Concept that writes
+ *    it invalidates that path exactly as it invalidates a link -> rewrite it.
+ *
+ * `rewriteWikilinksIn` still skips `![[ … ]]`, for the third reason: a
+ * NAME-resolved Embed resolves bundle-wide by name and suffix, so a Concept move
+ * can never invalidate it. Twin of
+ * `crates/sunstone-native/src/rewrite/engine.rs::rewrite_links_in`.
  */
 function rewriteLinksIn(
   oldSource: string,
@@ -170,15 +199,15 @@ function rewriteLinksIn(
   moves: Map<string, string>,
 ): { content: string; count: number } {
   const moved = oldSource !== newSource;
-  // Match `[text](inner)` but NOT images `![alt](src)`.
+  // Match `[text](inner)` AND Embeds `![alt](src)` — the `!` is captured so it
+  // survives the replacement verbatim (see the asymmetry note above).
   const re = /(!?)(\[[^\]]*\]\()([^)]*)(\))/g;
   let count = 0;
   let out = content.replace(re, (whole, bang: string, open: string, inner: string, close: string) => {
-    if (bang === '!') return whole; // image
     const rewritten = rewriteTarget(oldSource, newSource, moved, inner, moves);
     if (rewritten === null) return whole;
     count++;
-    return `${open}${rewritten}${close}`;
+    return `${bang}${open}${rewritten}${close}`;
   });
   const wiki = rewriteWikilinksIn(oldSource, out, moves);
   return { content: wiki.content, count: count + wiki.count };
@@ -212,7 +241,8 @@ function shortestResolvingSuffix(newPaths: string[], newSource: string, newTarge
 }
 
 /**
- * Rewrite wikilinks (`[[ … ]]`, never embeds `![[ … ]]`) that target a moved
+ * Rewrite wikilinks (`[[ … ]]`, never Embeds `![[ … ]]` — they are move-proof)
+ * that target a moved
  * Concept (§4). Resolution is from the source's OLD location against the OLD
  * bundle; only links whose resolved target moved are rewritten:
  *   - BARE `[[old]]`: rewrites only when the target's basename changed (a pure
@@ -236,7 +266,10 @@ function rewriteWikilinksIn(
   let m: RegExpExecArray | null;
   WIKILINK_RE.lastIndex = 0;
   while ((m = WIKILINK_RE.exec(masked)) !== null) {
-    if (m[1] === '!') continue; // embed (deferred)
+    // A NAME-resolved Embed resolves bundle-wide by name and suffix, so a
+    // Concept move can never invalidate it — skipped on the rewrite side too,
+    // unlike the path-model Embed in `rewriteLinksIn` (ei-1).
+    if (m[1] === '!') continue;
     const start = m.index;
     const inner = m[2]; // same offsets in masked & original (length-preserving)
     const innerStart = start + m[1].length + 2; // after `(!?)[[`
