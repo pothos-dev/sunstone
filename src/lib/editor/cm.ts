@@ -324,8 +324,11 @@ export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme)
   const mode = getEditorMode(view);
   const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
   const onCommentEdit = getViewOptions(view)?.onCommentEdit;
+  const currentPath = getViewOptions(view)?.brokenLinkContext?.currentPath;
   view.dispatch({
-    effects: compartment.reconfigure(modeExtensions(mode, onLinkClick, resolved, onCommentEdit)),
+    effects: compartment.reconfigure(
+      modeExtensions(mode, onLinkClick, resolved, onCommentEdit, currentPath),
+    ),
   });
 }
 
@@ -347,7 +350,10 @@ export function setEditorMode(view: EditorView, mode: EditorMode): void {
   const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
   const onCommentEdit = getViewOptions(view)?.onCommentEdit;
   const theme = getViewMermaidTheme(view) ?? 'light';
+  const currentPath = getViewOptions(view)?.brokenLinkContext?.currentPath;
   view.dispatch({
-    effects: compartment.reconfigure(modeExtensions(mode, onLinkClick, theme, onCommentEdit)),
+    effects: compartment.reconfigure(
+      modeExtensions(mode, onLinkClick, theme, onCommentEdit, currentPath),
+    ),
   });
 }

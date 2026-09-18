@@ -48,19 +48,41 @@ transfer and its conclusion should not either.
 
 ## Consequences
 
-- **`WidgetType.eq()` is keyed on `(src, alt, width, height, placement)`.** Source alone is
-  not enough once a size suffix exists, or editing `|300` to `|400` would reuse the old DOM.
-  An unrelated edit still produces an `eq` widget, so CodeMirror reuses the element and the
-  browser never re-decodes the image — the render-cache lesson ADR-0005 records, in the form
-  this field needs it.
-- **Upstream's URL-keyed `dimensionCache` is kept, and keeps storing *natural* dimensions.**
+- **`WidgetType.eq()` is keyed on `(src, alt, width, height, placement, render)`.** Source
+  alone is not enough once a size suffix exists, or editing `|300` to `|400` would reuse the
+  old DOM. The sixth component, `render`, names which of the three outputs the widget is —
+  image, error placeholder or click-to-load button. Without it the key is only *provably*
+  sufficient via the unwritten invariant "an error placeholder has `src === ''`", and an
+  error span and an `<img>` are genuinely different DOM. An unrelated edit still produces an
+  `eq` widget, so CodeMirror reuses the element and the browser never re-decodes the image —
+  the render-cache lesson ADR-0005 records, in the form this field needs it.
+- **Upstream's URL-keyed `dimensionCache` is kept at *module* scope, and keeps storing
+  *natural* dimensions.** It cannot live on the widget: CodeMirror's virtualizer unmounts
+  line DOM and reconstructs the widget on the way back, which is precisely the remount the
+  cache exists to survive.
   It exists to pin `width`/`height` on remount so a decoded image cannot grow the heightmap
   under an in-flight scroll. An explicit size from a `|` suffix is therefore applied as CSS
   `width`/`height`, never as HTML attributes, so two differently-sized Embeds of one file
   cannot corrupt each other's cache entry.
 - **A block widget must come from a `StateField`** (CM6 forbids ViewPlugin-sourced block
   decorations); a point inline widget may come from either. One field serves both, matching
-  upstream's structure and this repo's precedent in `mermaid.ts` and `criticMarkupView.ts`.
+  this repo's precedent in `mermaid.ts` and `criticMarkupView.ts`.
+- **The field is simpler than upstream's `imageBlocks`, not a copy of it.** Upstream walks
+  the lezer tree for `Image` nodes and therefore needs `ensureSyntaxTree`'s parse budget and
+  a `treeGrowthEffect` rebuild. Sunstone's field scans the raw text through the shared Embed
+  kernel, so none of that machinery applies and there is no fence-parse race on a long
+  Concept. It rebuilds on `refreshBrokenLinks`, the effect the host already dispatches on
+  `file-changed` and on a Concept switch.
+- **The field needs the open Concept's path**, and a `StateField.create` has no view to ask.
+  It is threaded through an optional fifth `modeExtensions` parameter reusing
+  `brokenLinkContext.currentPath` rather than a second option that could disagree with it —
+  both answer the same question.
+- **A non-image Attachment renders as nothing, for now.** `inlinePreview` replaces the whole
+  `Image` node regardless of its target, so once upstream's `imageBlocks` is gone a
+  `![doc](a.pdf)` has its source hidden and no widget replaces it. That matches what already
+  happens to a `data:` Embed, so the two are consistent rather than one being special-cased —
+  but it does mean the content silently disappears until al-1 gives non-image Attachments a
+  presentation of their own.
 - **The read-mode click gesture is free**, because in `read` the source is unreachable and
   caret placement is meaningless. It is spent on a lightbox for images the content column
   has downscaled. In `editing` the click stays upstream's caret-to-source, which is the only

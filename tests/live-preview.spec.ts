@@ -55,13 +55,30 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
   await expect(table).toBeVisible();
   await expect(table).toContainText('Status');
 
-  // --- Inline image widget renders (data URI -> fully renders) ------------
-  // (.cm-widgetBuffer is a CM6 internal zero-size img; match the real widget
-  // by its src instead.) The relative `./assets/diagram.png` image also
-  // renders its widget but 404s — there is no static file server under the
-  // fake backend; that is expected and noted in the slice report.
-  const img = editor.locator('.cm-content img[src^="data:image"]').first();
-  await expect(img).toBeVisible();
+  // --- An Embed renders a real Attachment ---------------------------------
+  // Retargeted for ei-1. This used to assert `img[src^="data:image"]`, aimed at
+  // the Concept's `data:` URI image — but the FAKE BACKEND's own attachment
+  // URLs are `data:` URLs too, so that selector would keep matching (and the
+  // spec keep passing) after `data:` Embeds stopped rendering at all. Assert on
+  // the Embed widget, on real decoded pixels, and on the `data:` Embed being
+  // absent instead.
+  const scroller = editor.locator('.cm-scroller');
+  await scroller.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  const img = editor.locator('.cm-embed img').first();
+  await expect(img).toBeVisible({ timeout: 15000 });
+  await expect
+    .poll(async () => img.evaluate((el: HTMLImageElement) => el.naturalWidth), {
+      timeout: 15000,
+    })
+    .toBeGreaterThan(0);
+  // The only Embed in this Concept that renders is the PNG Attachment; the
+  // `data:image/svg+xml` one above it deliberately produces no widget.
+  await expect(editor.locator('.cm-embed img[src^="data:image/svg+xml"]')).toHaveCount(0);
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0;
+  });
 
   // --- Cursor line reveals raw markdown markup ----------------------------
   // On an inactive heading line the leading `#` is hidden by the live preview.

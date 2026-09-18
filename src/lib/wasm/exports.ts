@@ -252,6 +252,43 @@ export function scanEmbeds(body: string): Embed[] {
 }
 
 /**
+ * Every Embed in a Concept `body`, with **UTF-16 code-unit** offsets — the unit
+ * a JS string index and a CodeMirror position count in (ADR 0006 §4, the same
+ * seam `scanCriticMarks` / `findCitationRefs` already report in).
+ *
+ * **This is the one a CodeMirror decoration builder calls.** `scanEmbeds`'
+ * byte offsets are the unit the SSR renderer and the rewrite engine slice Rust
+ * strings with; handing them to CodeMirror puts every decoration after the first
+ * non-ASCII character in the document in the wrong place. Degrades to `[]`.
+ */
+export function scanEmbedsUtf16(body: string): Embed[] {
+  return mod ? mod.scanEmbedsUtf16(body) : [];
+}
+
+/**
+ * True when `path`'s extension is one Sunstone renders as an image (`png`,
+ * `jpg`/`jpeg`, `gif`, `webp`, `avif`, `bmp`, `svg`, case-insensitively). A
+ * non-image Attachment keeps its literal rendering until `al-1`.
+ *
+ * The degraded path inlines the same extension list, so an Embed is never
+ * rendered as an image on the strength of a wasm miss (and never silently
+ * dropped before the module is ready either).
+ */
+export function isImageAttachment(path: string): boolean {
+  if (mod) return mod.isImageAttachment(path);
+  const name = (path.split('/').pop() ?? '').split(/[?#]/)[0];
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return false;
+  return IMAGE_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+}
+
+/**
+ * The image extensions, mirroring `sunstone_shared::embed::IMAGE_EXTENSIONS`.
+ * Only the degraded path above reads it — wasm owns the real answer.
+ */
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg'];
+
+/**
  * Resolve a path-model Embed (`![alt](target)`) written in `sourcePath` to a
  * bundle-relative Attachment path, or `null` for a non-Bundle target (any
  * `scheme:` URL, a pure anchor, or empty). Degrades to `null`.

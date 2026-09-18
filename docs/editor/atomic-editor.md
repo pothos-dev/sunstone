@@ -21,7 +21,7 @@ All are imported in `src/lib/editor/cm.ts` from `@atomic-editor/editor`:
 | --- | --- |
 | `inlinePreview({ onLinkClick, alwaysRender })` | The core live-preview decorator: hides inline markup on inactive lines, renders links, reveals the cursor line. `alwaysRender` is a [Sunstone patch](/editor/atomic-editor-patch.md). |
 | `tables({ onLinkClick })` | Renders GFM tables as interactive widgets. |
-| `imageBlocks()` | Renders `![alt](url)` image blocks (widget below the one-line source). |
+| `imageBlocks()` | Renders `![alt](url)` image blocks (widget below the one-line source). **Not wired** — Sunstone's own `embedBlocks()` replaces it ([ADR-0010](/adr/0010-embeds-as-point-widgets-over-inline-preview.md)). |
 | `atomicMarkdownSyntax` | The markdown syntax-highlighting style. |
 | `atomicEditorTheme` | The base editor theme (reads `data-theme` on the CM root for light/dark). |
 | `wikiLinks` | `[[name]]` rendering — enabled as an _optional secondary_ format ([ADR-0004](/adr/0004-wikilinks-optional-secondary-name-based.md)), wrapped by [Sunstone's adapter](/editor/custom-extensions.md). |

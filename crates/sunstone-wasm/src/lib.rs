@@ -310,6 +310,23 @@ pub fn scan_embeds(body: String) -> Vec<Embed> {
     embed::scan_embeds(&body)
 }
 
+/// Every Embed in a Concept `body`, in document order, with **UTF-16 code-unit**
+/// offsets — the unit a JS string and a CodeMirror position count in (ADR 0006
+/// §4). This is the one a decoration builder must call; `scanEmbeds`' byte
+/// offsets put every decoration after a non-ASCII character in the wrong place.
+#[wasm_bindgen(js_name = scanEmbedsUtf16)]
+pub fn scan_embeds_utf16(body: String) -> Vec<Embed> {
+    embed::scan_embeds_utf16(&body)
+}
+
+/// True when `path`'s extension is one Sunstone renders as an image
+/// (`sunstone_shared::embed::IMAGE_EXTENSIONS`, case-insensitive). A non-image
+/// Attachment keeps its literal rendering until `al-1`.
+#[wasm_bindgen(js_name = isImageAttachment)]
+pub fn is_image_attachment(path: String) -> bool {
+    embed::is_image_path(&path)
+}
+
 /// Resolve a PATH-model Embed (`![alt](target)`) from `source_path` to a
 /// bundle-relative Attachment path, or `null` for a non-Bundle target.
 #[wasm_bindgen(js_name = resolveEmbedPathIn)]

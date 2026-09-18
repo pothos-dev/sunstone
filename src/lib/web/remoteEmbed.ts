@@ -15,20 +15,24 @@
  * (`WebViewer.svelte`) and the print/PDF preview (`PrintView.svelte`).
  */
 
-/** The `<img>` a remote placeholder becomes once the reader asks for it. */
+import { createEmbedImage } from '$lib/embedImage';
+
+/**
+ * The `<img>` a remote placeholder becomes once the reader asks for it.
+ *
+ * The element itself is built by the shared `createEmbedImage` (`embed-image`,
+ * `loading="lazy"`, a requested size as CSS and never as HTML attributes,
+ * `src` assigned last) — the SAME builder the editor's Embed widget uses, so the
+ * two surfaces cannot drift on any of those rules.
+ */
 function imageFor(button: HTMLElement): HTMLImageElement | null {
   const src = button.dataset.embedSrc;
   if (!src) return null;
-  const img = document.createElement('img');
-  img.className = 'embed-image';
-  img.src = src;
-  img.alt = button.dataset.embedAlt ?? '';
-  img.loading = 'lazy';
-  // The size the author requested, as CSS (never HTML attributes) — the same
-  // rule the renderer follows for local Embeds.
-  const style = button.dataset.embedStyle;
-  if (style) img.setAttribute('style', style);
-  return img;
+  return createEmbedImage({
+    src,
+    alt: button.dataset.embedAlt ?? '',
+    style: button.dataset.embedStyle ?? null,
+  });
 }
 
 /**

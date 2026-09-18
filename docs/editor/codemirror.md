@@ -34,7 +34,7 @@ The keystone module is **`src/lib/editor/cm.ts`** — the editor _builder_. It o
 ```mermaid
 flowchart TD
   P["GFM parser + atomic syntax + atomic theme<br/>(livePreviewBase — every mode)"]
-  M["mode Compartment<br/>tables · imageBlocks · mermaidBlocks · inlinePreview ·<br/>citations · criticMarkup · readOnly/editable"]
+  M["mode Compartment<br/>tables · embedBlocks · mermaidBlocks · inlinePreview ·<br/>citations · criticMarkup · readOnly/editable"]
   F["find panel + keymap"]
   B["brokenLinks (conditional)"]
   W["wikilink Compartment (conditional)"]

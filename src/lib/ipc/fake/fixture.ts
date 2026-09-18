@@ -360,7 +360,10 @@ A GFM table renders as an interactive widget:
 | Code blocks  | done   |
 | Tables       | done   |
 
-Inline image (data URI — renders fully under the fake backend):
+A \`data:\` URI Embed, which deliberately renders NOTHING (ei-1: it is an
+injection vector once ei-2 inlines SVG, and carries no benefit a Bundle file
+does not). \`inlinePreview\` hides the source and \`embedBlocks\` emits no widget,
+so the line below is blank on purpose:
 
 ![green dot](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjgiIGZpbGw9IiMyZWNjNzEiLz48L3N2Zz4=)
 

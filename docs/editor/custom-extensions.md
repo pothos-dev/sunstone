@@ -15,6 +15,7 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | Extension | File(s) | CM primitive | Purpose |
 | --- | --- | --- | --- |
 | Mermaid diagrams | `mermaid.ts`, `mermaidBlocks.ts`, `mermaidTheme.ts` | `StateField` + block-replace `WidgetType` | Render ` ```mermaid ` fences as SVG |
+| Embedded images | `embeds.ts`, `embedPlan.ts`, `embedLightbox.ts` | `StateField` + point `WidgetType` | Render an Embed's Attachment as an `<img>` |
 | Wikilinks | `wiki-links.ts` | atomic `wikiLinks` + overlay `ViewPlugin` | `[[name]]` rendering / navigation |
 | Broken links | `broken-links.ts` | `ViewPlugin` + `StateEffect` | Dashed-red styling of unresolved `[](…)` |
 | Citations | `citations.ts` | `ViewPlugin` + `WidgetType` + flash `StateField` | `[n]` superscript → jump to citation row |
@@ -28,6 +29,23 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 ## Mermaid diagrams
 
 `mermaidBlocks(reading, theme)` renders ` ```mermaid ` fences as SVG. `mermaidBlocks.ts` is the pure detection layer: it walks the syntax tree (`ensureSyntaxTree` with a 200ms parse budget) for `FencedCode` nodes whose info string is `mermaid`, returning each fence's body and document range; `selectionTouches` decides the hybrid-mode reveal. `mermaid.ts` is the CM shell: a `StateField<DecorationSet>` providing `Decoration.replace({ block: true })` over each fence, driven by a `MermaidWidget` `WidgetType`. atomic-editor exposes no generic block-renderer seam, so this is a _sibling_ field, not a plugin on top of `imageBlocks`/`tables` ([ADR-0005](/adr/0005-mermaid-block-rendering.md)). Notable techniques: mermaid is lazy-loaded (`import('mermaid')`, `securityLevel: 'strict'`) only when the doc has a diagram; a module-level `source→SVG` cache plus a per-host generation token keep repaints cheap and discard stale async renders; `WidgetType.eq()` is keyed on `(source, theme, reading)`; and theme flips go through a [Compartment reconfigure](/editor/codemirror.md) because CM won't reconcile block-widget DOM in place. `mermaidTheme.ts` is CM-free (shared with the web viewer) and maps app CSS variables to concrete mermaid `themeVariables` — concrete values, because mermaid bakes colours into the SVG. It depends on the [patched](/editor/atomic-editor-patch.md) `treeGrowthEffect` re-export to re-render fences parsed after the initial budget.
+
+## Embedded images
+
+`embedBlocks(reading, currentPath)` renders an **Embed** — `![alt](x.png)` or `![[x.png]]` — as the **Attachment** it points at. It **replaces** atomic-editor's `imageBlocks()`, which is dropped from `modeExtensions` so nothing double-renders.
+
+`embedPlan.ts` is the pure layer: given the Embeds the wasm kernel found, it decides placement, render state and widget identity, taking `classify`/`isImage`/`resolve`/`url` as callbacks so it unit-tests over plain strings with no wasm, no index and no backend. `embeds.ts` is the CM shell: one `StateField` emitting exactly one **point** `Decoration.widget` per Embed and **never a replace** ([ADR-0010](/adr/0010-embeds-as-point-widgets-over-inline-preview.md)). Hiding the raw `![alt](x.png)` source, and revealing it under the cursor, is left entirely to `inlinePreview`, which already `Decoration.replace`s the whole `Image` node on inactive lines and honours the patched `alwaysRender` flag in `read` — a deliberate divergence from ADR-0005's block-replace, which was reasoned from mermaid fences being multi-line.
+
+Placement branches on one predicate — is the Embed the only content on its line? Alone → `Decoration.widget({ block: true, side: 1 })` at `line.to`; among text → an inline point widget at the node's end, suppressed while its own line is active (the cursor-overlap skip `citations.ts` and `smartDashesView.ts` use).
+
+Notable techniques:
+
+- **Offsets.** The field scans with `scanEmbedsUtf16`, not `scanEmbeds`. The Embed kernel reports **byte** offsets by default — the unit the SSR renderer and the rewrite engine slice Rust strings with — and CodeMirror positions are **UTF-16 code units**, so a byte offset misplaces every decoration after the first non-ASCII character. The UTF-16 variant lives in `crates/sunstone-shared/src/embed.rs` beside the byte one, the same way `critic.rs` and `citations.rs` already report this seam ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md) §4).
+- **Sizing.** An explicit `|300` / `300x200` is applied as CSS `width`/`height`, **never** as HTML attributes: those belong to upstream's URL-keyed `dimensionCache`, which stores *natural* dimensions so a remount reserves the right box and a decoding image cannot grow the heightmap mid-scroll. A width above the natural width upscales (Obsidian's behaviour); `max-width: 100%` keeps a size a request the content column may clamp.
+- **`eq()`** is keyed on `(render, placement, width, height, alt, src)` — source alone is not enough once sizes exist, or editing `|300` to `|400` would reuse the old DOM. An unrelated edit still yields an equal key, so CodeMirror reuses the element and the browser never re-decodes the image.
+- **Click.** In `editing` it is upstream's caret-to-source (`posAtDOM`, resolved at event time, never a captured offset) — the only way to reach a source line `inlinePreview` has hidden. In `read` there is no caret to place, so the gesture buys a **lightbox** for images the content column has downscaled: `embedLightbox.ts` mounts a focus-managed surface on `document.body` (Escape closes, focus trapped while open, restored on close).
+- **Two failure visuals, not three.** `embed-broken` (`var(--danger)`, dashed, matching `cm-broken-link`) covers both an unresolvable target and a resolved target whose bytes fail to load — the second needs an `onerror` handler upstream has none of. `embed-remote` is the neutral click-to-load affordance for an `http(s)` Embed, which fetches nothing until clicked; a `data:` URI and a non-image Attachment get no widget at all.
+- **One vocabulary with the server render.** The class names (`embed-image` / `embed-broken` / `embed-remote`), the `data-embed-*` attributes and the `<img>` builder (`src/lib/embedImage.ts`) are shared with the shared Rust renderer's output, `src/lib/rendered.css` and `src/lib/web/remoteEmbed.ts`, so the editor and the web/print surfaces cannot drift.
 
 ## Wikilinks
 

@@ -374,6 +374,50 @@ pub fn scan_embeds(body: &str) -> Vec<Embed> {
     out
 }
 
+/// Rewrite every Embed's `from`/`to` from a BYTE offset into `body` to a UTF-16
+/// code-unit offset.
+///
+/// Both offsets always land on a char boundary — an Embed starts at `!` and ends
+/// one past `)` / `]`, all ASCII — so every offset is a key of the boundary map.
+/// ASCII bodies short-circuit: there, one byte is one UTF-16 unit.
+fn to_utf16_offsets(body: &str, embeds: &mut [Embed]) {
+    if body.is_ascii() || embeds.is_empty() {
+        return;
+    }
+    let mut map: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::with_capacity(body.len() + 1);
+    let mut units = 0usize;
+    for (b, c) in body.char_indices() {
+        map.insert(b, units);
+        units += c.len_utf16();
+    }
+    map.insert(body.len(), units);
+    for e in embeds.iter_mut() {
+        if let Some(&u) = map.get(&e.from) {
+            e.from = u;
+        }
+        if let Some(&u) = map.get(&e.to) {
+            e.to = u;
+        }
+    }
+}
+
+/// Every Embed in a Concept body, in document order, with **UTF-16 code-unit**
+/// offsets — the unit a JS string and a CodeMirror position count in (ADR 0006
+/// §4), exactly as [`crate::critic`] and [`crate::citations`] already report.
+///
+/// This is the variant a CodeMirror decoration builder must use.
+/// [`scan_embeds`]'s byte offsets are the unit the SSR renderer and the rewrite
+/// engine slice Rust strings with; feeding those straight to CodeMirror puts
+/// every decoration after the first non-ASCII character in the wrong place.
+/// Everything else — detection, sizing, the accessible name — is identical,
+/// because this IS [`scan_embeds`] with its offsets converted.
+pub fn scan_embeds_utf16(body: &str) -> Vec<Embed> {
+    let mut out = scan_embeds(body);
+    to_utf16_offsets(body, &mut out);
+    out
+}
+
 /// Classify an Embed target before anything is fetched (ADR-0011): only
 /// [`EmbedTargetKind::Local`] resolves to an Attachment, [`EmbedTargetKind::Remote`]
 /// is click-to-load, and [`EmbedTargetKind::Data`] never renders.
@@ -864,5 +908,73 @@ mod tests {
         assert_eq!(parse_size("30 0"), None);
         assert_eq!(parse_size("300px"), None);
         assert_eq!(parse_size("-300"), None);
+    }
+
+    // --- UTF-16 offsets (the CodeMirror seam) ------------------------------
+
+    #[test]
+    fn utf16_scan_matches_byte_scan_on_ascii() {
+        let body = "text ![a](x.png) more\n\n![[y.png|300]]\n";
+        assert_eq!(scan_embeds_utf16(body), scan_embeds(body));
+    }
+
+    /// The bug this variant exists to prevent: a decoration built from a BYTE
+    /// offset lands past its Embed once a multi-byte character precedes it.
+    #[test]
+    fn utf16_offsets_skew_from_byte_offsets_after_non_ascii() {
+        // "é" is 2 bytes / 1 UTF-16 unit; "🎨" is 4 bytes / 2 UTF-16 units
+        // (a surrogate pair). Prefix: 3 + 1 + 1 + 2 + 1 + 1 = byte 9, unit 7.
+        let prefix = "Caf\u{e9} \u{1F3A8} ";
+        assert_eq!(prefix.len(), 11);
+        assert_eq!(prefix.encode_utf16().count(), 8);
+
+        let body = format!("{prefix}![a](x.png) tail");
+        let embed = "![a](x.png)";
+
+        let bytes = scan_embeds(&body);
+        assert_eq!(bytes.len(), 1);
+        assert_eq!((bytes[0].from, bytes[0].to), (11, 11 + embed.len()));
+
+        let units = scan_embeds_utf16(&body);
+        assert_eq!(units.len(), 1);
+        assert_eq!((units[0].from, units[0].to), (8, 8 + embed.len()));
+
+        // The UTF-16 span slices the Embed out of the JS-string view of the
+        // body; the byte span does NOT (it would cut three chars too late).
+        let js: Vec<u16> = body.encode_utf16().collect();
+        assert_eq!(
+            String::from_utf16_lossy(&js[units[0].from..units[0].to]),
+            embed
+        );
+        assert_ne!(
+            String::from_utf16_lossy(&js[bytes[0].from..bytes[0].to.min(js.len())]),
+            embed
+        );
+    }
+
+    #[test]
+    fn utf16_offsets_hold_across_several_embeds_and_forms() {
+        // Accented + emoji text BETWEEN the Embeds, so the skew accumulates.
+        let body = "\u{e9}![[a.png]] \u{1F3A8} ![b](c.png) \u{e9}![[d.png|12x8]]";
+        let units = scan_embeds_utf16(body);
+        let js: Vec<u16> = body.encode_utf16().collect();
+        let sliced: Vec<String> = units
+            .iter()
+            .map(|e| String::from_utf16_lossy(&js[e.from..e.to]))
+            .collect();
+        assert_eq!(sliced, vec!["![[a.png]]", "![b](c.png)", "![[d.png|12x8]]"]);
+        assert_eq!((units[2].width, units[2].height), (Some(12), Some(8)));
+    }
+
+    #[test]
+    fn utf16_offsets_survive_non_ascii_inside_the_embed_itself() {
+        let body = "![caf\u{e9}](caf\u{e9}.png) after";
+        let units = scan_embeds_utf16(body);
+        let js: Vec<u16> = body.encode_utf16().collect();
+        assert_eq!(
+            String::from_utf16_lossy(&js[units[0].from..units[0].to]),
+            "![caf\u{e9}](caf\u{e9}.png)"
+        );
+        assert_eq!(units[0].alt, "caf\u{e9}");
     }
 }

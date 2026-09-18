@@ -1,6 +1,6 @@
 ---
 status: needs-triage
-priority: 1
+priority: 3
 blocked-by: [ei-1]
 ---
 

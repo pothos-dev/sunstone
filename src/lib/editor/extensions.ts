@@ -19,7 +19,6 @@ import { backend } from '$lib/ipc';
 import { joinConcept, type Fences } from '$lib/frontmatter';
 import {
   inlinePreview,
-  imageBlocks,
   tables,
   atomicEditorTheme,
   atomicMarkdownSyntax,
@@ -38,6 +37,7 @@ import {
 } from './frontmatter-field';
 import { brokenLinks, brokenLinkTheme, type BrokenLinkContext } from './broken-links';
 import { mermaidBlocks } from './mermaid';
+import { embedBlocks } from './embeds';
 import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
@@ -205,12 +205,18 @@ function livePreviewBase(): Extension[] {
  *   - the read-only / editable gating (`read` is read-only).
  * The active-line highlight is included for `editing` only — reading view has no
  * editing caret to anchor it.
+ *
+ * `currentPath` is the open Concept's bundle-relative path — the base a
+ * path-model Embed (`![alt](./x.png)`) resolves against. Omitted, Embeds still
+ * render, but only the name-model (`![[x.png]]`) and bundle-absolute forms can
+ * resolve.
  */
 export function modeExtensions(
   mode: EditorMode,
   onLinkClick: (url: string) => void,
   theme: ResolvedTheme,
   onCommentEdit?: OnCommentEdit,
+  currentPath?: () => string,
 ): Extension[] {
   const reading = mode === 'read';
   return [
@@ -219,7 +225,14 @@ export function modeExtensions(
     // `view.dispatch`, so `EditorState.readOnly` below does NOT reach them —
     // reading mode locks them here instead.
     readOnlyTables(reading),
-    imageBlocks(),
+    // Embedded images (ADR-0010). REPLACES atomic-editor's `imageBlocks()`,
+    // which is deliberately NOT in this list: it is always block-below (so
+    // `see ![x](d.png) here` breaks the paragraph), it cannot size an image, it
+    // has no notion of `![[ … ]]`, and its `src` is a bundle-relative path the
+    // webview cannot fetch. Ours emits one POINT widget per Embed — block when
+    // the Embed is alone on its line, inline in flow otherwise — over the source
+    // `inlinePreview` hides, so it must come BEFORE `inlinePreview` below.
+    embedBlocks(reading, currentPath ?? (() => '')),
     // Render ` ```mermaid ` fences as Diagrams (ADR-0005). `reading` (read):
     // always rendered; `editing`: cursor inside reveals the raw fence.
     // `theme` bakes the diagram colours; a flip reconfigures this Compartment.
@@ -330,7 +343,19 @@ export function editorExtensions(
     ...livePreviewBase(),
     // Mode-dependent slice (decorations + read-only gating) in a Compartment so
     // `setEditorMode` can switch edit/hybrid/view without rebuilding the view.
-    livePreviewCompartment.of(modeExtensions(mode, onLinkClick ?? defaultLinkClick, theme, onCommentEdit)),
+    // `brokenLinkContext.currentPath` doubles as the Embed field's resolution
+    // base: both answer the same question ("which Concept is open?"), and a
+    // relative `![alt](./x.png)` resolves against it exactly as `[](./x.md)`
+    // does. Kept as one option rather than two so the two can never disagree.
+    livePreviewCompartment.of(
+      modeExtensions(
+        mode,
+        onLinkClick ?? defaultLinkClick,
+        theme,
+        onCommentEdit,
+        brokenLinkContext?.currentPath,
+      ),
+    ),
     // In-Concept Find & Replace: built-in search panel (mounted above the
     // editor) + its keymap, themed as editor chrome. Ctrl/Cmd+F is opened by
     // App.svelte via `openSearch`; the keymap supplies in-panel bindings.
