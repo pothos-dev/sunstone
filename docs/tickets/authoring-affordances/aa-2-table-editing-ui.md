@@ -1,6 +1,7 @@
 ---
-status: needs-info
+status: ready-for-agent
 priority: 3
+blocked-by: [aa-1]
 ---
 
 # aa-2: Create and restructure tables without writing pipes
@@ -27,20 +28,23 @@ in any bar.
 
 - [ ] An editing Tile offers "Insert table", which asks for (or defaults to) a
       size and inserts a valid GFM table with the caret in the first cell
-- [ ] Row and column insert/delete are reachable without a right-click — a
-      hover or focus affordance on the table, or a control in the format bar
-      when the caret is inside a table
+- [ ] Row and column insert/delete are reachable without a right-click, from a
+      table group that appears in the `aa-1` toolbar while the caret is inside
+      a table
+- [ ] The existing right-click cell menu keeps working and drives the same
+      transforms as the toolbar group
 - [ ] Per-column alignment (left / center / right / none) can be set from the
       UI and round-trips through the `---` / `:---` / `:---:` / `---:`
       separator row
-- [ ] Tab and Shift+Tab move between cells; Tab in the last cell either adds a
-      row or leaves the table, and whichever is chosen is documented
+- [ ] Tab and Shift+Tab move between cells; Tab in the last cell adds a row,
+      and Escape leaves the table
 - [ ] Every operation produces markdown that reparses to the same table, with
       the separator row kept valid, and leaves a single undo step
 - [ ] Nothing new is editable in reading mode — the `readOnlyTables` lock still
       holds, including for any new affordance
-- [ ] Table transforms that are not supplied by `@atomic-editor/editor` land as
-      pure functions in `src/lib` with unit tests
+- [ ] Insert-table, alignment and row/column change land as pure functions in
+      `src/lib` with unit tests; the vendored patch grows only for
+      Tab-between-cells, if at all
 - [ ] Playwright covers insert, cell navigation, row/column change, alignment
       and the reading-mode lock over the fake backend
 - [ ] All four gates green
@@ -68,36 +72,32 @@ in any bar.
   behaviour across modes (widget in reading/hybrid, raw source under the cursor,
   plain text in source mode, stable decoration identity).
 
-## Open questions
-
-1. **Extend the vendored widget, or wrap it?** (a) Grow
-   `patches/@atomic-editor%2Feditor@0.4.3.patch` with insert-table, alignment
-   and Tab navigation. (b) Keep the patch minimal and build the missing
-   operations as Sunstone-side pure transforms over the document text, driven
-   from our own chrome.
-   *Recommendation: (b).* The patch is already load-bearing and grows harder to
-   rebase with every upstream release; a pure transform in `src/lib` is testable
-   under `bun test src/lib` and matches the effort's stated seam. Reserve the
-   patch for things only the widget's internals can do — realistically just
-   Tab-between-cells, which lives in the widget's own DOM.
-2. **Where do the row/column controls appear?** (a) Hover handles on the table's
-   edges, Notion style. (b) A table group that appears in the `aa-1` format bar
-   when the caret is inside a table. (c) Keep the right-click menu as the only
-   home and simply advertise it.
-   *Recommendation: (b) first, (a) later.* It depends on `aa-1` landing, needs
-   no hit-testing against widget geometry, and is keyboard-reachable for free.
-   (c) is not an answer — undiscoverability is the whole ticket.
-3. **What does "Insert table" ask for?** A size picker grid, a fixed 3x3 that
-   the user then grows, or a prompt.
-   *Recommendation: a fixed 3x3 with a header row*, since row/column insert is
-   part of the same ticket. A picker grid is polish that can follow.
-4. **Does Tab in the last cell add a row or exit the table?** Word and Notion
-   add a row; a plain text editor exits.
-   *Recommendation: add a row*, which is what someone who does not write
-   markdown will expect, with Escape as the documented way out.
-
 ## Decisions
 
+- **Wrap the widget, do not grow the patch.** The missing operations —
+  insert-table, alignment, row/column change — land as pure transforms over the
+  document text in `src/lib`, driven from Sunstone's own chrome.
+  `patches/@atomic-editor%2Feditor@0.4.3.patch` is already load-bearing and gets
+  harder to rebase with every upstream release, and a pure transform is testable
+  under `bun test src/lib`, which is the seam the effort README makes binding.
+  The patch is reserved for the one thing only the widget's internals can do:
+  Tab/Shift+Tab between cells, which lives in the widget's own DOM.
+- **Controls live in the `aa-1` toolbar**, as a table group that appears when
+  the caret is inside a table. This is why `aa-2` is blocked by `aa-1`. It needs
+  no hit-testing against widget geometry and is keyboard-reachable for free.
+  Notion-style hover handles on the table edges are a later ticket, not this
+  one. Advertising the existing right-click menu is not an answer —
+  undiscoverability is the whole ticket.
+- **The existing cell context menu stays.** It already works and someone has
+  learned it; the toolbar group is an additional entry point to the same
+  operations, not a replacement. Both drive the same transforms.
+- **"Insert table" inserts a fixed 3x3 with a header row**, caret in the first
+  cell. Row and column insert ship in this same ticket, so growing it is one
+  click away. A size-picker grid is polish that can follow.
+- **Tab in the last cell adds a row**, matching Word and Notion — it is what
+  someone who does not write markdown expects. Escape is the documented way out
+  of the table, and this belongs in whatever user-facing keyboard reference the
+  repo carries.
 - The on-disk format stays plain GFM — pipes and a separator row. No HTML
   tables, no bespoke fence. The whole effort's premise is that the file is still
   ordinary markdown.
