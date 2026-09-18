@@ -34,6 +34,9 @@ import type {
   WikilinkParts,
   AnchorRewrite,
   AnchorRename,
+  Embed,
+  EmbedKind,
+  EmbedTargetKind,
 } from '$lib/wasm/pkg';
 
 /** The generated wasm DTOs, surfaced for consumers (ADR 0006 §6). */
@@ -50,6 +53,9 @@ export type {
   WikilinkTarget,
   WikilinkParts,
   AnchorRewrite,
+  Embed,
+  EmbedKind,
+  EmbedTargetKind,
 };
 
 /** The wasm module namespace (`BundleIndex` + the free exports). */
@@ -221,4 +227,61 @@ export function rewriteAnchors(
   return mod
     ? mod.rewriteAnchors(source, content, target, renames, paths)
     : { content, count: 0 };
+}
+
+// --- Free Embed exports (ei-1) ---------------------------------------------
+//
+// The Embed kernel — detection, size parsing and the two resolution models —
+// single-sourced in `sunstone_shared::embed`, so the editor's Embed widgets, the
+// fake backend and the native SSR renderer agree on what an Embed is, how big it
+// is and what it points at. The Attachment corpus is a SEPARATE index from the
+// `BundleIndex` handle's concept set (an Attachment is never a Concept), so it
+// is passed per call. Each degrades to a SAFE default until wasm is registered:
+// no Embeds, nothing resolved — and, for the classifier, the same scheme test
+// inlined, so a `data:` / remote target can never be mistaken for a Bundle file
+// on the degraded path.
+
+/**
+ * Every Embed in a Concept `body`, in document order (fenced code blocks and
+ * inline code spans skipped). `from`/`to` are BYTE offsets into `body`, not
+ * UTF-16 / CodeMirror positions — convert before using them as decoration
+ * ranges. Degrades to `[]`.
+ */
+export function scanEmbeds(body: string): Embed[] {
+  return mod ? mod.scanEmbeds(body) : [];
+}
+
+/**
+ * Resolve a path-model Embed (`![alt](target)`) written in `sourcePath` to a
+ * bundle-relative Attachment path, or `null` for a non-Bundle target (any
+ * `scheme:` URL, a pure anchor, or empty). Degrades to `null`.
+ */
+export function resolveEmbedPathIn(sourcePath: string, target: string): string | null {
+  return mod ? (mod.resolveEmbedPathIn(sourcePath, target) ?? null) : null;
+}
+
+/**
+ * Resolve a name-model Embed (`![[name.png]]`) against an explicit Attachment
+ * path-set under the ADR-0004 rules — case-insensitive, literal, partial paths
+ * by suffix, ties broken by shortest Bundle path — or `null` (broken). Degrades
+ * to `null`.
+ */
+export function resolveEmbedNameIn(attachmentPaths: string[], target: string): string | null {
+  return mod ? (mod.resolveEmbedNameIn(attachmentPaths, target) ?? null) : null;
+}
+
+/**
+ * Classify an Embed target before anything is fetched (ADR-0011): `local`
+ * resolves to an Attachment, `remote` is click-to-load, `data` never renders,
+ * `otherScheme` is not rendered either. The degraded path inlines the same
+ * scheme test so it fails SAFE (a remote/`data:` target is never reported as
+ * `local`).
+ */
+export function classifyEmbedTarget(target: string): EmbedTargetKind {
+  if (mod) return mod.classifyEmbedTarget(target);
+  const t = target.trim();
+  if (/^data:/i.test(t)) return 'data';
+  if (/^https?:/i.test(t)) return 'remote';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return 'otherScheme';
+  return 'local';
 }

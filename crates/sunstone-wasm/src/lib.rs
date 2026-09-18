@@ -17,6 +17,7 @@ use wasm_bindgen::prelude::*;
 
 use sunstone_shared::citations::{self, CitationRef};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
+use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
@@ -291,4 +292,41 @@ pub fn rewrite_anchors(
 ) -> AnchorRewrite {
     let (content, count) = rewrite_anchors_in(&source, &body, &target, &renames, &paths);
     AnchorRewrite { content, count }
+}
+
+// --- Free Embed exports (ei-1) ---------------------------------------------
+//
+// The Embed kernel: detection + size parsing + the two resolution models, all
+// single-sourced in `sunstone_shared::embed` so the editor's `embedBlocks`
+// field, the fake backend and the native SSR renderer agree on what an Embed is,
+// how big it is and what it points at. Handle-less like the family-12 exports:
+// the Attachment corpus is a SEPARATE index from the `BundleIndex` handle's
+// concept set (an Attachment is never a Concept), so it is passed per call.
+
+/// Every Embed in a Concept `body`, in document order, with BYTE offsets into
+/// the original body (fenced code blocks and inline code spans skipped).
+#[wasm_bindgen(js_name = scanEmbeds)]
+pub fn scan_embeds(body: String) -> Vec<Embed> {
+    embed::scan_embeds(&body)
+}
+
+/// Resolve a PATH-model Embed (`![alt](target)`) from `source_path` to a
+/// bundle-relative Attachment path, or `null` for a non-Bundle target.
+#[wasm_bindgen(js_name = resolveEmbedPathIn)]
+pub fn resolve_embed_path_in(source_path: String, target: String) -> Option<String> {
+    embed::resolve_embed_path(&source_path, &target)
+}
+
+/// Resolve a NAME-model Embed (`![[name.png]]`) against an explicit Attachment
+/// path-set under the ADR-0004 rules, or `null` (broken).
+#[wasm_bindgen(js_name = resolveEmbedNameIn)]
+pub fn resolve_embed_name_in(attachment_paths: Vec<String>, target: String) -> Option<String> {
+    embed::resolve_embed_name(&attachment_paths, &target)
+}
+
+/// Classify an Embed target before anything is fetched (ADR-0011): `local`
+/// resolves to an Attachment, `remote` is click-to-load, `data` never renders.
+#[wasm_bindgen(js_name = classifyEmbedTarget)]
+pub fn classify_embed_target(target: String) -> EmbedTargetKind {
+    embed::classify_target(&target)
 }
