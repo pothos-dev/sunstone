@@ -2,11 +2,11 @@
 status: resolved
 ---
 
-# 02a: Edit Frontmatter as YAML
+# ov-2: Edit Frontmatter as YAML
 
 **What to build:** an author edits a Concept's Frontmatter as YAML text, so every OKF v0.2 family becomes writable instead of greyed out. Today the Properties panel models Frontmatter as `Property[]` and renders anything nested read-only — which is every v0.2 family (`generated` is a map, `verified` and `sources` are lists of maps, `sources[].usage_window` is a map inside a list entry). Editing the YAML directly makes all of them authorable at once, and round-trips unknown keys, comments, quoting and key order byte-for-byte, which the structured model never could. This is [ADR 0008](/adr/0008-raw-yaml-frontmatter-editing.md); it supersedes [ADR 0003](/adr/0003-structured-frontmatter-reserialization.md).
 
-This ticket is the **editing surface only**. The linting and completion that replace the panel's autocomplete are [02b](02b-okf-language-service.md), which depends on this and on [04](04-bundle-root-okf-version-marker.md). Everything the family tickets need in order to *author* their fields lands here.
+This ticket is the **editing surface only**. The linting and completion that replace the panel's autocomplete are [ov-3](ov-3-okf-language-service.md), which depends on this and on [ov-5](ov-5-bundle-root-okf-version-marker.md). Everything the family tickets need in order to *author* their fields lands here.
 
 The unified undo timeline from ADR-0003 survives, but not unchanged: the YAML now has a document of its own, so the body editor's `history()` stays the single stack and the YAML editor runs with no history of its own, forwarding undo/redo to it. `frontmatterField` still holds the frontmatter with the payload changed from `Property[]` to the YAML string. Grouping becomes ours to do — CodeMirror coalesces only events that both carry document changes, so intermediate keystrokes go in with `addToHistory: false` and one history entry opens per idle pause. Because an undo step can now change a surface the user cannot see, focus follows what was undone.
 

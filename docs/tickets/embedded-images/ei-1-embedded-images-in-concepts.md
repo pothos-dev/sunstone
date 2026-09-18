@@ -2,7 +2,7 @@
 status: ready-for-agent
 ---
 
-# 01: Embedded images in a Concept
+# ei-1: Embedded images in a Concept
 
 **What to build:** an image file stored in the Bundle renders inline in the Concept that embeds it, in reading mode, hybrid mode and the server-rendered web view. Today neither form renders: markdown images are skipped by link extraction on purpose (`src/lib/ipc/fake/links.ts` and the Rust `index/links.rs` both drop a `[text](…)` match preceded by `!` as "not a Concept link"), and `![[ … ]]` embeds are deferred by [ADR-0004](/adr/0004-wikilinks-optional-secondary-name-based.md), so the scanner sees a literal `!` plus a wikilink. Both forms currently show as raw text everywhere.
 

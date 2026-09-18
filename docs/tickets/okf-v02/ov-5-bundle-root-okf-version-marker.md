@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [01]
+blocked-by: [ov-1]
 ---
 
-# 04: Trust the `okf_version` marker when finding the Bundle root
+# ov-5: Trust the `okf_version` marker when finding the Bundle root
 
 **What to build:** when a Bundle ships the one marker OKF actually sanctions, Sunstone believes it instead of guessing. v0.2 §12 permits `okf_version` in a bundle-root `index.md` frontmatter block and states it is the only place Frontmatter is permitted in a Reserved file — which makes an `index.md` carrying `okf_version` a positive, unambiguous root declaration. Sunstone's current root finder is deliberately structural: it infers from the path list alone and never reads Frontmatter, so it cannot see this marker and will still guess wrong on a Bundle that declares itself.
 

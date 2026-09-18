@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [04]
+blocked-by: [ov-5]
 ---
 
-# 07: Declare `okf_version` on Bundles Sunstone creates
+# ov-8: Declare `okf_version` on Bundles Sunstone creates
 
 **What to build:** a Bundle created or first indexed by Sunstone identifies itself, so the next tool to open it — Sunstone included — finds the root on the first rung instead of guessing. Sunstone is a producer as well as a consumer, and writing the marker it now reads closes the loop.
 

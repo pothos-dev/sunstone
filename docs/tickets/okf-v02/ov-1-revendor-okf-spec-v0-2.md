@@ -2,7 +2,7 @@
 status: resolved
 ---
 
-# 01: Re-vendor the OKF spec at v0.2 and record its new upstream home
+# ov-1: Re-vendor the OKF spec at v0.2 and record its new upstream home
 
 **What to build:** the vendored spec Sunstone reads from is the current one. Today it is a v0.1 snapshot captured 2026-06-17 from `GoogleCloudPlatform/knowledge-catalog`, and that path is now a frozen copy — the canonical spec has moved to `GoogleCloudPlatform/open-knowledge-format` and advanced to v0.2. Every doc that cites a spec section must still land on the right section after the renumbering, so a reader following a link from the Glossary or a Bundle/Concept page arrives where they expect.
 

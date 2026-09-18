@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [04]
+blocked-by: [ov-5]
 ---
 
-# 05: Complete the Bundle root fallback ladder
+# ov-6: Complete the Bundle root fallback ladder
 
 **What to build:** a Bundle that ships no `okf_version` marker still roots predictably, and an unrootable folder degrades safely instead of mis-navigating. With the marker rung in place, the remaining rungs become explicit and ordered rather than an ad-hoc sequence of heuristics: after the marker, prefer the outermost directory in the chain of directories carrying an `index.md` — tolerating gaps, since an `index.md` is optional at every level — then the git repository toplevel, since OKF names git as the recommended distribution unit, and finally the opened folder itself, with bundle-absolute links degrading to resolving against the Concept's own directory.
 

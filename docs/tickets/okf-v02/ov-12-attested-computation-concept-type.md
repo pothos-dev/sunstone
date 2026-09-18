@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [01, 02a, 02b, 09]
+blocked-by: [ov-1, ov-2, ov-3, ov-10]
 ---
 
-# 11: The `Attested Computation` Concept type
+# ov-12: The `Attested Computation` Concept type
 
 **What to build:** a Concept whose `type` is `Attested Computation` is recognised as a computation with a contract, not just another document, and its contract fields are editable. This is the one new Concept type in OKF v0.2 (§10): a computation becomes a first-class Concept that other Concepts link to, so a metric narrates its figures and the figures themselves carry the code and the machinery to check it.
 

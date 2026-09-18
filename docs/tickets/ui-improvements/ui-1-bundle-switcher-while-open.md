@@ -2,7 +2,7 @@
 status: ready-for-agent
 ---
 
-# 01: Switch Bundles without restarting
+# ui-1: Switch Bundles without restarting
 
 **What to build:** a user with a Bundle already open can jump to another one from inside the editor. Today the known-folder list only appears at startup when Sunstone launched with no path — once a Bundle is open, the only way to reach a different one is to quit and relaunch. This ticket gives that same list a second entry point: an overlay over the open editor, opened by a hotkey and by a visible affordance, offering the same most-recently-opened folders under the same auto-focused fuzzy filter.
 

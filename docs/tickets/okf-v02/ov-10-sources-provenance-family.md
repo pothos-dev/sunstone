@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [01, 02a, 02b, 03]
+blocked-by: [ov-1, ov-2, ov-3, ov-4]
 ---
 
-# 09: Provenance family — `sources`, credibility signals, and per-claim attribution
+# ov-10: Provenance family — `sources`, credibility signals, and per-claim attribution
 
 **What to build:** a reader can see what a Concept was derived from, follow those sources where they are followable, and jump from a specific claim in the body to the source backing it. OKF v0.2 moves provenance out of the body and into Frontmatter as `sources`, a list of entries where only `resource` is required, plus optional `id`, `title` and the credibility signals `author`, `usage_count` and `last_modified`. A `usage_window` of `{ from, to }` sits as a sibling of `sources` and frames every `usage_count`, and a single entry may override it.
 
@@ -15,7 +15,7 @@ Per-claim attribution joins on `id`: the body cites with a markdown footnote who
 
 The `[n]` form is **deprecated, not removed**: `find_citation_refs` / `citation_def_pos` and the `citations` CodeMirror extension keep working so v0.1 Bundles still read correctly, alongside the legacy `# Citations` list. Nothing new should be authored in that form, and the docs must say so. `[n]` is digits-only, so it cannot collide with a `[^label]` footnote.
 
-Editing `sources` itself is not this ticket's problem — the YAML Frontmatter editor is [02a](02a-frontmatter-yaml-editor.md) and its OKF lint/completion is [02b](02b-okf-language-service.md); this ticket consumes both, and contributes the `sources` rules to the second.
+Editing `sources` itself is not this ticket's problem — the YAML Frontmatter editor is [ov-2](ov-2-frontmatter-yaml-editor.md) and its OKF lint/completion is [ov-3](ov-3-okf-language-service.md); this ticket consumes both, and contributes the `sources` rules to the second.
 
 This ticket also carries the v0.1 migration it supersedes: the body `# Citations` list becomes `sources`, and a consumer SHOULD read `sources` while MAY still parsing a legacy `# Citations` list.
 

@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [11]
+blocked-by: [ov-12]
 ---
 
-# 12: The `# Computation` conventional body heading
+# ov-13: The `# Computation` conventional body heading
 
 **What to build:** the code in an `Attested Computation` is presented as the computation it is, rather than as an anonymous fenced block partway down the page. OKF v0.2 adds `# Computation` to its set of conventional body headings — the section holding the query or model the Concept attests to, alongside the prose that cites its sources.
 

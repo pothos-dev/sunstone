@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [05]
+blocked-by: [ov-6]
 ---
 
-# 06: Let the user set the Bundle root explicitly
+# ov-7: Let the user set the Bundle root explicitly
 
 **What to build:** when detection gets the root wrong, the user fixes it once and it stays fixed. A command on a folder in the Explorer marks that folder as the Bundle root; bundle-absolute links immediately resolve from it, and the choice survives restarts. An override outranks every rung of the detection ladder — it is the user correcting the guess, so nothing re-derives over it.
 

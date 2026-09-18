@@ -1,9 +1,9 @@
 ---
 status: ready-for-agent
-blocked-by: [01]
+blocked-by: [ov-1]
 ---
 
-# 03: Recognise the OKF actor convention
+# ov-4: Recognise the OKF actor convention
 
 **What to build:** wherever Sunstone shows who produced or confirmed something, a reader sees a person distinguished from a machine at a glance rather than a raw string. OKF v0.2 §7 defines one convention for every identity-valued field: `human:<id>` for a person, `process:<id>` for an automated process, and `<producer>/<version>` for an agent or tool. The spec's own examples also use a `team:` prefix on a source's author, so the parser must tolerate prefixes it does not model rather than mangling them.
 
