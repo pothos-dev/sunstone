@@ -1,15 +1,15 @@
 ---
-status: needs-info
+status: ready-for-agent
 priority: 3
 ---
 
-# aa-1: A visible formatting bar for the editing Tile
+# aa-1: A formatting toolbar for the editing Tile
 
 **What to build:** someone editing a Concept can apply bold, italic, inline
 code, strikethrough, headings and links by clicking a labelled control, without
 knowing the markdown syntax or the hotkey. The control also reads back state:
-with the caret inside a bold run, the bold control shows as active, so the bar
-teaches what the document already says.
+with the caret inside a bold run, the bold control shows as active, so the
+toolbar teaches what the document already says.
 
 Every transform this needs already exists. `editor/textFormat.ts` holds the
 pure toggles — `toggleInlineWrap`, `headingFormatEdit`, `insertLink`, `linkAt` —
@@ -23,23 +23,31 @@ Two things are genuinely new. First, **active-state readout**: no code today
 asks "is the caret inside a `**` run" or "what heading level is this line".
 That is a new pure query over doc + selection, unit-tested alongside the
 toggles, driven off CodeMirror's selection updates rather than polled. Second,
-the bar's **placement**, which is a live design question — see below.
+the toolbar's **placement**: a second row inside the per-Tile Concept header,
+under the existing title/controls row and above the editor text, shown only
+while the Tile is editing.
 
-- [ ] An editing Tile shows controls for bold, italic, inline code,
-      strikethrough, heading level and link
+- [ ] An editing Tile shows a toolbar as a second row of its Concept header,
+      carrying controls for bold, italic, inline code, strikethrough, heading
+      level and link
 - [ ] Each control applies the existing command from `editor/commands.ts`; no
       formatting transform is reimplemented in a component
 - [ ] Each control reflects whether the format is active at the caret, updating
       as the selection moves, via a pure query unit-tested in `src/lib`
-- [ ] Each control carries its hotkey in its tooltip, so the bar teaches the
-      keyboard path rather than replacing it
+- [ ] Each control carries its hotkey in its tooltip, so the toolbar teaches
+      the keyboard path rather than replacing it
 - [ ] Clicking a control returns focus to the editor with the selection intact
-- [ ] The bar is absent or fully disabled when the Tile is in reading mode
-- [ ] The bar is reachable by keyboard and announces state to a screen reader
-- [ ] The bar does not steal the Region focus model's semantics — Escape and
-      Tab behave as the focus model documents
-- [ ] `docs/GLOSSARY.md` names the new surface and resolves the "toolbar"
-      _Avoid_ entry
+- [ ] The toolbar is absent when the Tile is in reading mode, and present in
+      both the desktop and the web shell
+- [ ] The toolbar is reachable by keyboard and announces state to a screen
+      reader
+- [ ] The toolbar does not steal the Region focus model's semantics — Escape
+      and Tab behave as the focus model documents
+- [ ] The toolbar does not break the Concept header's existing layout at narrow
+      Tile widths (a Column can be a third of the Editor pane)
+- [ ] `docs/GLOSSARY.md` carries a **Toolbar** entry and the _Avoid_ lines
+      under **Concept header** and **Activity Rail** no longer claim the term
+      is removed
 - [ ] Playwright covers apply, toggle-off, active-state readout and the
       reading-mode case over the fake backend
 - [ ] All four gates green
@@ -58,39 +66,32 @@ the bar's **placement**, which is a live design question — see below.
   already dense.
 - `docs/GLOSSARY.md`, "UI chrome" — **Concept header** lists "toolbar
   (removed)" under _Avoid_, and **Activity Rail** states "there is no global
-  nav/tool bar". This ticket is in tension with that and must settle it.
+  nav/tool bar". Both are now stale; see the naming decision below for exactly
+  what to change.
 - `docs/interface/focus-model.md` — six Regions in a fixed 3x2 grid, exactly
   one active. A new focusable strip has to be placed in that model, not bolted
   beside it.
 
-## Open questions
-
-1. **Where does the bar live?** (a) A second row inside the Concept header,
-   shown only while editing, next to the undo/redo group that already appears
-   conditionally. (b) A floating bar over the selection, Obsidian/Notion style,
-   appearing only when text is selected. (c) A strip docked above the Editor
-   pane like the Find panel.
-   *Recommendation: (a).* It reuses the "controls scoped to this Concept/Tile"
-   rule the glossary already states, needs no new hit-testing or positioning
-   logic, and is visible before the user selects anything — which is the point
-   for a non-technical author. (b) is prettier but only helps someone who
-   already knows to select text first.
-2. **What is the surface called?** The glossary deliberately retired "toolbar".
-   *Recommendation: "Format bar"* — a second row of the Concept header, scoped
-   to the Tile, which is materially not the global tool bar that was removed.
-   Whatever is chosen, the glossary entries for **Concept header** and
-   **Activity Rail** need editing in the same change.
-3. **Is it always shown, or opt-in?** A technical author who lives on hotkeys
-   loses vertical space to a row they never click.
-   *Recommendation: always shown while editing for now, with the question of a
-   setting deferred to a later ticket* — Sunstone has no general settings
-   surface, and inventing one here widens this ticket past its purpose.
-4. **Does it appear in the web shell?** Nothing here is desktop-specific.
-   *Recommendation: yes, both shells* — the non-technical reader is if anything
-   more likely to be on web.
-
 ## Decisions
 
+- **Placement → a second row of the Concept header, shown only while editing.**
+  It reuses the "controls scoped to this Concept/Tile" rule the glossary already
+  states, needs no hit-testing or positioning logic, and is visible before the
+  user selects anything — which is the point for a non-technical author. A
+  floating selection bar only helps someone who already knows to select first.
+- **Name → "Toolbar".** The decision to retire the term is reversed: it is the
+  word a non-technical user already knows, and this effort exists for them.
+  `docs/GLOSSARY.md` gains a **Toolbar** entry (per-Tile, editing-only,
+  formatting controls) and the _Avoid_ lines under **Concept header** and
+  **Activity Rail** are corrected in the same change — the Rail is still not a
+  toolbar, and there is still no *global* tool bar, so those entries narrow
+  rather than disappear.
+- **Always shown while editing**, absent in reading mode. No toggle and no
+  setting: Sunstone has no general settings surface, and inventing one here
+  widens the ticket past its purpose. Revisit only if the row proves to cost
+  too much vertical space in practice.
+- **Both shells.** Nothing here is desktop-specific, and the non-technical
+  reader this effort targets is if anything more likely to be on web.
 - Controls dispatch the existing commands rather than new transforms — the
   effort README makes the pure-transform seam binding, and the toggles are
   already tested.
@@ -99,4 +100,4 @@ the bar's **placement**, which is a live design question — see below.
   slice of work. This ticket ships exactly the operations the keymap already
   exposes, so the chrome and the transforms do not land in one change.
 - Tables get their own affordances in `aa-2`; no table control appears in this
-  bar.
+  toolbar.

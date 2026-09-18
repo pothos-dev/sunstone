@@ -20,11 +20,12 @@ Decisions that bind the tickets here:
 - **Reading mode stays inert.** Every affordance is absent or disabled when the
   Tile is not editing, matching the read-only gating that
   `editor/tableReadOnly.ts` already enforces for table widgets.
-- **The glossary says "toolbar" is a removed term.** `docs/GLOSSARY.md` records
-  that a global tool bar was deliberately removed in favour of the Activity
-  Rail and the per-Tile Concept header, and lists "toolbar" under _Avoid_. Any
-  ticket here that reintroduces a bar owes the glossary an update naming the
-  new surface, its scope, and why it is not the bar that was removed.
+- **"Toolbar" is back, scoped to the Tile.** `docs/GLOSSARY.md` retired the
+  term when a global tool bar was removed in favour of the Activity Rail and
+  the per-Tile Concept header. `aa-1` reverses that for a per-Tile,
+  editing-only formatting row, because it is the word a non-technical user
+  already knows. There is still no *global* tool bar and the Rail is still not
+  one — the _Avoid_ entries narrow rather than vanish.
 
 Out of scope: visual redesign and theming, a block-insert / slash-command menu,
 image or diagram authoring (see the `embedded-images` effort), and anything
