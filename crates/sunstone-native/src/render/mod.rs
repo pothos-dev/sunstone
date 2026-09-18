@@ -17,21 +17,27 @@
 //!     present and clickable — broken links are tolerated per OKF),
 //!   - external (`scheme:`)  → a normal anchor opening in a new tab.
 //!
-//! Pipeline: strip frontmatter → rewrite `[[wikilinks]]` to markdown links
-//! carrying a resolution marker → parse with comrak → mark standard-link URLs
-//! with the same markers (+ collect the heading outline) → render HTML → rewrite
-//! the marker hrefs into the final anchor attributes.
+//! Pipeline: strip frontmatter → rewrite Embeds to marker images → rewrite
+//! `[[wikilinks]]` to markdown links carrying a resolution marker → parse with
+//! comrak → mark standard-link URLs with the same markers (+ collect the heading
+//! outline) → render HTML → rewrite the marker hrefs into the final anchor
+//! attributes → rewrite the Embed markers into their final markup.
+//!
+//! **Embeds** (`![alt](x.png)` / `![[x.png]]`) point at an Attachment rather than
+//! a Concept and resolve against a SEPARATE index; they get their `src` from a
+//! per-shell URL mapper. That whole pass lives in `embeds.rs` (ei-1, ADR-0011).
 //!
 //! Mermaid fenced blocks are left as inert `<pre><code>` source here; their
 //! client-side hydration is a later slice.
 //!
 //! This module is split into: the pipeline above (here), the CriticMarkup
-//! sentinel pass (`critic.rs`), and the citation-superscript sentinel pass
-//! (`citations.rs`); the two sentinel passes share their scan/substitute
-//! plumbing via `sentinel::Sentinels`.
+//! sentinel pass (`critic.rs`), the citation-superscript sentinel pass
+//! (`citations.rs`) and the Embed pass (`embeds.rs`); the two sentinel passes
+//! share their scan/substitute plumbing via `sentinel::Sentinels`.
 
 mod citations;
 mod critic;
+mod embeds;
 mod sentinel;
 
 use std::path::Path;
@@ -53,6 +59,7 @@ use sunstone_shared::wikilink::{self, parse_target};
 
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
+use embeds::{embeds_to_markers, rewrite_embed_markers};
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -72,29 +79,51 @@ pub struct RenderPayload {
 
 /// Render the Concept at `rel_path` (validated against the Bundle root, like the
 /// other read routes) to a [`RenderPayload`], resolving links against `index`.
+///
+/// `asset_url` maps a bundle-relative **Attachment** path to a URL the calling
+/// shell can serve (ei-1, ADR-0011). It is a MAPPER rather than the prefix
+/// ADR-0011 first proposed, because the two shells' URL shapes are not
+/// prefix-compatible — `sunstone-asset://localhost/<whole path percent-encoded>`
+/// on the desktop versus `/api/asset?path=<encoded>` on the web. See
+/// `render/embeds.rs`.
 pub fn render_concept(
     root: &Path,
     index: &Index,
     rel_path: &str,
+    asset_url: &dyn Fn(&str) -> String,
 ) -> Result<RenderPayload, String> {
     // read_concept validates the path (escape rejection) and reads the raw file.
     let content = bundle::read_concept(root, rel_path)?;
     let all_paths = index.concept_paths();
-    Ok(render_body(&content, rel_path, &all_paths, &|p| {
-        index.concept_exists(p)
-    }))
+    // Attachments are a SEPARATE index from `all_paths` (ticket decision): a
+    // non-`.md` path folded into the Concept corpus could shift the structurally
+    // inferred Bundle root.
+    let attachments = index.attachment_paths();
+    Ok(render_body(
+        &content,
+        rel_path,
+        &all_paths,
+        &|p| index.concept_exists(p),
+        &attachments,
+        asset_url,
+    ))
 }
 
 /// Pure render over raw Concept `content` (frontmatter included). `source_path`
 /// is the Concept's own path (for relative links / `[[#anchor]]`); `all_paths`
 /// is every Concept path in the Bundle (for name-based wikilink resolution);
 /// `exists` reports whether a resolved path is a real Concept (for broken-link
-/// marking). Split out from `render_concept` so it is testable without disk.
+/// marking); `attachments` is every Attachment path in the Bundle (for
+/// name-resolved Embeds and for Embed broken-ness); `asset_url` maps a resolved
+/// Attachment path to a shell-servable URL. Split out from `render_concept` so
+/// it is testable without disk.
 pub fn render_body(
     content: &str,
     source_path: &str,
     all_paths: &[String],
     exists: &dyn Fn(&str) -> bool,
+    attachments: &[String],
+    asset_url: &dyn Fn(&str) -> String,
 ) -> RenderPayload {
     let frontmatter = frontmatter_fields(content);
     // Outline enumeration is the SAME pure ATX scan the editor runs over wasm
@@ -103,6 +132,16 @@ pub fn render_body(
     // (so the frontmatter offset is applied); ATX-only (setext dropped).
     let outline = scan_headings(content);
     let body = strip_frontmatter(content);
+
+    // 0a. Rewrite every Embed (`![alt](x.png)` / `![[x.png]]`) to a marker image
+    //     whose destination indexes a side table of resolved render decisions,
+    //     substituted back after comrak (ei-1). FIRST, before the sentinel
+    //     passes: those rewrite bytes, and an Embed's alt text must not carry a
+    //     private-use sentinel that a later pass would expand into HTML tags
+    //     inside an attribute value. It is also the only way `![[ … ]]` reaches
+    //     comrak at all — `replace_wikilinks` deliberately skips embeds.
+    let (body, embed_table) = embeds_to_markers(body, source_path, attachments, asset_url);
+    let body = body.as_str();
 
     // 0. Replace CriticMarkup delimiters with sentinel tokens BEFORE comrak,
     //    leaving each mark's inner content in the markdown stream so it is still
@@ -161,6 +200,10 @@ pub fn render_body(
     // outline slugs) so the Outline section can scroll the rendered view to it.
     let html = inject_heading_ids(&String::from_utf8_lossy(&buf), &outline, &heading_is_setext);
     let html = rewrite_marker_hrefs(&html);
+    // Substitute the Embed markers comrak emitted as `<img src="sapembed:N">`
+    // with their final markup (a real `<img>`, a broken placeholder, a
+    // click-to-load affordance, or nothing at all for a `data:` URI).
+    let html = rewrite_embed_markers(&html, &embed_table);
     // Finally, substitute the CriticMarkup sentinels comrak carried through
     // (untouched, since they are private-use unicode) with our critic HTML tags.
     let html = substitute_critic_sentinels(&html, &critic_repls);
@@ -346,9 +389,30 @@ mod tests {
     }
 
     fn render(body: &str, source: &str, all: &[&str]) -> RenderPayload {
+        render_with(body, source, all, &[])
+    }
+
+    /// Render with an Attachment corpus too, through a stand-in for the web
+    /// shell's mapper (`/api/asset?path=…`). The desktop's mapper is a different
+    /// SHAPE, which is the whole reason the renderer takes a mapper rather than
+    /// ADR-0011's original prefix; `commands.rs` owns that one.
+    fn render_with(
+        body: &str,
+        source: &str,
+        all: &[&str],
+        attachments: &[&str],
+    ) -> RenderPayload {
         let all = paths(all);
         let set: Vec<String> = all.clone();
-        render_body(body, source, &all, &move |p| set.iter().any(|x| x == p))
+        let attachments = paths(attachments);
+        render_body(
+            body,
+            source,
+            &all,
+            &move |p| set.iter().any(|x| x == p),
+            &attachments,
+            &|p| format!("/api/asset?path={}", sunstone_shared::url::query_encode(p)),
+        )
     }
 
     #[test]
@@ -459,6 +523,149 @@ mod tests {
         let p = render("`[[good]]`", "a.md", &["a.md", "good.md"]);
         assert!(!p.html.contains("internal-link"));
         assert!(p.html.contains("<code>"));
+    }
+
+    // --- Embeds (ei-1) ------------------------------------------------------
+
+    #[test]
+    fn a_markdown_embed_gets_a_mapped_src() {
+        // comrak would otherwise emit the author's raw relative `src`, which 404s
+        // in both shells. Relative to the Concept's own directory.
+        let p = render_with("![logo](logo.png)", "docs/a.md", &["docs/a.md"], &["docs/logo.png"]);
+        assert!(p.html.contains(r#"<img class="embed-image""#), "{}", p.html);
+        assert!(p.html.contains(r#"src="/api/asset?path=docs%2Flogo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"alt="logo""#));
+        assert!(p.html.contains(r#"loading="lazy""#));
+        // The mapped `src` replaces the author's — no raw relative path survives.
+        assert!(!p.html.contains(r#"src="logo.png""#));
+    }
+
+    #[test]
+    fn a_bundle_absolute_markdown_embed_resolves_from_the_root() {
+        let p = render_with("![](/assets/logo.png)", "deep/a.md", &["deep/a.md"], &["assets/logo.png"]);
+        assert!(p.html.contains(r#"src="/api/asset?path=assets%2Flogo.png""#), "{}", p.html);
+        // No author alt → the accessible name is the filename WITH extension
+        // (ADR-0010: `alt=""` would be a lie for an embedded diagram).
+        assert!(p.html.contains(r#"alt="logo.png""#));
+    }
+
+    #[test]
+    fn a_wikilink_embed_resolves_by_name_across_the_bundle() {
+        // comrak does not know `![[ … ]]` and `replace_wikilinks` deliberately
+        // skips embeds — this is the pre-comrak conversion doing the work.
+        let p = render_with("see ![[logo.png]] here", "deep/a.md", &["deep/a.md"], &["assets/sub/logo.png"]);
+        assert!(p.html.contains(r#"src="/api/asset?path=assets%2Fsub%2Flogo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"alt="logo.png""#));
+        // The raw syntax is gone from the output.
+        assert!(!p.html.contains("[["));
+    }
+
+    #[test]
+    fn a_wikilink_embed_takes_the_shortest_path_on_a_tie() {
+        let p = render_with(
+            "![[logo.png]]",
+            "a.md",
+            &["a.md"],
+            &["deep/nested/logo.png", "logo.png"],
+        );
+        assert!(p.html.contains(r#"src="/api/asset?path=logo.png""#), "{}", p.html);
+    }
+
+    #[test]
+    fn an_embed_size_is_css_never_an_html_attribute() {
+        // An HTML `width`/`height` attribute would corrupt the editor's URL-keyed
+        // dimension cache, which stores NATURAL dimensions (ticket decision).
+        let both = render_with("![[logo.png|300x200]]", "a.md", &["a.md"], &["logo.png"]);
+        assert!(both.html.contains(r#"style="width:300px;height:200px""#), "{}", both.html);
+        assert!(!both.html.contains("width=\""));
+
+        let wide = render_with("![[logo.png|300]]", "a.md", &["a.md"], &["logo.png"]);
+        assert!(wide.html.contains(r#"style="width:300px""#), "{}", wide.html);
+
+        // Same in the markdown form, where the size rides in the alt slot — and
+        // the accessible name then falls back to the filename.
+        let md = render_with("![300x200](logo.png)", "a.md", &["a.md"], &["logo.png"]);
+        assert!(md.html.contains(r#"style="width:300px;height:200px""#), "{}", md.html);
+        assert!(md.html.contains(r#"alt="logo.png""#));
+    }
+
+    #[test]
+    fn an_unresolvable_embed_is_a_visible_placeholder_and_the_rest_still_renders() {
+        let p = render_with(
+            "# Title\n\n![](missing.png) and ![[nope.png]]\n\nafter\n",
+            "a.md",
+            &["a.md"],
+            &["other.png"],
+        );
+        // Mirrors the broken-LINK convention: present, visible, `data-broken`.
+        assert!(p.html.contains(r#"<span class="embed-broken" data-broken="true""#), "{}", p.html);
+        assert!(p.html.contains(r#"data-embed-target="missing.png""#));
+        assert!(p.html.contains(r#"data-embed-target="nope.png""#));
+        assert!(!p.html.contains("<img"));
+        // Never aborts the render.
+        assert!(p.html.contains("<h1 id=\"title\">"));
+        assert!(p.html.contains("after"));
+    }
+
+    #[test]
+    fn a_remote_embed_is_click_to_load_and_fetches_nothing() {
+        // On the web shell the author and the reader are different people:
+        // opening a Concept must not fire a tracking pixel from the reader's IP.
+        let p = render_with("![](https://tracker.example/pixel.png)", "a.md", &["a.md"], &[]);
+        assert!(p.html.contains(r#"<button type="button" class="embed-remote""#), "{}", p.html);
+        assert!(p.html.contains(r#"data-embed-src="https://tracker.example/pixel.png""#));
+        // Nothing the browser will load on its own.
+        assert!(!p.html.contains("<img"));
+        // ...and specifically no `src` attribute of its own (the URL rides in
+        // `data-embed-src`, which the leading space distinguishes).
+        assert!(!p.html.contains(r#" src="https://tracker.example"#));
+    }
+
+    #[test]
+    fn a_data_uri_embed_does_not_render_at_all() {
+        let p = render_with(
+            "before ![x](data:image/png;base64,iVBORw0KGgo=) after",
+            "a.md",
+            &["a.md"],
+            &[],
+        );
+        assert!(!p.html.contains("<img"));
+        assert!(!p.html.contains("data:image"));
+        assert!(!p.html.contains("embed-broken"));
+        assert!(p.html.contains("before"));
+        assert!(p.html.contains("after"));
+    }
+
+    #[test]
+    fn an_embed_inside_code_is_left_alone() {
+        let p = render_with("`![[logo.png]]`", "a.md", &["a.md"], &["logo.png"]);
+        assert!(p.html.contains("<code>"));
+        assert!(!p.html.contains("<img"));
+    }
+
+    #[test]
+    fn a_non_image_embed_keeps_todays_literal_rendering() {
+        // Out of scope until `al-1`.
+        let p = render_with("![d](notes.pdf)", "a.md", &["a.md"], &["notes.pdf"]);
+        assert!(p.html.contains(r#"<img src="notes.pdf""#), "{}", p.html);
+        assert!(!p.html.contains("embed-image"));
+    }
+
+    #[test]
+    fn an_embed_alt_cannot_inject_markup_though_unsafe_is_off() {
+        // `render.unsafe_` stays false, and everything this pass injects AFTER
+        // comrak is attribute-escaped here rather than by comrak.
+        let p = render_with(r#"![" onerror="alert(1)](logo.png)"#, "a.md", &["a.md"], &["logo.png"]);
+        assert!(!p.html.contains("onerror=\"alert"), "{}", p.html);
+        assert!(p.html.contains("&quot;"));
+    }
+
+    #[test]
+    fn an_embed_among_text_stays_inline_in_its_paragraph() {
+        // comrak wraps a lone image in a `<p>`; a block placeholder there would
+        // close the paragraph early in the browser.
+        let p = render_with("text ![[missing.png]] more", "a.md", &["a.md"], &[]);
+        assert!(p.html.contains("<p>text <span class=\"embed-broken\""), "{}", p.html);
     }
 
     #[test]

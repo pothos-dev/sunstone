@@ -146,7 +146,16 @@ mod tests {
     fn render(body: &str, source: &str, all: &[&str]) -> crate::render::RenderPayload {
         let all = paths(all);
         let set: Vec<String> = all.clone();
-        render_body(body, source, &all, &move |p| set.iter().any(|x| x == p))
+        // The Embed pass needs an Attachment corpus + a shell URL mapper; neither
+        // is exercised here (see `render/embeds.rs` for those tests).
+        render_body(
+            body,
+            source,
+            &all,
+            &move |p| set.iter().any(|x| x == p),
+            &[],
+            &|p| p.to_string(),
+        )
     }
 
     #[test]

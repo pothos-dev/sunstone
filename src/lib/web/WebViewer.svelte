@@ -20,6 +20,7 @@
   import WebOutline from './WebOutline.svelte';
   import WebBacklinks from './WebBacklinks.svelte';
   import { hydrateMermaid } from './webMermaid';
+  import { wireRemoteEmbeds } from './remoteEmbed';
   import { loadUiState, saveUiState } from './uiState';
   import { snapshotWebViewerUiState, restoreWebViewerUiState } from './webViewerUiState';
   import { matchesHotkey } from '$lib/matchesHotkey';
@@ -175,6 +176,15 @@
     const resolved = theme.resolved;
     const el = articleEl;
     if (el) void hydrateMermaid(el, resolved);
+  });
+
+  // --- Remote Embeds: click-to-load (ei-1) ---
+  // The renderer withholds a remote image's `src` so opening a Concept fetches
+  // nothing; this turns the placeholder into a real <img> on click.
+  $effect(() => {
+    const el = articleEl;
+    if (!el) return;
+    return wireRemoteEmbeds(el);
   });
 
   // --- Persist UI state (localStorage) — gated until the initial load applies. ---

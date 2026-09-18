@@ -15,10 +15,15 @@ Bundle root with the primitive that already exists:
 - **The seam** gains one `Backend` method returning a *URL string* for a bundle-relative
   path, implemented by `tauri.ts`, `http.ts` and `fake.ts`. No `Uint8Array`, `Blob` or
   `ArrayBuffer` crosses it; the `Backend` interface stays entirely JSON-and-string.
-- **The shared Rust renderer** takes an asset-URL **prefix** parameter, because one
+- **The shared Rust renderer** takes an asset-URL **mapper** parameter —
+  `&dyn Fn(&str) -> String`, from a bundle-relative path to a URL — because one
   `render_concept` feeds two shells: the web viewer (`WebViewer.svelte`) *and* the desktop
   print/PDF window (`PrintView.svelte`). A hardcoded `/api/asset` `src` would 404 in the
-  desktop PDF export.
+  desktop PDF export. *(Corrected during implementation: this said **prefix**. It cannot
+  be one. The desktop percent-encodes the WHOLE path into a single URL segment —
+  `sunstone-asset://localhost/a%2Fb.png` — while the web passes it as a query value —
+  `/api/asset?path=a%2Fb.png`. The two are not a common prefix over the same string, so a
+  mapper it is; each shell owns its closure, and `render/embeds.rs` owns neither shape.)*
 
 ## Considered Options
 
@@ -59,5 +64,5 @@ Bundle root with the primitive that already exists:
 - **Attachments are as readable as the Concepts that embed them.** `GET /api/asset` is
   unauthenticated, exactly like `/api/concept` and `/api/render`; only `/api/history` and
   `/api/file-at-rev` are gated. This is a deliberate match, not an oversight.
-- The renderer's prefix parameter is the seam that keeps SSR, the web viewer and the desktop
-  PDF on one HTML pipeline; a future third shell supplies a third prefix and nothing else.
+- The renderer's mapper parameter is the seam that keeps SSR, the web viewer and the desktop
+  PDF on one HTML pipeline; a future third shell supplies a third closure and nothing else.

@@ -4,6 +4,7 @@
   import { createLatestGuard } from '$lib/asyncGuard';
   import type { RenderPayload } from '$lib/types';
   import { hydrateMermaid } from '$lib/web/webMermaid';
+  import { wireRemoteEmbeds } from '$lib/web/remoteEmbed';
   import { conceptTitle } from '$lib/web/conceptUrl';
 
   // Chrome-free print/PDF preview of a single Concept, opened in its OWN
@@ -128,6 +129,15 @@
     };
     el.addEventListener('click', followLinks);
     return () => el.removeEventListener('click', followLinks);
+  });
+
+  // Remote Embeds are click-to-load here too (ei-1): the preview is a live
+  // webview before it is a sheet of paper, so a reader can pull one in before
+  // printing — and, exactly as in the viewer, nothing is fetched until they do.
+  $effect(() => {
+    const el = bodyEl;
+    if (!el) return;
+    return wireRemoteEmbeds(el);
   });
 
   function decFont() {

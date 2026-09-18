@@ -12,6 +12,9 @@ path = "src/main.rs"
 [dependencies]
 # Sunstone's reusable domain logic — the SAME bundle/index code the desktop uses.
 sunstone-native = { path = "../sunstone-native" }
+# `url::query_encode` — the ONE percent-encoder, shared with the desktop shell,
+# so `/api/asset?path=…` is built exactly as `http.ts` builds it (ei-1).
+sunstone-shared = { path = "../sunstone-shared" }
 axum = "0.8"
 # `time` is for the sync loop's notify-with-timeout tick scheduling (Spec 2 §8.1).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }

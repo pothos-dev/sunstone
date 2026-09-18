@@ -13,6 +13,7 @@ use sunstone_native::index::TagCount;
 use sunstone_native::render::{self, RenderPayload};
 use sunstone_native::rewrite::{self, AnchorRename, RewriteSummary};
 use sunstone_native::search::{self, SearchHit};
+use sunstone_shared::url::query_encode;
 use tauri::State;
 
 use crate::session::Session;
@@ -269,7 +270,20 @@ pub(crate) fn file_at_rev(
 pub(crate) fn render_concept(session: State<'_, Arc<Session>>, path: String) -> Result<RenderPayload, String> {
     let state = session.current()?;
     let index = state.read_index()?;
-    render::render_concept(&state.bundle_root, &index, &path)
+    render::render_concept(&state.bundle_root, &index, &path, &asset_url)
+}
+
+/// The desktop shell's Attachment-URL mapper, handed to the shared renderer so
+/// an Embed's `src` is fetchable from the print/PDF window (ei-1, ADR-0011).
+///
+/// The shape is `asset.rs`'s, and it must stay byte-identical to `tauri.ts`'s
+/// `attachmentUrl` (which mirrors Tauri's own `convertFileSrc`): the WHOLE
+/// bundle-relative path is percent-encoded into ONE URL path segment, so `a/b.png`
+/// becomes `a%2Fb.png` — `query_encode` is `encodeURIComponent`'s Rust twin and
+/// escapes `/` for exactly that reason. `asset.rs::rel_path_from_uri` decodes it
+/// once to recover the path it hands to `bundle::resolve`.
+fn asset_url(path: &str) -> String {
+    format!("{}://localhost/{}", crate::asset::SCHEME, query_encode(path))
 }
 
 /// Load the persisted per-Bundle session state (last-open Concept, expanded
@@ -290,4 +304,50 @@ pub(crate) fn load_bundle_state(session: State<'_, Arc<Session>>) -> Result<Bund
 pub(crate) fn save_bundle_state(session: State<'_, Arc<Session>>, bundle_state: BundleState) -> Result<(), String> {
     let state = session.current()?;
     config::save_bundle_state(&state.bundle_root, bundle_state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_asset_mapper_matches_the_scheme_handler_and_the_frontend() {
+        // One shape, three places: this mapper, `asset.rs::rel_path_from_uri`
+        // (which decodes it ONCE), and `tauri.ts`'s `attachmentUrl`
+        // (`encodeURIComponent`, mirroring Tauri's own `convertFileSrc`). The
+        // whole path is ONE percent-encoded segment, so separators arrive as
+        // `%2F` — a drift here silently 404s every Embed in the print/PDF window.
+        assert_eq!(
+            asset_url("assets/sub/logo.png"),
+            "sunstone-asset://localhost/assets%2Fsub%2Flogo.png"
+        );
+        assert_eq!(
+            asset_url("a b+c.png"),
+            "sunstone-asset://localhost/a%20b%2Bc.png"
+        );
+        // A literal `%` in a filename is escaped, so one decode recovers it.
+        assert_eq!(
+            asset_url("a%2Fb.png"),
+            "sunstone-asset://localhost/a%252Fb.png"
+        );
+    }
+
+    #[test]
+    fn a_rendered_embed_points_at_the_asset_scheme() {
+        let dir = std::env::temp_dir().join(format!("sunstone-cmd-embed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("assets")).unwrap();
+        std::fs::write(dir.join("assets/logo.png"), b"\x89PNG").unwrap();
+        std::fs::write(dir.join("note.md"), "![[logo.png]]\n").unwrap();
+        let index = sunstone_native::index::Index::build(&dir);
+        let payload = render::render_concept(&dir, &index, "note.md", &asset_url).unwrap();
+        assert!(
+            payload
+                .html
+                .contains(r#"src="sunstone-asset://localhost/assets%2Flogo.png""#),
+            "{}",
+            payload.html
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

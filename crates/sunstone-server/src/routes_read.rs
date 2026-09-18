@@ -25,6 +25,7 @@ use sunstone_native::bundle::{self, TreeNode};
 use sunstone_native::index::TagCount;
 use sunstone_native::render::{self, RenderPayload};
 use sunstone_native::search::{self, SearchHit};
+use sunstone_shared::url::query_encode;
 
 use crate::{ServerEvent, ServerState};
 
@@ -64,9 +65,23 @@ pub(crate) async fn render_handler(
         .app
         .read_index()
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
-    render::render_concept(&state.app.bundle_root, &index, &q.path)
+    render::render_concept(&state.app.bundle_root, &index, &q.path, &asset_url)
         .map(Json)
         .map_err(ApiError::from_core)
+}
+
+/// The web shell's Attachment-URL mapper, handed to the shared renderer so an
+/// Embed's `src` is fetchable from the SSR'd page (ei-1, ADR-0011).
+///
+/// The shape is `routes_asset.rs`'s — `/api/asset?path=<percent-encoded>` — and
+/// must stay identical to `http.ts`'s `attachmentUrl`. Relative and same-origin,
+/// so it rides the `src/hooks.server.ts` proxy and needs no CORS.
+///
+/// This is why the renderer takes a MAPPER and not the asset-URL *prefix*
+/// ADR-0011 first proposed: a query value and the desktop's single
+/// percent-encoded path segment are not two prefixes over the same string.
+fn asset_url(path: &str) -> String {
+    format!("/api/asset?path={}", query_encode(path))
 }
 
 #[derive(Deserialize)]
@@ -309,7 +324,7 @@ mod tests {
         )
         .unwrap();
         let index = sunstone_native::index::Index::build(&root);
-        let payload = render::render_concept(&root, &index, "note.md").unwrap();
+        let payload = render::render_concept(&root, &index, "note.md", &asset_url).unwrap();
         assert!(payload.html.contains("<h1 id="));
         assert!(payload.html.contains("<p>"));
         // The in-bundle link resolves to an internal nav anchor.
@@ -321,10 +336,38 @@ mod tests {
     }
 
     #[test]
+    fn the_asset_mapper_matches_the_route_and_the_frontend() {
+        // One shape, three places: this mapper, `routes_asset.rs`'s
+        // `?path=` query, and `http.ts`'s `attachmentUrl`
+        // (`encodeURIComponent`). A drift here silently 404s every Embed in the
+        // SSR'd page, which no other test would notice.
+        assert_eq!(asset_url("assets/logo.png"), "/api/asset?path=assets%2Flogo.png");
+        assert_eq!(asset_url("a b+c.png"), "/api/asset?path=a%20b%2Bc.png");
+        // A literal `%` in a filename is escaped, so ONE decode (axum's `Query`)
+        // recovers it — the invariant `routes_asset.rs` pins from the other side.
+        assert_eq!(asset_url("a%2Fb.png"), "/api/asset?path=a%252Fb.png");
+    }
+
+    #[test]
+    fn a_rendered_embed_points_at_the_asset_route() {
+        let root = temp_bundle();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("assets/logo.png"), b"\x89PNG").unwrap();
+        std::fs::write(root.join("note.md"), "![[logo.png]]\n").unwrap();
+        let index = sunstone_native::index::Index::build(&root);
+        let payload = render::render_concept(&root, &index, "note.md", &asset_url).unwrap();
+        assert!(
+            payload.html.contains(r#"src="/api/asset?path=assets%2Flogo.png""#),
+            "{}",
+            payload.html
+        );
+    }
+
+    #[test]
     fn render_route_rejects_path_escape_with_400() {
         let root = temp_bundle();
         let index = sunstone_native::index::Index::build(&root);
-        let err = render::render_concept(&root, &index, "../secret.md").unwrap_err();
+        let err = render::render_concept(&root, &index, "../secret.md", &asset_url).unwrap_err();
         assert_eq!(classify(&err), StatusCode::BAD_REQUEST);
     }
 

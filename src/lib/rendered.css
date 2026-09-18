@@ -255,3 +255,81 @@
   white-space: pre-wrap;
   overflow-x: auto;
 }
+
+/* --- Embeds (ei-1) ----------------------------------------------------------
+   The shared Rust renderer (`render/embeds.rs`) emits, for every Embed
+   (`![alt](x.png)` / `![[x.png]]`) in a Concept body, ONE of:
+
+     <img class="embed-image" src=…>            resolved in-Bundle Attachment
+     <span class="embed-broken" data-broken>    unresolvable — visible, never fatal
+     <button class="embed-remote" data-embed-src>  http(s) — click-to-load
+     (nothing)                                  a `data:` URI
+
+   All three are inline-level on purpose: comrak wraps a lone image in a `<p>`,
+   and a block element there would close the paragraph early. These class names
+   are a contract with the editor's Embed widget — keep the two visuals in step.
+
+   A requested size arrives as an INLINE `style="width:…"`, never as an HTML
+   `width` attribute (the editor's dimension cache is keyed on natural
+   dimensions), so `height: auto` below is deliberately overridable by it. */
+.rendered .embed-image {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border-radius: var(--radius-sm, 4px);
+}
+
+/* Unresolvable Embed: the error visual, matching the broken-link vocabulary
+   (`a.internal-link.broken` above, and the editor's `cm-broken-link`) — the
+   danger token, dashed, and still showing WHAT was asked for so the typo is
+   findable. */
+.rendered .embed-broken {
+  display: inline-block;
+  padding: 0.05em 0.4em;
+  border: 1px dashed var(--danger, #c0392b);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--danger-soft, rgba(192, 57, 43, 0.08));
+  color: var(--danger, #c0392b);
+  font-size: 0.85em;
+  cursor: help;
+}
+
+/* Remote Embed: NEUTRAL, not an error — a remote image is a normal state, it is
+   just one the reader has to ask for. Nothing is fetched until this is clicked
+   (on the web shell the author and the reader are different people, so an
+   automatic load would fire a tracking pixel from the reader's browser and IP). */
+.rendered .embed-remote {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.2em 0.6em;
+  border: 1px dashed var(--border, #bbb);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-sunken, rgba(127, 127, 127, 0.08));
+  color: var(--text-muted, #777);
+  font: inherit;
+  font-size: 0.85em;
+  line-height: 1.6;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rendered .embed-remote:hover {
+  background: var(--hover, rgba(127, 127, 127, 0.15));
+  color: var(--text, inherit);
+}
+
+/* On paper a click-to-load affordance cannot be clicked; keep it visible (the
+   reader should know something is there) but drop the interactive styling. */
+@media print {
+  .rendered .embed-remote {
+    background: none;
+    cursor: default;
+  }
+
+  .rendered .embed-image {
+    break-inside: avoid;
+  }
+}
