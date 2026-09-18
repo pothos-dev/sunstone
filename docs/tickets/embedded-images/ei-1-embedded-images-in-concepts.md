@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: ready-for-human
 priority: 3
 ---
 
@@ -64,3 +64,25 @@ Settled in a grilling session; the reasoning that needed more than a line went i
 - **Rewrite asymmetry** → only the **markdown** rewrite path gains `!` handling. Extraction keeps dropping `!` (no Backlinks edge), and `sunstone-shared`'s wikilink scanner is untouched: `![[name.png]]` and `![[folder/name.png]]` resolve bundle-wide by name and suffix, so moving a Concept can never invalidate them. That asymmetry is deliberate and needs a comment at both sites, or someone will "fix" it back — the shared-scanner invariant in `wikilink.rs` survives intact.
 - **Non-image Embeds** → out of scope, and the interim behaviour turned out to be *nothing rendered*, not the literal text this decision originally predicted. `inlinePreview` hides the whole `Image` node regardless of target, so with upstream's `imageBlocks` gone a `![doc](a.pdf)` leaves no trace. That is consistent with the `data:` case rather than a special case, but it means content silently disappears — which raises the urgency of [al-1](/tickets/attachment-listing/al-1-non-image-attachments-listed-on-a-concept.md) from nice-to-have to a gap this ticket opens.
 - **CSP** → out of scope here, and an explicit AC on [ei-2](ei-2-theme-aware-svg-embeds.md) rather than a fourth ticket. ei-2's inlined author-controlled SVG is the first thing that genuinely needs one.
+
+## Comments
+
+**Built, blocked on one tooling step.** Seven slices landed across `60bec1d…af1fcea`.
+Three of the four gates are green — `cargo check`, `cargo test` (515 across the workspace)
+and `bun test src/lib` (632). `bun run check` has **9 errors, all in
+`src/lib/wasm/exports.ts`**, because `src/lib/wasm/pkg` predates the Embed kernel and
+`wasm-pack` is not installed on this machine.
+
+That is not only a typecheck failure. Until `bun run build:wasm` regenerates `pkg`,
+`scanEmbedsUtf16` is `undefined` at runtime and **no Embed renders in the editor at all**,
+so neither `tests/embed-render-caching.spec.ts` nor `tests/web-embeds.spec.ts` can pass —
+the latter's `webServer` also builds the SSR bundle from the same stale `pkg`. The web
+half was verified by hand against a real `sunstone-server` instead: `/api/attachment-paths`,
+`/api/render` name-resolving `![[wide.png]]`, and `/api/asset` serving 133 bytes of
+`64 x 16` PNG.
+
+To unblock: `sudo pacman -S wasm-pack`, then `bun run build:wasm && bun run check`, then
+both Playwright suites. The `wasm32-unknown-unknown` target is already installed.
+
+Two acceptance criteria are therefore unverified rather than done: the Playwright coverage,
+and the editor half of every rendering criterion.
