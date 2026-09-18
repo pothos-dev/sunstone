@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: done
 ---
 
 # ov-1: Re-vendor the OKF spec at v0.2 and record its new upstream home

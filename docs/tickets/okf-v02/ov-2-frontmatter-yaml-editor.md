@@ -1,5 +1,5 @@
 ---
-status: resolved
+status: done
 ---
 
 # ov-2: Edit Frontmatter as YAML

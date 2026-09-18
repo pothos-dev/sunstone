@@ -1,5 +1,5 @@
 ---
-status: needs-triage
+status: captured
 priority: 3
 blocked-by: [ei-1]
 ---

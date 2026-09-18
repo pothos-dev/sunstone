@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: ready
 priority: 2
 blocked-by: [ei-1]
 ---

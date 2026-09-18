@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: ready
 blocked-by: [ov-1, ov-2, ov-3, ov-10]
 ---
 

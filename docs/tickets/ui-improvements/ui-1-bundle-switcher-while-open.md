@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: ready
 ---
 
 # ui-1: Switch Bundles without restarting
