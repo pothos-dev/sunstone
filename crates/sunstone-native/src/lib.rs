@@ -11,6 +11,7 @@ pub mod bundle;
 pub mod config;
 pub mod git;
 pub mod index;
+pub mod mime;
 pub mod paths;
 pub mod render;
 pub mod rewrite;

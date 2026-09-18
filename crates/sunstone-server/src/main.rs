@@ -8,6 +8,8 @@
 //! - `GET /api/tree`                 → the recursive `TreeNode`
 //! - `GET /api/concept?path=<rel>`   → a Concept's raw markdown (string)
 //! - `GET /api/render?path=<rel>`    → rendered `{ html, frontmatter, outline }`
+//! - `GET /api/asset?path=<rel>`     → an Attachment's raw bytes (ADR-0011) —
+//!   the one route answering with bytes rather than JSON/SSE
 //! - `GET /api/search?q=<query>`     → `SearchHit[]` (bundle-wide full-text)
 //! - `GET /api/backlinks?path=<rel>` → source Concept paths linking to it
 //! - `GET /api/tags`                 → `TagCount[]` (tags + counts)
@@ -37,6 +39,7 @@ mod boot;
 mod conflict;
 mod config;
 mod history;
+mod routes_asset;
 mod routes_read;
 mod routes_write;
 mod sync;
@@ -257,6 +260,10 @@ fn router(state: Arc<ServerState>) -> Router {
         .route("/api/bundle-root", get(routes_read::bundle_root_handler))
         .route("/api/tree", get(routes_read::tree_handler))
         .route("/api/render", get(routes_read::render_handler))
+        // Attachment bytes (ADR-0011). Unauthenticated, exactly like
+        // `/api/concept` and `/api/render`: an Attachment is as readable as the
+        // Concept that embeds it.
+        .route("/api/asset", get(routes_asset::asset_handler))
         .route("/api/search", get(routes_read::search_handler))
         .route("/api/backlinks", get(routes_read::backlinks_handler))
         .route("/api/tags", get(routes_read::tags_handler))

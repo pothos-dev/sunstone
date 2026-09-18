@@ -1,3 +1,4 @@
+mod asset;
 mod cli;
 mod commands;
 mod pdf;
@@ -56,6 +57,12 @@ pub fn run() {
     let cli_path = opts.bundle;
 
     tauri::Builder::default()
+        // Attachment bytes reach the webview over `sunstone-asset://localhost/<rel>`
+        // (ADR-0011): resolved per request against the LIVE Session's Bundle
+        // root, confined by `bundle::resolve`. Deliberately NOT Tauri's built-in
+        // asset protocol — its scope is static configuration, and Sunstone picks
+        // its Bundle root at runtime and swaps it mid-process.
+        .register_asynchronous_uri_scheme_protocol(asset::SCHEME, asset::handle)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
