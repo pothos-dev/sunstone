@@ -297,6 +297,34 @@ export interface Backend {
    */
   savePdf(defaultName: string): Promise<string | null>;
 
+  // --- Attachments (slice: embedded-images) ---
+
+  /**
+   * The URL an `<img>` can load for the **Attachment** at `path` — the image
+   * file an Embed (`![alt](x.png)` / `![[x.png]]`) points at. `path` is
+   * bundle-relative, forward-slash, like every path on this seam; each shell
+   * supplies its own scheme (ADR-0011):
+   *   - `tauri.ts` — `sunstone-asset://localhost/<path>`, resolved per request
+   *     against the live `Session` in Rust;
+   *   - `http.ts`  — `/api/asset?path=…`, same-origin behind the `/api` proxy;
+   *   - `fake.ts`  — a `data:` URL from the in-memory fixture (the desktop
+   *     Playwright suite serves a static SPA with no file server).
+   *
+   * **SYNCHRONOUS on purpose — do NOT "fix" this to a Promise.** Every other
+   * method here is async because it does I/O; this one does none. It is pure
+   * string construction, and it is called from a CodeMirror decoration builder,
+   * which CANNOT await — exactly as `broken-links.ts` resolves link targets
+   * synchronously through the wasm `indexStore` rather than querying the
+   * backend per link. Making it async would force the Embed widget to render
+   * empty and patch itself in later, on every keystroke that rebuilds
+   * decorations.
+   *
+   * Total: it never throws and never checks existence. A path with no
+   * Attachment behind it still yields a URL; the miss surfaces as the `<img>`
+   * failing to load, which the widget renders as its error placeholder.
+   */
+  attachmentUrl(path: string): string;
+
   // --- External links (slice: open-external-links) ---
 
   /**

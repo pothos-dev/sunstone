@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { TreeNode } from '$lib/types';
+import { attachmentPaths } from './attachments';
 import { FILES, FOLDERS } from './store';
 import { buildTree, applyDelete, applyRename } from './tree';
 
@@ -46,6 +47,7 @@ describe('buildTree', () => {
       'codemirror.md',
       'complex-frontmatter.md',
       'duplicate-keys.md',
+      'embeds-demo.md',
       'index.md',
       'links-demo.md',
       'no-frontmatter.md',
@@ -65,6 +67,23 @@ describe('buildTree', () => {
 
     // Empty folder sorts among the dirs, before all root files.
     expect(childNames(root)).toEqual(['concepts', 'drafts', 'index.md', 'log.md']);
+  });
+
+  // Attachments (the fixture's embedded images) live in their own map in
+  // `./attachments`, NOT in `FILES` — precisely so the Explorer never lists an
+  // image. This guards that separation: the tree must contain no `assets` folder
+  // and nothing but `.md` leaves, however many Attachments the fixture seeds.
+  test('Attachments never reach the tree', () => {
+    const root = buildTree();
+    const walk = (node: TreeNode): string[] =>
+      (node.children ?? []).flatMap((c) => [c.path, ...walk(c)]);
+    const paths = walk(root);
+    expect(paths).not.toContain('assets');
+    expect(attachmentPaths().length).toBeGreaterThan(0);
+    for (const attachment of attachmentPaths()) expect(paths).not.toContain(attachment);
+    const files = (node: TreeNode): string[] =>
+      (node.children ?? []).flatMap((c) => (c.isDir ? files(c) : [c.path]));
+    expect(files(root).every((p) => p.endsWith('.md'))).toBe(true);
   });
 
   test('files are leaf nodes without a children array', () => {

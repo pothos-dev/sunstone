@@ -20,6 +20,12 @@ import type {
 const FILE_CHANGED_EVENT = 'file-changed';
 
 /**
+ * Sunstone's custom URI scheme for Attachment bytes (ADR-0011). Matches the
+ * scheme registered by `register_asynchronous_uri_scheme_protocol` in Rust.
+ */
+const ASSET_SCHEME = 'sunstone-asset';
+
+/**
  * Real Backend implementation, talking to Rust over Tauri IPC.
  * Command names match the `#[tauri::command]` functions registered in lib.rs.
  */
@@ -178,6 +184,21 @@ export const tauriBackend: Backend = {
   // per-platform webview PDF export live in Rust (`save_pdf`).
   savePdf(defaultName: string): Promise<string | null> {
     return invoke<string | null>('save_pdf', { defaultName });
+  },
+
+  // Attachment bytes reach the webview over Sunstone's OWN URI scheme (ADR-0011),
+  // registered in Rust and resolved per request against the live `Session` — not
+  // over IPC, and not over Tauri's built-in `asset:` protocol (whose scope is
+  // static, while Sunstone's Bundle root is chosen at runtime). So there is
+  // nothing to `invoke` here: the URL is pure string construction, which is also
+  // what lets this method be synchronous for the decoration builder.
+  //
+  // The shape mirrors Tauri's own `convertFileSrc`: the WHOLE bundle-relative
+  // path is percent-encoded into one URL path segment (so `a/b.png` becomes
+  // `a%2Fb.png`), and the Rust scheme handler percent-decodes it once to recover
+  // the path it hands to `bundle::resolve`.
+  attachmentUrl(path: string): string {
+    return `${ASSET_SCHEME}://localhost/${encodeURIComponent(path)}`;
   },
 
   // WebKitGTK ignores `window.open`; hand the URL to the OS via the opener

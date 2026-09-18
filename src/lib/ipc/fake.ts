@@ -22,6 +22,7 @@ import {
   isSafePath,
   folderExists,
 } from './fake/store';
+import { ATTACHMENTS, fakeAttachmentUrl } from './fake/attachments';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
 import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
@@ -56,6 +57,9 @@ import { loadBundleState, saveBundleState } from './bundleState';
  *   - `store`   — the shared mutable `FILES`/`FOLDERS`/`COMMITTED_FILES` state
  *                 (exported as live bindings, so every module shares one copy)
  *                 plus the path predicates over them;
+ *   - `attachments` — the seeded Attachments (path -> `data:` URL), a list kept
+ *                 SEPARATE from `FILES` so images never reach the tree or
+ *                 `listConceptPaths`;
  *   - `tree`    — TreeNode construction + path-mutating rename/delete;
  *   - `frontmatter` — the test-only `stripTagsFromFrontmatter` affordance (the
  *                 index-parse kernels are wasm FREE exports, `$lib/wasm/exports`);
@@ -191,6 +195,9 @@ if (typeof window !== 'undefined') {
     simulateSyncNotice,
     clearAllTags,
     files: FILES,
+    // The seeded Attachments, so a spec can drive/inspect Embed cases without
+    // reaching into the module graph (images are NOT in `files`, by design).
+    attachments: ATTACHMENTS,
   };
 }
 
@@ -475,6 +482,18 @@ export const fakeBackend: Backend = {
     if (content === undefined) throw new Error(`no such concept: ${path}`);
     await ensureIndexReady(); // the fake render derives outline/critic/citations from wasm.
     return renderConceptFake(content);
+  },
+
+  // Attachments (slice: embedded-images). The desktop Playwright suite serves a
+  // STATIC SPA over this backend — there is no file server behind it — so a
+  // `sunstone-asset://` or `/api/asset` URL would resolve to nothing. The fake
+  // therefore hands back a `data:` URL carrying the fixture bytes, which still
+  // honours ADR-0011 (a URL crosses the seam, never bytes) and lets a spec
+  // assert an Embed genuinely LOADED, not merely that an `<img>` exists. An
+  // unseeded path yields an unservable URL rather than an exception — see
+  // `fakeAttachmentUrl`.
+  attachmentUrl(path: string): string {
+    return fakeAttachmentUrl(path);
   },
 
   // Running under plain Chromium (dev / Playwright): the browser-shell

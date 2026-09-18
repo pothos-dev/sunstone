@@ -273,6 +273,58 @@ predates any review of the document.
 An unrelated closing paragraph.
 `,
 
+  // A Concept exercising EMBEDS (slice: embedded-images) against the fixture
+  // Attachments in `./attachments` — one case per line so a Playwright spec can
+  // address each by its line text. Covered: an Embed alone on its line (block
+  // placement) via a bundle-absolute path; an Embed mid-paragraph (inline, in
+  // flow) via a relative path; a name-resolved `![[mark.svg]]`; both sized forms
+  // (`![[wide.png|120]]` and `![120](…)`); an unresolvable Embed; and a remote
+  // Embed, which must show the click-to-load affordance and fetch NOTHING.
+  //
+  // Deliberately carries NO `tags` and only already-used frontmatter keys +
+  // `type: concept`, so the exact tag/type/key counts other specs assert on are
+  // untouched. It links to no Concept either, so the backlink graph is unchanged
+  // (an Embed is not a link — `links.ts` drops the `!` form).
+  'concepts/embeds-demo.md': `---
+type: concept
+title: Embeds Demo
+description: Exercises embedded images (Attachments) in every placement.
+---
+
+# Embeds Demo
+
+An Embed alone on its line renders as a block widget below it (bundle-absolute):
+
+![dot](/assets/dot.png)
+
+An Embed among text renders inline: see ![wide](./assets/wide.png) here, in flow
+with the surrounding sentence.
+
+A name-resolved Embed finds the Attachment anywhere in the Bundle:
+
+![[mark.svg]]
+
+A sized Embed requests a width; the \`|\` suffix is a size, never an alias:
+
+![[wide.png|120]]
+
+The markdown form takes a size too, consumed from the alt text:
+
+![120](./assets/wide.png)
+
+An unresolvable Embed shows an error placeholder and breaks nothing after it:
+
+![[nope.png]]
+
+A remote Embed shows a click-to-load affordance and fetches nothing until
+clicked:
+
+![remote](https://example.com/x.png)
+
+Closing prose, after every Embed above, proves nothing swallowed the rest of the
+Concept.
+`,
+
   'concepts/editor/live-preview.md': `---
 type: concept
 title: Live Preview
@@ -312,8 +364,11 @@ Inline image (data URI — renders fully under the fake backend):
 
 ![green dot](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMjgiIGZpbGw9IiMyZWNjNzEiLz48L3N2Zz4=)
 
-Local image (resolved relative to the Concept; the widget renders even if the
-src 404s under the fake backend — there is no static file server here):
+Local image — an Embed of the Attachment \`concepts/editor/assets/diagram.png\`,
+resolved relative to this Concept. It LOADS under the fake backend: there is
+still no static file server here, but \`attachmentUrl\` resolves an Attachment to
+a \`data:\` URL from the fixture (see \`./attachments\`), so the widget shows real
+pixels rather than a broken image:
 
 ![diagram](./assets/diagram.png)
 

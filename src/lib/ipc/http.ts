@@ -432,6 +432,15 @@ export const httpBackend: Backend = {
     return getJson<RenderPayload>(`/api/render?path=${encodeURIComponent(path)}`);
   },
 
+  // Attachment bytes come from the server's `GET /api/asset` (ADR-0011), the
+  // same relative, same-origin `/api/...` shape every other read uses — so it
+  // rides the `src/hooks.server.ts` proxy and needs no CORS. Unlike the other
+  // methods this one only BUILDS the URL (the browser does the fetching, as the
+  // `<img>` loads), which is why it is synchronous; see `Backend.attachmentUrl`.
+  attachmentUrl(path: string): string {
+    return `/api/asset?path=${encodeURIComponent(path)}`;
+  },
+
   // The web app already runs in a browser: the browser-shell fallbacks shared
   // with the fake backend (see `./browserShell`). (The web viewer opens its own
   // chrome-free print tab directly, so `openPrintWindow` is interface parity.)
