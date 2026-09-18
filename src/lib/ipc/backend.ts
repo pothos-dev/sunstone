@@ -300,6 +300,30 @@ export interface Backend {
   // --- Attachments (slice: embedded-images) ---
 
   /**
+   * Every **Attachment** path in the Bundle (bundle-relative, forward-slash,
+   * sorted). An Attachment (docs/GLOSSARY.md) is a non-`.md` file stored in the
+   * Bundle — today an image file — and it is what an Embed (`![alt](x.png)` /
+   * `![[x.png]]`) points at.
+   *
+   * The Embed decoration seeds a SYNCHRONOUS Attachment corpus from this, for
+   * the same reason `listConceptPaths` exists: CodeMirror decorations cannot
+   * await, so name-resolving `![[name.png]]` needs the whole candidate set in
+   * hand, not a per-Embed query. It is refreshed alongside the concept-path set
+   * on `onFileChanged` and on Concept switch (`$lib/state/index.svelte.ts`).
+   *
+   * **A separate list, NOT a filter over `listConceptPaths`.** The two corpora
+   * are disjoint by construction, in Rust (`Index::attachment_paths` vs
+   * `Index::concept_paths`) and in the fake alike. `listConceptPaths` also feeds
+   * the Explorer tree, Quick nav, the Wikilink candidate set and the wasm
+   * `BundleIndex`, and every one of those must stay `.md`-only; a combined list
+   * would make that hold only as long as five separate consumers each remember
+   * to filter. Keeping the lists apart makes "no Attachment in the tree" true by
+   * construction. See the Attachment-index note in
+   * `crates/sunstone-native/src/index.rs`.
+   */
+  listAttachmentPaths(): Promise<string[]>;
+
+  /**
    * The URL an `<img>` can load for the **Attachment** at `path` — the image
    * file an Embed (`![alt](x.png)` / `![[x.png]]`) points at. `path` is
    * bundle-relative, forward-slash, like every path on this seam; each shell

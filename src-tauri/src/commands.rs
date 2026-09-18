@@ -177,6 +177,20 @@ pub(crate) fn list_concept_paths(session: State<'_, Arc<Session>>) -> Result<Vec
     Ok(index.concept_paths())
 }
 
+/// Every **Attachment** path in the Bundle index (ei-1), sorted. A SEPARATE
+/// list from `list_concept_paths`, exactly as the index keeps them separate:
+/// the frontend seeds its synchronous Embed-resolution corpus from this one,
+/// while the `.md`-only concept list keeps feeding the tree, Quick nav and the
+/// wasm `BundleIndex`.
+#[tauri::command]
+pub(crate) fn list_attachment_paths(
+    session: State<'_, Arc<Session>>,
+) -> Result<Vec<String>, String> {
+    let state = session.current()?;
+    let index = state.read_index()?;
+    Ok(index.attachment_paths())
+}
+
 /// Sources linking TO `path` (backlinks). Used by the backlinks panel (slice 7).
 #[tauri::command]
 pub(crate) fn backlinks(session: State<'_, Arc<Session>>, path: String) -> Result<Vec<String>, String> {

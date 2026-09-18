@@ -22,7 +22,7 @@ import {
   isSafePath,
   folderExists,
 } from './fake/store';
-import { ATTACHMENTS, fakeAttachmentUrl } from './fake/attachments';
+import { ATTACHMENTS, attachmentPaths, fakeAttachmentUrl } from './fake/attachments';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
 import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
@@ -374,6 +374,12 @@ export const fakeBackend: Backend = {
 
   async listConceptPaths(): Promise<string[]> {
     return conceptPaths();
+  },
+
+  // The seeded Attachments, from their OWN map — `FILES` is `.md`-only by
+  // construction, so this can never be a filter over `conceptPaths()`.
+  async listAttachmentPaths(): Promise<string[]> {
+    return attachmentPaths();
   },
 
   async backlinks(path: string): Promise<string[]> {

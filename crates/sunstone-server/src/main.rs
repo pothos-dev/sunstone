@@ -277,6 +277,13 @@ fn router(state: Arc<ServerState>) -> Router {
             "/api/concept-paths",
             get(routes_read::concept_paths_handler),
         )
+        // The Attachment counterpart of `/api/concept-paths` — a separate list,
+        // not a filter (the index keeps the two corpora apart). Unauthenticated
+        // for the same reason `/api/asset` is.
+        .route(
+            "/api/attachment-paths",
+            get(routes_read::attachment_paths_handler),
+        )
         .route("/api/events", get(routes_read::events_handler))
         // Git history (Spec 2 §11) — both gated by the `AuthedUser` extractor,
         // because `file-at-rev` returns the full text of any path at any

@@ -129,6 +129,12 @@ export const tauriBackend: Backend = {
     return invoke<string[]>('list_concept_paths');
   },
 
+  // The Attachment counterpart of `list_concept_paths` — a separate Rust
+  // command over the index's separate Attachment corpus (see `Backend`).
+  listAttachmentPaths(): Promise<string[]> {
+    return invoke<string[]>('list_attachment_paths');
+  },
+
   backlinks(path: string): Promise<string[]> {
     return invoke<string[]>('backlinks', { path });
   },

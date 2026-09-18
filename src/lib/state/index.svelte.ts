@@ -68,8 +68,7 @@ class IndexStore {
 
   /**
    * Every Attachment path (bundle-relative), sorted — the name model's
-   * candidate set. `[]` before the first refresh or on a backend without
-   * Attachment listing.
+   * candidate set. `[]` before the first refresh.
    */
   attachmentPaths(): string[] {
     return this.#attachments.paths;
@@ -125,40 +124,26 @@ class IndexStore {
     // handle and every reader no-ops (silent degrade).
     const wasm = await ensureWasm();
     try {
-      const paths = await backend.listConceptPaths();
+      // Both corpora in one round-trip pair: the `.md`-only concept set that
+      // backs the handle, and the Attachment set held beside it (they are two
+      // separate seam methods because they are two separate indexes — see
+      // `Backend.listAttachmentPaths`).
+      const [paths, attachments] = await Promise.all([
+        backend.listConceptPaths(),
+        backend.listAttachmentPaths(),
+      ]);
       // Swap the handle: free the OLD one before building the new (ADR 0006
       // §4), only once we have a fresh set — so a backend error leaves the
-      // previous handle untouched.
+      // previous handle AND the previous Attachment corpus untouched.
       this.#handle?.free();
       this.#handle = wasm ? new wasm.BundleIndex(paths) : null;
-      this.#attachments = attachmentCorpus(await loadAttachmentPaths());
+      this.#attachments = attachmentCorpus(attachments);
       this.version += 1;
     } catch {
       // Index unavailable: leave the previous handle in place. Broken-link
       // styling is best-effort and must never block; a stale set just means a
       // link may briefly look (un)broken until the next refresh.
     }
-  }
-}
-
-/**
- * The Attachment path list from the backend, or `[]`.
- *
- * Feature-detected on purpose: `listAttachmentPaths` is the LAST piece of the
- * Attachment seam to land (the native index and the fake both hold the list
- * already), and this store must not break the shells that predate it. Its own
- * try/catch keeps an Attachment-listing failure from taking the concept-path
- * refresh — the far more important half — down with it.
- */
-async function loadAttachmentPaths(): Promise<string[]> {
-  const source = backend as { listAttachmentPaths?: () => Promise<string[]> };
-  if (typeof source.listAttachmentPaths !== 'function') return [];
-  try {
-    return await source.listAttachmentPaths();
-  } catch {
-    // No Attachments listed: Embeds resolve to `null` and render their error
-    // placeholder, exactly as an unresolvable Embed does. Never throws.
-    return [];
   }
 }
 

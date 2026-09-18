@@ -373,6 +373,12 @@ export const httpBackend: Backend = {
   listConceptPaths(): Promise<string[]> {
     return getJson<string[]>('/api/concept-paths');
   },
+  // The Attachment counterpart of `/api/concept-paths`: its own route over the
+  // index's own Attachment corpus, not a filter over the concept list (see
+  // `Backend.listAttachmentPaths`). Unauthenticated like every other read.
+  listAttachmentPaths(): Promise<string[]> {
+    return getJson<string[]>('/api/attachment-paths');
+  },
   backlinks(path: string): Promise<string[]> {
     return getJson<string[]>(`/api/backlinks?path=${encodeURIComponent(path)}`);
   },

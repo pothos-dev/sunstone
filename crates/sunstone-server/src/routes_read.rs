@@ -1,7 +1,7 @@
 //! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
 //! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! and `/api/events` (SSE), plus the shared `ApiError`
+//! `/api/attachment-paths`, and `/api/events` (SSE), plus the shared `ApiError`
 //! HTTP-boundary error type and its `sunstone-native` string classifier.
 //!
 //! Split out of `main.rs` verbatim (ticket: split main.rs) — no behavior
@@ -158,6 +158,21 @@ pub(crate) async fn concept_paths_handler(
 ) -> Result<Json<Vec<String>>, ApiError> {
     let index = read_index(&state)?;
     Ok(Json(index.concept_paths()))
+}
+
+/// Every **Attachment** path in the Bundle index (ei-1), sorted. Deliberately a
+/// SEPARATE route from `/api/concept-paths` rather than a flag on it, mirroring
+/// the two separate corpora in the index: the concept list stays `.md`-only for
+/// the tree / Quick nav / Wikilink consumers, and this one is the Embed
+/// resolver's candidate set.
+///
+/// Unauthenticated, exactly like `/api/concept-paths` and `/api/asset`: it is a
+/// list of file names in a Bundle whose bytes are already served unauthenticated.
+pub(crate) async fn attachment_paths_handler(
+    State(state): State<Arc<ServerState>>,
+) -> Result<Json<Vec<String>>, ApiError> {
+    let index = read_index(&state)?;
+    Ok(Json(index.attachment_paths()))
 }
 
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.
@@ -361,6 +376,28 @@ mod tests {
             "{}",
             payload.html
         );
+    }
+
+    /// What `/api/attachment-paths` serves, over a real on-disk Bundle: the
+    /// Attachment corpus, sorted, and DISJOINT from `/api/concept-paths`. The
+    /// handler itself is a three-line wrapper over this; the contract worth
+    /// pinning is that the two routes never return each other's files (the
+    /// `.md`-only concept list feeds the tree, Quick nav and wikilinks).
+    #[test]
+    fn the_attachment_paths_route_is_a_separate_corpus_from_concept_paths() {
+        let root = temp_bundle(); // note.md + sub/deep.md
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("assets/logo.png"), b"\x89PNG").unwrap();
+        std::fs::write(root.join("sub/mark.svg"), b"<svg/>").unwrap();
+        let index = sunstone_native::index::Index::build(&root);
+
+        assert_eq!(
+            index.attachment_paths(),
+            vec!["assets/logo.png".to_string(), "sub/mark.svg".to_string()]
+        );
+        let concepts = index.concept_paths();
+        assert!(concepts.contains(&"note.md".to_string()));
+        assert!(!concepts.iter().any(|p| p.ends_with(".png") || p.ends_with(".svg")));
     }
 
     #[test]
