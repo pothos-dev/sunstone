@@ -178,7 +178,7 @@
     if (el) void hydrateMermaid(el, resolved);
   });
 
-  // --- Remote Embeds: click-to-load (ei-1) ---
+  // --- Remote Embeds: click-to-load (af-1) ---
   // The renderer withholds a remote image's `src` so opening a Concept fetches
   // nothing; this turns the placeholder into a real <img> on click.
   $effect(() => {

@@ -25,7 +25,7 @@
 //!
 //! **Embeds** (`![alt](x.png)` / `![[x.png]]`) point at an Attachment rather than
 //! a Concept and resolve against a SEPARATE index; they get their `src` from a
-//! per-shell URL mapper. That whole pass lives in `embeds.rs` (ei-1, ADR-0011).
+//! per-shell URL mapper. That whole pass lives in `embeds.rs` (af-1, ADR-0011).
 //!
 //! Mermaid fenced blocks are left as inert `<pre><code>` source here; their
 //! client-side hydration is a later slice.
@@ -81,7 +81,7 @@ pub struct RenderPayload {
 /// other read routes) to a [`RenderPayload`], resolving links against `index`.
 ///
 /// `asset_url` maps a bundle-relative **Attachment** path to a URL the calling
-/// shell can serve (ei-1, ADR-0011). It is a MAPPER rather than the prefix
+/// shell can serve (af-1, ADR-0011). It is a MAPPER rather than the prefix
 /// ADR-0011 first proposed, because the two shells' URL shapes are not
 /// prefix-compatible — `sunstone-asset://localhost/<whole path percent-encoded>`
 /// on the desktop versus `/api/asset?path=<encoded>` on the web. See
@@ -135,7 +135,7 @@ pub fn render_body(
 
     // 0a. Rewrite every Embed (`![alt](x.png)` / `![[x.png]]`) to a marker image
     //     whose destination indexes a side table of resolved render decisions,
-    //     substituted back after comrak (ei-1). FIRST, before the sentinel
+    //     substituted back after comrak (af-1). FIRST, before the sentinel
     //     passes: those rewrite bytes, and an Embed's alt text must not carry a
     //     private-use sentinel that a later pass would expand into HTML tags
     //     inside an attribute value. It is also the only way `![[ … ]]` reaches
@@ -525,7 +525,7 @@ mod tests {
         assert!(p.html.contains("<code>"));
     }
 
-    // --- Embeds (ei-1) ------------------------------------------------------
+    // --- Embeds (af-1) ------------------------------------------------------
 
     #[test]
     fn a_markdown_embed_gets_a_mapped_src() {
@@ -645,7 +645,7 @@ mod tests {
 
     #[test]
     fn a_non_image_embed_keeps_todays_literal_rendering() {
-        // Out of scope until `al-1`.
+        // Out of scope until `af-3`.
         let p = render_with("![d](notes.pdf)", "a.md", &["a.md"], &["notes.pdf"]);
         assert!(p.html.contains(r#"<img src="notes.pdf""#), "{}", p.html);
         assert!(!p.html.contains("embed-image"));

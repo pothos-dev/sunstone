@@ -1,5 +1,5 @@
 /**
- * The one `<img>` builder both Embed surfaces use (ei-1).
+ * The one `<img>` builder both Embed surfaces use (af-1).
  *
  * An Embed (`![alt](x.png)` / `![[x.png]]`) becomes an image in two places that
  * otherwise share no code: the editor's `embedBlocks` CodeMirror widget

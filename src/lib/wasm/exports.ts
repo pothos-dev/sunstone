@@ -229,7 +229,7 @@ export function rewriteAnchors(
     : { content, count: 0 };
 }
 
-// --- Free Embed exports (ei-1) ---------------------------------------------
+// --- Free Embed exports (af-1) ---------------------------------------------
 //
 // The Embed kernel — detection, size parsing and the two resolution models —
 // single-sourced in `sunstone_shared::embed`, so the editor's Embed widgets, the
@@ -268,7 +268,7 @@ export function scanEmbedsUtf16(body: string): Embed[] {
 /**
  * True when `path`'s extension is one Sunstone renders as an image (`png`,
  * `jpg`/`jpeg`, `gif`, `webp`, `avif`, `bmp`, `svg`, case-insensitively). A
- * non-image Attachment keeps its literal rendering until `al-1`.
+ * non-image Attachment keeps its literal rendering until `af-3`.
  *
  * The degraded path inlines the same extension list, so an Embed is never
  * rendered as an image on the strength of a wasm miss (and never silently

@@ -1,5 +1,5 @@
 /**
- * Click-to-load for REMOTE Embeds in server-rendered Concept HTML (ei-1,
+ * Click-to-load for REMOTE Embeds in server-rendered Concept HTML (af-1,
  * ADR-0011).
  *
  * The shared Rust renderer never gives an `http(s)` Embed a real `src`: it emits

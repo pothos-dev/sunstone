@@ -131,7 +131,7 @@
     return () => el.removeEventListener('click', followLinks);
   });
 
-  // Remote Embeds are click-to-load here too (ei-1): the preview is a live
+  // Remote Embeds are click-to-load here too (af-1): the preview is a live
   // webview before it is a sheet of paper, so a reader can pull one in before
   // printing — and, exactly as in the viewer, nothing is fetched until they do.
   $effect(() => {

@@ -1,4 +1,4 @@
-//! The **Embed** pass of the SSR render (ei-1, ADR-0010/ADR-0011).
+//! The **Embed** pass of the SSR render (af-1, ADR-0010/ADR-0011).
 //!
 //! An Embed (`![alt](path.png)` / `![[name.png]]`) points at an **Attachment** —
 //! a non-`.md` file in the Bundle. comrak emits the author's raw relative `src`
@@ -45,7 +45,7 @@
 //! | in-Bundle image that does not | `<span class="embed-broken" data-broken="true">` |
 //! | `http:` / `https:` | `<button class="embed-remote">` — click-to-load, never auto-fetched |
 //! | `data:` | nothing at all |
-//! | any other `scheme:`, or a non-image extension | left exactly as the author wrote it (out of scope until `al-1`) |
+//! | any other `scheme:`, or a non-image extension | left exactly as the author wrote it (out of scope until `af-3`) |
 //!
 //! The remote case is the one with teeth: on the web shell the author and the
 //! reader are different people, so opening a Concept must not fire a tracking
@@ -108,7 +108,7 @@ fn size_style(width: Option<u32>, height: Option<u32>) -> Option<String> {
 ///
 /// * `source_path` — the embedding Concept, for relative path resolution;
 /// * `attachments` — every Attachment path in the Bundle (the separate index
-///   ei-1 keeps apart from `all_paths`), used BOTH to resolve `![[name.png]]` by
+///   af-1 keeps apart from `all_paths`), used BOTH to resolve `![[name.png]]` by
 ///   name and to decide whether a path-resolved Embed actually exists;
 /// * `asset_url` — the shell's bundle-relative-path → URL mapper.
 ///
@@ -145,7 +145,7 @@ pub(super) fn embeds_to_markers(
             EmbedTargetKind::Local => {
                 if !embed::is_image_path(&e.target) {
                     // A non-image Attachment (and a `![[concept]]` transclusion)
-                    // keeps today's literal rendering until `al-1`.
+                    // keeps today's literal rendering until `af-3`.
                     None
                 } else {
                     let resolved = match e.kind {
@@ -310,7 +310,7 @@ mod tests {
 
     #[test]
     fn a_non_image_embed_is_left_untouched() {
-        // Out of scope until `al-1`: a non-image Attachment and a `![[concept]]`
+        // Out of scope until `af-3`: a non-image Attachment and a `![[concept]]`
         // transclusion both keep today's literal rendering.
         let (out, table) = markers("![d](notes.pdf) ![[other]]", "a.md", &["notes.pdf"]);
         assert_eq!(out, "![d](notes.pdf) ![[other]]");

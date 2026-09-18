@@ -52,7 +52,7 @@ describe('outboundLinks — wikilinks', () => {
   });
 
   test('a markdown Embed of a Concept path still creates no edge', () => {
-    // The extraction half of the deliberate ei-1 asymmetry: even when the Embed
+    // The extraction half of the deliberate af-1 asymmetry: even when the Embed
     // target IS a Concept, `!` drops it. The plain link beside it still counts.
     const out = outboundLinks(
       'index.md',
@@ -120,7 +120,7 @@ describe('planRewrites — wikilinks', () => {
   });
 });
 
-describe('planRewrites — Embeds (the ei-1 `!`-asymmetry)', () => {
+describe('planRewrites — Embeds (the af-1 `!`-asymmetry)', () => {
   // Same snapshot/restore harness as above: these tests drive the LIVE FILES.
   let snapshot: Record<string, string>;
   const setFiles = (files: Record<string, string>) => {

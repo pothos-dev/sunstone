@@ -20,7 +20,7 @@ import {
 } from './embedPlan';
 
 // ---------------------------------------------------------------------------
-// Embed rendering (slice: embedded-images, ADR-0010)
+// Embed rendering (slice: attachment-files, ADR-0010)
 //
 // `embedBlocks()` is Sunstone's replacement for atomic-editor's `imageBlocks()`,
 // which is REMOVED from the extension list (`extensions.ts`) so nothing

@@ -1,10 +1,10 @@
 ---
 status: captured
 priority: 3
-blocked-by: [ei-1]
+blocked-by: [af-1]
 ---
 
-# al-1: Non-image Attachments listed on a Concept
+# af-3: Non-image Attachments listed on a Concept
 
 **What to build:** a Concept that **Embeds** a non-image **[Attachment](/GLOSSARY.md)** —
 `![[report.pdf]]`, `![notes](./notes.csv)` — shows it in a list at the bottom of the
@@ -12,13 +12,13 @@ Concept instead of rendering the raw Embed text, and opening an entry hands the 
 OS default application (desktop) or downloads it (web). The list appears in `editing`,
 `read`, the web view and the print/PDF export.
 
-[ei-1](/tickets/embedded-images/ei-1-embedded-images-in-concepts.md) built everything this
+[af-1](/tickets/attachment-files/af-1-attachment-files-in-concepts.md) built everything this
 needs and restricted itself to images: the URL-returning `Backend` method, the desktop URI
 scheme, `GET /api/asset`, the separate Attachment index, the Embed parser covering both
 syntaxes, and the path confinement. This ticket is a second presentation over that seam,
 not a second seam.
 
-Note the `blocked-by` is real: until ei-1 lands, a non-image Embed keeps rendering as
+Note the `blocked-by` is real: until af-1 lands, a non-image Embed keeps rendering as
 literal text, which is the current behaviour and is fine.
 
 - [ ] A non-image Embed no longer renders as raw `![[ … ]]` or `![ … ]( … )` text

@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
 /**
- * Slice: embedded-images (ei-1, ADR-0010) — the widget-reuse guarantee.
+ * Slice: attachment-files (af-1, ADR-0010) — the widget-reuse guarantee.
  *
  * The Embed field rebuilds its decoration set on every doc change AND every
  * selection change, so the widget for an untouched image is reconstructed

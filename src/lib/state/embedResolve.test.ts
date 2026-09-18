@@ -1,4 +1,4 @@
-// Unit tests for Embed resolution over the Attachment corpus (ei-1).
+// Unit tests for Embed resolution over the Attachment corpus (af-1).
 //
 // These pin the COMPOSITION `indexStore.resolveEmbed` performs — which model
 // runs, what the name model is given, and when `exists` is false — by injecting

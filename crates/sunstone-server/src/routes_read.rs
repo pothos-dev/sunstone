@@ -71,7 +71,7 @@ pub(crate) async fn render_handler(
 }
 
 /// The web shell's Attachment-URL mapper, handed to the shared renderer so an
-/// Embed's `src` is fetchable from the SSR'd page (ei-1, ADR-0011).
+/// Embed's `src` is fetchable from the SSR'd page (af-1, ADR-0011).
 ///
 /// The shape is `routes_asset.rs`'s — `/api/asset?path=<percent-encoded>` — and
 /// must stay identical to `http.ts`'s `attachmentUrl`. Relative and same-origin,
@@ -160,7 +160,7 @@ pub(crate) async fn concept_paths_handler(
     Ok(Json(index.concept_paths()))
 }
 
-/// Every **Attachment** path in the Bundle index (ei-1), sorted. Deliberately a
+/// Every **Attachment** path in the Bundle index (af-1), sorted. Deliberately a
 /// SEPARATE route from `/api/concept-paths` rather than a flag on it, mirroring
 /// the two separate corpora in the index: the concept list stays `.md`-only for
 /// the tree / Quick nav / Wikilink consumers, and this one is the Embed

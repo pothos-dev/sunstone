@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Embed lightbox (slice: embedded-images, ADR-0010)
+// Embed lightbox (slice: attachment-files, ADR-0010)
 //
 // In `read` mode the click gesture on an Embed is free — the source is
 // unreachable and caret placement is meaningless — so ADR-0010 spends it on a

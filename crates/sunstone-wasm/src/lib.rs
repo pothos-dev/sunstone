@@ -294,7 +294,7 @@ pub fn rewrite_anchors(
     AnchorRewrite { content, count }
 }
 
-// --- Free Embed exports (ei-1) ---------------------------------------------
+// --- Free Embed exports (af-1) ---------------------------------------------
 //
 // The Embed kernel: detection + size parsing + the two resolution models, all
 // single-sourced in `sunstone_shared::embed` so the editor's `embedBlocks`
@@ -321,7 +321,7 @@ pub fn scan_embeds_utf16(body: String) -> Vec<Embed> {
 
 /// True when `path`'s extension is one Sunstone renders as an image
 /// (`sunstone_shared::embed::IMAGE_EXTENSIONS`, case-insensitive). A non-image
-/// Attachment keeps its literal rendering until `al-1`.
+/// Attachment keeps its literal rendering until `af-3`.
 #[wasm_bindgen(js_name = isImageAttachment)]
 pub fn is_image_attachment(path: String) -> bool {
     embed::is_image_path(&path)

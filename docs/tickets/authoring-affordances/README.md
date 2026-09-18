@@ -28,5 +28,5 @@ Decisions that bind the tickets here:
   one — the _Avoid_ entries narrow rather than vanish.
 
 Out of scope: visual redesign and theming, a block-insert / slash-command menu,
-image or diagram authoring (see the `embedded-images` effort), and anything
+image or diagram authoring (see the `attachment-files` effort), and anything
 that changes the Bundle's contents beyond the open Concept's body.

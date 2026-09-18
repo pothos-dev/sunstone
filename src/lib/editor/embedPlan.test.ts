@@ -255,7 +255,7 @@ describe('planEmbeds — render state', () => {
     }
   });
 
-  test('a non-image Attachment gets no widget (out of scope until al-1)', () => {
+  test('a non-image Attachment gets no widget (out of scope until af-3)', () => {
     expect(
       planEmbeds([embedIn(src, '![a](a.png)', { target: 'report.pdf' })], doc, options()),
     ).toEqual([]);

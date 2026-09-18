@@ -7,7 +7,7 @@
 //!
 //! Deliberately a `match` and not a MIME-sniffing crate: the recognised set is
 //! the Embed extension list from
-//! [ei-1](/tickets/embedded-images/ei-1-embedded-images-in-concepts.md)
+//! [af-1](/tickets/attachment-files/af-1-attachment-files-in-concepts.md)
 //! (`png`, `jpg`/`jpeg`, `gif`, `webp`, `avif`, `bmp`, `svg`), matched
 //! case-insensitively. Anything else is served as opaque bytes, which is both
 //! honest and inert in an `<img>`.

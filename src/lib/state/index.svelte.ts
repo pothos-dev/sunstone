@@ -39,7 +39,7 @@ class IndexStore {
   #handle: BundleIndex | null = null;
 
   /**
-   * The **Attachment** corpus (ei-1), held BESIDE the handle's concept-path set
+   * The **Attachment** corpus (af-1), held BESIDE the handle's concept-path set
    * rather than inside it. An Attachment is never a Concept: folding the two
    * together would put images into quick-nav, the Explorer tree and the
    * structural bundle-root inference (see the Attachment-index note in

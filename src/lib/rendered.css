@@ -256,7 +256,7 @@
   overflow-x: auto;
 }
 
-/* --- Embeds (ei-1) ----------------------------------------------------------
+/* --- Embeds (af-1) ----------------------------------------------------------
    The shared Rust renderer (`render/embeds.rs`) emits, for every Embed
    (`![alt](x.png)` / `![[x.png]]`) in a Concept body, ONE of:
 

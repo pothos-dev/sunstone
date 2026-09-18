@@ -177,7 +177,7 @@ pub(crate) fn list_concept_paths(session: State<'_, Arc<Session>>) -> Result<Vec
     Ok(index.concept_paths())
 }
 
-/// Every **Attachment** path in the Bundle index (ei-1), sorted. A SEPARATE
+/// Every **Attachment** path in the Bundle index (af-1), sorted. A SEPARATE
 /// list from `list_concept_paths`, exactly as the index keeps them separate:
 /// the frontend seeds its synchronous Embed-resolution corpus from this one,
 /// while the `.md`-only concept list keeps feeding the tree, Quick nav and the
@@ -288,7 +288,7 @@ pub(crate) fn render_concept(session: State<'_, Arc<Session>>, path: String) -> 
 }
 
 /// The desktop shell's Attachment-URL mapper, handed to the shared renderer so
-/// an Embed's `src` is fetchable from the print/PDF window (ei-1, ADR-0011).
+/// an Embed's `src` is fetchable from the print/PDF window (af-1, ADR-0011).
 ///
 /// The shape is `asset.rs`'s, and it must stay byte-identical to `tauri.ts`'s
 /// `attachmentUrl` (which mirrors Tauri's own `convertFileSrc`): the WHOLE

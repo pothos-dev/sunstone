@@ -122,7 +122,7 @@ fn rewrite_links_in(
     // inline code for wikilinks and hands markdown-link inners through with
     // their original code-agnostic behaviour. Embeds / images arrive flagged.
     //
-    // # The `!`-asymmetry is DELIBERATE (ei-1) — site 2 of 4
+    // # The `!`-asymmetry is DELIBERATE (af-1) — site 2 of 4
     //
     // REWRITE does NOT drop `!`; EXTRACTION (`index/links.rs`) does. Do not
     // "restore symmetry" here. The two questions are different:
@@ -485,7 +485,7 @@ mod tests {
         assert_eq!(summary.links_changed, 1);
     }
 
-    // --- Embeds: the deliberate `!`-asymmetry (ei-1) --------------------------
+    // --- Embeds: the deliberate `!`-asymmetry (af-1) --------------------------
 
     #[test]
     fn a_moved_concepts_relative_embed_follows_it() {
@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn an_embed_of_a_moved_concept_is_rewritten_too() {
-        // Formerly `images_are_not_rewritten`, inverted by ei-1: the rewrite
+        // Formerly `images_are_not_rewritten`, inverted by af-1: the rewrite
         // side no longer drops `!`. Rewriting a path that moved is right for an
         // Embed for the same reason it is right for a link.
         let files = &[("a.md", "![img](/b.md)"), ("b.md", "# B")];

@@ -29,7 +29,7 @@ pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
 /// parens. Reference-style links are out of scope (the fixtures and OKF
 /// Concepts use inline links).
 ///
-/// # The `!`-asymmetry is DELIBERATE (ei-1) — site 1 of 4
+/// # The `!`-asymmetry is DELIBERATE (af-1) — site 1 of 4
 ///
 /// EXTRACTION drops `!`; REWRITE (`rewrite/engine.rs`) does not. Do not
 /// "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn an_embed_of_a_concept_still_creates_no_edge() {
-        // The extraction half of the ei-1 asymmetry, pinned: even when an Embed
+        // The extraction half of the af-1 asymmetry, pinned: even when an Embed
         // target IS a Concept path, it contributes no link (hence no backlink).
         // The rewrite half deliberately behaves the OTHER way.
         let links = extract_links("a.md", "![x](/b.md) ![[c.png]] [real](/b.md)");

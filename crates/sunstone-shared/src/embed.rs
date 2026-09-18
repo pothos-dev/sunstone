@@ -16,7 +16,7 @@
 //! In an Embed a `|` suffix is a **SIZE**, never an alias (glossary rule), and a
 //! `#anchor` is meaningless and ignored.
 //!
-//! ## The deliberate scanner asymmetry (ei-1)
+//! ## The deliberate scanner asymmetry (af-1)
 //!
 //! The shared scanner in [`crate::scan`] SKIPS embeds (`![[ … ]]`) and this
 //! module does NOT change that. That asymmetry is intentional, not an oversight:
@@ -42,8 +42,8 @@ use crate::paths::{find_byte, resolve_internal};
 use crate::wikilink::{basename, find_double_close};
 
 /// The Attachment extensions Sunstone renders as an image, matched
-/// case-insensitively (ei-1). Non-image Attachments keep their literal
-/// rendering until `al-1`.
+/// case-insensitively (af-1). Non-image Attachments keep their literal
+/// rendering until `af-3`.
 pub const IMAGE_EXTENSIONS: [&str; 8] = ["png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg"];
 
 /// Which resolution model an Embed uses — the two are NOT interchangeable.
@@ -463,7 +463,7 @@ pub fn resolve_embed_path(source_path: &str, target: &str) -> Option<String> {
 /// `![[logo.png]]` matches the basename `logo.png` INCLUDING its extension.
 ///
 /// * `attachment_paths`: every Attachment path in the Bundle (bundle-relative,
-///   no leading slash) — the separate index ei-1 keeps apart from `all_paths`.
+///   no leading slash) — the separate index af-1 keeps apart from `all_paths`.
 /// * `target`: the Embed's target; a `|size` / `#anchor` suffix is tolerated and
 ///   stripped, mirroring `resolve_wikilink` taking the raw inner text.
 pub fn resolve_embed_name(attachment_paths: &[String], target: &str) -> Option<String> {

@@ -81,7 +81,7 @@ transfer and its conclusion should not either.
   `Image` node regardless of its target, so once upstream's `imageBlocks` is gone a
   `![doc](a.pdf)` has its source hidden and no widget replaces it. That matches what already
   happens to a `data:` Embed, so the two are consistent rather than one being special-cased —
-  but it does mean the content silently disappears until al-1 gives non-image Attachments a
+  but it does mean the content silently disappears until af-3 gives non-image Attachments a
   presentation of their own.
 - **The read-mode click gesture is free**, because in `read` the source is unreachable and
   caret placement is meaningless. It is spent on a lightbox for images the content column

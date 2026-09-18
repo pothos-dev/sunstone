@@ -490,7 +490,7 @@ export const fakeBackend: Backend = {
     return renderConceptFake(content);
   },
 
-  // Attachments (slice: embedded-images). The desktop Playwright suite serves a
+  // Attachments (slice: attachment-files). The desktop Playwright suite serves a
   // STATIC SPA over this backend — there is no file server behind it — so a
   // `sunstone-asset://` or `/api/asset` URL would resolve to nothing. The fake
   // therefore hands back a `data:` URL carrying the fixture bytes, which still

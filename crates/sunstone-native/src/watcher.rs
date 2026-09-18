@@ -140,7 +140,7 @@ where
             update_index(state, &rel, abs, kind);
         } else if Index::is_attachment_path(&rel) {
             // Attachments are kept live exactly as Concepts are, in their own
-            // index (ei-1): the Embed widget resolves `![[name.png]]` against
+            // index (af-1): the Embed widget resolves `![[name.png]]` against
             // that list synchronously, so a dropped-in image must appear without
             // a restart. Nothing is read from disk — the index holds paths only.
             update_attachment_index(state, &rel, kind);
@@ -187,7 +187,7 @@ fn update_index(state: &AppState, rel: &str, abs: &Path, kind: &str) {
     }
 }
 
-/// Apply a single Attachment change to the in-memory index (ei-1). The
+/// Apply a single Attachment change to the in-memory index (af-1). The
 /// Attachment index holds PATHS only, so there is nothing to re-read: a
 /// create/modify records the path, a removal drops it.
 fn update_attachment_index(state: &AppState, rel: &str, kind: &str) {
@@ -367,7 +367,7 @@ mod tests {
     #[test]
     fn an_attachment_indexes_separately_and_leaves_on_removal() {
         // An image dropped into the Bundle must reach the ATTACHMENT index
-        // live (ei-1) — and only that one: it is not a Concept.
+        // live (af-1) — and only that one: it is not a Concept.
         let (root, state) = temp_state();
         assert_eq!(created(&root, &state, "assets/dot.png"), 1);
         {
@@ -376,7 +376,7 @@ mod tests {
             assert!(index.concept_paths().is_empty());
         }
 
-        // A non-image, non-`.md` file is neither (until al-1).
+        // A non-image, non-`.md` file is neither (until af-3).
         assert_eq!(created(&root, &state, "notes.txt"), 1);
         assert_eq!(
             state.read_index().unwrap().attachment_paths(),

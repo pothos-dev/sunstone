@@ -25,7 +25,18 @@ import {
   TEST_AUTH_SECRET,
   TEST_AUTH_NAME,
   TEST_AUTH_EMAIL,
+  setupWebBundleRepo,
 } from './tests/web-bundle';
+
+// Seed the throwaway git-repo fixture HERE, at config module scope, NOT in
+// `globalSetup`: Playwright starts `webServer` processes BEFORE it runs
+// globalSetup, so a server booted first indexes an empty directory. The `.md`
+// side survived that because the file watcher backfills Concepts, but the
+// Attachment index had no such backfill and came up empty, failing
+// web-embeds.spec.ts against a server whose route demonstrably works. Module
+// scope is evaluated before either server launches, so the ordering is not a
+// race at all.
+setupWebBundleRepo();
 
 // The Rust API port. Overridable because 8787 is a popular default and a
 // developer machine may already have something on it — the suite then fails at
@@ -41,9 +52,6 @@ export default defineConfig({
   // specs. The desktop runner `testIgnore`s the same pattern, keeping the two
   // suites disjoint (each spec belongs to exactly one runner).
   testMatch: /web-.*\.spec\.ts$/,
-  // Build the throwaway seeded git-repo fixture (temp copy) before the servers
-  // boot, so a web Save lands a real commit without polluting the outer repo.
-  globalSetup: './tests/global-setup.web.ts',
   fullyParallel: false,
   workers: 1,
   reporter: 'list',
@@ -66,7 +74,13 @@ export default defineConfig({
       // built by global-setup, NOT the in-repo fixture). `SUNSTONE_JWT_SECRET`
       // enables the write routes; axum verifies write JWTs against it, so it
       // MUST match the secret the SvelteKit hook mints with (below).
-      command: `cargo build -p sunstone-server && SUNSTONE_BUNDLE=${WEB_BUNDLE_DIR} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} ./target/debug/sunstone-server`,
+      // Launched via `cargo run`, NOT `cargo build && ./target/debug/...`: a
+      // developer with `build.target-dir` set in ~/.cargo/config.toml builds
+      // somewhere else entirely, so the hardcoded path silently served a STALE
+      // binary left over from before that setting — the suite then fails on
+      // routes that demonstrably exist in the source. `cargo run` always
+      // launches what it just built, wherever that lives.
+      command: `SUNSTONE_BUNDLE=${WEB_BUNDLE_DIR} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} cargo run -q -p sunstone-server`,
       url: `http://localhost:${RUST_PORT}/api/bundle-root`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

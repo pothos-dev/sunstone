@@ -273,7 +273,7 @@ predates any review of the document.
 An unrelated closing paragraph.
 `,
 
-  // A Concept exercising EMBEDS (slice: embedded-images) against the fixture
+  // A Concept exercising EMBEDS (slice: attachment-files) against the fixture
   // Attachments in `./attachments` — one case per line so a Playwright spec can
   // address each by its line text. Covered: an Embed alone on its line (block
   // placement) via a bundle-absolute path; an Embed mid-paragraph (inline, in
@@ -360,8 +360,8 @@ A GFM table renders as an interactive widget:
 | Code blocks  | done   |
 | Tables       | done   |
 
-A \`data:\` URI Embed, which deliberately renders NOTHING (ei-1: it is an
-injection vector once ei-2 inlines SVG, and carries no benefit a Bundle file
+A \`data:\` URI Embed, which deliberately renders NOTHING (af-1: it is an
+injection vector once af-2 inlines SVG, and carries no benefit a Bundle file
 does not). \`inlinePreview\` hides the source and \`embedBlocks\` emits no widget,
 so the line below is blank on purpose:
 

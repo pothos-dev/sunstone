@@ -297,7 +297,7 @@ export interface Backend {
    */
   savePdf(defaultName: string): Promise<string | null>;
 
-  // --- Attachments (slice: embedded-images) ---
+  // --- Attachments (slice: attachment-files) ---
 
   /**
    * Every **Attachment** path in the Bundle (bundle-relative, forward-slash,

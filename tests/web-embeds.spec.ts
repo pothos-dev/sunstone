@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
 /**
- * Embeds resolving against a REAL backend (ticket ei-1).
+ * Embeds resolving against a REAL backend (ticket af-1).
  *
  * The desktop Playwright suite drives the in-memory fake, whose Attachments are
  * seeded `data:` URLs — so it can never prove that the name-resolved Embed form

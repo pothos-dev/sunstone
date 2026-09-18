@@ -68,7 +68,7 @@ pub struct Index {
     concepts: HashMap<String, ConceptEntry>,
     /// target path -> set of source paths linking TO it (backlinks).
     reverse: HashMap<String, BTreeSet<String>>,
-    /// Every **Attachment** path in the Bundle (ei-1), a set SEPARATE from
+    /// Every **Attachment** path in the Bundle (af-1), a set SEPARATE from
     /// `concepts` — see [`Index::attachment_paths`] for why it is not a
     /// type-tagged single list. Sorted by construction (`BTreeSet`).
     attachments: BTreeSet<String>,
@@ -206,7 +206,7 @@ impl Index {
         v
     }
 
-    // --- Attachments (ei-1) -------------------------------------------------
+    // --- Attachments (af-1) -------------------------------------------------
     //
     // An **Attachment** (docs/GLOSSARY.md) is a non-`.md` file stored in the
     // Bundle that a Concept can **Embed**. It is indexed in its own set, NEVER
@@ -226,7 +226,7 @@ impl Index {
     /// Whether `rel` names a file the index tracks as an Attachment.
     ///
     /// The predicate lives HERE, in one place, delegating to the Embed kernel:
-    /// widening Attachments to non-image files (ticket `al-1`) is then a
+    /// widening Attachments to non-image files (ticket `af-3`) is then a
     /// one-line change at this single site, not a hunt through the walker, the
     /// watcher and the query methods.
     pub fn is_attachment_path(rel: &str) -> bool {
@@ -452,7 +452,7 @@ mod tests {
         );
     }
 
-    // --- Attachments (ei-1) -------------------------------------------------
+    // --- Attachments (af-1) -------------------------------------------------
 
     /// An index with two Concepts (one Embedding both Attachments) and two
     /// Attachments, one of them at the Bundle's top level.
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn attachment_predicate_is_the_embed_kernel() {
-        // One predicate, one place: widening Attachments beyond images (al-1)
+        // One predicate, one place: widening Attachments beyond images (af-3)
         // must be a single-line change here, not a hunt across modules.
         assert!(Index::is_attachment_path("a/b/Diagram.PnG"));
         assert!(Index::is_attachment_path("mark.svg"));
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn find_bundle_root_input_is_unchanged_by_attachments() {
-        // THE reason the Attachment index is separate (ei-1 "Attachment index"):
+        // THE reason the Attachment index is separate (af-1 "Attachment index"):
         // `find_bundle_root` infers the root structurally, and `concept_paths()`
         // is what feeds it. A top-level `assets/` folder is the hazard shape —
         // with the Attachments folded in, `assets` would be a second top-level

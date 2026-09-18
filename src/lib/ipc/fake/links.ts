@@ -72,7 +72,7 @@ const WIKILINK_RE = /(!?)\[\[([^\]]*)\]\]/g;
 /**
  * Resolve every wikilink in a (code-masked) body to bundle paths via §1.
  * Embeds `![[ … ]]` are skipped — they point at an Attachment, which is not a
- * Backlinks endpoint (ei-1). Returns resolved targets (may include
+ * Backlinks endpoint (af-1). Returns resolved targets (may include
  * `sourcePath` for `[[#heading]]`).
  */
 function wikilinkTargets(sourcePath: string, body: string): string[] {
@@ -82,7 +82,7 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
   let m: RegExpExecArray | null;
   WIKILINK_RE.lastIndex = 0;
   while ((m = WIKILINK_RE.exec(masked)) !== null) {
-    // An Embed never creates a Backlinks edge (ei-1, the extraction half of
+    // An Embed never creates a Backlinks edge (af-1, the extraction half of
     // the deliberate `!`-asymmetry documented on `outboundLinks`).
     if (m[1] === '!') continue;
     const resolved = resolveWikilinkIn(allPaths, sourcePath, m[2]);
@@ -94,7 +94,7 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
 /**
  * Extract outbound internal link targets from a Concept's body, resolved.
  *
- * ## The `!`-asymmetry is DELIBERATE (ei-1) — site 3 of 4
+ * ## The `!`-asymmetry is DELIBERATE (af-1) — site 3 of 4
  *
  * EXTRACTION drops `!`; REWRITE (`rewriteLinksIn` below) does not. Do not
  * "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
@@ -177,7 +177,7 @@ function buildMoveMap(from: string, to: string): Map<string, string> {
  * (used to re-resolve + recompute relative links). Returns the new content and
  * the count of links changed.
  *
- * ## The `!`-asymmetry is DELIBERATE (ei-1) — site 4 of 4
+ * ## The `!`-asymmetry is DELIBERATE (af-1) — site 4 of 4
  *
  * REWRITE does NOT drop `!`; EXTRACTION (`outboundLinks` above) does. Do not
  * "restore symmetry" here. The two questions are different:
@@ -268,7 +268,7 @@ function rewriteWikilinksIn(
   while ((m = WIKILINK_RE.exec(masked)) !== null) {
     // A NAME-resolved Embed resolves bundle-wide by name and suffix, so a
     // Concept move can never invalidate it — skipped on the rewrite side too,
-    // unlike the path-model Embed in `rewriteLinksIn` (ei-1).
+    // unlike the path-model Embed in `rewriteLinksIn` (af-1).
     if (m[1] === '!') continue;
     const start = m.index;
     const inner = m[2]; // same offsets in masked & original (length-preserving)

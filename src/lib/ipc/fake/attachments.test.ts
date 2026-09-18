@@ -1,6 +1,6 @@
 // Unit tests for the fake backend's Attachment fixture and for the URL shapes
 // the three `Backend.attachmentUrl` implementations build (slice:
-// embedded-images). The URL shapes are a CONTRACT other slices build against —
+// attachment-files). The URL shapes are a CONTRACT other slices build against —
 // the Rust `sunstone-asset://` scheme handler and the server's `GET /api/asset`
 // route both parse what is asserted here.
 import { describe, expect, test } from 'bun:test';

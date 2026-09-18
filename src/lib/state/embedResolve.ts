@@ -1,4 +1,4 @@
-// Embed resolution over the Attachment corpus (ei-1) — the pure half of
+// Embed resolution over the Attachment corpus (af-1) — the pure half of
 // `index.svelte.ts`'s Embed support, so it can be unit-tested (CLAUDE.md: pure
 // logic lives in plain `.ts`; the rune module stays thin over it).
 //

@@ -59,7 +59,7 @@ Bundle root with the primitive that already exists:
 - **`app.security.csp` stays `null` for now.** Adding a Content-Security-Policy is a
   whole-app change with its own breakage surface (mermaid's injected SVG, `{@html}`, Vite's
   dev inline scripts) and belongs with
-  [ei-2](/tickets/embedded-images/ei-2-theme-aware-svg-embeds.md), whose
+  [af-2](/tickets/attachment-files/af-2-theme-aware-svg-embeds.md), whose
   inlined author-controlled SVG is the first thing that genuinely needs it.
 - **Attachments are as readable as the Concepts that embed them.** `GET /api/asset` is
   unauthenticated, exactly like `/api/concept` and `/api/render`; only `/api/history` and

@@ -56,7 +56,7 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
   await expect(table).toContainText('Status');
 
   // --- An Embed renders a real Attachment ---------------------------------
-  // Retargeted for ei-1. This used to assert `img[src^="data:image"]`, aimed at
+  // Retargeted for af-1. This used to assert `img[src^="data:image"]`, aimed at
   // the Concept's `data:` URI image — but the FAKE BACKEND's own attachment
   // URLs are `data:` URLs too, so that selector would keep matching (and the
   // spec keep passing) after `data:` Embeds stopped rendering at all. Assert on

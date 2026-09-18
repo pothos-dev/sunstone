@@ -1,7 +1,7 @@
 import type { Embed, EmbedTargetKind } from '$lib/wasm/exports';
 
 // ---------------------------------------------------------------------------
-// Embed placement planning (slice: embedded-images, ADR-0010)
+// Embed placement planning (slice: attachment-files, ADR-0010)
 //
 // The PURE half of `embedBlocks()`: given the Embeds the wasm kernel found in
 // the body, decide — with no DOM, no CodeMirror and no backend — WHERE each
@@ -207,10 +207,10 @@ export function embedWidgetKey(plan: {
  * `inlinePreview` has already hidden its source — when:
  *
  *   * its target is a `data:` URI or any other non-`http(s)` scheme. `data:` is
- *     an injection vector once ei-2 inlines SVG and carries no benefit a Bundle
- *     file does not (ticket ei-1, "Remote images");
+ *     an injection vector once af-2 inlines SVG and carries no benefit a Bundle
+ *     file does not (ticket af-1, "Remote images");
  *   * its target is not an image we render. Non-image Attachments are out of
- *     scope until `al-1`;
+ *     scope until `af-3`;
  *   * it is INLINE and its own line is active in `editing` — the cursor-overlap
  *     skip, so the line being edited shows source only.
  *
@@ -226,9 +226,9 @@ export function planEmbeds(
 
   for (const embed of embeds) {
     const kind = opts.classify(embed.target);
-    // `data:` and `mailto:`/`file:`/… never render (ADR-0011 / ei-1).
+    // `data:` and `mailto:`/`file:`/… never render (ADR-0011 / af-1).
     if (kind === 'data' || kind === 'otherScheme') continue;
-    // Non-image Attachments keep today's rendering until al-1.
+    // Non-image Attachments keep today's rendering until af-3.
     if (!opts.isImage(embed.target)) continue;
 
     const line = doc.lineAt(embed.from);
