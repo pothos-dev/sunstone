@@ -40,6 +40,20 @@ _Avoid_: "internal link" (ambiguous — could mean any in-Bundle link; say **Wik
 A file with OKF-defined special meaning: `index.md` (progressive-disclosure listing) and
 `log.md` (dated change history). Not ordinary Concepts.
 
+**Attachment**:
+A non-`.md` file stored in the Bundle and shown inside a Concept that **Embeds** it — images
+today, other file types later. Not a **Concept**: it carries no frontmatter, never appears in the
+**Explorer** tree, and is never a **Backlinks** endpoint. OKF says nothing about non-markdown
+files, so Attachments are a Sunstone extension — see [Bundle](/okf/bundle.md).
+_Avoid_: "asset", "media", "attachment file"; say **image** only when the file kind matters.
+
+**Embed**:
+A reference from a **Concept** to an **Attachment**, written `![alt](path.png)` — resolved by
+**path**, like a markdown link — or `![[name.png]]` — resolved by **name**, under the
+**Wikilink** rules. An Embed *renders* the Attachment in place; an ordinary link to the same file
+does not. Inside an Embed a `|` suffix is a **size**, never an alias.
+_Avoid_: "transclusion", "inline image", "image link".
+
 **Frontmatter**:
 The leading YAML block (delimited by `---`) on a Concept. Only `type` is required;
 `title`, `description`, `resource`, `tags`, `timestamp` are recommended; unknown keys must
@@ -206,7 +220,8 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
 
 ## Relationships
 
-- A **Bundle** contains many **Concepts** and **Reserved files**, nested in directories.
+- A **Bundle** contains many **Concepts** and **Reserved files**, nested in directories,
+  plus any **Attachments** those Concepts **Embed**.
 - A **Concept** has one **Frontmatter** block and one markdown body.
 - A **Concept** links to other **Concepts** primarily via standard markdown links: bundle-absolute
   (`[x](/path.md)`) or relative (`[x](./path.md)`), and optionally via **Wikilinks** (`[[name]]`,
