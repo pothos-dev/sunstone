@@ -15,11 +15,16 @@ cd "$SCRIPT_DIR"
 
 BIN_NAME="sunstone"
 INSTALL_DIR="$HOME/.local/bin"
-# Honour CARGO_TARGET_DIR if set, else the cargo WORKSPACE-ROOT target dir.
-# (The repo is a cargo workspace — crates/* + src-tauri — so build output lands
-# in ./target, NOT src-tauri/target. A pre-workspace src-tauri/target/release
-# binary may still linger and would install a stale version if used.)
-TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/target}"
+# Ask cargo where it actually builds, rather than assuming ./target. The repo is
+# a cargo workspace (crates/* + src-tauri), so output does not land in
+# src-tauri/target — but it does not necessarily land in ./target either: a
+# `build.target-dir` in ~/.cargo/config.toml redirects it elsewhere entirely,
+# and a stale ./target/release/sunstone left over from before that setting would
+# then be installed silently. cargo metadata reports the real directory,
+# accounting for CARGO_TARGET_DIR, the config and the workspace root alike.
+TARGET_DIR="$(cargo metadata --format-version 1 --no-deps 2>/dev/null \
+  | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')"
+TARGET_DIR="${TARGET_DIR:-${CARGO_TARGET_DIR:-$SCRIPT_DIR/target}}"
 BUILT_BIN="$TARGET_DIR/release/$BIN_NAME"
 
 if ! command -v bun >/dev/null 2>&1; then
