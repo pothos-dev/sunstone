@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Backend } from './backend';
 import type {
@@ -190,6 +191,11 @@ export const tauriBackend: Backend = {
   // per-platform webview PDF export live in Rust (`save_pdf`).
   savePdf(defaultName: string): Promise<string | null> {
     return invoke<string | null>('save_pdf', { defaultName });
+  },
+
+  async setWindowTitle(title: string): Promise<void> {
+    document.title = title;
+    await getCurrentWindow().setTitle(title);
   },
 
   // Attachment bytes reach the webview over Sunstone's OWN URI scheme (ADR-0011),

@@ -1,7 +1,7 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
-import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
+import { openPrintTab, noSavePdf, setDocumentTitle, openExternalTab } from './browserShell';
 import type {
   TreeNode,
   FileChange,
@@ -452,5 +452,6 @@ export const httpBackend: Backend = {
   // chrome-free print tab directly, so `openPrintWindow` is interface parity.)
   openPrintWindow: openPrintTab,
   savePdf: noSavePdf,
+  setWindowTitle: setDocumentTitle,
   openExternal: openExternalTab,
 };

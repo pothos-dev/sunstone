@@ -44,6 +44,8 @@
   import { retryFrames } from '$lib/retryFrames';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
+  import { splitFrontmatter } from '$lib/wasm/exports';
+  import { windowTitle } from '$lib/tileTitle';
 
   interface Props {
     /**
@@ -340,6 +342,16 @@
   // prose sizes). Seeded from localStorage in `onMount` before this first runs.
   $effect(() => {
     applyZoom(zoom.scale);
+  });
+
+  // Keep the window title on the active Concept. NOT on the web, where
+  // `WebViewer` owns the document `<title>`. `indexStore.version` re-runs this
+  // once wasm is ready, so the frontmatter `title` is read (see Tile.svelte).
+  $effect(() => {
+    if (__SUNSTONE_WEB__) return;
+    void indexStore.version;
+    const title = windowTitle(editor.path, splitFrontmatter(editor.content).yaml);
+    void backend.setWindowTitle(title).catch(() => {});
   });
 
   // Persist the last-open Concept whenever active-Tile navigation changes it.

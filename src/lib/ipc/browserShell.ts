@@ -20,6 +20,10 @@ export async function noSavePdf(_defaultName: string): Promise<string | null> {
   return null;
 }
 
+export async function setDocumentTitle(title: string): Promise<void> {
+  document.title = title;
+}
+
 export async function openExternalTab(url: string): Promise<void> {
   window.open(url, '_blank', 'noopener,noreferrer');
 }

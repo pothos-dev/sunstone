@@ -38,3 +38,13 @@ export function tileHeaderLabel(
   const dir = dirname(path);
   return { dir: dir === '' ? '' : `${dir}/`, name };
 }
+
+/**
+ * The desktop window title for the active Concept: its header label followed by
+ * the app name (`CodeMirror 6 — Sunstone`), or just `Sunstone` when nothing is
+ * open.
+ */
+export function windowTitle(path: string | null, yaml: string): string {
+  const name = tileTitle(path, yaml);
+  return name === '' ? 'Sunstone' : `${name} — Sunstone`;
+}

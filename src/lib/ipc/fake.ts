@@ -24,7 +24,7 @@ import {
 } from './fake/store';
 import { ATTACHMENTS, attachmentPaths, fakeAttachmentUrl } from './fake/attachments';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
-import { openPrintTab, noSavePdf, openExternalTab } from './browserShell';
+import { openPrintTab, noSavePdf, setDocumentTitle, openExternalTab } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
@@ -506,6 +506,7 @@ export const fakeBackend: Backend = {
   // fallbacks shared with the http backend (see `./browserShell`).
   openPrintWindow: openPrintTab,
   savePdf: noSavePdf,
+  setWindowTitle: setDocumentTitle,
   openExternal: openExternalTab,
 };
 

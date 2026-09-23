@@ -297,6 +297,13 @@ export interface Backend {
    */
   savePdf(defaultName: string): Promise<string | null>;
 
+  /**
+   * Set the app window title (the desktop App keeps it on the active Concept).
+   * Desktop sets the native window title; the fake/HTTP impls set
+   * `document.title`.
+   */
+  setWindowTitle(title: string): Promise<void>;
+
   // --- Attachments (slice: attachment-files) ---
 
   /**

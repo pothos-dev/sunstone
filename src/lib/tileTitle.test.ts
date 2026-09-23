@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { tileTitle, tileHeaderLabel } from './tileTitle';
+import { tileTitle, tileHeaderLabel, windowTitle } from './tileTitle';
 
 test('tileTitle: empty when nothing is open', () => {
   expect(tileTitle(null, '')).toBe('');
@@ -50,4 +50,13 @@ test('tileHeaderLabel: a root-level Concept has no prefix', () => {
 
 test('tileHeaderLabel: empty Tile has neither prefix nor name', () => {
   expect(tileHeaderLabel(null, '')).toEqual({ dir: '', name: '' });
+});
+
+test('windowTitle: app name alone when nothing is open', () => {
+  expect(windowTitle(null, '')).toBe('Sunstone');
+});
+
+test('windowTitle: Concept title then app name', () => {
+  expect(windowTitle('concepts/codemirror.md', 'title: CodeMirror 6\n')).toBe('CodeMirror 6 — Sunstone');
+  expect(windowTitle('concepts/bundle.md', '')).toBe('bundle — Sunstone');
 });
