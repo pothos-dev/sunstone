@@ -7,7 +7,7 @@
 //
 // This store holds ONLY the Focused-item path as a rune and the pure
 // key-handling logic (delegating index math to `$lib/treeNav`). It is DOM-free:
-// App.svelte drives DOM focus from `focusedPath` via roving tabindex + an
+// ExplorerPane.svelte drives DOM focus from `focusedPath` via roving tabindex + an
 // effect, and supplies the side-effecting callbacks (open a Concept + move focus
 // to the Editor, toggle a folder's expanded state). Keeping it here mirrors the
 // other `.svelte.ts` stores and keeps App's keydown wiring thin.
@@ -22,7 +22,7 @@ import {
 import type { TreeNode } from '$lib/types';
 import { isPlainKey } from '$lib/keynav';
 
-/** Side-effects the handler invokes; supplied by App.svelte. */
+/** Side-effects the handler invokes; supplied by ExplorerPane.svelte. */
 export interface ExplorerNavActions {
   /** Whether a folder path is currently expanded. */
   isExpanded: (path: string) => boolean;
@@ -34,7 +34,7 @@ export interface ExplorerNavActions {
 
 /**
  * CRUD-dialog triggers the Focused-item key handler invokes; supplied by
- * App.svelte (slice: explorer-crud-keybindings). Each fires the SAME existing
+ * ExplorerPane.svelte (slice: explorer-crud-keybindings). Each fires the SAME existing
  * `TreeCrud` dialog the right-click context menu opens, targeting `path` (the
  * current Focused item). The new-target rule (inside a folder vs. sibling of a
  * file) is applied by TreeCrud's existing `childDirOf`, so these just hand it

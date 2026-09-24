@@ -12,6 +12,7 @@
   import { session } from '$lib/state/session.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { treeDnd } from '$lib/state/treeDnd.svelte';
+  import { dropZoneHandlers } from '$lib/treeDnd';
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
   import { flattenVisible, neighborAfterRemoval, ordinaryChildren } from '$lib/treeNav';
@@ -41,6 +42,13 @@
   function openMenu(node: TreeNode, x: number, y: number) {
     crud?.openMenu(node, x, y);
   }
+
+  // The pane itself is the Bundle-root drop zone (rows handle their folders).
+  const rootDrop = dropZoneHandlers({
+    state: treeDnd,
+    dir: () => '',
+    move: (from, toDir) => void treeActions.movePath(from, toDir),
+  });
 
   const rootOrdinary = $derived(bundle.tree ? ordinaryChildren(bundle.tree) : []);
 
@@ -157,28 +165,9 @@
   class:drop-target={treeDnd.dropTarget === ''}
   bind:this={treePane}
   onkeydown={onTreeKeydown}
-  ondragover={(e) => {
-    const from = treeDnd.dragging;
-    if (from === null || !treeDnd.canDrop(from, '')) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    treeDnd.dropTarget = '';
-  }}
-  ondragleave={(e) => {
-    if (
-      e.currentTarget instanceof Node &&
-      e.relatedTarget instanceof Node &&
-      e.currentTarget.contains(e.relatedTarget)
-    )
-      return;
-    if (treeDnd.dropTarget === '') treeDnd.dropTarget = null;
-  }}
-  ondrop={(e) => {
-    e.preventDefault();
-    const from = treeDnd.dragging;
-    treeDnd.end();
-    if (from !== null && treeDnd.canDrop(from, '')) void treeActions.movePath(from, '');
-  }}
+  ondragover={rootDrop.ondragover}
+  ondragleave={rootDrop.ondragleave}
+  ondrop={rootDrop.ondrop}
   role="presentation"
 >
   {#if bundle.loading}

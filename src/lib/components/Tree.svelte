@@ -5,6 +5,7 @@
   import { session } from '$lib/state/session.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { treeDnd } from '$lib/state/treeDnd.svelte';
+  import { dropZoneHandlers } from '$lib/treeDnd';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
   import { indexChild, ordinaryChildren as ordinaryChildrenOf, reservedChildren } from '$lib/treeNav';
   import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
@@ -82,7 +83,7 @@
   // "move INTO this folder"; a file row resolves to its PARENT folder, so a
   // slightly-off drop onto a sibling Concept is a safe no-op rather than a
   // surprise move. Dropping onto empty tree space targets the Bundle root — that
-  // zone lives on `.tree-tile` in App.svelte.
+  // zone lives on `.tree-tile` in ExplorerPane.svelte.
   const draggable = $derived(node.isDir || isMarkdown);
   const dropDir = $derived(node.isDir ? node.path : dirname(node.path));
   // Only folder rows show the highlight; a hovered file lights up its PARENT.
@@ -130,36 +131,20 @@
   // a stale/unmounted node.
   onDestroy(clearExpandTimer);
 
-  function onDragOver(e: DragEvent) {
-    const from = treeDnd.dragging;
-    if (from === null || !treeDnd.canDrop(from, dropDir)) return;
-    e.preventDefault(); // a missing preventDefault here means "not a drop target"
-    e.stopPropagation(); // handled here — don't also trigger the root drop zone
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    treeDnd.dropTarget = dropDir;
-    if (node.isDir && !expanded && expandTimer === null) {
-      expandTimer = setTimeout(() => session.setExpanded(node.path, true), 600);
-    }
-  }
-
-  function onDragLeave(e: DragEvent) {
-    // Ignore leaves into our own descendants; only clear when the pointer
-    // actually exits this row.
-    if (e.currentTarget instanceof Node && e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) {
-      return;
-    }
-    clearExpandTimer();
-    if (treeDnd.dropTarget === dropDir) treeDnd.dropTarget = null;
-  }
-
-  function onDrop(e: DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    clearExpandTimer();
-    const from = treeDnd.dragging;
-    treeDnd.end();
-    if (from !== null && treeDnd.canDrop(from, dropDir)) void treeActions.movePath(from, dropDir);
-  }
+  // Each row is a drop zone into `dropDir` (nested in the Explorer's root
+  // zone, so it stops the event); a hovered collapsed folder springs open.
+  const drop = dropZoneHandlers({
+    state: treeDnd,
+    dir: () => dropDir,
+    move: (from, toDir) => void treeActions.movePath(from, toDir),
+    nested: true,
+    onOver: () => {
+      if (node.isDir && !expanded && expandTimer === null) {
+        expandTimer = setTimeout(() => session.setExpanded(node.path, true), 600);
+      }
+    },
+    onExit: clearExpandTimer,
+  });
 
   // The tree shows only Concepts (`.md` files) and folders; any other file type
   // in the Bundle is ignored. Displayed names omit the `.md` extension.
@@ -196,9 +181,9 @@
     {draggable}
     ondragstart={onDragStart}
     ondragend={() => treeDnd.end()}
-    ondragover={onDragOver}
-    ondragleave={onDragLeave}
-    ondrop={onDrop}
+    ondragover={drop.ondragover}
+    ondragleave={drop.ondragleave}
+    ondrop={drop.ondrop}
     role="treeitem"
     aria-selected="false"
     aria-expanded={expanded}
@@ -267,9 +252,9 @@
     draggable={isMarkdown}
     ondragstart={onDragStart}
     ondragend={() => treeDnd.end()}
-    ondragover={onDragOver}
-    ondragleave={onDragLeave}
-    ondrop={onDrop}
+    ondragover={drop.ondragover}
+    ondragleave={drop.ondragleave}
+    ondrop={drop.ondrop}
     role="treeitem"
     aria-selected={selected === node.path}
     tabindex={isFocusedItem ? 0 : -1}
