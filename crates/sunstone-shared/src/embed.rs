@@ -29,11 +29,11 @@
 //!
 //! Only the markdown (path-resolved) rewrite path gains `!` handling, since
 //! `![alt](../img.png)` is relative and a move DOES invalidate it. Consequently
-//! this module carries its own [`mask_code`] walk rather than calling
+//! this module masks code itself ([`mask_code`]) rather than calling
 //! `scan::scan_replace`: it needs byte offsets and it must see the very spans
-//! the shared scanner is required to ignore. The code-skipping CONTRACT is the
-//! same one `scan.rs` documents (fenced blocks, inline code spans), and the mask
-//! is length-preserving so every offset indexes the ORIGINAL body — the same
+//! the shared scanner is required to ignore. The mask runs on the same
+//! `scan::walk_code` state machine, so the code-skipping rules (fenced blocks,
+//! inline code spans) exist once, and the mask is length-preserving so every offset indexes the ORIGINAL body — the same
 //! invariant `maskCode` holds in the TS twin.
 
 use serde::{Deserialize, Serialize};
@@ -951,4 +951,3 @@ mod tests {
         assert_eq!(units[0].alt, "caf\u{e9}");
     }
 }
-

@@ -33,7 +33,7 @@ Pure link/frontmatter/render-derived logic is **not** reimplemented in TypeScrip
 | --- | --- |
 | `pkg/` | The gitignored `wasm-pack build --target web` output; produced by `bun run build:wasm` before the check/unit/Playwright gates. |
 | `index.ts` | `ensureWasm()` — the memoized, `browser`-guarded loader that dynamic-`import()`s `pkg/`, runs its async `init()` once, and returns the module (or `null` on SSR / load failure). Failure **degrades** to a no-op, never a dead page. |
-| `exports.ts` | Synchronous wrappers over the **free** (handle-less) wasm exports (`splitFrontmatter`, `scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `slugify`, …); before the module registers they return safe no-op defaults, so callers on the property-model / outline paths never await. |
+| `exports.ts` | Synchronous wrappers over the **free** (handle-less) wasm exports (`splitFrontmatter`, `scanHeadings`, `parseCriticMarks`, `findCitationRefs`, …); before the module registers they return safe no-op defaults, so callers on the property-model / outline paths never await. |
 | `bunTestSetup.ts` | Preloads the shipping `pkg/` for `bun test`, so the seam is tested against exactly the wasm that ships. |
 
 The stateful `BundleIndex` handle (owns the saved concept-path set; `resolveLink` / `resolveWikilink` / `rewriteAnchorsIn` / `conceptPaths` / `urlToConcept`) is owned by `state/index.svelte.ts` (`indexStore`): built after `ensureWasm()` on mount / `file-changed` / CRUD, `.free()`d on swap, with a `version` rune that re-runs decorations once wasm is ready. SSR imports none of this — `WebViewer` renders native Rust HTML.

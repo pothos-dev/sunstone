@@ -74,8 +74,8 @@ It exposes two shapes over the shared kernels:
   same code that runs natively.
 - **Free (handle-less) exports** — per-call kernels for frontmatter
   (`splitFrontmatter`, `parseFrontmatter*`), render-derived scanners
-  (`scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `conceptToUrl`,
-  `slugify`), and the fake backend's corpus-walking variants (`resolveLinkIn`,
+  (`scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `conceptToUrl`),
+  and the fake backend's corpus-walking variants (`resolveLinkIn`,
   `rewriteAnchors`, …) that take an explicit path-set rather than the handle's.
 
 The frontend loads and calls all of this through `src/lib/wasm/` — see the
