@@ -39,6 +39,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{find_byte, resolve_internal};
+use crate::scan::{walk_code, CodeClass};
 use crate::wikilink::{basename, best_name_match, find_double_close};
 
 /// The Attachment extensions Sunstone renders as an image, matched
@@ -234,66 +235,19 @@ fn blank(out: &mut [u8], from: usize, to: usize) {
 /// ASCII spaces, so a multi-byte char inside code becomes N spaces and the
 /// result is still valid UTF-8 of the same length.
 fn mask_code(body: &str) -> String {
-    let bytes = body.as_bytes();
-    let mut out = bytes.to_vec();
-    let mut i = 0usize;
-    let mut in_inline_code = false;
-    let mut fence: Option<u8> = None;
-    let mut at_line_start = true;
-
-    while i < bytes.len() {
-        let b = bytes[i];
-
-        // --- Fenced code blocks (line-start ``` / ~~~) --------------------
-        if at_line_start {
-            let mut j = i;
-            while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
-                j += 1;
-            }
-            if j + 2 < bytes.len()
-                && (bytes[j] == b'`' || bytes[j] == b'~')
-                && bytes[j + 1] == bytes[j]
-                && bytes[j + 2] == bytes[j]
-            {
-                let ch = bytes[j];
-                match fence {
-                    Some(f) if f == ch => fence = None,
-                    None => fence = Some(ch),
-                    _ => {}
+    let mut out = body.as_bytes().to_vec();
+    walk_code(body.as_bytes(), |i, class| {
+        match class {
+            CodeClass::FenceLine { end } => blank(&mut out, i, end),
+            CodeClass::Fenced | CodeClass::Tick => blank(&mut out, i, i + 1),
+            CodeClass::Text { in_inline_code } => {
+                if in_inline_code {
+                    blank(&mut out, i, i + 1);
                 }
-                let end = find_byte(bytes, i, b'\n')
-                    .map(|p| p + 1)
-                    .unwrap_or(bytes.len());
-                blank(&mut out, i, end);
-                i = end;
-                at_line_start = true;
-                continue;
             }
         }
-
-        if fence.is_some() {
-            if b != b'\n' {
-                out[i] = b' ';
-            }
-            at_line_start = b == b'\n';
-            i += 1;
-            continue;
-        }
-
-        if b == b'`' {
-            in_inline_code = !in_inline_code;
-            out[i] = b' ';
-            at_line_start = false;
-            i += 1;
-            continue;
-        }
-
-        if in_inline_code && b != b'\n' {
-            out[i] = b' ';
-        }
-        at_line_start = b == b'\n';
-        i += 1;
-    }
+        None
+    });
 
     String::from_utf8(out).expect("masking only overwrites whole bytes with ASCII spaces")
 }
@@ -953,3 +907,4 @@ mod tests {
         assert_eq!(units[0].alt, "caf\u{e9}");
     }
 }
+
