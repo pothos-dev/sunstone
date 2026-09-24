@@ -293,30 +293,12 @@ impl IntoResponse for WriteError {
 mod tests {
     use super::*;
     use crate::config::{self, Config};
-    use crate::sync::SyncState;
-    use sunstone_native::app_state::AppState;
+    use crate::testutil::{seeded_bundle, server_state};
     use std::path::PathBuf;
-    use crate::testutil::seeded_bundle;
-    use std::sync::Mutex;
-    use tokio::sync::broadcast;
 
     /// A fresh Bundle root seeded with `note.md` + `sub/deep.md`.
     fn temp_bundle() -> PathBuf {
         seeded_bundle("write-routes")
-    }
-
-    /// A `ServerState` over `cfg`, with nothing running behind it — enough to
-    /// exercise the wiring the handlers do before/after `run_write`.
-    fn state_with(cfg: Config) -> Arc<ServerState> {
-        let (events, _) = broadcast::channel::<ServerEvent>(8);
-        Arc::new(ServerState {
-            app: Arc::new(AppState::new(cfg.bundle_root.clone())),
-            events,
-            write_lock: Mutex::new(()),
-            jwt_secret: None,
-            cfg,
-            sync: SyncState::new(),
-        })
     }
 
     /// §5's gate really reaches the handlers: every write closure names the shape
@@ -326,15 +308,15 @@ mod tests {
     fn write_handlers_take_their_shape_from_the_parsed_config() {
         let root = temp_bundle();
         assert_eq!(
-            WriteShape::for_config(&state_with(Config::plain(root.clone())).cfg),
+            WriteShape::for_config(&server_state(Config::plain(root.clone())).cfg),
             WriteShape::Plain
         );
         let mut git_cfg = Config::plain(root.clone());
         git_cfg.shape = config::Shape::GitLocal;
-        assert_eq!(WriteShape::for_config(&state_with(git_cfg).cfg), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&server_state(git_cfg).cfg), WriteShape::Git);
         let mut synced = Config::plain(root);
         synced.shape = config::Shape::GitSynced;
-        assert_eq!(WriteShape::for_config(&state_with(synced).cfg), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&server_state(synced).cfg), WriteShape::Git);
     }
 
     /// §5's kick: the write path signals the loop once the write lock is free
@@ -342,7 +324,7 @@ mod tests {
     /// what makes outbound latency independent of the poll interval.
     #[tokio::test]
     async fn a_write_kicks_the_sync_loop_after_broadcasting() {
-        let state = state_with(Config::plain(temp_bundle()));
+        let state = server_state(Config::plain(temp_bundle()));
         let user = AuthedUser {
             name: "Ada Lovelace".to_string(),
             email: "ada@example.com".to_string(),
@@ -379,7 +361,7 @@ mod tests {
     /// its echo and every other tab live-refreshes.
     #[tokio::test]
     async fn rename_broadcasts_removed_then_modified_with_the_forwarded_client_id() {
-        let state = state_with(Config::plain(temp_bundle()));
+        let state = server_state(Config::plain(temp_bundle()));
         let user = AuthedUser {
             name: "Ada Lovelace".to_string(),
             email: "ada@example.com".to_string(),

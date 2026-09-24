@@ -9,6 +9,14 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+
+use sunstone_native::app_state::AppState;
+use tokio::sync::broadcast;
+
+use crate::config::Config;
+use crate::sync::SyncState;
+use crate::{ServerEvent, ServerState};
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -39,6 +47,22 @@ pub fn seeded_bundle(tag: &str) -> PathBuf {
     put(&dir, "note.md", b"# Hello\n\nbody");
     put(&dir, "sub/deep.md", b"deep");
     dir
+}
+
+/// A `ServerState` over `cfg` with nothing running behind it (no watcher, no
+/// loop): the index is built over `cfg.bundle_root`, and the write secret is
+/// taken from `cfg.jwt_secret`, exactly as `main` does. Subscribe to
+/// `state.events` for the broadcast side.
+pub fn server_state(cfg: Config) -> Arc<ServerState> {
+    let (events, _) = broadcast::channel::<ServerEvent>(8);
+    Arc::new(ServerState {
+        app: Arc::new(AppState::new(cfg.bundle_root.clone())),
+        events,
+        write_lock: Mutex::new(()),
+        jwt_secret: cfg.jwt_secret.clone(),
+        cfg,
+        sync: SyncState::new(),
+    })
 }
 
 /// Run a git command in `root`, asserting success.

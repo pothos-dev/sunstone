@@ -304,9 +304,9 @@ fn router(state: Arc<ServerState>) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil::{seeded_bundle, server_state};
     use config::Config;
     use std::path::PathBuf;
-    use crate::testutil::seeded_bundle;
 
     /// A fresh Bundle root seeded with `note.md` + `sub/deep.md`.
     fn temp_bundle() -> PathBuf {
@@ -317,16 +317,7 @@ mod tests {
     fn router_builds_over_server_state() {
         // Smoke: constructing the router with a real ServerState (index built on
         // startup + a broadcast sender) must not panic.
-        let root = temp_bundle();
-        let (events, _) = broadcast::channel::<ServerEvent>(8);
-        let _app = router(Arc::new(ServerState {
-            app: Arc::new(AppState::new(root.clone())),
-            events,
-            write_lock: Mutex::new(()),
-            jwt_secret: None,
-            cfg: Config::plain(root),
-            sync: SyncState::new(),
-        }));
+        let _app = router(server_state(Config::plain(temp_bundle())));
     }
 
     #[tokio::test]

@@ -266,7 +266,7 @@ pub(crate) fn classify(msg: &str) -> StatusCode {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use crate::testutil::seeded_bundle;
+    use crate::testutil::{seeded_bundle, server_state};
 
     /// A fresh Bundle root seeded with `note.md` + `sub/deep.md`.
     fn temp_bundle() -> PathBuf {
@@ -449,22 +449,10 @@ mod tests {
     #[tokio::test]
     async fn events_route_leaves_file_unnamed_and_names_sync() {
         use crate::config::Config;
-        use crate::sync::{SyncNotice, SyncNoticeKind, SyncState};
-        use std::sync::{Arc, Mutex};
-        use sunstone_native::app_state::AppState;
+        use crate::sync::{SyncNotice, SyncNoticeKind};
         use sunstone_native::watcher::FileChange;
-        use tokio::sync::broadcast;
 
-        let (events, _) = broadcast::channel::<ServerEvent>(8);
-        let cfg = Config::plain(temp_bundle());
-        let state = Arc::new(ServerState {
-            app: Arc::new(AppState::new(cfg.bundle_root.clone())),
-            events,
-            write_lock: Mutex::new(()),
-            jwt_secret: None,
-            cfg,
-            sync: SyncState::new(),
-        });
+        let state = server_state(Config::plain(temp_bundle()));
 
         // Subscribe by opening the SSE response, then broadcast both payloads.
         let resp = events_handler(State(state.clone())).await.into_response();

@@ -428,7 +428,6 @@ fn abort(repo_root: &Path, reason: impl std::fmt::Display) -> String {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use std::sync::Mutex;
     use std::time::Duration;
 
     use sunstone_native::git::CommitIdentity;
@@ -440,7 +439,7 @@ mod tests {
 
     use crate::testutil::{
         commit_all, git, git_available, git_stdout as stdout, head, local_identity, put, read,
-        temp_dir,
+        server_state, temp_dir,
     };
 
     /// The whole deployment in three directories: a bare remote, a second clone
@@ -872,17 +871,8 @@ mod tests {
         commit_all(&d.repo, "edit notes/f.md via web", Some(WEB_DATE));
 
         let cfg = synced_cfg(&d.repo, &d.origin, "");
-        let (events, mut rx) = tokio::sync::broadcast::channel::<ServerEvent>(8);
-        let state = Arc::new(ServerState {
-            app: Arc::new(sunstone_native::app_state::AppState::new(
-                cfg.bundle_root.clone(),
-            )),
-            events,
-            write_lock: Mutex::new(()),
-            jwt_secret: None,
-            cfg,
-            sync: SyncState::new(),
-        });
+        let state = server_state(cfg);
+        let mut rx = state.events.subscribe();
 
         let handle = spawn(state.clone());
         let event = tokio::time::timeout(Duration::from_secs(20), rx.recv())

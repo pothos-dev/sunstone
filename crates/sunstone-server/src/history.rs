@@ -118,17 +118,13 @@ pub async fn file_at_rev_handler(
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use std::sync::Mutex;
 
     use axum::http::StatusCode;
-    use sunstone_native::app_state::AppState;
-    use tokio::sync::broadcast;
 
     use crate::config::{Config, Shape};
-    use crate::sync::SyncState;
-    use crate::{ServerEvent, ServerState};
+    use crate::ServerState;
 
-    use crate::testutil::{git as run, git_available, temp_dir};
+    use crate::testutil::{git as run, git_available, server_state, temp_dir};
 
     /// A git repo with `a.md` committed, plus `sub/b.md` committed one level
     /// down (the bind-mounted-subdirectory case).
@@ -147,19 +143,12 @@ mod tests {
     }
 
     fn state(shape: Shape, bundle_root: PathBuf) -> Arc<ServerState> {
-        let mut cfg = Config::plain(bundle_root.clone());
+        let mut cfg = Config::plain(bundle_root);
         cfg.shape = shape;
-        let (events, _) = broadcast::channel::<ServerEvent>(8);
-        Arc::new(ServerState {
-            app: Arc::new(AppState::new(bundle_root)),
-            events,
-            write_lock: Mutex::new(()),
-            // Set, so the gate that matters in these tests is the SHAPE — the
-            // auth gate is proven by `AuthedUser` being in the signature.
-            jwt_secret: Some(b"test-secret".to_vec()),
-            cfg,
-            sync: SyncState::new(),
-        })
+        // Set, so the gate that matters in these tests is the SHAPE — the
+        // auth gate is proven by `AuthedUser` being in the signature.
+        cfg.jwt_secret = Some(b"test-secret".to_vec());
+        server_state(cfg)
     }
 
     fn user() -> AuthedUser {

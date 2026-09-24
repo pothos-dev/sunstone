@@ -65,13 +65,8 @@ pub(crate) async fn asset_handler(
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::sync::SyncState;
-    use crate::testutil::temp_dir;
-    use crate::ServerEvent;
+    use crate::testutil::{server_state, temp_dir};
     use std::path::{Path, PathBuf};
-    use std::sync::Mutex;
-    use sunstone_native::app_state::AppState;
-    use tokio::sync::broadcast;
 
     /// A Bundle root holding one nested Attachment, plus a Concept so the index
     /// build has something to chew on.
@@ -84,15 +79,7 @@ mod tests {
     }
 
     fn state_over(root: &Path) -> Arc<ServerState> {
-        let (events, _) = broadcast::channel::<ServerEvent>(8);
-        Arc::new(ServerState {
-            app: Arc::new(AppState::new(root.to_path_buf())),
-            events,
-            write_lock: Mutex::new(()),
-            jwt_secret: None,
-            cfg: Config::plain(root.to_path_buf()),
-            sync: SyncState::new(),
-        })
+        server_state(Config::plain(root.to_path_buf()))
     }
 
     /// Drive the handler and return `(status, content-type, body)`.
