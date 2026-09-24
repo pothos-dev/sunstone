@@ -282,6 +282,59 @@ fn integrate(
     sync: &SyncState,
 ) -> Result<Option<Vec<SyncNotice>>, String> {
     let upstream = git_cfg.upstream_ref();
+    let started = git::rebase_onto(repo_root, &git_cfg.branch)?;
+    let run = resolve_stops(repo_root, ahead, started)?;
+
+    match run.outcome {
+        RebaseOutcome::Completed => {}
+        RebaseOutcome::Refused { reason } if run.stops == 0 => {
+            // Git never started — the dirty-tree case §8.3 names. Log it and skip;
+            // the tree is left exactly as it was.
+            //
+            // Deduplicated like every other repeating condition (§10.6, "quiet by
+            // default"): a tree that stays dirty refuses on *every* tick, which at
+            // the 10s default would be ~8,600 identical lines/day — exactly the
+            // noise that makes the log useless when someone finally reads it.
+            let msg = format!(
+                "rebase onto {upstream} refused, skipping this sync \
+                 (the working tree is left untouched): {reason}"
+            );
+            if sync.note_tick_error(&msg) {
+                eprintln!("sunstone-server: {msg}");
+            }
+            return Ok(None);
+        }
+        // A refusal *mid-run* is a state we do not model: unwind and retry.
+        RebaseOutcome::Refused { reason } => return Err(abort(repo_root, reason)),
+        RebaseOutcome::Stopped => unreachable!("resolve_stops returns only when not Stopped"),
+    }
+
+    Ok(Some(report_integration(
+        git_cfg,
+        repo_root,
+        behind,
+        &upstream,
+        &run.resolutions,
+    )))
+}
+
+/// What [`resolve_stops`] leaves behind: the rebase's first non-`Stopped`
+/// outcome, how many stops it took to get there, and every resolution made on
+/// the way.
+struct ResolvedRun {
+    outcome: RebaseOutcome,
+    stops: usize,
+    resolutions: Vec<Resolution>,
+}
+
+/// Resolve every stop of a started rebase through §9 until git reports
+/// something other than `Stopped`. `Err` — the resolver hit a state it does not
+/// recognise, or the rebase is not advancing: the rebase has been aborted.
+fn resolve_stops(
+    repo_root: &Path,
+    ahead: usize,
+    started: RebaseOutcome,
+) -> Result<ResolvedRun, String> {
     // **ONE `ForkMap` for the whole run** (§9's coalescing row): N replayed
     // commits touching one path write to the same fork, which then holds the
     // final content.
@@ -303,7 +356,7 @@ fn integrate(
     // Exceeding it means we stopped more times than there were commits to
     // consume, i.e. the rebase is not advancing — a state we do not model.
     let max_stops = ahead.max(1);
-    let mut outcome = git::rebase_onto(repo_root, &git_cfg.branch)?;
+    let mut outcome = started;
     let mut iterations = 0usize;
     while outcome == RebaseOutcome::Stopped {
         iterations += 1;
@@ -351,34 +404,26 @@ fn integrate(
         };
     }
 
-    match outcome {
-        RebaseOutcome::Completed => {}
-        RebaseOutcome::Refused { reason } if iterations == 0 => {
-            // Git never started — the dirty-tree case §8.3 names. Log it and skip;
-            // the tree is left exactly as it was.
-            //
-            // Deduplicated like every other repeating condition (§10.6, "quiet by
-            // default"): a tree that stays dirty refuses on *every* tick, which at
-            // the 10s default would be ~8,600 identical lines/day — exactly the
-            // noise that makes the log useless when someone finally reads it.
-            let msg = format!(
-                "rebase onto {upstream} refused, skipping this sync \
-                 (the working tree is left untouched): {reason}"
-            );
-            if sync.note_tick_error(&msg) {
-                eprintln!("sunstone-server: {msg}");
-            }
-            return Ok(None);
-        }
-        // A refusal *mid-run* is a state we do not model: unwind and retry.
-        RebaseOutcome::Refused { reason } => return Err(abort(repo_root, reason)),
-        RebaseOutcome::Stopped => unreachable!("the loop above exits only when not Stopped"),
-    }
+    Ok(ResolvedRun {
+        outcome,
+        stops: iterations,
+        resolutions,
+    })
+}
 
-    // Content changed, so this **always** logs (§10.6) — the conflict/fork and
-    // dropped-deletion lines first, then the one integration line.
+/// Log a completed integration and build its client notices.
+///
+/// Content changed, so this **always** logs (§10.6) — the conflict/fork and
+/// dropped-deletion lines first, then the one integration line.
+fn report_integration(
+    git_cfg: &GitConfig,
+    repo_root: &Path,
+    behind: usize,
+    upstream: &str,
+    resolutions: &[Resolution],
+) -> Vec<SyncNotice> {
     let mut notices = Vec::new();
-    for resolution in &resolutions {
+    for resolution in resolutions {
         // Punch list 7 / §10.2: strip to bundle-relative **before** building the
         // notice. `None` = the conflict was outside the Bundle: still resolved
         // (or `--continue` would refuse), still logged for the operator, but no
@@ -397,7 +442,7 @@ fn integrate(
     eprintln!(
         "sunstone-server: integrated {behind} commits from {upstream} ({files} files changed)"
     );
-    Ok(Some(notices))
+    notices
 }
 
 /// §10.6's two always-logged content lines.
