@@ -25,11 +25,14 @@
 //! resolved target IS a moved Concept. External (`scheme:`) and pure-anchor
 //! links are never touched.
 //!
-//! Path math mirrors `src/lib/links.ts` / `index.rs` EXACTLY (bundle-relative,
-//! '/'-separated; `.`/`..` collapse with leading-`..` escapes dropped). The fake
-//! backend ports the same logic so the behaviour is testable in Chromium.
+//! Links resolve through `sunstone_shared::paths::resolve_internal`, as in
+//! `index.rs` (bundle-relative, '/'-separated; `.`/`..` collapse with
+//! leading-`..` escapes dropped). The fake backend
+//! (`src/lib/ipc/fake/links.ts`) drives the same shared code through wasm so
+//! the behaviour is testable in Chromium.
 //!
-//! Pure module logic — `#[tauri::command]` wrappers in `lib.rs` stay thin.
+//! Pure module logic — the host wrappers (`src-tauri/src/commands.rs`, the
+//! server's routes) stay thin.
 
 use std::collections::HashMap;
 

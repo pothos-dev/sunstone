@@ -1,9 +1,10 @@
 //! Outbound markdown-link extraction for the Bundle index.
 //!
 //! Finds every internal markdown link target in a Concept body and resolves it
-//! to a bundle-relative path. Mirrors `src/lib/links.ts` EXACTLY (external
-//! `scheme:`, pure-anchor, and empty links are ignored), so the frontend's
-//! broken-link decoration can trust the Rust index.
+//! to a bundle-relative path via `sunstone_shared::paths::resolve_internal`
+//! (external `scheme:`, pure-anchor, and empty links are ignored) — the same
+//! resolver the frontend runs through wasm, so its broken-link decoration can
+//! trust the Rust index.
 
 use std::collections::BTreeSet;
 

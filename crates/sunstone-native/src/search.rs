@@ -10,7 +10,8 @@
 //! (the user's text is escaped, so regex metacharacters are matched verbatim).
 //! This keeps the affordance a "find text" box, not a regex console.
 //!
-//! Pure module logic — the `#[tauri::command]` wrapper in `lib.rs` stays thin.
+//! Pure module logic — the host wrappers (`src-tauri/src/commands.rs`, the
+//! server's routes) stay thin.
 
 use std::path::Path;
 

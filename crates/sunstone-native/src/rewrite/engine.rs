@@ -3,8 +3,9 @@
 //! exhaustively unit-testable (see the tests at the bottom of this file). The
 //! orchestration in `rewrite.rs` reads/writes files and drives this engine.
 //!
-//! Path math mirrors `src/lib/links.ts` / `index.rs` EXACTLY (bundle-relative,
-//! '/'-separated; `.`/`..` collapse with leading-`..` escapes dropped).
+//! Links resolve through `sunstone_shared::paths::resolve_internal`, as in
+//! `index.rs` (bundle-relative, '/'-separated; `.`/`..` collapse with
+//! leading-`..` escapes dropped).
 
 use std::collections::HashMap;
 

@@ -9,9 +9,9 @@
 //!
 //! This module is the single source of truth for both behaviours that consume
 //! wikilinks in the Rust backend: outbound-link extraction / backlinks
-//! (`index.rs`) and rename-rewrite (`rewrite.rs`). The TS fake backend
-//! (`src/lib/links.ts`) mirrors `resolve_wikilink` EXACTLY so the editor's
-//! broken-link decoration can trust this index.
+//! (`index.rs`) and rename-rewrite (`rewrite.rs`). The editor and the TS fake
+//! backend (`src/lib/ipc/fake/links.ts`) call `resolve_wikilink` through the
+//! wasm build, so the editor's broken-link decoration can trust this index.
 
 use crate::paths::find_byte;
 
@@ -122,8 +122,8 @@ pub fn basename(path: &str) -> &str {
 }
 
 /// Resolve a wikilink target to a bundle path, or `None` if unresolved
-/// (broken). MUST be identical to `resolveWikilink` in `src/lib/links.ts` and
-/// the shared spec's §1 algorithm.
+/// (broken), per the shared spec's §1 algorithm. The frontend calls this same
+/// function through wasm.
 ///
 /// * `all_paths`: every concept `.md` path in the bundle (bundle-relative, no
 ///   leading slash).

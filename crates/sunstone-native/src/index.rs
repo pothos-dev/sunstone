@@ -6,13 +6,14 @@
 //! (`watcher.rs`): a created/modified/removed Concept reindexes just that file
 //! and refreshes the reverse map and aggregates.
 //!
-//! Link resolution mirrors `src/lib/links.ts` EXACTLY (bundle-absolute `/x.md`
-//! from the root; relative `./`, `../`, or bare `x.md` against the Concept's
-//! directory; external `scheme:` and pure-anchor links ignored). Keeping the
-//! two in lock-step is what lets the frontend's broken-link decoration trust
-//! the Rust index.
+//! Link resolution is `sunstone_shared::paths::resolve_internal`
+//! (bundle-absolute `/x.md` from the root; relative `./`, `../`, or bare `x.md`
+//! against the Concept's directory; external `scheme:` and pure-anchor links
+//! ignored) — the same code the frontend runs through the wasm build, which is
+//! what lets its broken-link decoration trust the Rust index.
 //!
-//! Pure module logic — `#[tauri::command]` wrappers in `lib.rs` stay thin.
+//! Pure module logic — the host wrappers (`src-tauri/src/commands.rs`, the
+//! server's routes) stay thin.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;

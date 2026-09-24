@@ -36,8 +36,9 @@ pub struct BundleState {
     /// Bundle-relative paths of folders the user had expanded in the tree.
     pub expanded_folders: Vec<String>,
     /// Persisted window geometry for this Bundle (size + position), or `None`
-    /// before the first save. Window handling lives in Rust (`lib.rs` setup +
-    /// the window event handler) so the frontend never imports window APIs.
+    /// before the first save. Window handling lives in Rust (src-tauri's
+    /// `startup::wire_window_persistence`) so the frontend never imports
+    /// window APIs.
     pub window: Option<WindowState>,
     /// Bundle-relative paths of recently-opened Concepts, most-recent first.
     /// Deduped and capped by the frontend; round-tripped here so the quick-nav

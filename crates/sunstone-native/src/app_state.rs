@@ -16,7 +16,8 @@ const SELF_WRITE_WINDOW: Duration = Duration::from_millis(1500);
 /// absolute paths Sunstone itself just wrote, with the instant of the write.
 /// The filesystem watcher consults this to suppress echo events for our own
 /// autosave writes (so they never trigger a reload loop or cursor jump), while
-/// still reloading on genuine external edits. See ARCHITECTURE.md.
+/// still reloading on genuine external edits. See
+/// `docs/architecture/sunstone-native.md`.
 pub struct AppState {
     /// Canonicalized absolute path of the opened Bundle root.
     pub bundle_root: PathBuf,

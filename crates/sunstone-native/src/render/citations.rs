@@ -1,7 +1,8 @@
 //! Citation references (citation-superscripts).
 //!
-//! Mirrors the pure TS rules in `src/lib/citations.ts` so the exported PDF / web
-//! render matches the live editor:
+//! Detection is `sunstone_shared::citations::find_citation_refs`, the same code
+//! the live editor's widgets (`src/lib/editor/citations.ts`) call through wasm,
+//! so the exported PDF / web render matches the editor:
 //!   - an inline `[n]` that FOLLOWS a word (preceded by a non-whitespace char
 //!     that is not `[`, and not trailed by `]`/`(`/`:`) → a superscript link to
 //!     the citation-table row;
