@@ -321,32 +321,24 @@ pub fn init(root: &Path, branch: &str) -> Result<(), String> {
 /// failure rather than a stderr line, and `--short` to get `main` rather than
 /// `refs/heads/main`.
 pub fn current_branch(root: &Path) -> Option<String> {
-    let output = run_git(root, &["symbolic-ref", "--quiet", "--short", "HEAD"])?;
-    if !output.status.success() {
-        return None;
-    }
-    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if branch.is_empty() {
-        None
-    } else {
-        Some(branch)
-    }
+    stdout_value(&run_git(root, &["symbolic-ref", "--quiet", "--short", "HEAD"])?)
 }
 
 /// `git remote get-url origin`, or `None` when there is no `origin` remote / not
 /// a repo. §4.4 compares it against the configured origin: a **mismatch fails
 /// loudly and touches nothing.**
 pub fn remote_url(root: &Path) -> Option<String> {
-    let output = run_git(root, &["remote", "get-url", "origin"])?;
+    stdout_value(&run_git(root, &["remote", "get-url", "origin"])?)
+}
+
+/// The trimmed stdout of a successful git query, or `None` when it failed or
+/// printed nothing.
+fn stdout_value(output: &Output) -> Option<String> {
     if !output.status.success() {
         return None;
     }
-    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if url.is_empty() {
-        None
-    } else {
-        Some(url)
-    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!value.is_empty()).then_some(value)
 }
 
 /// `git diff --name-status <range>` as `(status letter, path)` pairs — e.g.
@@ -412,15 +404,8 @@ pub fn rebase_head_timestamp(root: &Path) -> Option<String> {
         // UTC rather than pulling in a time crate.
         &[("TZ", "UTC")],
     )?;
-    if !output.status.success() {
-        return None; // no rebase in progress: REBASE_HEAD does not resolve
-    }
-    let ts = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if ts.is_empty() {
-        None
-    } else {
-        Some(ts)
-    }
+    // Fails when no rebase is in progress: REBASE_HEAD does not resolve.
+    stdout_value(&output)
 }
 
 #[cfg(test)]
