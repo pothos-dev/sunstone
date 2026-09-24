@@ -12,22 +12,7 @@ import {
   type WikiLinksConfig,
 } from '@atomic-editor/editor';
 import { indexStore } from '$lib/state/index.svelte';
-
-/**
- * The `name` and `#anchor` of a raw wikilink inner text (`name|alias#anchor`).
- * The alias begins at the first `|`; the anchor at the first `#` in the name
- * part. Resolution itself lives on the wasm handle (`resolveWikilink`); this is
- * the small display-side split the label + open scroll need. Mirrors the Rust
- * `wikilink::parse_target` for these two fields.
- */
-function splitWikilinkParts(raw: string): { name: string; anchor: string | null } {
-  let namePart = raw;
-  const pipe = namePart.indexOf('|');
-  if (pipe !== -1) namePart = namePart.slice(0, pipe);
-  const hash = namePart.indexOf('#');
-  if (hash === -1) return { name: namePart, anchor: null };
-  return { name: namePart.slice(0, hash), anchor: namePart.slice(hash + 1) };
-}
+import { wikilinkAnchor, wikilinkLabel } from './wikilinkParts';
 
 // ---------------------------------------------------------------------------
 // Wikilink rendering (ADR-0004) — `[[name]]` as an OPTIONAL, name-based
@@ -72,21 +57,7 @@ function resolveTarget(ctx: WikiLinkContext, target: string): WikiLinkResolvedTa
   // Unresolved by the name index, OR resolves to a path absent from the index
   // (same existence check the broken markdown-link decoration uses) → missing.
   if (!resolved || !indexStore.exists(resolved.path)) return null;
-  return { target, label: labelFor(target, resolved.path), status: 'resolved' };
-}
-
-/**
- * Display label for a resolved bare wikilink (the aliased `[[a|b]]` case keeps
- * its own label via the upstream decoration). Prefer the author's written name
- * (Obsidian shows what was typed); fall back to the resolved file's basename.
- */
-function labelFor(rawTarget: string, path: string): string {
-  const { name } = splitWikilinkParts(rawTarget);
-  const written = name.trim();
-  if (written !== '') return written;
-  // Pure same-file anchor `[[#heading]]` → name is empty; use the file basename.
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  return base.replace(/\.md$/i, '');
+  return { target, label: wikilinkLabel(target, resolved.path), status: 'resolved' };
 }
 
 /**
@@ -99,9 +70,8 @@ export function wikiLinksExtension(ctx: WikiLinkContext): Extension {
     // `resolve` is async upstream; our resolver is synchronous, so wrap it.
     resolve: (target) => Promise.resolve(resolveTarget(ctx, target)),
     onOpen: (target) => {
-      const { anchor } = splitWikilinkParts(target);
       const resolved = indexStore.resolveWikilink(ctx.currentPath(), target);
-      if (resolved) ctx.open(resolved.path, anchor && anchor.trim() !== '' ? anchor : null);
+      if (resolved) ctx.open(resolved.path, wikilinkAnchor(target));
     },
     openOnClick: true,
   };
