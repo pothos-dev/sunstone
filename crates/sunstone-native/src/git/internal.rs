@@ -19,10 +19,7 @@ pub(super) const GIT_MISSING: &str = "git is not available";
 /// Applies [`apply_git_env`], the single process-global environment helper, so
 /// every git child — networked or not — is configured identically (Spec 2 §3).
 pub(super) fn run_git(root: &Path, args: &[&str]) -> Option<Output> {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(root).args(args);
-    apply_git_env(&mut cmd);
-    cmd.output().ok()
+    run_git_env(root, args, &[])
 }
 
 /// Like [`run_git`] but with extra environment variables set on the child (used
