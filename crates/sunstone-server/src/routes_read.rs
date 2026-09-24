@@ -1,8 +1,8 @@
 //! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
 //! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! `/api/attachment-paths`, and `/api/events` (SSE), plus the shared `ApiError`
-//! HTTP-boundary error type and its `sunstone-native` string classifier.
+//! `/api/attachment-paths`, and `/api/events` (SSE), plus the shared
+//! [`read_index`] helper. Errors map through [`crate::api_error`].
 //!
 //! Split out of `main.rs` verbatim (ticket: split main.rs) — no behavior
 //! change, just relocation.
@@ -14,7 +14,6 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
     response::sse::{Event, KeepAlive, Sse},
-    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
@@ -27,6 +26,7 @@ use sunstone_native::render::{self, RenderPayload};
 use sunstone_native::search::{self, SearchHit};
 use sunstone_shared::url::query_encode;
 
+use crate::api_error::{guard_rel_path, ApiError};
 use crate::{ServerEvent, ServerState};
 
 pub(crate) async fn bundle_root_handler(State(state): State<Arc<ServerState>>) -> Json<String> {
@@ -61,10 +61,7 @@ pub(crate) async fn render_handler(
 ) -> Result<Json<RenderPayload>, ApiError> {
     // Resolve links against the in-memory index. The read lock is held only for
     // the render call; a poisoned lock is a 500.
-    let index = state
-        .app
-        .read_index()
-        .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    let index = read_index(&state)?;
     render::render_concept(&state.app.bundle_root, &index, &q.path, &asset_url)
         .map(Json)
         .map_err(ApiError::from_core)
@@ -185,20 +182,6 @@ pub(crate) fn read_index(
         .map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-/// Reject a `path` that escapes the Bundle (absolute, or containing a `..`
-/// segment) with a 400. These index routes never touch the filesystem, but the
-/// path is still a client-supplied bundle-relative key, so we guard the network
-/// boundary the same way the fs routes do.
-pub(crate) fn guard_rel_path(path: &str) -> Result<(), ApiError> {
-    if path.starts_with('/') || path.split('/').any(|c| c == "..") {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
-            format!("path escapes the bundle: {path}"),
-        ));
-    }
-    Ok(())
-}
-
 /// SSE event name for a divergence notice (Spec 2 §10.3). Named, so
 /// `EventSource` dispatches it **only** to `addEventListener('sync', …)`.
 pub(crate) const SYNC_EVENT: &str = "sync";
@@ -231,59 +214,17 @@ pub(crate) async fn events_handler(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
-// --- Error mapping ----------------------------------------------------------
-
-/// An error crossing the HTTP boundary: a status + a message. `sunstone-native`
-/// returns stringly-typed errors; we classify them into 4xx codes so a path
-/// escape is a `400 Bad Request` (a client mistake / attack) while a missing
-/// Concept is a `404 Not Found`.
-pub(crate) struct ApiError(pub(crate) StatusCode, pub(crate) String);
-
-impl ApiError {
-    fn from_core(msg: String) -> Self {
-        ApiError(classify(&msg), msg)
-    }
-}
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        (self.0, self.1).into_response()
-    }
-}
-
-/// Map a `sunstone-native` error string to an HTTP status. Path-escape / invalid
-/// path errors are the caller's fault (a real network boundary now guards
-/// them) → `400`; everything else (a genuinely missing/unreadable file) → `404`.
-pub(crate) fn classify(msg: &str) -> StatusCode {
-    if msg.contains("escapes the bundle") || msg.contains("must be bundle-relative") {
-        StatusCode::BAD_REQUEST
-    } else {
-        StatusCode::NOT_FOUND
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use crate::api_error::classify;
+    use axum::response::IntoResponse;
     use crate::testutil::{seeded_bundle, server_state};
+    use std::path::PathBuf;
 
     /// A fresh Bundle root seeded with `note.md` + `sub/deep.md`.
     fn temp_bundle() -> PathBuf {
         seeded_bundle("read")
-    }
-
-    #[test]
-    fn classify_escape_is_400_missing_is_404() {
-        assert_eq!(classify("path escapes the bundle: ../x"), StatusCode::BAD_REQUEST);
-        assert_eq!(
-            classify("path must be bundle-relative: /abs"),
-            StatusCode::BAD_REQUEST
-        );
-        assert_eq!(
-            classify("../x: No such file or directory"),
-            StatusCode::NOT_FOUND
-        );
     }
 
     #[test]
@@ -410,16 +351,6 @@ mod tests {
         let root = temp_bundle();
         assert!(search::search(&root, "").unwrap().is_empty());
         assert!(search::search(&root, "   ").unwrap().is_empty());
-    }
-
-    #[test]
-    fn guard_rel_path_rejects_escapes() {
-        assert!(guard_rel_path("a/b.md").is_ok());
-        assert!(guard_rel_path("note.md").is_ok());
-        let escape = guard_rel_path("../secret.md").unwrap_err();
-        assert_eq!(escape.0, StatusCode::BAD_REQUEST);
-        assert_eq!(guard_rel_path("/etc/passwd").unwrap_err().0, StatusCode::BAD_REQUEST);
-        assert_eq!(guard_rel_path("a/../../x.md").unwrap_err().0, StatusCode::BAD_REQUEST);
     }
 
     #[test]

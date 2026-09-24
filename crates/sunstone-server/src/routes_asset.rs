@@ -20,7 +20,7 @@
 //!   which is what catches the escape the syntactic check *cannot* see: an
 //!   in-Bundle symlink pointing outside it.
 //!
-//! Both, not one. `classify` then maps an escape to `400` and a path that simply
+//! Both, not one. [`ApiError::from_core`] then maps an escape to `400` and a path that simply
 //! is not there to `404`.
 
 use std::sync::Arc;
@@ -34,8 +34,8 @@ use serde::Deserialize;
 
 use sunstone_native::{bundle, mime};
 
-use crate::routes_read::{classify, guard_rel_path};
-use crate::{ApiError, ServerState};
+use crate::api_error::{guard_rel_path, ApiError};
+use crate::ServerState;
 
 #[derive(Deserialize)]
 pub(crate) struct AssetQuery {
@@ -53,7 +53,7 @@ pub(crate) async fn asset_handler(
 ) -> Result<Response, ApiError> {
     guard_rel_path(&q.path)?;
     let resolved = bundle::resolve(&state.app.bundle_root, &q.path)
-        .map_err(|msg| ApiError(classify(&msg), msg))?;
+        .map_err(ApiError::from_core)?;
     // Blocking read, like every other read route in this crate — Attachments are
     // small enough that a streaming body would buy complexity, not throughput.
     let bytes = std::fs::read(&resolved)

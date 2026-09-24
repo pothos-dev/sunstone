@@ -17,7 +17,6 @@ use std::sync::Arc;
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
@@ -27,6 +26,7 @@ use sunstone_native::git::CommitIdentity;
 use sunstone_native::rewrite::{AnchorRename, RewriteSummary};
 use sunstone_native::watcher::{FileAuthor, FileChange, FileOrigin};
 
+use crate::api_error::WriteError;
 use crate::auth::AuthedUser;
 use crate::routes_read::ConceptQuery;
 use crate::{ServerEvent, ServerState};
@@ -278,17 +278,6 @@ fn client_id(headers: &HeaderMap) -> String {
         .to_string()
 }
 
-/// A write failure crossing the HTTP boundary: classified by `classify_write`
-/// (400/409/404/500 — distinct from the read classifier's 404 default). Auth
-/// failures never reach here — the `AuthedUser` extractor 401s first.
-pub(crate) struct WriteError(String);
-
-impl IntoResponse for WriteError {
-    fn into_response(self) -> Response {
-        (write::classify_write(&self.0), self.0).into_response()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,25 +400,5 @@ mod tests {
     #[test]
     fn a_missing_client_header_yields_an_empty_client_id() {
         assert_eq!(client_id(&HeaderMap::new()), "");
-    }
-
-    /// `WriteError::into_response` carries the write taxonomy onto HTTP:
-    /// 400 invalid path, 409 existing target, 404 missing referent, 500 default.
-    #[test]
-    fn write_error_maps_the_write_taxonomy_onto_http_statuses() {
-        let status = |msg: &str| WriteError(msg.to_string()).into_response().status();
-        assert_eq!(
-            status("path escapes the bundle: ../x"),
-            StatusCode::BAD_REQUEST
-        );
-        assert_eq!(status("already exists: a.md"), StatusCode::CONFLICT);
-        assert_eq!(
-            status("target folder does not exist: sub"),
-            StatusCode::NOT_FOUND
-        );
-        assert_eq!(
-            status("git commit failed: boom"),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
     }
 }

@@ -45,8 +45,6 @@ use sunstone_native::bundle;
 use sunstone_native::git::{self, CommitIdentity};
 use sunstone_native::rewrite::{self, AnchorRename, RewriteSummary};
 
-use axum::http::StatusCode;
-
 /// One SSE change group to broadcast (becomes one stamped `FileChange`). A
 /// rename yields two (a `removed` of the old path, a `modified`/`created` of the
 /// new) so a client with the old path open falls into the "deleted" state
@@ -343,28 +341,11 @@ fn structural_result(summary: RewriteSummary, from: &str, to: &str) -> WriteResu
     }
 }
 
-/// Classify a write failure into an HTTP status. Distinct from the READ
-/// classifier (whose default is 404): a write's default failure is a *server*
-/// fault (500). Auth failures never reach here (the extractor 401s first).
-pub fn classify_write(msg: &str) -> StatusCode {
-    if msg.contains("escapes the bundle")
-        || msg.contains("must be bundle-relative")
-        || msg.contains("must end in .md")
-        || msg.contains("must not be empty")
-    {
-        StatusCode::BAD_REQUEST // 400 — invalid path (client)
-    } else if msg.contains("already exists") || msg.contains("already in that folder") {
-        StatusCode::CONFLICT // 409 — create/rename onto an existing target
-    } else if msg.contains("does not exist") || msg.contains("No such file") {
-        StatusCode::NOT_FOUND // 404 — referenced path/parent missing
-    } else {
-        StatusCode::INTERNAL_SERVER_ERROR // 500 — IO / git / poisoned lock
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api_error::classify_write;
+    use axum::http::StatusCode;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use sunstone_native::git::{self, FileHistory};
@@ -640,34 +621,6 @@ mod tests {
         // AnchorRename is Deserialize-only; build it via JSON to avoid depending
         // on private field visibility.
         serde_json::from_value(serde_json::json!({ "from": from, "to": to })).unwrap()
-    }
-
-    #[test]
-    fn classify_write_maps_the_taxonomy() {
-        assert_eq!(
-            classify_write("path escapes the bundle: ../x"),
-            StatusCode::BAD_REQUEST
-        );
-        assert_eq!(
-            classify_write("a Concept path must end in .md: x.txt"),
-            StatusCode::BAD_REQUEST
-        );
-        assert_eq!(
-            classify_write("already exists: a.md"),
-            StatusCode::CONFLICT
-        );
-        assert_eq!(
-            classify_write("already in that folder: a.md"),
-            StatusCode::CONFLICT
-        );
-        assert_eq!(
-            classify_write("target folder does not exist: sub/x.md"),
-            StatusCode::NOT_FOUND
-        );
-        assert_eq!(
-            classify_write("git commit failed: boom"),
-            StatusCode::INTERNAL_SERVER_ERROR
-        );
     }
 
     // --- §5 shape gating ----------------------------------------------------

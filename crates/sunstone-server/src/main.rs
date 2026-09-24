@@ -34,6 +34,7 @@
 //! writes, there is nothing to suppress — every change is a genuine external
 //! edit worth delivering to all connected browsers.
 
+mod api_error;
 mod auth;
 mod boot;
 mod conflict;
@@ -60,10 +61,9 @@ use sunstone_native::app_state::AppState;
 use sunstone_native::watcher::{self, FileChange};
 use sync::{SyncNotice, SyncState};
 
-// Re-exported at the crate root so sibling modules (`auth`, `history`, `sync`,
-// `routes_read`, `routes_write`) can keep referring to these as `crate::…`
-// regardless of which file they're physically defined in.
-pub(crate) use routes_read::{guard_rel_path, ApiError};
+// Re-exported at the crate root so sibling modules (`history`, …) can refer to
+// these as `crate::…` regardless of which file they're physically defined in.
+pub(crate) use api_error::{guard_rel_path, ApiError};
 
 use config::Config;
 
