@@ -27,7 +27,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Query, State},
-    http::{header::CONTENT_TYPE, StatusCode},
+    http::{
+        header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS},
+        StatusCode,
+    },
     response::{IntoResponse, Response},
 };
 use serde::Deserialize;
@@ -58,7 +61,15 @@ pub(crate) async fn asset_handler(
     // small enough that a streaming body would buy complexity, not throughput.
     let bytes = std::fs::read(&resolved)
         .map_err(|e| ApiError(StatusCode::NOT_FOUND, format!("{}: {e}", q.path)))?;
-    Ok(([(CONTENT_TYPE, mime::content_type_for(&q.path))], bytes).into_response())
+    Ok((
+        [
+            (CONTENT_TYPE, mime::content_type_for(&q.path)),
+            (X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (CONTENT_SECURITY_POLICY, mime::ATTACHMENT_CSP),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 #[cfg(test)]
@@ -111,6 +122,20 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(content_type, "image/png");
         assert_eq!(body, b"\x89PNG-bytes");
+    }
+
+    #[tokio::test]
+    async fn attachment_bytes_carry_the_hardening_headers() {
+        // An SVG opened directly (not via <img>) would otherwise run its
+        // script in the app's origin.
+        let root = temp_bundle();
+        let q = Query(AssetQuery { path: "assets/sub/logo.png".to_string() });
+        let Ok(response) = asset_handler(State(state_over(&root)), q).await else {
+            panic!("the Attachment must be served");
+        };
+        let headers = response.headers();
+        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+        assert_eq!(headers.get("content-security-policy").unwrap(), mime::ATTACHMENT_CSP);
     }
 
     #[tokio::test]

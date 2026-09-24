@@ -82,6 +82,8 @@ fn serve(root: &Path, rel_path: &str) -> Response<Vec<u8>> {
         Ok(bytes) => Response::builder()
             .status(StatusCode::OK)
             .header(CONTENT_TYPE, mime::content_type_for(rel_path))
+            .header("x-content-type-options", "nosniff")
+            .header("content-security-policy", mime::ATTACHMENT_CSP)
             .body(bytes)
             .expect("a static response builder cannot fail"),
         Err(e) => error(StatusCode::NOT_FOUND, format!("{rel_path}: {e}")),
@@ -249,6 +251,15 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
         assert_eq!(res.headers()[CONTENT_TYPE], "image/png");
         assert_eq!(res.body(), b"\x89PNG-bytes");
+    }
+
+    #[test]
+    fn attachment_bytes_carry_the_hardening_headers() {
+        let root = temp_bundle();
+        let res = serve(&root, "assets/sub/logo.png");
+        let headers = res.headers();
+        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+        assert_eq!(headers.get("content-security-policy").unwrap(), mime::ATTACHMENT_CSP);
     }
 
     #[test]

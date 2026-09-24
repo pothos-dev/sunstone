@@ -12,6 +12,14 @@
 //! case-insensitively. Anything else is served as opaque bytes, which is both
 //! honest and inert in an `<img>`.
 
+/// `Content-Security-Policy` sent with every Attachment response. An `<img>`
+/// never runs an SVG's script, but the same URL opened as a *document* (a new
+/// tab, a link) would run it in the app's origin; `sandbox` plus
+/// `default-src 'none'` makes such a document inert while leaving inline SVG
+/// styling intact. Sent alongside `X-Content-Type-Options: nosniff`, so an
+/// `application/octet-stream` body is never sniffed into HTML.
+pub const ATTACHMENT_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
 /// The `Content-Type` for a bundle-relative Attachment path, by extension.
 /// Unknown / missing extension → `application/octet-stream`.
 pub fn content_type_for(rel_path: &str) -> &'static str {
