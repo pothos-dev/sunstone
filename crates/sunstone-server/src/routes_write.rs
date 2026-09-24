@@ -296,25 +296,13 @@ mod tests {
     use crate::sync::SyncState;
     use sunstone_native::app_state::AppState;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicU32, Ordering};
+    use crate::testutil::seeded_bundle;
     use std::sync::Mutex;
     use tokio::sync::broadcast;
 
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    /// A throwaway canonicalized bundle root under the OS temp dir, seeded with
-    /// one Concept so the happy-path routes have something to read.
+    /// A fresh Bundle root seeded with `note.md` + `sub/deep.md`.
     fn temp_bundle() -> PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-server-{}-{}",
-            std::process::id(),
-            n
-        ));
-        std::fs::create_dir_all(dir.join("sub")).unwrap();
-        std::fs::write(dir.join("note.md"), "# Hello\n\nbody").unwrap();
-        std::fs::write(dir.join("sub/deep.md"), "deep").unwrap();
-        dir.canonicalize().unwrap()
+        seeded_bundle("write-routes")
     }
 
     /// A `ServerState` over `cfg`, with nothing running behind it — enough to

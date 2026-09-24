@@ -17,7 +17,7 @@ pub fn git_available() -> bool {
     Command::new("git").arg("--version").output().is_ok()
 }
 
-/// A fresh canonicalized temp directory, following `main.rs`'s counter idiom
+/// A fresh canonicalized temp directory, with a process-wide counter
 /// (no `tempfile` dev-dependency in this crate). Collision-free across all
 /// test modules: one shared counter, plus the process id.
 pub fn temp_dir(tag: &str) -> PathBuf {
@@ -30,6 +30,15 @@ pub fn temp_dir(tag: &str) -> PathBuf {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.canonicalize().unwrap()
+}
+
+/// A fresh Bundle root (see [`temp_dir`]) seeded with `note.md` and
+/// `sub/deep.md`, so the happy-path routes have something to read.
+pub fn seeded_bundle(tag: &str) -> PathBuf {
+    let dir = temp_dir(tag);
+    put(&dir, "note.md", b"# Hello\n\nbody");
+    put(&dir, "sub/deep.md", b"deep");
+    dir
 }
 
 /// Run a git command in `root`, asserting success.
