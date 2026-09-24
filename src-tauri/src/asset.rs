@@ -46,6 +46,20 @@ use crate::session::Session;
 /// macOS; wry rewrites it to `http://sunstone-asset.localhost/<rel>` on Windows.
 pub const SCHEME: &str = "sunstone-asset";
 
+/// The desktop shell's Attachment-URL builder — the inverse of
+/// [`rel_path_from_uri`] — handed to the shared renderer so an Embed's `src` is
+/// fetchable from the print/PDF window (af-1, ADR-0011).
+///
+/// It must stay byte-identical to `tauri.ts`'s `attachmentUrl` (which mirrors
+/// Tauri's own `convertFileSrc`): the WHOLE bundle-relative path is
+/// percent-encoded into ONE URL path segment, so `a/b.png` becomes `a%2Fb.png`
+/// — `query_encode` is `encodeURIComponent`'s Rust twin and escapes `/` for
+/// exactly that reason. [`rel_path_from_uri`] decodes it once to recover the
+/// path it hands to [`bundle::resolve`].
+pub(crate) fn url_for(path: &str) -> String {
+    format!("{SCHEME}://localhost/{}", sunstone_shared::url::query_encode(path))
+}
+
 /// The bundle-relative path carried by an asset request: `Uri::path()` minus its
 /// leading `/`, percent-decoded.
 ///
@@ -142,6 +156,36 @@ mod tests {
 
     fn uri(s: &str) -> Uri {
         s.parse().unwrap()
+    }
+
+    #[test]
+    fn the_url_builder_matches_the_scheme_handler_and_the_frontend() {
+        // One shape, three places: `url_for`, `rel_path_from_uri` (which decodes
+        // it ONCE), and `tauri.ts`'s `attachmentUrl` (`encodeURIComponent`,
+        // mirroring Tauri's own `convertFileSrc`). The whole path is ONE
+        // percent-encoded segment, so separators arrive as `%2F` — a drift here
+        // silently 404s every Embed in the print/PDF window.
+        assert_eq!(
+            url_for("assets/sub/logo.png"),
+            "sunstone-asset://localhost/assets%2Fsub%2Flogo.png"
+        );
+        assert_eq!(url_for("a b+c.png"), "sunstone-asset://localhost/a%20b%2Bc.png");
+        // A literal `%` in a filename is escaped, so one decode recovers it.
+        assert_eq!(url_for("a%2Fb.png"), "sunstone-asset://localhost/a%252Fb.png");
+    }
+
+    #[test]
+    fn a_built_url_decodes_back_to_the_same_path() {
+        for path in [
+            "logo.png",
+            "assets/sub/logo.png",
+            "assets/a b+c.png",
+            "50% off/a%2Fb.png",
+            "bilder/größe 😀 漢字.png",
+            "odd/#?&=;,'@!$.png",
+        ] {
+            assert_eq!(rel_path_from_uri(&uri(&url_for(path))), path, "{path:?}");
+        }
     }
 
     #[test]
