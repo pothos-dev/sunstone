@@ -45,7 +45,7 @@
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
   import { splitFrontmatter } from '$lib/wasm/exports';
-  import { windowTitle } from '$lib/tileTitle';
+  import { windowTitle, foldersToExpand } from '$lib/tileTitle';
 
   interface Props {
     /**
@@ -455,6 +455,25 @@
 
   let pendingDeleteNeighbor = $state<string | null>(null);
 
+  // Show `folder` in the Explorer (Tile header breadcrumbs): expand it and every
+  // ancestor, reveal the Explorer if hidden, and move the Explorer cursor onto
+  // its row, scrolled into view. Focus stays where it is (the Tile).
+  function revealFolderInExplorer(folder: string) {
+    for (const p of foldersToExpand(folder)) {
+      if (!session.isExpanded(p)) session.setExpanded(p, true);
+    }
+    session.revealLeftSection('explorer');
+    explorerNav.setFocused(folder);
+    retryFrames(() => {
+      const row = treePane?.querySelector<HTMLElement>(
+        `.row[data-row-path="${CSS.escape(folder)}"]`,
+      );
+      if (!row) return false;
+      row.scrollIntoView({ block: 'nearest' });
+      return true;
+    }, 10);
+  }
+
   function refocusExplorerAt(path: string | null) {
     if (path !== null) explorerNav.setFocused(path);
     retryFrames(() => {
@@ -820,6 +839,7 @@
                     workspace.splitDown();
                   }}
                   onClose={() => void closeTileAndFocus(tile.id)}
+                  onRevealFolder={revealFolderInExplorer}
                   onViewportLine={(line) => {
                     // Only the active Tile feeds the Outline — it is the Tile the
                     // Outline lists headings for.

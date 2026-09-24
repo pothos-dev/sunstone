@@ -55,7 +55,9 @@
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
-  import { tileHeaderLabel } from '$lib/tileTitle';
+  import { tileHeaderLabel, type Crumb } from '$lib/tileTitle';
+  import { folderIndexPath } from '$lib/treeNav';
+  import { bundle } from '$lib/state/bundle.svelte';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
@@ -85,6 +87,8 @@
      *  Outline can highlight the current heading (outline-active-heading).
      *  Null when nothing is open / the view has no geometry yet. */
     onViewportLine?: (line: number | null) => void;
+    /** Show a folder in the Explorer (expand it and its ancestors); header breadcrumbs. */
+    onRevealFolder?: (folder: string) => void;
   }
 
   let {
@@ -97,6 +101,7 @@
     onSplitDown,
     onClose,
     onViewportLine,
+    onRevealFolder,
   }: Props = $props();
 
   let editorParent = $state<HTMLDivElement | null>(null);
@@ -171,6 +176,16 @@
   // shows the right Concept (a rare flake in tile-header.spec.ts). `tile.content`
   // is the source both halves derive from, so reading it here cannot go stale.
   const headerLabel = $derived(tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml));
+  const headerCrumbs = $derived(
+    headerLabel.crumbs.map((c) => ({ ...c, index: folderIndexPath(bundle.tree, c.folder) })),
+  );
+
+  // A header breadcrumb opens that folder's index.md (when it has one and it is
+  // not already open) and shows the folder in the Explorer.
+  function openCrumb(crumb: Crumb & { index: string | null }) {
+    if (crumb.index !== null && crumb.index !== tile.activePath) void tile.open(crumb.index);
+    onRevealFolder?.(crumb.folder);
+  }
 
   // --- Unified undo/redo over the Tile's single body+frontmatter history -------
   let canUndo = $state(false);
@@ -633,7 +648,8 @@
 >
   <TileHeader
     title={headerLabel.name}
-    titleDir={headerLabel.dir}
+    crumbs={headerCrumbs}
+    onCrumb={openCrumb}
     titlePath={tile.activePath}
     hasOpenConcept={tile.activePath !== null}
     {editing}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Crumb } from '$lib/tileTitle';
+
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
   //   - the Concept title + a close affordance (clears the Tile to empty state),
@@ -17,11 +19,14 @@
     /** The active Concept's derived header label ('' when the Tile is empty). */
     title: string;
     /**
-     * The Concept's bundle-relative FOLDER prefix, trailing slash included
-     * (`'concepts/editor/'`), shown dimmed ahead of the label so the header says
-     * where the Concept lives. `''` for a root-level Concept or an empty Tile.
+     * The Concept's ancestor folders, outermost first, shown dimmed ahead of the
+     * label as clickable breadcrumbs (`concepts/editor/`) so the header says
+     * where the Concept lives. `index` is the folder's `index.md`, or null when
+     * it has none. Empty for a root-level Concept or an empty Tile.
      */
-    titleDir?: string;
+    crumbs?: (Crumb & { index: string | null })[];
+    /** A breadcrumb was clicked: open its index (if any) and show it in the Explorer. */
+    onCrumb?: (crumb: Crumb & { index: string | null }) => void;
     /** The Concept's bundle-relative path, used as the label's hover tooltip. */
     titlePath?: string | null;
     /** Whether a Concept is open (gates the per-Concept controls). */
@@ -75,7 +80,8 @@
 
   let {
     title,
-    titleDir = '',
+    crumbs = [],
+    onCrumb,
     titlePath = null,
     hasOpenConcept,
     editing,
@@ -130,7 +136,17 @@
     <!-- Folder prefix + name. The prefix is dimmed so the Concept still reads as
          the label's subject, and the tooltip carries the exact path. -->
     <span class="tile-title" data-testid="tile-title" title={titlePath ?? title}
-      >{#if titleDir}<span class="tile-title-dir" data-testid="tile-title-dir">{titleDir}</span
+      >{#if crumbs.length > 0}<span class="tile-title-dir" data-testid="tile-title-dir"
+          >{#each crumbs as crumb (crumb.folder)}<button
+              type="button"
+              class="crumb"
+              data-testid="tile-crumb"
+              data-folder={crumb.folder}
+              title={crumb.index
+                ? `Open ${crumb.index} and show it in the Explorer`
+                : `Show ${crumb.folder} in the Explorer`}
+              onclick={() => onCrumb?.(crumb)}>{crumb.name}</button
+            >/{/each}</span
         >{/if}{title}</span
     >
   </div>
@@ -379,6 +395,21 @@
   .tile-title-dir {
     font-weight: 400;
     color: var(--text-muted);
+  }
+
+  /* A breadcrumb reads as plain dimmed path text until hovered. */
+  .crumb {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .crumb:hover {
+    color: var(--text);
+    text-decoration: underline;
   }
 
   .tile-controls {

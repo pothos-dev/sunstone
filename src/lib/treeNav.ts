@@ -138,3 +138,21 @@ export function prevIndexClamped(from: number, length: number): number {
   if (from < 0) return 0;
   return Math.max(from - 1, 0);
 }
+
+/**
+ * The `index.md` directly inside `folder` (bundle-relative, `''` for the root),
+ * or null when the folder has none or is not in the tree. Used by the Tile
+ * header breadcrumbs, which open a folder's index when it has one.
+ */
+export function folderIndexPath(root: TreeNode | null, folder: string): string | null {
+  let node: TreeNode | undefined = root ?? undefined;
+  if (node && folder !== '') {
+    const parts = folder.split('/');
+    for (let i = 0; i < parts.length && node; i++) {
+      const path = parts.slice(0, i + 1).join('/');
+      node = node.children?.find((c) => c.isDir && c.path === path);
+    }
+  }
+  if (!node) return null;
+  return reservedChildren(node).find((r) => r.kind === 'index')?.path ?? null;
+}

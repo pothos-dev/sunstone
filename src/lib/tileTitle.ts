@@ -32,11 +32,38 @@ export function tileTitle(path: string | null, yaml: string): string {
 export function tileHeaderLabel(
   path: string | null,
   yaml: string,
-): { dir: string; name: string } {
+): { dir: string; name: string; crumbs: Crumb[] } {
   const name = tileTitle(path, yaml);
-  if (path === null) return { dir: '', name };
+  if (path === null) return { dir: '', name, crumbs: [] };
   const dir = dirname(path);
-  return { dir: dir === '' ? '' : `${dir}/`, name };
+  return { dir: dir === '' ? '' : `${dir}/`, name, crumbs: folderCrumbs(dir) };
+}
+
+/** One ancestor folder of the open Concept, as a clickable header breadcrumb. */
+export interface Crumb {
+  /** The folder's own name (`editor`). */
+  name: string;
+  /** The folder's bundle-relative path (`concepts/editor`). */
+  folder: string;
+}
+
+/**
+ * The breadcrumbs for the folder `dir` (bundle-relative, `''` for the root):
+ * one per folder from the outermost down, each carrying its full path.
+ */
+export function folderCrumbs(dir: string): Crumb[] {
+  if (dir === '') return [];
+  const parts = dir.split('/');
+  return parts.map((name, i) => ({ name, folder: parts.slice(0, i + 1).join('/') }));
+}
+
+/**
+ * Every ancestor folder of `folder`, itself included, outermost first
+ * (`a/b/c` → `a`, `a/b`, `a/b/c`): the folders to expand so `folder`'s
+ * row is visible in the Explorer.
+ */
+export function foldersToExpand(folder: string): string[] {
+  return folderCrumbs(folder).map((c) => c.folder);
 }
 
 /**

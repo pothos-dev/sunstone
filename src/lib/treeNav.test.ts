@@ -8,6 +8,7 @@ import {
   ordinaryChildren,
   prevIndexClamped,
   reservedChildren,
+  folderIndexPath,
 } from './treeNav';
 
 // A small Bundle tree: a `concepts/` folder with a nested `editor/` folder,
@@ -197,5 +198,18 @@ describe('reservedChildren', () => {
     expect(reservedChildren(tree.children![2])).toEqual([
       { path: 'concepts/index.md', kind: 'index' },
     ]);
+  });
+});
+
+describe('folderIndexPath', () => {
+  test("a folder's own index.md", () => {
+    expect(folderIndexPath(tree, 'concepts')).toBe('concepts/index.md');
+    expect(folderIndexPath(tree, '')).toBe('index.md');
+  });
+
+  test('null when the folder has no index or is missing', () => {
+    expect(folderIndexPath(tree, 'concepts/editor')).toBeNull();
+    expect(folderIndexPath(tree, 'nope')).toBeNull();
+    expect(folderIndexPath(null, 'concepts')).toBeNull();
   });
 });
