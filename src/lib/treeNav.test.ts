@@ -9,6 +9,7 @@ import {
   prevIndexClamped,
   reservedChildren,
   folderIndexPath,
+  indexChild,
 } from './treeNav';
 
 // A small Bundle tree: a `concepts/` folder with a nested `editor/` folder,
@@ -211,5 +212,46 @@ describe('folderIndexPath', () => {
     expect(folderIndexPath(tree, 'concepts/editor')).toBeNull();
     expect(folderIndexPath(tree, 'nope')).toBeNull();
     expect(folderIndexPath(null, 'concepts')).toBeNull();
+  });
+});
+
+describe('indexChild', () => {
+  test("the node's own index.md, ignoring deeper ones", () => {
+    expect(indexChild(tree)).toBe('index.md');
+    expect(indexChild(tree.children![2])).toBe('concepts/index.md');
+  });
+
+  test('null for a folder without one, or a file node', () => {
+    expect(indexChild(tree.children![2].children![2])).toBeNull();
+    expect(indexChild(tree.children![1])).toBeNull();
+  });
+
+  test('matches the reserved name case-insensitively, but never a folder', () => {
+    const node: TreeNode = {
+      name: 'x',
+      path: 'x',
+      isDir: true,
+      children: [
+        { name: 'index.md', path: 'x/index.md', isDir: true, children: [] },
+        { name: 'INDEX.md', path: 'x/INDEX.md', isDir: false },
+      ],
+    };
+    expect(indexChild(node)).toBe('x/INDEX.md');
+  });
+});
+
+describe('ordinaryChildren markdown filter', () => {
+  test('keeps .md case-insensitively and drops other extensions', () => {
+    const node: TreeNode = {
+      name: '',
+      path: '',
+      isDir: true,
+      children: [
+        { name: 'A.MD', path: 'A.MD', isDir: false },
+        { name: 'b.md.txt', path: 'b.md.txt', isDir: false },
+        { name: 'c.markdown', path: 'c.markdown', isDir: false },
+      ],
+    };
+    expect(ordinaryChildren(node).map((c) => c.path)).toEqual(['A.MD']);
   });
 });

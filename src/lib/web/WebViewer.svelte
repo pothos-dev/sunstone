@@ -7,7 +7,7 @@
   import { backend } from '$lib/ipc';
   import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { ordinaryChildren, reservedChildren } from '$lib/treeNav';
-  import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
+  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import SidebarEdge from '$lib/components/SidebarEdge.svelte';
@@ -139,7 +139,6 @@
 
   const rootOrdinary = $derived(data.tree ? ordinaryChildren(data.tree) : []);
   const rootReserved = $derived(data.tree ? reservedChildren(data.tree) : []);
-  const RESERVED_GLYPH: Record<ReservedKind, string> = { index: '☰', log: '🕑' };
 
   // --- Sidebar Accordion + whole-Sidebar collapse + Properties collapse ---
   let explorerOpen = $state(true);

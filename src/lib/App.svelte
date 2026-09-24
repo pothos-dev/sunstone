@@ -10,7 +10,7 @@
   import { applyZoom, zoom } from '$lib/state/zoom.svelte';
   import { wheelZoomStep } from '$lib/zoom';
   import type { TreeNode } from '$lib/types';
-  import { RESERVED_FILES, type ReservedKind } from '$lib/reserved';
+  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
   import Tree from '$lib/components/Tree.svelte';
   import TreeCrud from '$lib/components/TreeCrud.svelte';
   import QuickNav from '$lib/components/QuickNav.svelte';
@@ -637,7 +637,6 @@
 
   const rootOrdinary = $derived(bundle.tree ? ordinaryChildren(bundle.tree) : []);
   const rootReservedSorted = $derived(bundle.tree ? reservedChildren(bundle.tree) : []);
-  const ROOT_RESERVED_GLYPH: Record<ReservedKind, string> = { index: '☰', log: '🕑' };
 
   $effect(() => {
     const notice = treeActions.notice;
@@ -693,7 +692,7 @@
                 data-reserved-path={r.path}
                 data-reserved-kind={r.kind}
                 onclick={() => openConcept(r.path)}
-              >{ROOT_RESERVED_GLYPH[r.kind]}</button>
+              >{RESERVED_GLYPH[r.kind]}</button>
             {/each}
           </div>
         {/if}

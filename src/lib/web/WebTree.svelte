@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { TreeNode } from '$lib/types';
-  import { stripMd } from '$lib/path';
-  import { isReservedFile, reservedKind } from '$lib/reserved';
-  import { ordinaryChildren as ordinaryChildrenOf } from '$lib/treeNav';
+  import { isMarkdownName, stripMd } from '$lib/path';
+  import { indexChild, ordinaryChildren as ordinaryChildrenOf } from '$lib/treeNav';
   import Self from './WebTree.svelte';
 
   interface Props {
@@ -28,19 +27,13 @@
   // Deliberately NO dnd / crud / context-menu / focus-Region coupling.
   const expanded = $derived(node.isDir && isExpanded(node.path));
   const indent = $derived(depth * 16);
-  const isMarkdown = $derived(!node.isDir && node.name.toLowerCase().endsWith('.md'));
+  const isMarkdown = $derived(!node.isDir && isMarkdownName(node.name));
   const displayName = $derived(node.isDir ? node.name : stripMd(node.name));
   const children = $derived(ordinaryChildrenOf(node));
 
   // This folder's `index.md`, if any. Clicking the folder name opens it (first
   // click); once it's the open Concept, a further name-click toggles instead.
-  const indexPath = $derived(
-    node.isDir
-      ? ((node.children ?? []).find(
-          (c) => !c.isDir && isReservedFile(c.path) && reservedKind(c.path) === 'index',
-        )?.path ?? null)
-      : null,
-  );
+  const indexPath = $derived(node.isDir ? indexChild(node) : null);
 
   function toggle() {
     setExpanded(node.path, !expanded);

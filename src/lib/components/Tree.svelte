@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import type { TreeNode } from '$lib/types';
-  import { dirname, stripMd } from '$lib/path';
+  import { dirname, isMarkdownName, stripMd } from '$lib/path';
   import { session } from '$lib/state/session.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { treeDnd } from '$lib/state/treeDnd.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { ordinaryChildren as ordinaryChildrenOf } from '$lib/treeNav';
-  import { isReservedFile, reservedKind, RESERVED_FILES, type ReservedKind } from '$lib/reserved';
+  import { indexChild, ordinaryChildren as ordinaryChildrenOf, reservedChildren } from '$lib/treeNav';
+  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
   import Self from './Tree.svelte';
 
   interface Props {
@@ -75,7 +75,7 @@
     session.setExpanded(node.path, !expanded);
   }
 
-  const isMarkdown = $derived(!node.isDir && node.name.toLowerCase().endsWith('.md'));
+  const isMarkdown = $derived(!node.isDir && isMarkdownName(node.name));
 
   // Drag-and-drop moving (slice: tree-dnd). Folders and Concepts (`.md` files)
   // can be dragged. The drop TARGET resolves to a folder: a folder row means
@@ -174,30 +174,15 @@
   // This folder's index page (`index.md`), if it has one. There is no longer an
   // index icon: clicking the folder name opens it (see `onNameClick`), so the
   // path is all we need here.
-  const indexPath = $derived(
-    node.isDir
-      ? ((node.children ?? []).find(
-          (c) => !c.isDir && isReservedFile(c.path) && reservedKind(c.path) === 'index',
-        )?.path ?? null)
-      : null,
-  );
+  const indexPath = $derived(node.isDir ? indexChild(node) : null);
 
   // The reserved files surfaced as folder-row icons, in a stable order, each as
   // { kind, path } so the affordance can open it. `index` is deliberately
   // excluded — it is reached by clicking the folder name instead — leaving just
   // `log`. The icon opens it like any other Concept (normal markdown editing).
-  const RESERVED_ORDER: ReservedKind[] = ['index', 'log'];
   const reservedAffordances = $derived(
-    node.isDir
-      ? (node.children ?? [])
-          .filter((c) => !c.isDir && isReservedFile(c.path) && reservedKind(c.path) !== 'index')
-          .map((c) => ({ kind: reservedKind(c.path) as ReservedKind, path: c.path }))
-          .sort((a, b) => RESERVED_ORDER.indexOf(a.kind) - RESERVED_ORDER.indexOf(b.kind))
-      : [],
+    node.isDir ? reservedChildren(node).filter((r) => r.kind !== 'index') : [],
   );
-
-  /** A small glyph per reserved kind for the folder-row affordance. */
-  const RESERVED_GLYPH: Record<ReservedKind, string> = { index: '☰', log: '🕑' };
 </script>
 
 {#if node.isDir}

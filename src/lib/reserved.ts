@@ -22,6 +22,12 @@ export const RESERVED_FILES: Record<ReservedKind, string> = {
   log: 'log.md',
 };
 
+/**
+ * The small glyph each reserved kind shows as a folder-row / Bundle-root
+ * affordance (desktop Explorer, App root listing, web viewer).
+ */
+export const RESERVED_GLYPH: Record<ReservedKind, string> = { index: '☰', log: '🕑' };
+
 /** Every reserved basename (lowercase), for membership checks. */
 const RESERVED_BASENAMES = new Set<string>(Object.values(RESERVED_FILES));
 

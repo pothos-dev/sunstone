@@ -12,6 +12,7 @@
 // its own pure module with unit tests.
 
 import type { TreeNode } from '$lib/types';
+import { isMarkdownName } from '$lib/path';
 import { isReservedFile, reservedKind, type ReservedKind } from '$lib/reserved';
 
 /** One row in the flattened visible-rows list. */
@@ -36,7 +37,7 @@ export interface VisibleRow {
  */
 export function ordinaryChildren(node: TreeNode): TreeNode[] {
   return (node.children ?? []).filter(
-    (c) => c.isDir || (c.name.toLowerCase().endsWith('.md') && !isReservedFile(c.path)),
+    (c) => c.isDir || (isMarkdownName(c.name) && !isReservedFile(c.path)),
   );
 }
 
@@ -59,6 +60,14 @@ export function reservedChildren(node: TreeNode): ReservedEntry[] {
     .filter((c) => !c.isDir && isReservedFile(c.path))
     .map((c) => ({ path: c.path, kind: reservedKind(c.path) as ReservedKind }))
     .sort((a, b) => RESERVED_ORDER.indexOf(a.kind) - RESERVED_ORDER.indexOf(b.kind));
+}
+
+/**
+ * The path of the `index.md` directly under `node`, or `null` when it has none
+ * — what a folder-name click opens (desktop Explorer, web tree).
+ */
+export function indexChild(node: TreeNode): string | null {
+  return reservedChildren(node).find((r) => r.kind === 'index')?.path ?? null;
 }
 
 /**
@@ -153,6 +162,5 @@ export function folderIndexPath(root: TreeNode | null, folder: string): string |
       node = node.children?.find((c) => c.isDir && c.path === path);
     }
   }
-  if (!node) return null;
-  return reservedChildren(node).find((r) => r.kind === 'index')?.path ?? null;
+  return node ? indexChild(node) : null;
 }
