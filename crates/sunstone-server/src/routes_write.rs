@@ -106,7 +106,7 @@ pub(crate) async fn create_folder_handler(
         &state,
         &user,
         &headers,
-        move |app, shape, ident| shape.create_folder(app, ident, &body.path),
+        move |app, shape, _ident| shape.create_folder(app, &body.path),
         |_| StatusCode::NO_CONTENT,
     )
     .await

@@ -75,6 +75,35 @@ impl WriteResult {
     }
 }
 
+/// The commit subjects the web write path lands, spelled once: the
+/// amend-else-fresh probes ([`head_is_ours`]) must match the subject the write
+/// site committed with, byte for byte.
+mod subject {
+    pub fn create(path: &str) -> String {
+        format!("create {path} via web")
+    }
+
+    pub fn edit(path: &str) -> String {
+        format!("edit {path} via web")
+    }
+
+    pub fn relink(target: &str) -> String {
+        format!("relink {target} via web")
+    }
+
+    pub fn rename(from: &str, to: &str) -> String {
+        format!("rename {from} → {to} via web")
+    }
+
+    pub fn moved(from: &str, to: &str) -> String {
+        format!("move {from} → {to} via web")
+    }
+
+    pub fn delete(path: &str) -> String {
+        format!("delete {path} via web")
+    }
+}
+
 /// Whether this deployment's write path commits — the whole of §5's gate.
 ///
 /// Only two values, because the *write* path cannot tell git-local from
@@ -137,7 +166,7 @@ impl WriteShape {
         // Decide BEFORE writing — the write is about to overwrite the empty file.
         // `self.commits()` first, so the plain shape never probes HEAD.
         let fold_into_create = self.commits()
-            && head_is_ours(app, ident, &format!("create {path} via web"))
+            && head_is_ours(app, ident, &subject::create(path))
             && file_is_empty(&app.bundle_root.join(path));
         let resolved = bundle::write_concept(&app.bundle_root, path, content)?;
         app.note_self_write(resolved);
@@ -145,12 +174,7 @@ impl WriteShape {
             if fold_into_create {
                 git::amend(&app.bundle_root, &[path], ident)?;
             } else {
-                git::commit(
-                    &app.bundle_root,
-                    &[path],
-                    &format!("edit {path} via web"),
-                    ident,
-                )?;
+                git::commit(&app.bundle_root, &[path], &subject::edit(path), ident)?;
             }
         }
         Ok(WriteResult::change("modified", path.to_string()))
@@ -166,12 +190,7 @@ impl WriteShape {
         let resolved = bundle::create_concept(&app.bundle_root, path)?;
         app.note_self_write(resolved);
         if self.commits() {
-            git::commit(
-                &app.bundle_root,
-                &[path],
-                &format!("create {path} via web"),
-                ident,
-            )?;
+            git::commit(&app.bundle_root, &[path], &subject::create(path), ident)?;
         }
         Ok(WriteResult::change("created", path.to_string()))
     }
@@ -180,12 +199,7 @@ impl WriteShape {
     /// committed (git tracks no empty dirs), so there is nothing to commit here
     /// in **any** shape; the folder enters history when its first Concept lands.
     /// We still broadcast a `created` so every client refreshes its tree.
-    pub fn create_folder(
-        self,
-        app: &AppState,
-        _ident: &CommitIdentity,
-        path: &str,
-    ) -> Result<WriteResult, String> {
+    pub fn create_folder(self, app: &AppState, path: &str) -> Result<WriteResult, String> {
         let resolved = bundle::create_folder(&app.bundle_root, path)?;
         app.note_self_write(resolved);
         Ok(WriteResult::change("created", path.to_string()))
@@ -207,12 +221,7 @@ impl WriteShape {
         // Structural op → stage the whole tree (the op's move + every fixup); the
         // global lock guarantees no other write is in flight.
         if self.commits() {
-            git::commit(
-                &app.bundle_root,
-                &[],
-                &format!("rename {from} → {to} via web"),
-                ident,
-            )?;
+            git::commit(&app.bundle_root, &[], &subject::rename(from, to), ident)?;
         }
         Ok(structural_result(summary, from, to))
     }
@@ -239,12 +248,7 @@ impl WriteShape {
         let summary = rewrite::move_into(app, from, to_dir)?;
         app.note_self_write(app.bundle_root.join(&to));
         if self.commits() {
-            git::commit(
-                &app.bundle_root,
-                &[],
-                &format!("move {from} → {to} via web"),
-                ident,
-            )?;
+            git::commit(&app.bundle_root, &[], &subject::moved(from, &to), ident)?;
         }
         Ok(structural_result(summary, from, &to))
     }
@@ -259,12 +263,7 @@ impl WriteShape {
         app.note_self_write(app.bundle_root.join(path));
         bundle::delete_path(&app.bundle_root, path)?;
         if self.commits() {
-            git::commit(
-                &app.bundle_root,
-                &[path],
-                &format!("delete {path} via web"),
-                ident,
-            )?;
+            git::commit(&app.bundle_root, &[path], &subject::delete(path), ident)?;
         }
         Ok(WriteResult::change("removed", path.to_string()))
     }
@@ -294,26 +293,18 @@ impl WriteShape {
         // the whole tree (the rewrite touched inbound sources we don't enumerate
         // here).
         if self.commits() {
-            if head_is_ours(app, ident, &format!("edit {target} via web")) {
+            if head_is_ours(app, ident, &subject::edit(target)) {
                 git::amend(&app.bundle_root, &[], ident)?;
             } else {
-                git::commit(
-                    &app.bundle_root,
-                    &[],
-                    &format!("relink {target} via web"),
-                    ident,
-                )?;
+                git::commit(&app.bundle_root, &[], &subject::relink(target), ident)?;
             }
         }
 
         // The target's committed body is authoritative — broadcast a `modified` so
         // other clients reload it / refresh their sidebars.
         Ok(WriteResult {
-            changes: vec![ChangeGroup {
-                kind: "modified",
-                paths: vec![target.to_string()],
-            }],
             summary: Some(summary),
+            ..WriteResult::change("modified", target.to_string())
         })
     }
 }
@@ -402,12 +393,8 @@ mod tests {
         WriteShape::Git.create_concept(app, ident, path)
     }
 
-    fn create_folder(
-        app: &AppState,
-        ident: &CommitIdentity,
-        path: &str,
-    ) -> Result<WriteResult, String> {
-        WriteShape::Git.create_folder(app, ident, path)
+    fn create_folder(app: &AppState, path: &str) -> Result<WriteResult, String> {
+        WriteShape::Git.create_folder(app, path)
     }
 
     fn rename_path(
@@ -562,7 +549,7 @@ mod tests {
         let app = AppState::new(root.clone());
         let before = head_subject(&root);
 
-        let result = create_folder(&app, &ident(), "sub").unwrap();
+        let result = create_folder(&app, "sub").unwrap();
         assert!(root.join("sub").is_dir());
         // Empty dir → nothing to commit; HEAD is unchanged.
         assert_eq!(head_subject(&root), before);
@@ -783,7 +770,7 @@ mod tests {
         plain
             .write_concept(&app, &ident(), "n.md", "---\ntitle: N\n---\n")
             .unwrap();
-        plain.create_folder(&app, &ident(), "sub").unwrap();
+        plain.create_folder(&app, "sub").unwrap();
         plain.rename_path(&app, &ident(), "a.md", "c.md").unwrap();
         plain.move_path(&app, &ident(), "c.md", "sub").unwrap();
         plain.delete_path(&app, &ident(), "sub/c.md").unwrap();
