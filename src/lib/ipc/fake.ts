@@ -19,10 +19,13 @@ import {
   COMMITTED_FILES,
   FOLDERS,
   conceptPaths,
-  isSafePath,
+  assertSafePath,
+  readFileOrThrow,
+  fileExists,
   folderExists,
 } from './fake/store';
-import { ATTACHMENTS, attachmentPaths, fakeAttachmentUrl } from './fake/attachments';
+import { attachmentPaths, fakeAttachmentUrl } from './fake/attachments';
+import { dirname, moveDestination } from '$lib/path';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
 import { openPrintTab, noSavePdf, setDocumentTitle, openExternalTab } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
@@ -195,9 +198,6 @@ if (typeof window !== 'undefined') {
     simulateSyncNotice,
     clearAllTags,
     files: FILES,
-    // The seeded Attachments, so a spec can drive/inspect Embed cases without
-    // reaching into the module graph (images are NOT in `files`, by design).
-    attachments: ATTACHMENTS,
   };
 }
 
@@ -249,20 +249,11 @@ export const fakeBackend: Backend = {
   },
 
   async readConcept(path: string): Promise<string> {
-    if (!isSafePath(path)) {
-      throw new Error(`path escapes the bundle: ${path}`);
-    }
-    const content = FILES[path];
-    if (content === undefined) {
-      throw new Error(`no such concept: ${path}`);
-    }
-    return content;
+    return readFileOrThrow(path);
   },
 
   async writeConcept(path: string, content: string): Promise<void> {
-    if (!isSafePath(path)) {
-      throw new Error(`path escapes the bundle: ${path}`);
-    }
+    assertSafePath(path);
     // Sunstone's own write: update the in-memory bundle but do NOT notify
     // subscribers — the real backend suppresses the watcher echo for self
     // writes, and the fake must be behaviourally faithful (no reload loop).
@@ -293,15 +284,12 @@ export const fakeBackend: Backend = {
   // ops are NOT recorded as self-writes so the watcher's `file-changed` fires.
 
   async createConcept(path: string): Promise<void> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
+    assertSafePath(path);
     if (!path.endsWith('.md')) throw new Error(`a Concept path must end in .md: ${path}`);
-    if (Object.prototype.hasOwnProperty.call(FILES, path)) {
-      throw new Error(`already exists: ${path}`);
-    }
+    if (fileExists(path)) throw new Error(`already exists: ${path}`);
     // Mirror the Rust `create_concept`: the parent folder must already exist
     // (there, the `fs::write` fails otherwise). `''` = Bundle root, always OK.
-    const slash = path.lastIndexOf('/');
-    const parent = slash === -1 ? '' : path.slice(0, slash);
+    const parent = dirname(path);
     if (parent !== '' && !folderExists(parent)) {
       throw new Error(`parent folder does not exist: ${path}`);
     }
@@ -310,7 +298,7 @@ export const fakeBackend: Backend = {
   },
 
   async createFolder(path: string): Promise<void> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
+    assertSafePath(path);
     if (path === '') throw new Error('path must not be empty');
     if (folderExists(path)) throw new Error(`already exists: ${path}`);
     FOLDERS.add(path);
@@ -318,32 +306,27 @@ export const fakeBackend: Backend = {
   },
 
   async renamePath(from: string, to: string): Promise<RewriteSummary> {
-    if (!isSafePath(from) || !isSafePath(to)) {
-      throw new Error('path escapes the bundle');
-    }
+    assertSafePath(from, to);
     return renameAndRewrite(from, to);
   },
 
   async movePath(from: string, toDir: string): Promise<RewriteSummary> {
-    if (!isSafePath(from) || (toDir !== '' && !isSafePath(toDir))) {
-      throw new Error('path escapes the bundle');
-    }
-    const name = from.split('/').filter(Boolean).pop();
-    if (!name) throw new Error(`invalid source path: ${from}`);
-    const to = toDir === '' ? name : `${toDir.replace(/\/+$/, '')}/${name}`;
+    assertSafePath(from, toDir); // `''` (the Bundle root) is a safe path
+    if (!from.split('/').some(Boolean)) throw new Error(`invalid source path: ${from}`);
+    const to = moveDestination(from, toDir);
     if (to === from) throw new Error(`already in that folder: ${from}`);
     return renameAndRewrite(from, to);
   },
 
   async deletePath(path: string): Promise<void> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
+    assertSafePath(path);
     const removed = applyDelete(path);
     if (removed.length === 0) throw new Error(`no such path: ${path}`);
     for (const p of removed) notifyFsChange('removed', p);
   },
 
   async rewriteAnchors(target: string, renames: AnchorRename[]): Promise<RewriteSummary> {
-    if (!isSafePath(target)) throw new Error(`path escapes the bundle: ${target}`);
+    assertSafePath(target);
     if (renames.length === 0) return { linksChanged: 0, filesChanged: 0 };
     const allPaths = conceptPaths();
     let linksChanged = 0;
@@ -463,7 +446,7 @@ export const fakeBackend: Backend = {
   // — the same distinguishable state the real backend surfaces for a
   // never-committed file, so the review toggle can disable itself.
   async fileHistory(path: string): Promise<FileHistory> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
+    assertSafePath(path);
     if (!Object.prototype.hasOwnProperty.call(COMMITTED_FILES, path)) {
       return { status: 'untracked' };
     }
@@ -471,7 +454,7 @@ export const fakeBackend: Backend = {
   },
 
   async fileAtRev(path: string, rev: string): Promise<FileAtRev> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
+    assertSafePath(path);
     const content = committedContentAt(path, rev);
     if (content === null) return { status: 'notFound' };
     return { status: 'ok', content };
@@ -483,9 +466,7 @@ export const fakeBackend: Backend = {
   // `./fake/render`. Path validation + missing-file behaviour mirror
   // `readConcept` (which the render reads through).
   async renderConcept(path: string): Promise<RenderPayload> {
-    if (!isSafePath(path)) throw new Error(`path escapes the bundle: ${path}`);
-    const content = FILES[path];
-    if (content === undefined) throw new Error(`no such concept: ${path}`);
+    const content = readFileOrThrow(path);
     await ensureIndexReady(); // the fake render derives outline/critic/citations from wasm.
     return renderConceptFake(content);
   },

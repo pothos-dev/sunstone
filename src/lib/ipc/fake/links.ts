@@ -21,6 +21,7 @@ import {
   resolveWikilinkIn,
   splitWikilinkTarget,
 } from '$lib/wasm/exports';
+import { dirname, remapPath } from '$lib/path';
 import { FILES, conceptPaths } from './store';
 
 /**
@@ -124,12 +125,6 @@ export function outboundLinks(path: string, content: string): string[] {
   return [...targets];
 }
 
-/** Directory portion of a bundle-relative path ('' for a root-level file). */
-function dirOf(path: string): string {
-  const slash = path.lastIndexOf('/');
-  return slash === -1 ? '' : path.slice(0, slash);
-}
-
 /** Relative path FROM `fromDir` TO bundle-relative `target`, with `./`/`../`. */
 function relativePath(fromDir: string, target: string): string {
   const from = fromDir === '' ? [] : fromDir.split('/');
@@ -164,9 +159,10 @@ function buildMoveMap(from: string, to: string): Map<string, string> {
     map.set(from, to);
     return map;
   }
-  const prefix = `${from}/`;
+  // A folder: every Concept beneath it (never `from` itself — it has no `.md`).
   for (const path of conceptPaths()) {
-    if (path.startsWith(prefix)) map.set(path, `${to}/${path.slice(prefix.length)}`);
+    const dest = remapPath(path, from, to);
+    if (dest !== null) map.set(path, dest);
   }
   return map;
 }
@@ -357,7 +353,7 @@ function rewriteTarget(
     return null;
   }
 
-  const newPath = isAbsolute ? `/${newTarget}` : relativePath(dirOf(newSource), newTarget);
+  const newPath = isAbsolute ? `/${newTarget}` : relativePath(dirname(newSource), newTarget);
   if (newPath === pathPart) return null;
 
   return `${leading}${angleOpen}${newPath}${suffix}${angleClose}${title}`;

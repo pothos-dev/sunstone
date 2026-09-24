@@ -6,7 +6,8 @@
 // mirroring the real backend's directory semantics.
 
 import type { TreeNode } from '$lib/types';
-import { FILES, FOLDERS, folderExists, pathExists } from './store';
+import { basename, dirname, remapPath } from '$lib/path';
+import { FILES, FOLDERS, fileExists, folderExists, pathExists } from './store';
 
 /**
  * Build the recursive TreeNode for the fixture from the flat FILES map.
@@ -24,12 +25,9 @@ export function buildTree(): TreeNode {
     const existing = dirs.get(dirPath);
     if (existing) return existing;
 
-    const slash = dirPath.lastIndexOf('/');
-    const parentPath = slash === -1 ? '' : dirPath.slice(0, slash);
-    const name = slash === -1 ? dirPath : dirPath.slice(slash + 1);
-    const parent = ensureDir(parentPath);
+    const parent = ensureDir(dirname(dirPath));
 
-    const node: TreeNode = { name, path: dirPath, isDir: true, children: [] };
+    const node: TreeNode = { name: basename(dirPath), path: dirPath, isDir: true, children: [] };
     parent.children!.push(node);
     dirs.set(dirPath, node);
     return node;
@@ -39,11 +37,7 @@ export function buildTree(): TreeNode {
   for (const folder of FOLDERS) ensureDir(folder);
 
   for (const path of Object.keys(FILES)) {
-    const slash = path.lastIndexOf('/');
-    const dirPath = slash === -1 ? '' : path.slice(0, slash);
-    const name = slash === -1 ? path : path.slice(slash + 1);
-    const dir = ensureDir(dirPath);
-    dir.children!.push({ name, path, isDir: false });
+    ensureDir(dirname(path)).children!.push({ name: basename(path), path, isDir: false });
   }
 
   // Sort each directory: dirs first, then files, alphabetically.
@@ -70,34 +64,33 @@ export function applyRename(from: string, to: string): void {
   // Mirror the Rust `rename_path` guard: the target's parent folder must exist
   // (a real `fs::rename` would otherwise fail). `''` is the Bundle root, always
   // present. Checked before any mutation so a rejected rename is a no-op.
-  const slash = to.lastIndexOf('/');
-  const parent = slash === -1 ? '' : to.slice(0, slash);
+  const parent = dirname(to);
   if (parent !== '' && !folderExists(parent)) {
     throw new Error(`target folder does not exist: ${to}`);
   }
 
-  if (Object.prototype.hasOwnProperty.call(FILES, from)) {
+  if (fileExists(from)) {
     // Single file.
     FILES[to] = FILES[from];
     delete FILES[from];
     return;
   }
 
-  // Folder: move it and every descendant (files + tracked subfolders).
-  const fromPrefix = `${from}/`;
+  // Folder: move it and every descendant (files + tracked subfolders). `from`
+  // itself is not a FILES key here (that was the single-file branch), so only
+  // descendants remap; a tracked FOLDERS entry may be `from` itself.
   for (const p of Object.keys(FILES)) {
-    if (p.startsWith(fromPrefix)) {
-      FILES[`${to}/${p.slice(fromPrefix.length)}`] = FILES[p];
+    const dest = remapPath(p, from, to);
+    if (dest !== null) {
+      FILES[dest] = FILES[p];
       delete FILES[p];
     }
   }
   for (const f of [...FOLDERS]) {
-    if (f === from) {
+    const dest = remapPath(f, from, to);
+    if (dest !== null) {
       FOLDERS.delete(f);
-      FOLDERS.add(to);
-    } else if (f.startsWith(fromPrefix)) {
-      FOLDERS.delete(f);
-      FOLDERS.add(`${to}/${f.slice(fromPrefix.length)}`);
+      FOLDERS.add(dest);
     }
   }
   FOLDERS.add(to);
@@ -109,7 +102,7 @@ export function applyRename(from: string, to: string): void {
  */
 export function applyDelete(path: string): string[] {
   const removed: string[] = [];
-  if (Object.prototype.hasOwnProperty.call(FILES, path)) {
+  if (fileExists(path)) {
     delete FILES[path];
     removed.push(path);
     return removed;

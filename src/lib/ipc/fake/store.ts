@@ -55,6 +55,31 @@ export function isSafePath(path: string): boolean {
   return !path.split('/').includes('..');
 }
 
+/**
+ * Throw unless every path in `paths` stays inside the bundle. The message
+ * names the path when there is exactly one (the Rust per-path error) and is the
+ * bare `'path escapes the bundle'` for a multi-path op (rename/move).
+ */
+export function assertSafePath(...paths: string[]): void {
+  if (paths.every(isSafePath)) return;
+  throw new Error(
+    paths.length === 1 ? `path escapes the bundle: ${paths[0]}` : 'path escapes the bundle',
+  );
+}
+
+/** The content of the file at `path`, after the escape check; throws when absent. */
+export function readFileOrThrow(path: string): string {
+  assertSafePath(path);
+  const content = FILES[path];
+  if (content === undefined) throw new Error(`no such concept: ${path}`);
+  return content;
+}
+
+/** True if `path` is an existing FILE (an own key of `FILES`). */
+export function fileExists(path: string): boolean {
+  return Object.prototype.hasOwnProperty.call(FILES, path);
+}
+
 /** True if `path` is an existing folder (explicit, or implied by a file). */
 export function folderExists(path: string): boolean {
   if (FOLDERS.has(path)) return true;
@@ -64,5 +89,5 @@ export function folderExists(path: string): boolean {
 
 /** True if `path` is an existing file OR folder. */
 export function pathExists(path: string): boolean {
-  return Object.prototype.hasOwnProperty.call(FILES, path) || folderExists(path);
+  return fileExists(path) || folderExists(path);
 }

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { FILES, FOLDERS, conceptPaths, folderExists, isSafePath, pathExists } from './store';
+import {
+  FILES,
+  FOLDERS,
+  assertSafePath,
+  conceptPaths,
+  fileExists,
+  folderExists,
+  isSafePath,
+  pathExists,
+  readFileOrThrow,
+} from './store';
 
 // Some tests mutate the shared fixture; restore it after each test.
 const filesSnapshot = { ...FILES };
@@ -42,6 +52,48 @@ describe('isSafePath', () => {
     expect(isSafePath('..\\outside.md')).toBe(true);
     expect(isSafePath('foo\\..\\bar.md')).toBe(true);
     expect(isSafePath('concepts\\file.md')).toBe(true);
+  });
+});
+
+describe('assertSafePath', () => {
+  test('passes safe paths, including the Bundle root', () => {
+    expect(() => assertSafePath('index.md')).not.toThrow();
+    expect(() => assertSafePath('a.md', '')).not.toThrow();
+  });
+
+  test('a single unsafe path is named in the message', () => {
+    expect(() => assertSafePath('../x.md')).toThrow(new Error('path escapes the bundle: ../x.md'));
+  });
+
+  test('a multi-path op throws the bare message when any path is unsafe', () => {
+    expect(() => assertSafePath('a.md', '/etc')).toThrow(new Error('path escapes the bundle'));
+    expect(() => assertSafePath('../a.md', 'b')).toThrow(new Error('path escapes the bundle'));
+  });
+});
+
+describe('readFileOrThrow', () => {
+  test('returns the live content', () => {
+    FILES['live.md'] = '# live';
+    expect(readFileOrThrow('live.md')).toBe('# live');
+  });
+
+  test('rejects an escaping path before looking it up', () => {
+    expect(() => readFileOrThrow('../index.md')).toThrow(
+      new Error('path escapes the bundle: ../index.md'),
+    );
+  });
+
+  test('a missing file is "no such concept"', () => {
+    expect(() => readFileOrThrow('ghost.md')).toThrow(new Error('no such concept: ghost.md'));
+  });
+});
+
+describe('fileExists', () => {
+  test('true only for FILES keys, not folders or inherited props', () => {
+    expect(fileExists('index.md')).toBe(true);
+    expect(fileExists('concepts')).toBe(false);
+    expect(fileExists('ghost.md')).toBe(false);
+    expect(fileExists('constructor')).toBe(false);
   });
 });
 
