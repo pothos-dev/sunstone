@@ -14,7 +14,7 @@
 // Splitting a Concept into `open` / `yaml` / `close` / `body` is NOT here — it
 // is `splitFrontmatter` in the shared Rust core (ADR 0006 §11-B).
 
-import { parseDocument, stringify } from 'yaml';
+import { parseDocument, stringify, type Document } from 'yaml';
 import { basename, stripMd } from '$lib/path';
 
 /**
@@ -58,6 +58,20 @@ export interface YamlError {
 }
 
 /**
+ * Parse `yaml` the one way every helper here does: `uniqueKeys: false`, so a
+ * duplicate key is a lint finding rather than a parse error (see `yamlError`).
+ * `parseDocument` collects errors on the document rather than throwing, but a
+ * malformed input can still trip the tokenizer — that surfaces as `thrown`.
+ */
+function tryParseYaml(yaml: string): { ok: true; doc: Document } | { ok: false; thrown: unknown } {
+  try {
+    return { ok: true, doc: parseDocument(yaml, { uniqueKeys: false }) };
+  } catch (e) {
+    return { ok: false, thrown: e };
+  }
+}
+
+/**
  * The first parse error in `yaml`, or `null` when the block is well-formed.
  * Drives BOTH the Frontmatter editor's error indicator and — via
  * `isParseable` — the save gate, so the two can never disagree about whether a
@@ -70,15 +84,13 @@ export interface YamlError {
  * so it is a LINT finding, not a reason to refuse the write.
  */
 export function yamlError(yaml: string): YamlError | null {
-  let errors;
-  try {
-    errors = parseDocument(yaml, { uniqueKeys: false }).errors;
-  } catch (e) {
-    // `parseDocument` collects errors rather than throwing, but a malformed
-    // input can still trip the tokenizer; treat that as unparseable too.
+  const parsed = tryParseYaml(yaml);
+  if (!parsed.ok) {
+    // A tokenizer throw is unparseable too.
+    const e = parsed.thrown;
     return { message: e instanceof Error ? e.message : String(e), from: 0, to: yaml.length };
   }
-  const first = errors[0];
+  const first = parsed.doc.errors[0];
   if (!first) return null;
   const [from, to] = first.pos;
   const end = Math.min(Math.max(to, from + 1), Math.max(yaml.length, 1));
@@ -98,9 +110,11 @@ export function isParseable(yaml: string): boolean {
  */
 export function titleFromYaml(yaml: string): string | null {
   if (yaml.trim() === '') return null;
+  const parsed = tryParseYaml(yaml);
+  if (!parsed.ok) return null;
   let value;
   try {
-    value = parseDocument(yaml, { uniqueKeys: false }).toJS({ maxAliasCount: 100 });
+    value = parsed.doc.toJS({ maxAliasCount: 100 }); // throws e.g. past maxAliasCount
   } catch {
     return null;
   }
@@ -119,14 +133,9 @@ export function titleFromYaml(yaml: string): string | null {
  * does not parse (nothing to format) or when formatting would not change it.
  */
 export function formatYaml(yaml: string): string | null {
-  let doc;
-  try {
-    doc = parseDocument(yaml, { uniqueKeys: false });
-  } catch {
-    return null;
-  }
-  if (doc.errors.length > 0) return null;
-  const out = doc.toString().replace(/\n$/, '');
+  const parsed = tryParseYaml(yaml);
+  if (!parsed.ok || parsed.doc.errors.length > 0) return null;
+  const out = parsed.doc.toString().replace(/\n$/, '');
   return out === yaml ? null : out;
 }
 
