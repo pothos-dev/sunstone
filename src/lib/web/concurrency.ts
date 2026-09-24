@@ -79,6 +79,18 @@ export function structuralOpGated(op: StructuralOp, dirty: boolean): boolean {
   return dirty && op !== 'create';
 }
 
+/** The three answers a leave / structural-op modal offers over a dirty buffer. */
+export type GateChoice = 'save' | 'discard' | 'cancel';
+
+/**
+ * Whether a three-way gate choice lets the gated action (Concept switch, Tile
+ * close, rename/move/delete) go ahead: Save and Discard both leave the buffer
+ * clean and proceed; Cancel aborts it.
+ */
+export function gateProceeds(choice: GateChoice): boolean {
+  return choice !== 'cancel';
+}
+
 // --- User-facing copy for the concurrency surfaces (ticket 08 §3-5) ---------
 // Kept here (pure, unit-tested) so the `.svelte` glue never inlines message
 // strings; each takes the attributed writer name or `null` (external/desktop

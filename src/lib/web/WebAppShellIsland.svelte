@@ -8,7 +8,7 @@
   //
   // The coordinator is a THIN switch over the pure `concurrency.ts` helpers and
   // the `editor` module singleton (the SAME active-Tile/Document model `App`
-  // drives). It owns four web-only concerns — all guarded on `__SUNSTONE_WEB__`
+  // drives). It owns seven web-only concerns — all guarded on `__SUNSTONE_WEB__`
   // so the desktop shell is byte-identical:
   //   1. SSE routing — the SINGLE `onFileChanged` handler (App's own subscription
   //      is web-gated off), routing the active buffer through refresh / clean
@@ -40,7 +40,13 @@
   import { setDirtyLeaveGate } from '$lib/state/workspace.svelte';
   import type { Document } from '$lib/state/document.svelte';
   import type { FileChange, SyncNotice } from '$lib/types';
-  import { routeFileChange, structuralOpGated, type GatedStructuralOp } from './concurrency';
+  import {
+    gateProceeds,
+    routeFileChange,
+    structuralOpGated,
+    type GateChoice,
+    type GatedStructuralOp,
+  } from './concurrency';
   import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptHref, urlSyncAction } from './urlSync';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
@@ -250,42 +256,17 @@
     if (p !== null) void editor.onExternalChange('removed', [p]);
   }
 
-  // --- Three-way leave modal (ticket 08 §4) — resolves the workspace gate ------
-  async function leaveSave(): Promise<void> {
-    const s = leave;
-    await s?.doc.saveNow();
-    leave = null;
-    s?.resolve(true);
-  }
-  async function leaveDiscard(): Promise<void> {
-    const s = leave;
-    await s?.doc.discardLocalEdits();
-    leave = null;
-    s?.resolve(true);
-  }
-  function leaveCancel(): void {
-    const s = leave;
-    leave = null;
-    s?.resolve(false);
-  }
-
-  // --- Three-way structural-op modal (ticket 08 §5) — resolves treeActions gate -
-  async function structuralSave(): Promise<void> {
-    const s = structural;
-    await s?.doc.saveNow();
-    structural = null;
-    s?.resolve(true);
-  }
-  async function structuralDiscard(): Promise<void> {
-    const s = structural;
-    await s?.doc.discardLocalEdits();
-    structural = null;
-    s?.resolve(true);
-  }
-  function structuralCancel(): void {
-    const s = structural;
-    structural = null;
-    s?.resolve(false);
+  // --- Three-way modals — resolve the workspace leave gate (ticket 08 §4) or
+  // the treeActions structural-op gate (§5). Save/Discard settle the outgoing
+  // buffer first; the modal closes, then the gate promise resolves. Cancel does
+  // no await, so it closes + resolves synchronously.
+  async function resolveGate(slot: 'leave' | 'structural', choice: GateChoice): Promise<void> {
+    const s = slot === 'leave' ? leave : structural;
+    if (choice === 'save') await s?.doc.saveNow();
+    else if (choice === 'discard') await s?.doc.discardLocalEdits();
+    if (slot === 'leave') leave = null;
+    else structural = null;
+    s?.resolve(gateProceeds(choice));
   }
 
   // --- Explicit Save (ticket 08 §4) ------------------------------------------
@@ -398,12 +379,12 @@
       onConflictKeep={conflictKeep}
       onDeletedRecreate={deletedRecreate}
       onDeletedDiscard={deletedDiscard}
-      onLeaveSave={leaveSave}
-      onLeaveDiscard={leaveDiscard}
-      onLeaveCancel={leaveCancel}
-      onStructuralSave={structuralSave}
-      onStructuralDiscard={structuralDiscard}
-      onStructuralCancel={structuralCancel}
+      onLeaveSave={() => void resolveGate('leave', 'save')}
+      onLeaveDiscard={() => void resolveGate('leave', 'discard')}
+      onLeaveCancel={() => void resolveGate('leave', 'cancel')}
+      onStructuralSave={() => void resolveGate('structural', 'save')}
+      onStructuralDiscard={() => void resolveGate('structural', 'discard')}
+      onStructuralCancel={() => void resolveGate('structural', 'cancel')}
     />
   </div>
 {:else}

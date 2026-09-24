@@ -3,6 +3,7 @@ import {
   isOwnEcho,
   routeFileChange,
   structuralOpGated,
+  gateProceeds,
   conflictTitle,
   updatedNoticeText,
   deletedStateText,
@@ -122,4 +123,10 @@ test('structuralPromptText spells out the gated op verb', () => {
   expect(structuralPromptText('rename', 'B', 'A')).toBe('Save A before renaming B?');
   expect(structuralPromptText('move', 'B', 'A')).toBe('Save A before moving B?');
   expect(structuralPromptText('delete', 'B', 'A')).toBe('Save A before deleting B?');
+});
+
+test('gateProceeds: save and discard proceed, cancel aborts', () => {
+  expect(gateProceeds('save')).toBe(true);
+  expect(gateProceeds('discard')).toBe(true);
+  expect(gateProceeds('cancel')).toBe(false);
 });
