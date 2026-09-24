@@ -54,8 +54,7 @@
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { isReservedFile } from '$lib/reserved';
-  import { tileHeaderLabel, type Crumb } from '$lib/tileTitle';
-  import { folderIndexPath } from '$lib/treeNav';
+  import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
   import { bundle } from '$lib/state/bundle.svelte';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { region } from '$lib/region';
@@ -175,13 +174,11 @@
   // shows the right Concept (a rare flake in tile-header.spec.ts). `tile.content`
   // is the source both halves derive from, so reading it here cannot go stale.
   const headerLabel = $derived(tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml));
-  const headerCrumbs = $derived(
-    headerLabel.crumbs.map((c) => ({ ...c, index: folderIndexPath(bundle.tree, c.folder) })),
-  );
+  const headerCrumbs = $derived(indexCrumbs(headerLabel.crumbs, bundle.tree));
 
   // A header breadcrumb opens that folder's index.md (when it has one and it is
   // not already open) and shows the folder in the Explorer.
-  function openCrumb(crumb: Crumb & { index: string | null }) {
+  function openCrumb(crumb: IndexedCrumb) {
     if (crumb.index !== null && crumb.index !== tile.activePath) void tile.open(crumb.index);
     onRevealFolder?.(crumb.folder);
   }

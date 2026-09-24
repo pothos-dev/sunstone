@@ -9,6 +9,8 @@
 
 import { basename, dirname, stripMd } from '$lib/path';
 import { titleFromYaml } from '$lib/frontmatter';
+import { folderIndexPath } from '$lib/treeNav';
+import type { TreeNode } from '$lib/types';
 
 /**
  * Derive the header label for the Tile showing `path` with the frontmatter block
@@ -55,6 +57,18 @@ export function folderCrumbs(dir: string): Crumb[] {
   if (dir === '') return [];
   const parts = dir.split('/');
   return parts.map((name, i) => ({ name, folder: parts.slice(0, i + 1).join('/') }));
+}
+
+/** A header breadcrumb plus its folder's `index.md` path (`null` = none). */
+export type IndexedCrumb = Crumb & { index: string | null };
+
+/**
+ * Attach each crumb's folder `index.md` (looked up in the Bundle `tree`), which
+ * a header breadcrumb click opens. `index` is `null` for a folder without one,
+ * or for every crumb while the tree is not loaded.
+ */
+export function indexCrumbs(crumbs: Crumb[], tree: TreeNode | null): IndexedCrumb[] {
+  return crumbs.map((c) => ({ ...c, index: folderIndexPath(tree, c.folder) }));
 }
 
 /**

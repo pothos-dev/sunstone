@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Crumb } from '$lib/tileTitle';
+  import type { IndexedCrumb } from '$lib/tileTitle';
 
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
@@ -24,9 +24,9 @@
      * where the Concept lives. `index` is the folder's `index.md`, or null when
      * it has none. Empty for a root-level Concept or an empty Tile.
      */
-    crumbs?: (Crumb & { index: string | null })[];
+    crumbs?: IndexedCrumb[];
     /** A breadcrumb was clicked: open its index (if any) and show it in the Explorer. */
-    onCrumb?: (crumb: Crumb & { index: string | null }) => void;
+    onCrumb?: (crumb: IndexedCrumb) => void;
     /** The Concept's bundle-relative path, used as the label's hover tooltip. */
     titlePath?: string | null;
     /** Whether a Concept is open (gates the per-Concept controls). */

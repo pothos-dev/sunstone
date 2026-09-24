@@ -1,5 +1,13 @@
 import { test, expect } from 'bun:test';
-import { tileTitle, tileHeaderLabel, windowTitle, folderCrumbs, foldersToExpand } from './tileTitle';
+import {
+  tileTitle,
+  tileHeaderLabel,
+  windowTitle,
+  folderCrumbs,
+  foldersToExpand,
+  indexCrumbs,
+} from './tileTitle';
+import type { TreeNode } from './types';
 
 test('tileTitle: empty when nothing is open', () => {
   expect(tileTitle(null, '')).toBe('');
@@ -79,4 +87,31 @@ test('tileHeaderLabel: carries the folder crumbs', () => {
 
 test('foldersToExpand: the folder and each ancestor', () => {
   expect(foldersToExpand('a/b/c')).toEqual(['a', 'a/b', 'a/b/c']);
+});
+
+test('indexCrumbs: attaches each folder index.md, null where absent', () => {
+  const tree: TreeNode = {
+    name: '',
+    path: '',
+    isDir: true,
+    children: [
+      {
+        name: 'a',
+        path: 'a',
+        isDir: true,
+        children: [
+          { name: 'index.md', path: 'a/index.md', isDir: false },
+          { name: 'b', path: 'a/b', isDir: true, children: [] },
+        ],
+      },
+    ],
+  };
+  expect(indexCrumbs(folderCrumbs('a/b'), tree)).toEqual([
+    { name: 'a', folder: 'a', index: 'a/index.md' },
+    { name: 'b', folder: 'a/b', index: null },
+  ]);
+});
+
+test('indexCrumbs: every index is null before the tree loads', () => {
+  expect(indexCrumbs(folderCrumbs('a'), null)).toEqual([{ name: 'a', folder: 'a', index: null }]);
 });
