@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -117,7 +118,7 @@ pub struct WindowState {
 /// The whole on-disk store: app config plus a map of bundle-path -> state.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
-pub(crate) struct Store {
+struct Store {
     /// App-level config shared across Bundles.
     pub config: AppConfig,
     /// Per-Bundle session state, keyed by the Bundle's absolute path string.
@@ -161,7 +162,7 @@ fn store_path() -> Option<PathBuf> {
 
 /// Load the whole store from disk. Missing or corrupt file -> defaults (never
 /// an error: losing session state must not break startup).
-pub(crate) fn load_store() -> Store {
+fn load_store() -> Store {
     let Some(path) = store_path() else {
         return Store::default();
     };
@@ -172,10 +173,46 @@ pub(crate) fn load_store() -> Store {
 }
 
 /// Persist the whole store to disk (pretty JSON for human inspection).
-pub(crate) fn save_store(store: &Store) -> Result<(), String> {
+///
+/// Written to a sibling temp file and renamed over `state.json`, so a reader
+/// (or a crash mid-write) never sees a half-written store.
+fn save_store(store: &Store) -> Result<(), String> {
     let path = store_path().ok_or_else(|| "no OS config directory".to_string())?;
     let text = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
-    std::fs::write(&path, text).map_err(|e| e.to_string())
+    write_atomic(&path, &text).map_err(|e| e.to_string())
+}
+
+/// Replace `path` with `text` via a temp file in the same directory and a
+/// rename, so the old or the new content is visible at any instant, never a
+/// partial one. The temp name carries the pid, as another Sunstone process may
+/// be saving concurrently.
+fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let mut tmp_name = path.file_name().unwrap_or_default().to_os_string();
+    tmp_name.push(format!(".{}.tmp", std::process::id()));
+    let tmp = path.with_file_name(tmp_name);
+    let written = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    written
+}
+
+/// Serialises this process's load-mutate-save cycles, so two threads updating
+/// different fields (window geometry vs. session state, say) cannot drop each
+/// other's write.
+static STORE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Load the store, let `update` mutate it, and save it back, all under
+/// [`STORE_LOCK`]. `update` returns whether anything changed; the store is
+/// only written when it did.
+fn with_store(update: impl FnOnce(&mut Store) -> bool) -> Result<(), String> {
+    // A panic in another update cannot leave the `()` guard inconsistent.
+    let _guard = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let mut store = load_store();
+    if update(&mut store) {
+        save_store(&store)?;
+    }
+    Ok(())
 }
 
 /// Normalise a Bundle root path to the string key used in the store. We use the
@@ -198,11 +235,12 @@ pub fn load_bundle_state(bundle_root: &Path) -> BundleState {
 /// Save the session state for one Bundle, merging it into the store (other
 /// Bundles' entries and app config are preserved).
 pub fn save_bundle_state(bundle_root: &Path, state: BundleState) -> Result<(), String> {
-    let mut store = load_store();
-    let key = bundle_key(bundle_root);
-    let merged = merge_frontend_state(store.bundles.get(&key), state);
-    store.bundles.insert(key, merged);
-    save_store(&store)
+    with_store(|store| {
+        let key = bundle_key(bundle_root);
+        let merged = merge_frontend_state(store.bundles.get(&key), state);
+        store.bundles.insert(key, merged);
+        true
+    })
 }
 
 /// Fold a frontend session snapshot over the stored entry. The frontend owns
@@ -229,10 +267,11 @@ pub fn load_window_state(bundle_root: &Path) -> Option<WindowState> {
 /// Persist window geometry for a Bundle without disturbing the rest of its
 /// session state. Called from the window resize/move/close handler.
 pub fn save_window_state(bundle_root: &Path, window: WindowState) -> Result<(), String> {
-    let mut store = load_store();
-    let entry = store.bundles.entry(bundle_key(bundle_root)).or_default();
-    entry.window = Some(window);
-    save_store(&store)
+    with_store(|store| {
+        let entry = store.bundles.entry(bundle_key(bundle_root)).or_default();
+        entry.window = Some(window);
+        true
+    })
 }
 
 /// One entry in the launcher's "known folders" list: a previously-opened Bundle,
@@ -274,10 +313,11 @@ fn display_name(path: &str) -> String {
 /// makes a folder "known" to the launcher the moment it is first opened, before
 /// any session state is saved.
 pub fn touch_bundle(bundle_root: &Path) -> Result<(), String> {
-    let mut store = load_store();
-    let entry = store.bundles.entry(bundle_key(bundle_root)).or_default();
-    entry.last_opened = Some(now_millis());
-    save_store(&store)
+    with_store(|store| {
+        let entry = store.bundles.entry(bundle_key(bundle_root)).or_default();
+        entry.last_opened = Some(now_millis());
+        true
+    })
 }
 
 /// Sort known-folder entries newest-first: by `last_opened` descending, with
@@ -314,11 +354,7 @@ pub fn list_known_bundles() -> Vec<KnownBundle> {
 /// its persisted config does not grow forever. `path` is the store key (an entry's
 /// `KnownBundle.path`). A no-op if the key is absent.
 pub fn forget_bundle(path: &str) -> Result<(), String> {
-    let mut store = load_store();
-    if store.bundles.remove(path).is_some() {
-        save_store(&store)?;
-    }
-    Ok(())
+    with_store(|store| store.bundles.remove(path).is_some())
 }
 
 #[cfg(test)]
@@ -363,6 +399,26 @@ mod tests {
         assert_eq!(st.expanded_folders.len(), 2);
         assert_eq!(st.window.unwrap().width, 800);
         assert_eq!(st.recent_files, vec!["a/b.md", "a/c.md"]);
+    }
+
+    #[test]
+    fn write_atomic_replaces_the_file_and_leaves_no_temp_behind() {
+        let dir = std::env::temp_dir().join(format!(
+            "sunstone-config-atomic-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+        write_atomic(&path, "first").unwrap();
+        write_atomic(&path, "second").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
+        let names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("state.json")]);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
