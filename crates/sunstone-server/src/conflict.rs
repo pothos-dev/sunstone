@@ -95,7 +95,7 @@ impl Resolution {
     /// The path the notice is *about* (the canonical path in both variants),
     /// **repo-root-relative** — see the module note on path relativity;
     /// [`Self::to_bundle_relative`] is what makes it user-facing.
-    #[allow(dead_code)] // the resolver's documented accessor; the loop matches on the variants
+    #[cfg(test)] // the loop matches on the variants
     pub fn path(&self) -> &str {
         match self {
             Resolution::Forked { path, .. } => path,
@@ -158,13 +158,11 @@ pub struct ForkMap {
 impl ForkMap {
     /// An empty map for one rebase run.
     pub fn new() -> Self {
-        ForkMap {
-            minted: BTreeMap::new(),
-        }
+        Self::default()
     }
 
     /// The fork already minted for `path` in this run, if any.
-    #[allow(dead_code)] // the coalescing invariant's test seam; `fork_for` is the loop's call
+    #[cfg(test)] // the coalescing invariant's test seam; `fork_for` is the loop's call
     pub fn get(&self, path: &str) -> Option<&str> {
         self.minted.get(path).map(String::as_str)
     }
@@ -191,7 +189,7 @@ impl ForkMap {
 
     /// Every resolution minted in this run, by canonical path — the source of
     /// the run's log lines.
-    #[allow(dead_code)] // §9.4: the loop logs from the resolution record, not from the map
+    #[cfg(test)] // §9.4: the loop logs from the resolution record, not from the map
     pub fn entries(&self) -> impl Iterator<Item = (&str, &str)> {
         self.minted.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }

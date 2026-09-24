@@ -171,7 +171,7 @@ impl Config {
     /// The trivially-correct plain config every module's tests build on;
     /// `main()` itself goes through [`crate::config::parse_env`] +
     /// [`crate::boot::run`].
-    #[allow(dead_code)] // the trivially-correct plain config every module's tests build on
+    #[cfg(test)]
     pub fn plain(bundle_root: PathBuf) -> Config {
         Config {
             shape: Shape::Plain,
