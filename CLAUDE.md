@@ -35,12 +35,17 @@ and the web write test strategy.
 ## Conventions that bite
 
 - **IPC seam**: the frontend never imports `@tauri-apps/api` outside
-  `src/lib/ipc/`. All backend access goes through the `Backend` interface; both
-  `tauri.ts` (real) and `fake.ts` (in-memory) must implement every method.
+  `src/lib/ipc/`. All backend access goes through the `Backend` interface;
+  `tauri.ts` (desktop), `http.ts` (web) and `fake.ts` (in-memory) must each
+  implement every method.
 - **Pure logic lives in plain `.ts`** (e.g. `path.ts`, `treeNav.ts`,
-  `frontmatter.ts`, `appHotkeys.ts`, `propertiesEdits.ts`, `quickNavResults.ts`)
+  `frontmatter.ts`, `appHotkeys.ts`, `quickNavResults.ts`)
   so it can be unit-tested; `.svelte`/`.svelte.ts` files stay thin over those
   helpers. When component logic grows, extract it this way (precedents:
-  `tileEditorMenu.ts`, `treeCrud.ts`, `editor/mermaidRender.ts`).
+  `tileEditorMenu.ts`, `treeCrud.ts`, `editor/mermaidRender.ts`,
+  `state/sessionState.ts`, `dividerDrag.ts`). Big components split into child
+  components the same way (`ExplorerPane.svelte`, `Sidebar.svelte` out of `App.svelte`).
 - **Paths crossing the seam** are bundle-relative, forward-slash.
+- **Desktop Playwright runs rewrite `docs/assets/*.png`** (screenshot specs) —
+  revert them before committing unless refreshing marketing images.
 - Commit messages end with: `🤖 Generated with claude-code`.

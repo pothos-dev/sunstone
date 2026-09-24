@@ -68,6 +68,11 @@ bunx playwright test -c playwright.config.ts             # all desktop specs
 bunx playwright test -c playwright.config.ts tree-crud   # a subset (by spec name)
 ```
 
+> **Screenshot specs rewrite tracked files.** `marketing-screenshots.spec.ts` and
+> `critic-annotations.spec.ts` regenerate the PNGs under `docs/assets/` on every
+> desktop run. Revert them (`git checkout -- docs/assets`) unless you meant to refresh
+> the marketing images.
+
 ### Running inside an ax agent sandbox
 
 Every spec in both suites imports `test`/`expect` from `tests/fixtures.ts`
@@ -90,6 +95,8 @@ mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start
                                     # watching it before globalSetup seeds it
 bunx playwright test -c playwright.web.config.ts
 ```
+
+The Rust API binds port `8787` by default; if something else already holds it, set `SUNSTONE_TEST_API_PORT=<free port>` (the suite otherwise fails at "webServer was not able to start"). Both suites build into the same `build/` directory, so never run them concurrently.
 
 `reuseExistingServer` also lets you pre-build/pre-start either server by hand (e.g. build to a temp dir where in-repo build dirs are protected) and have Playwright reuse it.
 
