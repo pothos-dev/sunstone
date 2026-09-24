@@ -14,7 +14,7 @@ use sunstone_shared::paths::{dir_of, is_external, resolve_internal};
 use sunstone_shared::wikilink::{self, parse_target};
 
 use super::paths::{basename_of, relative_path, shortest_resolving_suffix};
-use sunstone_shared::rewrite::text::split_suffix;
+use sunstone_shared::rewrite::text::{split_suffix, LinkInner};
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
 /// changed. Matches the TS `{ linksChanged, filesChanged }`.
@@ -168,27 +168,10 @@ fn rewrite_target(
     inner: &str,
     moves: &HashMap<String, String>,
 ) -> Option<String> {
-    // Split off leading whitespace and an optional `<...>` / trailing title so we
-    // only touch the URL itself. Mirrors `extract_href`.
-    let leading_ws_len = inner.len() - inner.trim_start().len();
-    let leading = &inner[..leading_ws_len];
-    let rest = &inner[leading_ws_len..];
-
-    // The URL is up to the first whitespace; everything after is the title.
-    let (url_raw, title) = match rest.find(char::is_whitespace) {
-        Some(p) => (&rest[..p], &rest[p..]),
-        None => (rest, ""),
-    };
-    if url_raw.is_empty() {
-        return None;
-    }
-
-    // Strip optional angle brackets around the URL (preserve to re-apply).
-    let (angle_open, url_core, angle_close) = if url_raw.starts_with('<') && url_raw.ends_with('>') {
-        ("<", &url_raw[1..url_raw.len() - 1], ">")
-    } else {
-        ("", url_raw, "")
-    };
+    // Split off leading whitespace, an optional `<...>` and a trailing title so
+    // we only touch the URL itself.
+    let link = LinkInner::parse(inner)?;
+    let url_core = link.url;
 
     if is_external(url_core) || url_core.starts_with('#') {
         return None;
@@ -236,9 +219,7 @@ fn rewrite_target(
         return None;
     }
 
-    Some(format!(
-        "{leading}{angle_open}{new_path}{suffix}{angle_close}{title}"
-    ))
+    Some(link.with_url(&format!("{new_path}{suffix}")))
 }
 
 /// Decide whether a wikilink (raw inner text of `[[ ... ]]`) needs rewriting

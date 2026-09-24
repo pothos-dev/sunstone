@@ -23,7 +23,7 @@ use crate::paths::{is_external, resolve_internal};
 use crate::slug::slugify;
 use crate::wikilink::{self, parse_target};
 
-use super::text::split_suffix;
+use super::text::{split_suffix, LinkInner};
 
 /// One heading-slug rename: the old slug (`from`) and the new slug (`to`). Sent
 /// from the editor, which tracks each heading's identity across edits and emits a
@@ -135,22 +135,8 @@ fn rewrite_md_anchor(
     target: &str,
     renames: &[AnchorRename],
 ) -> Option<String> {
-    let leading_ws_len = inner.len() - inner.trim_start().len();
-    let leading = &inner[..leading_ws_len];
-    let rest = &inner[leading_ws_len..];
-
-    let (url_raw, title) = match rest.find(char::is_whitespace) {
-        Some(p) => (&rest[..p], &rest[p..]),
-        None => (rest, ""),
-    };
-    if url_raw.is_empty() {
-        return None;
-    }
-    let (angle_open, url_core, angle_close) = if url_raw.starts_with('<') && url_raw.ends_with('>') {
-        ("<", &url_raw[1..url_raw.len() - 1], ">")
-    } else {
-        ("", url_raw, "")
-    };
+    let link = LinkInner::parse(inner)?;
+    let url_core = link.url;
     if is_external(url_core) || url_core.starts_with('#') {
         return None;
     }
@@ -170,8 +156,7 @@ fn rewrite_md_anchor(
         return None;
     }
     let new_anchor = new_anchor_for(anchor, renames)?;
-    let new_url = format!("{path_part}#{new_anchor}{tail}");
-    Some(format!("{leading}{angle_open}{new_url}{angle_close}{title}"))
+    Some(link.with_url(&format!("{path_part}#{new_anchor}{tail}")))
 }
 
 #[cfg(test)]
