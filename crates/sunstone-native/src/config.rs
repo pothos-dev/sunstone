@@ -186,8 +186,10 @@ fn save_store(store: &Store) -> Result<(), String> {
 /// Replace `path` with `text` via a temp file in the same directory and a
 /// rename, so the old or the new content is visible at any instant, never a
 /// partial one. The temp name carries the pid, as another Sunstone process may
-/// be saving concurrently.
+/// be saving concurrently. A symlinked store (e.g. kept in a dotfiles repo) is
+/// followed, so the rename replaces its target rather than the link.
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let path = &path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let mut tmp_name = path.file_name().unwrap_or_default().to_os_string();
     tmp_name.push(format!(".{}.tmp", std::process::id()));
     let tmp = path.with_file_name(tmp_name);
@@ -419,6 +421,25 @@ mod tests {
             .map(|e| e.unwrap().file_name())
             .collect();
         assert_eq!(names, vec![std::ffi::OsString::from("state.json")]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_atomic_follows_a_symlinked_store() {
+        let dir = std::env::temp_dir().join(format!(
+            "sunstone-config-symlink-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("real.json");
+        let link = dir.join("state.json");
+        std::fs::write(&target, "old").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        write_atomic(&link, "new").unwrap();
+        assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "new");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
