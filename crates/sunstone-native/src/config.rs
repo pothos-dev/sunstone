@@ -117,7 +117,7 @@ pub struct WindowState {
 /// The whole on-disk store: app config plus a map of bundle-path -> state.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
-pub struct Store {
+pub(crate) struct Store {
     /// App-level config shared across Bundles.
     pub config: AppConfig,
     /// Per-Bundle session state, keyed by the Bundle's absolute path string.
@@ -161,7 +161,7 @@ fn store_path() -> Option<PathBuf> {
 
 /// Load the whole store from disk. Missing or corrupt file -> defaults (never
 /// an error: losing session state must not break startup).
-pub fn load_store() -> Store {
+pub(crate) fn load_store() -> Store {
     let Some(path) = store_path() else {
         return Store::default();
     };
@@ -172,7 +172,7 @@ pub fn load_store() -> Store {
 }
 
 /// Persist the whole store to disk (pretty JSON for human inspection).
-pub fn save_store(store: &Store) -> Result<(), String> {
+pub(crate) fn save_store(store: &Store) -> Result<(), String> {
     let path = store_path().ok_or_else(|| "no OS config directory".to_string())?;
     let text = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
     std::fs::write(&path, text).map_err(|e| e.to_string())

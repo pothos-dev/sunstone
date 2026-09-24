@@ -44,7 +44,8 @@ mod paths;
 // `sunstone-shared` (family 10). Re-export the DTO so native's command surface
 // (`sunstone_native::rewrite::AnchorRename`, consumed by src-tauri /
 // sunstone-server) keeps its shape — one definition, surfaced (ADR 0006 §6).
-pub use engine::{plan_rewrites, RewriteSummary};
+pub(crate) use engine::plan_rewrites;
+pub use engine::RewriteSummary;
 pub use sunstone_shared::AnchorRename;
 
 // ---------------------------------------------------------------------------
@@ -58,7 +59,7 @@ pub use sunstone_shared::AnchorRename;
 /// `index` provides the set of Concept paths. Folder detection: any indexed path
 /// with the `from/` prefix means `from` is a folder. A `from` that is itself a
 /// `.md` path is treated as a single Concept move.
-pub fn build_move_map(index: &Index, from: &str, to: &str) -> HashMap<String, String> {
+pub(crate) fn build_move_map(index: &Index, from: &str, to: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     // A `.md` source is a single Concept move (whether or not it is already in
     // the index — a freshly-created Concept still has its own outbound links to
@@ -79,7 +80,7 @@ pub fn build_move_map(index: &Index, from: &str, to: &str) -> HashMap<String, St
 /// The set of source Concepts that link INTO any moved Concept (the inbound
 /// linkers), from the index reverse map. Includes moved Concepts that link to
 /// other moved Concepts; the caller de-dupes against the move set anyway.
-pub fn inbound_sources(index: &Index, moves: &HashMap<String, String>) -> Vec<String> {
+pub(crate) fn inbound_sources(index: &Index, moves: &HashMap<String, String>) -> Vec<String> {
     let mut set = std::collections::BTreeSet::new();
     for old_target in moves.keys() {
         for source in index.backlinks(old_target) {

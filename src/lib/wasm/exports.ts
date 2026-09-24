@@ -242,22 +242,12 @@ export function rewriteAnchors(
 // on the degraded path.
 
 /**
- * Every Embed in a Concept `body`, in document order (fenced code blocks and
- * inline code spans skipped). `from`/`to` are BYTE offsets into `body`, not
- * UTF-16 / CodeMirror positions — convert before using them as decoration
- * ranges. Degrades to `[]`.
- */
-export function scanEmbeds(body: string): Embed[] {
-  return mod ? mod.scanEmbeds(body) : [];
-}
-
-/**
  * Every Embed in a Concept `body`, with **UTF-16 code-unit** offsets — the unit
  * a JS string index and a CodeMirror position count in (ADR 0006 §4, the same
  * seam `scanCriticMarks` / `findCitationRefs` already report in).
  *
- * **This is the one a CodeMirror decoration builder calls.** `scanEmbeds`'
- * byte offsets are the unit the SSR renderer and the rewrite engine slice Rust
+ * **This is the one a CodeMirror decoration builder calls.** Byte offsets
+ * (what `embed::scan_embeds` reports on the Rust side) are the unit the SSR renderer and the rewrite engine slice Rust
  * strings with; handing them to CodeMirror puts every decoration after the first
  * non-ASCII character in the document in the wrong place. Degrades to `[]`.
  */

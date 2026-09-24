@@ -256,6 +256,7 @@ impl Index {
     /// True if an Attachment exists at `path` (an exact bundle-relative key).
     /// The Attachment counterpart of [`Index::concept_exists`]; a path-model
     /// Embed (`![alt](x.png)`) is "broken" exactly when this is false.
+    #[cfg(test)]
     pub fn attachment_exists(&self, path: &str) -> bool {
         self.attachments.contains(path)
     }

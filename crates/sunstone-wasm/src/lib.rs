@@ -228,15 +228,6 @@ pub fn concept_to_url(path: String) -> String {
     url::concept_url(&path)
 }
 
-/// GitHub-style slug for a single anchor/heading string (no de-duplication).
-/// Surfaced so the fake backend's corpus-wide anchor rewriter matches anchors
-/// against renames with the SAME slug rule the editor/native side uses — the
-/// single source `sunstone_shared::slug::slugify` (family 13 retires `slug.ts`).
-#[wasm_bindgen(js_name = slugify)]
-pub fn slugify(text: String) -> String {
-    sunstone_shared::slug::slugify(&text)
-}
-
 // --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
 //
 // The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE
@@ -303,17 +294,10 @@ pub fn rewrite_anchors(
 // the Attachment corpus is a SEPARATE index from the `BundleIndex` handle's
 // concept set (an Attachment is never a Concept), so it is passed per call.
 
-/// Every Embed in a Concept `body`, in document order, with BYTE offsets into
-/// the original body (fenced code blocks and inline code spans skipped).
-#[wasm_bindgen(js_name = scanEmbeds)]
-pub fn scan_embeds(body: String) -> Vec<Embed> {
-    embed::scan_embeds(&body)
-}
-
 /// Every Embed in a Concept `body`, in document order, with **UTF-16 code-unit**
 /// offsets — the unit a JS string and a CodeMirror position count in (ADR 0006
-/// §4). This is the one a decoration builder must call; `scanEmbeds`' byte
-/// offsets put every decoration after a non-ASCII character in the wrong place.
+/// §4) — what a decoration builder must use; byte offsets would put every
+/// decoration after a non-ASCII character in the wrong place.
 #[wasm_bindgen(js_name = scanEmbedsUtf16)]
 pub fn scan_embeds_utf16(body: String) -> Vec<Embed> {
     embed::scan_embeds_utf16(&body)

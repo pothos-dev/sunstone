@@ -190,7 +190,7 @@ pub fn render_body(
     for node in root.descendants() {
         let mut data = node.data.borrow_mut();
         if let NodeValue::Link(link) = &mut data.value {
-            link.url = mark_link_url(&link.url, source_path, all_paths, exists);
+            link.url = mark_link_url(&link.url, source_path, exists);
         }
     }
 
@@ -297,7 +297,6 @@ fn wikilink_to_markdown(
 fn mark_link_url(
     url: &str,
     source_path: &str,
-    _all_paths: &[String],
     exists: &dyn Fn(&str) -> bool,
 ) -> String {
     if url.starts_with(M_INTERNAL) || url.starts_with(M_BROKEN) || url.starts_with(M_EXTERNAL) {
