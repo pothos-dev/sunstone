@@ -211,3 +211,34 @@ test('tile header: breadcrumbs open a folder index and show it in the Explorer',
   await expect(page.getByTestId('tile-crumb')).toHaveText(['concepts']);
   await expect(tree.locator('.row[data-row-path="concepts"]')).toHaveClass(/focused-item/);
 });
+
+test('tile header: a breadcrumb re-opens a collapsed Explorer Section and shows the folder', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const tree = page.getByTestId('tree');
+  await expect(tree).toBeVisible();
+  const livePreview = tree.locator('[data-path="concepts/editor/live-preview.md"]');
+  for (const folder of ['concepts', 'concepts/editor']) {
+    const child = tree.locator(`[data-row-path^="${folder}/"]`).first();
+    if (!(await child.isVisible())) await tree.locator(`.row[data-row-path="${folder}"]`).click();
+  }
+  await livePreview.click();
+  const crumbs = page.getByTestId('tile-crumb');
+  await expect(crumbs).toHaveText(['concepts', 'editor']);
+
+  // Collapse the Explorer folder AND the Explorer Section itself: the tree
+  // unmounts entirely.
+  await tree.locator('.row[data-row-path="concepts/editor"]').click();
+  const header = page.getByTestId('explorer-section-header');
+  await header.click();
+  await expect(header).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByTestId('tree')).toHaveCount(0);
+
+  // The `editor/` crumb (no index.md) re-expands the Section and the folder and
+  // puts the Explorer cursor on its row.
+  await crumbs.nth(1).click();
+  await expect(header).toHaveAttribute('aria-expanded', 'true');
+  await expect(livePreview).toBeVisible();
+  await expect(tree.locator('.row[data-row-path="concepts/editor"]')).toHaveClass(/focused-item/);
+});

@@ -23,6 +23,7 @@
   import Tile from '$lib/components/Tile.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
+  import { explorerNav } from '$lib/state/explorerNav.svelte';
   import { reservedChildren } from '$lib/treeNav';
   import { outlineNav, backlinksNav } from '$lib/state/listFocusNav.svelte';
   import { listRegionNav } from '$lib/state/listRegionNav.svelte';
@@ -38,7 +39,7 @@
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
   import { splitFrontmatter } from '$lib/wasm/exports';
-  import { windowTitle } from '$lib/tileTitle';
+  import { windowTitle, foldersToExpand } from '$lib/tileTitle';
 
   interface Props {
     /**
@@ -176,7 +177,7 @@
 
       session.endRestore();
 
-      explorerPane?.focusInitial();
+      focusExplorerInitial();
     })();
 
     void indexStore.refresh();
@@ -411,7 +412,54 @@
   }
 
   // --- Explorer (tree, its keyboard nav + CRUD routing) ----------------------
+  // ExplorerPane is mounted only while the Explorer Section is expanded, so the
+  // state half of reveal/refocus lives here and the DOM half retries across
+  // frames until the pane (and the row) exist.
   let explorerPane = $state<ReturnType<typeof ExplorerPane> | null>(null);
+  let pendingDeleteNeighbor: string | null = null;
+
+  // Show `folder` in the Explorer (Tile header breadcrumbs): expand it and every
+  // ancestor, reveal the Explorer if hidden, and move the Explorer cursor onto
+  // its row, scrolled into view. Focus stays where it is (the Tile).
+  function revealFolderInExplorer(folder: string) {
+    for (const p of foldersToExpand(folder)) {
+      if (!session.isExpanded(p)) session.setExpanded(p, true);
+    }
+    session.revealLeftSection('explorer');
+    explorerNav.setFocused(folder);
+    retryFrames(() => explorerPane?.scrollToRow(folder) ?? false, 10);
+  }
+
+  function refocusExplorerAt(path: string | null) {
+    if (path !== null) explorerNav.setFocused(path);
+    retryFrames(() => {
+      const target = explorerNav.focusedPath;
+      if (target === null || !explorerPane) return true;
+      return explorerPane.focusRow(target);
+    }, 10);
+  }
+
+  function focusExplorerInitial() {
+    retryFrames(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return true;
+      return explorerPane?.focusFirstRow() ?? false;
+    }, 20);
+  }
+
+  function onCrudCommit(path: string, opts?: { deleted?: boolean }) {
+    if (opts?.deleted) {
+      refocusExplorerAt(pendingDeleteNeighbor);
+      pendingDeleteNeighbor = null;
+    } else {
+      refocusExplorerAt(path);
+    }
+  }
+
+  function onCrudCancel() {
+    refocusExplorerAt(explorerNav.focusedPath);
+    pendingDeleteNeighbor = null;
+  }
 
   function openConceptFromTree(path: string) {
     openConcept(path);
@@ -562,6 +610,7 @@
         selected={editor.path}
         onopen={openConcept}
         onopenFocus={openConceptFromTree}
+        ondeleterequest={(neighbor) => (pendingDeleteNeighbor = neighbor)}
       />
     </SidebarSection>
 
@@ -625,7 +674,7 @@
                     workspace.splitDown();
                   }}
                   onClose={() => void closeTileAndFocus(tile.id)}
-                  onRevealFolder={(folder) => explorerPane?.reveal(folder)}
+                  onRevealFolder={revealFolderInExplorer}
                   onViewportLine={(line) => {
                     // Only the active Tile feeds the Outline — it is the Tile the
                     // Outline lists headings for.
@@ -756,8 +805,8 @@
   <TreeCrud
     bind:this={treeCrud}
     bind:focusTypeForPath
-    oncommit={(path, opts) => explorerPane?.onCrudCommit(path, opts)}
-    oncancel={() => explorerPane?.onCrudCancel()}
+    oncommit={onCrudCommit}
+    oncancel={onCrudCancel}
   />
 
   {#if treeActions.notice}

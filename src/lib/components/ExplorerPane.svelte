@@ -2,9 +2,13 @@
   // The Explorer Section's body in the desktop shell: the Bundle tree, its root
   // drop zone and "+ New…" button, plus the Explorer's keyboard wiring —
   // tree navigation, CRUD keys (routed to the shared TreeCrud dialogs App
-  // renders), the post-CRUD refocus, and the Focused-item → DOM focus mirror.
-  // App reaches in only through the exported `reveal` / `focusInitial` and the
-  // TreeCrud commit/cancel hooks.
+  // renders) and the Focused-item → DOM focus mirror.
+  //
+  // The pane is mounted only while the Explorer Section is expanded
+  // (SidebarSection unmounts collapsed content), so the STATE side of reveal /
+  // refocus (expanding folders, re-opening the Section, moving the Explorer
+  // cursor) stays in App, which then drives the DOM side lazily through the
+  // exported `scrollToRow` / `focusRow` / `focusFirstRow` once the pane exists.
   import type TreeCrud from './TreeCrud.svelte';
   import Tree from './Tree.svelte';
   import type { TreeNode } from '$lib/types';
@@ -16,8 +20,6 @@
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
   import { flattenVisible, neighborAfterRemoval, ordinaryChildren } from '$lib/treeNav';
-  import { retryFrames } from '$lib/retryFrames';
-  import { foldersToExpand } from '$lib/tileTitle';
 
   interface Props {
     /** The TreeCrud dialogs/menu App renders (null until mounted). */
@@ -28,9 +30,14 @@
     onopen: (path: string) => void;
     /** Open a Concept from the keyboard, landing focus in the Editor. */
     onopenFocus: (path: string) => void;
+    /**
+     * A keyboard Delete is about to open TreeCrud's confirm for a row; `neighbor`
+     * is the row that should take the cursor if the delete commits.
+     */
+    ondeleterequest: (neighbor: string | null) => void;
   }
 
-  let { crud, selected, onopen, onopenFocus }: Props = $props();
+  let { crud, selected, onopen, onopenFocus, ondeleterequest }: Props = $props();
 
   let treePane = $state<HTMLDivElement | null>(null);
 
@@ -69,7 +76,7 @@
       rename: (p) => crud?.requestRename(p),
       remove: (p) => {
         const rows = flattenVisible(bundle.tree, (q) => session.isExpanded(q));
-        pendingDeleteNeighbor = neighborAfterRemoval(rows, p);
+        ondeleterequest(neighborAfterRemoval(rows, p));
         crud?.requestDelete(p);
       },
       newConcept: (p) => crud?.requestNewConcept(p),
@@ -79,75 +86,33 @@
     if (crudHandled) e.preventDefault();
   }
 
-  let pendingDeleteNeighbor = $state<string | null>(null);
+  /** Scroll `path`'s row into view; false while it is not rendered yet. */
+  export function scrollToRow(path: string): boolean {
+    const row = treeRow(treePane, path);
+    if (!row) return false;
+    row.scrollIntoView({ block: 'nearest' });
+    return true;
+  }
+
+  /** Focus `path`'s row; false while it is not rendered yet. */
+  export function focusRow(path: string): boolean {
+    const row = treeRow(treePane, path);
+    if (!row) return false;
+    row.focus();
+    return true;
+  }
 
   /**
-   * Show `folder` in the Explorer (Tile header breadcrumbs): expand it and every
-   * ancestor, reveal the Explorer if hidden, and move the Explorer cursor onto
-   * its row, scrolled into view. Focus stays where it is (the Tile).
+   * Make the first visible row the Focused item and focus it; false while the
+   * tree (or that row) is not rendered yet.
    */
-  export function reveal(folder: string) {
-    for (const p of foldersToExpand(folder)) {
-      if (!session.isExpanded(p)) session.setExpanded(p, true);
-    }
-    session.revealLeftSection('explorer');
-    explorerNav.setFocused(folder);
-    retryFrames(() => {
-      const row = treeRow(treePane, folder);
-      if (!row) return false;
-      row.scrollIntoView({ block: 'nearest' });
-      return true;
-    }, 10);
-  }
-
-  function refocusAt(path: string | null) {
-    if (path !== null) explorerNav.setFocused(path);
-    retryFrames(() => {
-      const target = explorerNav.focusedPath;
-      if (target === null || !treePane) return true;
-      const row = treeRow(treePane, target);
-      if (!row) return false;
-      row.focus();
-      return true;
-    }, 10);
-  }
-
-  /** On launch: focus the first Explorer row unless something already holds focus. */
-  export function focusInitial() {
-    retryFrames(() => {
-      const active = document.activeElement;
-      if (active && active !== document.body) return true;
-      const root = bundle.tree;
-      if (treePane && root) {
-        const rows = flattenVisible(root, (q) => session.isExpanded(q));
-        const first = rows[0]?.path;
-        if (first !== undefined) {
-          explorerNav.setFocused(first);
-          const row = treeRow(treePane, first);
-          if (row) {
-            row.focus();
-            return true;
-          }
-        }
-      }
-      return false;
-    }, 20);
-  }
-
-  /** TreeCrud committed: refocus the touched row (or a deleted row's neighbour). */
-  export function onCrudCommit(path: string, opts?: { deleted?: boolean }) {
-    if (opts?.deleted) {
-      refocusAt(pendingDeleteNeighbor);
-      pendingDeleteNeighbor = null;
-    } else {
-      refocusAt(path);
-    }
-  }
-
-  /** TreeCrud cancelled: return focus to the Explorer's Focused item. */
-  export function onCrudCancel() {
-    refocusAt(explorerNav.focusedPath);
-    pendingDeleteNeighbor = null;
+  export function focusFirstRow(): boolean {
+    const root = bundle.tree;
+    if (!treePane || !root) return false;
+    const first = flattenVisible(root, (q) => session.isExpanded(q))[0]?.path;
+    if (first === undefined) return false;
+    explorerNav.setFocused(first);
+    return focusRow(first);
   }
 
   // Mirror the Explorer Focused-item path into DOM focus while it holds focus.
