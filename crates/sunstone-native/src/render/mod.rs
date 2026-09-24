@@ -53,7 +53,7 @@ use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
 use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
-use sunstone_shared::paths::{is_external, resolve_internal};
+use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_internal};
 use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
@@ -308,7 +308,7 @@ fn mark_link_url(
     if url.is_empty() || url.starts_with('#') {
         return url.to_string(); // in-page anchor / empty — leave to the browser
     }
-    match resolve_internal(source_path, url) {
+    match resolve_internal(source_path, url).map(|p| folder_index_fallback(p, &exists)) {
         Some(path) if exists(&path) => format!("{M_INTERNAL}{path}"),
         Some(path) => format!("{M_BROKEN}{path}"),
         None => url.to_string(),
@@ -428,6 +428,13 @@ mod tests {
         assert!(p.html.contains(r#"class="internal-link""#));
         assert!(p.html.contains(r#"data-path="good.md""#));
         assert!(p.html.contains(r#"href="/good""#));
+        assert!(!p.html.contains("broken"));
+    }
+
+    #[test]
+    fn a_folder_link_renders_as_a_link_to_its_index() {
+        let p = render("[guide](guide/)", "a.md", &["a.md", "guide/index.md"]);
+        assert!(p.html.contains(r#"data-path="guide/index.md""#), "{}", p.html);
         assert!(!p.html.contains("broken"));
     }
 

@@ -109,6 +109,21 @@ pub fn resolve_internal(current_path: &str, href: &str) -> Option<String> {
     }
 }
 
+/// A link to a folder opens that folder's `index.md`: when `path` is not
+/// itself a Concept but `<path>/index.md` is, return the index; otherwise
+/// `path` unchanged. `exists` reports concept-set membership.
+pub fn folder_index_fallback(path: String, exists: &impl Fn(&str) -> bool) -> String {
+    if exists(&path) {
+        return path;
+    }
+    let index = format!("{path}/index.md");
+    if exists(&index) {
+        index
+    } else {
+        path
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

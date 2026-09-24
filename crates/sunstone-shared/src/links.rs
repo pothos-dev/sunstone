@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{dir_of, is_external, resolve_internal};
+use crate::paths::{dir_of, folder_index_fallback, is_external, resolve_internal};
 use crate::wikilink::basename;
 
 /// The classified result of resolving a markdown link `href` (ADR 0006 §3).
@@ -120,10 +120,13 @@ pub fn resolve_link(
     // Bundle-absolute links are redirected into a nested OKF root when one is
     // identified and the rooted target exists; relative links never are.
     let path = if raw.starts_with('/') {
-        apply_bundle_root(&path, bundle_root, &exists)
+        // A rooted folder counts as present when it has an index to open.
+        let present = |p: &str| exists(p) || exists(&format!("{p}/index.md"));
+        apply_bundle_root(&path, bundle_root, &present)
     } else {
         path
     };
+    let path = folder_index_fallback(path, &exists);
     let ex = exists(&path);
     ResolvedLink::Internal {
         path,
@@ -203,6 +206,31 @@ mod tests {
     }
 
     // --- resolve_link (mirrors links.test.ts::resolveLink) -------------------
+
+    #[test]
+    fn a_folder_link_opens_the_folders_index() {
+        let set = paths(&["cur.md", "guide/index.md", "guide/a.md", "docs/sub/index.md", "docs/x.md"]);
+        let exists = |p: &str| set.iter().any(|x| x == p);
+        let internal = |path: &str, anchor: Option<&str>| ResolvedLink::Internal {
+            path: path.to_string(),
+            anchor: anchor.map(str::to_string),
+            exists: true,
+        };
+        for href in ["guide", "guide/", "./guide", "/guide/"] {
+            assert_eq!(resolve_link("cur.md", href, "", exists), internal("guide/index.md", None), "{href}");
+        }
+        assert_eq!(
+            resolve_link("cur.md", "guide#Setup", "", exists),
+            internal("guide/index.md", Some("Setup"))
+        );
+        // Through a nested bundle root, too.
+        assert_eq!(resolve_link("docs/x.md", "/sub", "docs", exists), internal("docs/sub/index.md", None));
+        // A folder with no index stays a (broken) folder path.
+        assert_eq!(
+            resolve_link("cur.md", "nothing/", "", exists),
+            ResolvedLink::Internal { path: "nothing".to_string(), anchor: None, exists: false }
+        );
+    }
 
     #[test]
     fn empty_or_whitespace_is_none() {
