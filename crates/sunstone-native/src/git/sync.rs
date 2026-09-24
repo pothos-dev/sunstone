@@ -370,7 +370,7 @@ fn parse_name_status(stdout: &str) -> Vec<(char, String)> {
         .filter_map(|line| {
             let mut fields = line.split('\t');
             let status = fields.next()?.chars().next()?;
-            let path = fields.last()?;
+            let path = fields.next_back()?;
             if path.is_empty() {
                 return None;
             }

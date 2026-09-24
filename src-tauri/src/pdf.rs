@@ -15,7 +15,7 @@ pub(crate) fn open_print_window(app: tauri::AppHandle, path: String) -> Result<(
     let query = format!("?print={}&toolbar=1", query_encode(&path));
     if let Some(existing) = app.get_webview_window("print") {
         existing
-            .eval(&format!("window.location.replace('index.html{query}')"))
+            .eval(format!("window.location.replace('index.html{query}')"))
             .map_err(|e| e.to_string())?;
         existing.set_focus().map_err(|e| e.to_string())?;
         return Ok(());

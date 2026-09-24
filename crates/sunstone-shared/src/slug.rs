@@ -21,9 +21,7 @@ pub fn slugify(text: &str) -> String {
     for ch in text.trim().to_lowercase().chars() {
         if ch.is_whitespace() {
             out.push('-');
-        } else if ch == '-' || ch == '_' {
-            out.push(ch);
-        } else if ch.is_alphanumeric() {
+        } else if ch == '-' || ch == '_' || ch.is_alphanumeric() {
             out.push(ch);
         }
         // everything else (punctuation, symbols) is dropped

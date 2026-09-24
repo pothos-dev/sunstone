@@ -9,6 +9,7 @@
 //!     carrying `id="cite-n"` (NOT superscript — a superscript row head reads
 //!     wrong);
 //!   - anything else → left untouched.
+//!
 //! A distinct PUA sentinel pair (shared plumbing with `critic.rs`, via
 //! `sentinel::Sentinels`, but a DIFFERENT delimiter pair) keeps the two
 //! substitution passes independent.

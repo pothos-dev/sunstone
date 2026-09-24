@@ -80,12 +80,9 @@ pub fn url_to_concept(url_path: &str, concept_paths: &[String]) -> Option<String
         return set.contains("index.md").then(|| "index.md".to_string());
     }
     let p = segs.join("/");
-    for candidate in [format!("{p}/index.md"), format!("{p}.md")] {
-        if set.contains(candidate.as_str()) {
-            return Some(candidate);
-        }
-    }
-    None
+    [format!("{p}/index.md"), format!("{p}.md")]
+        .into_iter()
+        .find(|candidate| set.contains(candidate.as_str()))
 }
 
 #[cfg(test)]

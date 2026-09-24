@@ -47,10 +47,14 @@ where
     scan_core(body, &mut wikilink, Some(&mut md_link))
 }
 
+/// `md_link(inner, is_image)` callback: an optional replacement for a Markdown
+/// link's inner text.
+type MdLinkFn<'a> = dyn FnMut(&str, bool) -> Option<String> + 'a;
+
 fn scan_core(
     body: &str,
     wikilink: &mut dyn FnMut(&str) -> String,
-    mut md_link: Option<&mut dyn FnMut(&str, bool) -> Option<String>>,
+    mut md_link: Option<&mut MdLinkFn<'_>>,
 ) -> String {
     let bytes = body.as_bytes();
     let mut out = String::with_capacity(body.len());
