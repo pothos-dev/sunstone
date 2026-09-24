@@ -54,7 +54,7 @@ pub fn search(root: &Path, query: &str) -> Result<Vec<SearchHit>, String> {
 
     // Case-insensitive literal search: escape the user text so metacharacters
     // are matched verbatim, then compile with the `i` flag.
-    let pattern = format!("(?i){}", regex_escape(trimmed));
+    let pattern = format!("(?i){}", regex::escape(trimmed));
     let matcher = RegexMatcher::new(&pattern).map_err(|e| e.to_string())?;
 
     let mut hits: Vec<SearchHit> = Vec::new();
@@ -100,18 +100,6 @@ pub fn search(root: &Path, query: &str) -> Result<Vec<SearchHit>, String> {
     hits.sort_by(|a, b| a.path.cmp(&b.path).then(a.line.cmp(&b.line)));
     hits.truncate(MAX_RESULTS);
     Ok(hits)
-}
-
-/// Escape regex metacharacters so a user query is matched as a literal string.
-fn regex_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        if "\\.+*?()|[]{}^$#".contains(c) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out
 }
 
 #[cfg(test)]
@@ -164,5 +152,15 @@ mod tests {
         let hits = search(&root, "a.b").unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].line, 1);
+    }
+
+    #[test]
+    fn every_metacharacter_is_matched_literally() {
+        let root = temp_root();
+        let query = r"a-b & c~d [x] (y) {1} ^$ | # . * + ? \ end";
+        std::fs::write(root.join("a.md"), format!("no\n{query}\nab & cd x y 1\n")).unwrap();
+        let hits = search(&root, query).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].line, 2);
     }
 }
