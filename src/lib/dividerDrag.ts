@@ -1,8 +1,10 @@
-// Shared pointer-capture drag loop for App.svelte's column/tile dividers. The
-// two handlers there differed only in axis (x for columns, y for tile stacks)
-// and in which pure `tileLayout` resize function consumed the fraction — this
-// hoists the identical plumbing (pointer capture, window move/release listeners,
-// delta-as-fraction math) into one helper.
+// Shared pointer-capture drag loop for the resize handles: App.svelte's
+// column/tile dividers and SidebarEdge's sidebar border. The handlers differed
+// only in axis (x for columns and sidebars, y for tile stacks) and in what
+// consumed the pointer travel — this hoists the identical plumbing (pointer
+// capture, window move/release listeners, the WebKitGTK `mouseup` fallback)
+// into `startPointerDrag`, with `startDividerDrag` as the fraction-of-container
+// flavour the tiling dividers use.
 
 export type DragAxis = 'x' | 'y';
 
@@ -13,6 +15,62 @@ export type DragAxis = 'x' | 'y';
  */
 export function dragFraction(start: number, current: number, size: number): number {
   return (current - start) / Math.max(size, 1);
+}
+
+export interface PointerDragOptions {
+  /** The handle's pointerdown event. */
+  event: PointerEvent;
+  /** Drag axis: 'x' reads clientX, 'y' clientY. */
+  axis: DragAxis;
+  /**
+   * Called on every pointermove with the TOTAL pointer travel in px since
+   * pointer-down. The caller applies it to the base it captured at
+   * pointer-down, so a clamp stays idempotent (dragging past a limit stops
+   * cleanly and reversing recovers).
+   */
+  onMove: (deltaPx: number) => void;
+  /** Called once when the drag ends. */
+  onEnd?: () => void;
+}
+
+/**
+ * Start a drag from a pointerdown. Calls `event.preventDefault()`, best-effort
+ * pointer-captures the handle, and tracks the pointer via window listeners
+ * until the release. The drag ends on `pointerup` OR `mouseup` (whichever the
+ * engine delivers first, and only once): WebKitGTK — the desktop shell's
+ * webview — can swallow `pointerup`, which would otherwise leave a stale move
+ * listener dragging on the user's next pointer motion. The caller is
+ * responsible for any pre-checks (primary button, container present) BEFORE
+ * calling.
+ */
+export function startPointerDrag({ event, axis, onMove, onEnd }: PointerDragOptions): void {
+  event.preventDefault();
+  const coord = (e: PointerEvent) => (axis === 'x' ? e.clientX : e.clientY);
+  const start = coord(event);
+  const el = event.currentTarget as HTMLElement;
+  try {
+    el.setPointerCapture(event.pointerId);
+  } catch {
+    /* best-effort: window listeners below catch the moves regardless */
+  }
+  const move = (ev: PointerEvent) => onMove(coord(ev) - start);
+  let finished = false;
+  const up = () => {
+    if (finished) return;
+    finished = true;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('mouseup', up);
+    try {
+      el.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore: capture may already be gone */
+    }
+    onEnd?.();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('mouseup', up);
 }
 
 export interface DividerDragOptions {
@@ -32,42 +90,9 @@ export interface DividerDragOptions {
 }
 
 /**
- * Start a divider drag from a pointerdown. Calls `event.preventDefault()`,
- * best-effort pointer-captures the divider, and tracks the pointer via window
- * listeners until the release. The drag ends on `pointerup` OR `mouseup`
- * (whichever the engine delivers first, and only once): WebKitGTK — the
- * desktop shell's webview — can swallow `pointerup`, which would otherwise
- * leave a stale move listener dragging on the user's next pointer motion.
- * The caller is responsible for any pre-checks (primary button, container
- * present) BEFORE calling.
+ * A tiling-divider drag: `startPointerDrag` reporting the travel as a fraction
+ * of the container's axis size (see `dragFraction`).
  */
 export function startDividerDrag({ event, axis, size, onFraction }: DividerDragOptions): void {
-  event.preventDefault();
-  const start = axis === 'x' ? event.clientX : event.clientY;
-  const el = event.currentTarget as HTMLElement;
-  try {
-    el.setPointerCapture(event.pointerId);
-  } catch {
-    /* best-effort: window listeners below catch the moves regardless */
-  }
-  const move = (ev: PointerEvent) => {
-    const current = axis === 'x' ? ev.clientX : ev.clientY;
-    onFraction(dragFraction(start, current, size));
-  };
-  let finished = false;
-  const up = () => {
-    if (finished) return;
-    finished = true;
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', up);
-    window.removeEventListener('mouseup', up);
-    try {
-      el.releasePointerCapture(event.pointerId);
-    } catch {
-      /* ignore: capture may already be gone */
-    }
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', up);
-  window.addEventListener('mouseup', up);
+  startPointerDrag({ event, axis, onMove: (delta) => onFraction(dragFraction(0, delta, size)) });
 }

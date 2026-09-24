@@ -16,6 +16,7 @@
     KEYBOARD_RESIZE_STEP,
     type SidebarSide,
   } from '$lib/sidebarResize';
+  import { startPointerDrag } from '$lib/dividerDrag';
 
   interface Props {
     /** Which sidebar this edge belongs to (drives the drag direction). */
@@ -38,40 +39,18 @@
 
   // Capture the base width at pointer-down and apply the TOTAL pointer delta
   // from that base (idempotent clamp), mirroring the tiling divider drags in
-  // App.svelte.
+  // App.svelte; the shared `startPointerDrag` owns capture, the window
+  // listeners and the WebKitGTK `mouseup` fallback.
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    e.preventDefault();
-    const el = e.currentTarget as HTMLElement;
-    const startX = e.clientX;
     const base = width;
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      /* best-effort: window listeners below catch the moves regardless */
-    }
     onResizeStart?.();
-    const move = (ev: PointerEvent) => onResize(resizeSidebarWidth(base, ev.clientX - startX, side));
-    // Ends the gesture on whichever release event the engine actually delivers —
-    // `mouseup` is the fallback for a `pointerup` swallowed by WebKitGTK (the
-    // desktop shell's webview) — and only once.
-    let finished = false;
-    const up = () => {
-      if (finished) return;
-      finished = true;
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      window.removeEventListener('mouseup', up);
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-      onResizeEnd?.();
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('mouseup', up);
+    startPointerDrag({
+      event: e,
+      axis: 'x',
+      onMove: (delta) => onResize(resizeSidebarWidth(base, delta, side)),
+      onEnd: () => onResizeEnd?.(),
+    });
   }
 
   function onKeyDown(e: KeyboardEvent) {

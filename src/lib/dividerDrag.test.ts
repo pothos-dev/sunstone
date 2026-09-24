@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { dragFraction, startDividerDrag } from './dividerDrag';
+import { dragFraction, startDividerDrag, startPointerDrag } from './dividerDrag';
 
 describe('dragFraction', () => {
   test('returns pointer travel as a fraction of the container size', () => {
@@ -92,6 +92,37 @@ describe('startDividerDrag', () => {
     startDividerDrag({ event: pointerDown(el, 0, 0), axis: 'x', size: 1, onFraction: () => {} });
     window.dispatchEvent(fakePointer('pointerup'));
     window.dispatchEvent(fakePointer('mouseup'));
+    expect(el.calls).toEqual(['set:7', 'release:7']);
+  });
+});
+
+describe('startPointerDrag', () => {
+  let savedWindow: unknown;
+  beforeEach(() => {
+    savedWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = new EventTarget();
+  });
+  afterEach(() => {
+    (globalThis as { window?: unknown }).window = savedWindow;
+  });
+
+  test('reports total px travel on the axis and calls onEnd exactly once', () => {
+    const el = fakeDivider();
+    const seen: number[] = [];
+    let ends = 0;
+    startPointerDrag({
+      event: pointerDown(el, 40, 500),
+      axis: 'x',
+      onMove: (d) => seen.push(d),
+      onEnd: () => ends++,
+    });
+    window.dispatchEvent(fakePointer('pointermove', 55, 0));
+    window.dispatchEvent(fakePointer('pointermove', 10, 0));
+    window.dispatchEvent(fakePointer('mouseup'));
+    window.dispatchEvent(fakePointer('pointerup'));
+    window.dispatchEvent(fakePointer('pointermove', 90, 0));
+    expect(seen).toEqual([15, -30]);
+    expect(ends).toBe(1);
     expect(el.calls).toEqual(['set:7', 'release:7']);
   });
 });
