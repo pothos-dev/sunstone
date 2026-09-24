@@ -86,6 +86,9 @@ pub struct BundleState {
     /// (hidden) on read. (Supersedes the older per-panel `properties_open` above,
     /// which is retained only so older files round-trip.)
     pub properties_shown: Option<bool>,
+    /// GLOBAL Frontmatter show/hide flag — the ADR-0008 name the frontend now
+    /// writes (it still reads `properties_shown` as a fallback).
+    pub frontmatter_shown: Option<bool>,
     /// Persisted tiling workspace layout (multi-concept-tiling ticket 06): the row
     /// of columns of tiles (order + weights, each tile's Concept path + view-mode,
     /// and the active tile). Round-tripped as OPAQUE JSON — the frontend owns the
@@ -196,8 +199,25 @@ pub fn load_bundle_state(bundle_root: &Path) -> BundleState {
 /// Bundles' entries and app config are preserved).
 pub fn save_bundle_state(bundle_root: &Path, state: BundleState) -> Result<(), String> {
     let mut store = load_store();
-    store.bundles.insert(bundle_key(bundle_root), state);
+    let key = bundle_key(bundle_root);
+    let merged = merge_frontend_state(store.bundles.get(&key), state);
+    store.bundles.insert(key, merged);
     save_store(&store)
+}
+
+/// Fold a frontend session snapshot over the stored entry. The frontend owns
+/// every field except the two Rust writes itself — `last_opened` (stamped by
+/// [`touch_bundle`]) and `window` (saved by the window event handler) — which
+/// the snapshot either lacks or echoes stale, so the stored values win.
+fn merge_frontend_state(stored: Option<&BundleState>, incoming: BundleState) -> BundleState {
+    match stored {
+        Some(stored) => BundleState {
+            last_opened: stored.last_opened,
+            window: stored.window,
+            ..incoming
+        },
+        None => incoming,
+    }
 }
 
 /// Read just the saved window geometry for a Bundle, if any. Used by the Tauri
@@ -427,5 +447,36 @@ mod tests {
         let st: BundleState = serde_json::from_str(json).unwrap();
         assert_eq!(st.last_open_concept.as_deref(), Some("x.md"));
         assert!(st.window.is_none());
+    }
+
+    #[test]
+    fn frontmatter_shown_round_trips() {
+        // The frontend persists the ADR-0008 name; it must survive a save/load.
+        let st: BundleState = serde_json::from_str(r#"{ "frontmatterShown": true }"#).unwrap();
+        let json = serde_json::to_value(&st).unwrap();
+        assert_eq!(json["frontmatterShown"], serde_json::json!(true));
+    }
+
+    #[test]
+    fn a_frontend_save_keeps_the_rust_owned_fields() {
+        // The frontend snapshot carries no lastOpened and echoes the window it
+        // loaded; neither may clobber what Rust stored since.
+        let stored = BundleState {
+            last_opened: Some(42),
+            window: Some(WindowState { width: 800, height: 600, x: Some(1), y: Some(2) }),
+            ..Default::default()
+        };
+        let incoming = BundleState {
+            last_open_concept: Some("a.md".into()),
+            window: Some(WindowState { width: 1, height: 1, x: None, y: None }),
+            ..Default::default()
+        };
+        let merged = merge_frontend_state(Some(&stored), incoming);
+        assert_eq!(merged.last_open_concept.as_deref(), Some("a.md"));
+        assert_eq!(merged.last_opened, Some(42));
+        assert_eq!(merged.window.unwrap().width, 800);
+        // A never-seen Bundle takes the incoming state as-is.
+        let fresh = merge_frontend_state(None, BundleState { last_opened: None, ..Default::default() });
+        assert!(fresh.last_opened.is_none());
     }
 }
