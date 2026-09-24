@@ -164,7 +164,7 @@ async fn main() {
         // Err only means "no subscribers right now" — fine to ignore.
         let _ = sink_tx.send(ServerEvent::File(change));
     }) {
-        Ok(w) => Some(watcher::WatcherHandle::new(w)),
+        Ok(w) => Some(w),
         Err(e) => {
             eprintln!("sunstone-server: filesystem watcher failed to start: {e}");
             None

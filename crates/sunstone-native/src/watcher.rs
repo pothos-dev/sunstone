@@ -66,14 +66,14 @@ pub struct FileAuthor {
 }
 
 /// Start watching `root` recursively, keeping `state`'s index current and
-/// delivering each (non-self) change to `sink`. The returned watcher must be
+/// delivering each (non-self) change to `sink`. The returned handle must be
 /// kept alive (managed in a long-lived owner) or watching stops.
 ///
 /// `state` is a shared handle to the SAME `AppState` the host's command layer
 /// uses, so index updates and self-write suppression observe one source of
 /// truth. `sink` is invoked from the watcher's own thread, hence the `Send`
 /// bound.
-pub fn start<F>(root: PathBuf, state: Arc<AppState>, sink: F) -> Result<RecommendedWatcher, String>
+pub fn start<F>(root: PathBuf, state: Arc<AppState>, sink: F) -> Result<WatcherHandle, String>
 where
     F: Fn(FileChange) + Send + 'static,
 {
@@ -93,7 +93,7 @@ where
         .watch(&watch_root, RecursiveMode::Recursive)
         .map_err(|e| e.to_string())?;
 
-    Ok(watcher)
+    Ok(WatcherHandle(watcher))
 }
 
 /// Translate a notify event into a `FileChange` for the `sink`, applying
@@ -231,16 +231,10 @@ fn to_bundle_relative(root: &Path, abs: &Path) -> Option<String> {
     }
 }
 
-/// Hold the watcher alive for the lifetime of the app. We wrap it so `lib.rs`
-/// can stash it without naming the concrete watcher type everywhere. The field
-/// is never read — owning it is what keeps the watcher (and thus watching) alive.
+/// A running watcher, as [`start`] returns it. Hosts stash it without naming
+/// the concrete notify watcher type. The field is never read — owning it is
+/// what keeps the watcher (and thus watching) alive; dropping it stops.
 pub struct WatcherHandle(#[allow(dead_code)] RecommendedWatcher);
-
-impl WatcherHandle {
-    pub fn new(watcher: RecommendedWatcher) -> Self {
-        WatcherHandle(watcher)
-    }
-}
 
 #[cfg(test)]
 mod tests {

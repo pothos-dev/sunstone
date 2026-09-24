@@ -83,7 +83,7 @@ impl Session {
         // Swap current state + watcher atomically-ish (each behind its own lock).
         // Assigning the watcher drops the previous one, stopping the old watch.
         *self.current.lock().map_err(|e| e.to_string())? = Some(state);
-        *self.watcher.lock().map_err(|e| e.to_string())? = Some(WatcherHandle::new(watcher));
+        *self.watcher.lock().map_err(|e| e.to_string())? = Some(watcher);
 
         // Remember this folder for the launcher (creates/stamps the store entry).
         let _ = config::touch_bundle(&root);
