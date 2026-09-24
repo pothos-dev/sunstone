@@ -138,7 +138,7 @@ impl FromRequestParts<Arc<ServerState>> for AuthedUser {
         state: &Arc<ServerState>,
     ) -> Result<Self, Self::Rejection> {
         // No configured secret → writing is disabled entirely.
-        let secret = state.jwt_secret.as_ref().ok_or_else(unauthorized)?;
+        let secret = state.cfg.jwt_secret.as_ref().ok_or_else(unauthorized)?;
         let header = parts
             .headers
             .get(AUTHORIZATION)

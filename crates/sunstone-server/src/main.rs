@@ -94,8 +94,7 @@ pub(crate) enum ServerEvent {
 /// Shared server state: the domain `AppState` (bundle root + index), the
 /// broadcast sender every `/api/events` connection subscribes to, the global
 /// write lock serializing the write→commit critical section (ticket 05/07 §4),
-/// the HS256 secret used to verify hook-minted write JWTs (ticket 04), the
-/// parsed environment [`Config`] (Spec 2 §2 — nothing downstream re-reads the
+/// the parsed environment [`Config`] (Spec 2 §2 — nothing downstream re-reads the
 /// environment), and the sync loop's shared state (§8.1/§10.5).
 pub(crate) struct ServerState {
     pub(crate) app: Arc<AppState>,
@@ -104,12 +103,11 @@ pub(crate) struct ServerState {
     /// (one Bundle = one working tree = one shared `index.lock`). The sync loop
     /// takes the **same** lock, so one owner touches the repo at a time.
     pub(crate) write_lock: Mutex<()>,
-    /// Shared secret for verifying hook-minted write JWTs. `None` (env unset)
-    /// disables writing — every write route 401s at the `AuthedUser` extractor.
-    pub(crate) jwt_secret: Option<Vec<u8>>,
     /// The one parse of the environment: the deployment shape, the git family,
-    /// the resolved bundle root. Read by the write path's shape gate (§5), the
-    /// history handlers' plain-shape short-circuit (§11.1) and the loop.
+    /// the resolved bundle root, the write-JWT secret. Read by the write path's
+    /// shape gate (§5), the history handlers' plain-shape short-circuit (§11.1),
+    /// the `AuthedUser` extractor (`jwt_secret`: `None` disables writing — every
+    /// write route 401s) and the loop.
     pub(crate) cfg: Config,
     /// The loop's wake-up `Notify` plus the counters `GET /api/sync-status`
     /// reports. Present in every shape; only the git-synced shape mutates it.
@@ -202,8 +200,7 @@ async fn main() {
     // off the one parse above (nothing downstream re-reads the environment).
     // Absent → writing is disabled (every write route 401s) — a safe read-only
     // default — and, per §11, so is history.
-    let jwt_secret = cfg.jwt_secret.clone();
-    if jwt_secret.is_none() {
+    if cfg.jwt_secret.is_none() {
         eprintln!(
             "sunstone-server: {} unset — write routes are disabled (read-only)",
             auth::SECRET_ENV
@@ -215,7 +212,6 @@ async fn main() {
         app: app_state,
         events,
         write_lock: Mutex::new(()),
-        jwt_secret,
         cfg,
         sync: SyncState::new(),
     });

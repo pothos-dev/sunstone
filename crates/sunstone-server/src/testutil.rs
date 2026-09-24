@@ -50,16 +50,14 @@ pub fn seeded_bundle(tag: &str) -> PathBuf {
 }
 
 /// A `ServerState` over `cfg` with nothing running behind it (no watcher, no
-/// loop): the index is built over `cfg.bundle_root`, and the write secret is
-/// taken from `cfg.jwt_secret`, exactly as `main` does. Subscribe to
-/// `state.events` for the broadcast side.
+/// loop), its index built over `cfg.bundle_root`. Subscribe to `state.events`
+/// for the broadcast side.
 pub fn server_state(cfg: Config) -> Arc<ServerState> {
     let (events, _) = broadcast::channel::<ServerEvent>(8);
     Arc::new(ServerState {
         app: Arc::new(AppState::new(cfg.bundle_root.clone())),
         events,
         write_lock: Mutex::new(()),
-        jwt_secret: cfg.jwt_secret.clone(),
         cfg,
         sync: SyncState::new(),
     })
