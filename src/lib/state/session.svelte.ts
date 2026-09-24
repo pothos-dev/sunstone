@@ -2,7 +2,8 @@ import { backend } from '$lib/ipc';
 import { createDebouncer } from '$lib/debounce';
 import { remapPaths } from '$lib/path';
 import { DEFAULT_EDITOR_MODE, type EditorMode } from '$lib/editor/cm';
-import { migrateEditorMode, type StoredLayout } from '$lib/state/layoutPersist';
+import type { StoredLayout } from '$lib/state/layoutPersist';
+import { bundleStateFromSession, sessionFromBundleState } from '$lib/state/sessionState';
 import type { BundleState } from '$lib/types';
 import type { RegionId } from '$lib/regionGrid';
 import { flagsToClearOnEnter } from '$lib/transientReveal';
@@ -22,7 +23,8 @@ import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
  * here never clobbers it.
  *
  * EXTENDING (the `recentFiles` field below was added this way): add a rune +
- * accessor here, include it in `snapshot()`, and seed it in `load()`. The
+ * accessor here, add the field to `SessionFields` + both mappings in
+ * `./sessionState.ts`, and pass it through `load()` / `#snapshot()`. The
  * Backend `BundleState` type and both impls already round-trip unknown fields,
  * so no seam change is needed beyond the new field.
  */
@@ -155,41 +157,31 @@ class SessionStore {
     SAVE_DEBOUNCE_MS,
   );
 
-  /** Load persisted state from the backend. Defaults on a missing/corrupt store. */
+  /**
+   * Load persisted state from the backend. Defaults on a missing/corrupt store;
+   * the per-field defaults + legacy migrations are `sessionFromBundleState`.
+   */
   async load(): Promise<void> {
     try {
-      const state = await backend.loadBundleState();
-      this.lastOpenConcept = state.lastOpenConcept ?? null;
-      this.expandedFolders = new Set(state.expandedFolders ?? []);
-      this.recentFiles = state.recentFiles ?? [];
-      // Sidebar collapse flags default to `true` (expanded) when absent — a fresh
-      // or older Bundle opens with the left Sidebar and every Section expanded.
-      this.leftSidebarOpen = state.leftSidebarOpen ?? true;
-      this.explorerOpen = state.explorerOpen ?? true;
-      // Tags defaults to COLLAPSED (`false`) when absent (see the field above).
-      this.tagsOpen = state.tagsOpen ?? false;
-      this.backlinksOpen = state.backlinksOpen ?? true;
-      this.outlineOpen = state.outlineOpen ?? true;
-      // Global Frontmatter toggle defaults to HIDDEN (`false`) when absent.
-      // `propertiesShown` is the pre-ADR-0008 name for the same flag; reading it
-      // keeps an existing user's choice across the rename.
-      this.frontmatterShown = state.frontmatterShown ?? state.propertiesShown ?? false;
-      // Migrate the legacy tri-state ('edit'/'hybrid'/'view') to the boolean
-      // 'editing'/'read'; an absent value defaults to 'read'.
-      this.editorMode = migrateEditorMode(state.editorMode);
+      const s = sessionFromBundleState(await backend.loadBundleState());
+      this.lastOpenConcept = s.lastOpenConcept;
+      this.expandedFolders = s.expandedFolders;
+      this.recentFiles = s.recentFiles;
+      this.leftSidebarOpen = s.leftSidebarOpen;
+      this.explorerOpen = s.explorerOpen;
+      this.tagsOpen = s.tagsOpen;
+      this.backlinksOpen = s.backlinksOpen;
+      this.outlineOpen = s.outlineOpen;
+      this.frontmatterShown = s.frontmatterShown;
+      this.editorMode = s.editorMode;
       // The full tiling layout (null on a fresh/old Bundle — App migrates from
-      // `lastOpenConcept` then). Carried as the raw stored value; validation +
-      // migration + corrupt-fallback happen in `resolveStoredLayout` at restore.
-      this.layout = state.layout ?? null;
+      // `lastOpenConcept` then).
+      this.layout = s.layout;
       this.#lastLayoutJson = JSON.stringify(this.layout);
-      // The right Sidebar defaults to COLLAPSED (`false`) when absent — a fresh
-      // or older Bundle opens with the right Sidebar hidden.
-      this.rightSidebarOpen = state.rightSidebarOpen ?? false;
-      // Sidebar widths default to the shared default when absent; a stored value
-      // is clamped on read so a corrupt/out-of-range width can't wedge the layout.
-      this.leftSidebarWidth = clampSidebarWidth(state.leftSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
-      this.rightSidebarWidth = clampSidebarWidth(state.rightSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
-      this.#window = state.window;
+      this.rightSidebarOpen = s.rightSidebarOpen;
+      this.leftSidebarWidth = s.leftSidebarWidth;
+      this.rightSidebarWidth = s.rightSidebarWidth;
+      this.#window = s.window;
     } catch {
       // Best-effort: a failed load just means no session to restore.
     }
@@ -441,23 +433,23 @@ class SessionStore {
 
   /** Current state as a plain `BundleState` for persistence. */
   #snapshot(): BundleState {
-    return {
+    return bundleStateFromSession({
       lastOpenConcept: this.lastOpenConcept,
-      expandedFolders: [...this.expandedFolders],
-      recentFiles: [...this.recentFiles],
+      expandedFolders: this.expandedFolders,
+      recentFiles: this.recentFiles,
       leftSidebarOpen: this.leftSidebarOpen,
       explorerOpen: this.explorerOpen,
       tagsOpen: this.tagsOpen,
       backlinksOpen: this.backlinksOpen,
+      outlineOpen: this.outlineOpen,
       rightSidebarOpen: this.rightSidebarOpen,
       leftSidebarWidth: this.leftSidebarWidth,
       rightSidebarWidth: this.rightSidebarWidth,
-      outlineOpen: this.outlineOpen,
       frontmatterShown: this.frontmatterShown,
       editorMode: this.editorMode,
       layout: this.layout,
       window: this.#window,
-    };
+    });
   }
 
   #scheduleSave(): void {
