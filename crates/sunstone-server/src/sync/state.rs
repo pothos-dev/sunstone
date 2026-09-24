@@ -26,16 +26,15 @@ pub struct SyncState {
 
 /// The mutex-guarded interior of [`SyncState`].
 pub(super) struct SyncInner {
+    /// The last fetch / push verdict. `false` doubles as §10.6's "currently in
+    /// a logged failure streak", so a transition is a change of this value.
     last_fetch_ok: bool,
     last_push_ok: bool,
     pending_commits: usize,
     /// When the last tick completed; `None` until the first one does.
     last_sync: Option<Instant>,
-    /// §10.6 transition tracking: whether we are currently in a logged fetch /
-    /// push failure streak, and how many push attempts it has lasted (so
+    /// How many push attempts the current failure streak has lasted (so
     /// recovery can log `push recovered after N attempts`).
-    fetch_failing: bool,
-    push_failing: bool,
     push_attempts: u32,
     /// The last tick error logged, so an anomaly that recurs every interval
     /// (a repo with no HEAD, say) is not ~8,600 identical lines/day. Same
@@ -55,8 +54,6 @@ impl SyncState {
                 last_push_ok: true,
                 pending_commits: 0,
                 last_sync: None,
-                fetch_failing: false,
-                push_failing: false,
                 push_attempts: 0,
                 last_error: None,
             }),
@@ -102,12 +99,11 @@ impl SyncState {
     /// once).
     pub fn note_fetch(&self, ok: bool) -> bool {
         let mut inner = self.lock();
-        inner.last_fetch_ok = ok;
         // A transition is a *change* of streak state in either direction: the
         // first failure logs (with git's text), repeats are silent, and the
         // recovery logs once.
-        let transition = inner.fetch_failing != !ok;
-        inner.fetch_failing = !ok;
+        let transition = inner.last_fetch_ok != ok;
+        inner.last_fetch_ok = ok;
         transition
     }
 
@@ -118,20 +114,19 @@ impl SyncState {
     /// that is an expected race, not a transport verdict.
     pub fn note_push(&self, ok: bool) -> bool {
         let mut inner = self.lock();
+        let was_failing = !inner.last_push_ok;
+        let transition = inner.last_push_ok != ok;
         inner.last_push_ok = ok;
-        let transition = inner.push_failing != !ok;
-        if ok {
-            inner.push_failing = false;
-            // `push_attempts` is deliberately **not** cleared here: the recovery
-            // line is logged immediately after this call and reads it through
-            // [`Self::push_attempts`]. The next failure starts a fresh streak at 1.
-        } else {
-            inner.push_attempts = if inner.push_failing {
+        // On success `push_attempts` is deliberately **not** cleared: the
+        // recovery line is logged immediately after this call and reads it
+        // through [`Self::push_attempts`]. The next failure starts a fresh
+        // streak at 1.
+        if !ok {
+            inner.push_attempts = if was_failing {
                 inner.push_attempts.saturating_add(1)
             } else {
                 1
             };
-            inner.push_failing = true;
         }
         transition
     }
