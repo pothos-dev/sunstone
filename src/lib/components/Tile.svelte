@@ -103,11 +103,14 @@
   }: Props = $props();
 
   let editorParent = $state<HTMLDivElement | null>(null);
-  let view: EditorView | null = null;
   // `view` itself is deliberately NOT reactive (it is built once and mutated
-  // through CodeMirror's own API). This flag is: the Frontmatter Region needs to
-  // re-read `view` the moment it exists, because the YAML editor hangs off the
-  // body editor's state (ADR 0008).
+  // through CodeMirror's own API). Making it `$state` would make every effect
+  // that null-checks it (mode, links, theme, mermaid) re-run once on build.
+  // The template reads it only through `viewReady`, which IS reactive: the
+  // Frontmatter Region needs to re-read `view` the moment it exists, because
+  // the YAML editor hangs off the body editor's state (ADR 0008).
+  // svelte-ignore non_reactive_update
+  let view: EditorView | null = null;
   let viewReady = $state(false);
 
   // The open Concept's frontmatter YAML, mirrored out of the editor's
