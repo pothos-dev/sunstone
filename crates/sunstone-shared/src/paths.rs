@@ -77,6 +77,13 @@ pub fn normalize_segments<'a>(segments: impl Iterator<Item = &'a str>) -> String
 /// (so a path part already split of its suffix passes through unchanged).
 /// Mirrors the path-only core of the former `resolveLink` in `src/lib/links.ts`.
 pub fn resolve_internal(current_path: &str, href: &str) -> Option<String> {
+    resolve_location(current_path, href).filter(|path| !path.is_empty())
+}
+
+/// [`resolve_internal`], except that a link naming the Bundle root itself
+/// (`/`, `./`, `..` from a top-level Concept) resolves to `Some("")` rather
+/// than `None` — the root is a folder that [`folder_index_fallback`] can open.
+pub fn resolve_location(current_path: &str, href: &str) -> Option<String> {
     let raw = href.trim();
     if raw.is_empty() || is_external(raw) || raw.starts_with('#') {
         return None;
@@ -101,22 +108,27 @@ pub fn resolve_internal(current_path: &str, href: &str) -> Option<String> {
         };
         normalize_segments(dir_segments.into_iter().chain(path_part.split('/')))
     };
+    Some(path)
+}
 
-    if path.is_empty() {
-        None
+/// The `index.md` inside folder `dir` (`""` = the Bundle root).
+pub fn index_of(dir: &str) -> String {
+    if dir.is_empty() {
+        "index.md".to_string()
     } else {
-        Some(path)
+        format!("{dir}/index.md")
     }
 }
 
 /// A link to a folder opens that folder's `index.md`: when `path` is not
 /// itself a Concept but `<path>/index.md` is, return the index; otherwise
-/// `path` unchanged. `exists` reports concept-set membership.
+/// `path` unchanged. `""` names the Bundle root, whose index is the root
+/// `index.md`. `exists` reports concept-set membership.
 pub fn folder_index_fallback(path: String, exists: &impl Fn(&str) -> bool) -> String {
     if exists(&path) {
         return path;
     }
-    let index = format!("{path}/index.md");
+    let index = index_of(&path);
     if exists(&index) {
         index
     } else {

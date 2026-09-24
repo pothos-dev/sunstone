@@ -4,13 +4,13 @@
 //! `resolve_link` classifies a clicked `href` into external / internal / none,
 //! carrying the target's bundle-relative path, a trailing `#anchor`, and — for
 //! the wasm handle — whether the target `exists` in the concept set (§4). The
-//! path-only core lives in [`crate::paths::resolve_internal`]; this adds the
-//! `kind` classification, anchor extraction, and the nested-bundle-root
-//! redirect. `find_bundle_root` locates the OKF root within the opened tree.
+//! path-only core lives in [`crate::paths::resolve_location`]; this adds the
+//! `kind` classification, anchor extraction, the nested-bundle-root redirect,
+//! and the folder → `index.md` fallback. `find_bundle_root` locates the OKF root within the opened tree.
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{dir_of, folder_index_fallback, is_external, resolve_internal};
+use crate::paths::{dir_of, folder_index_fallback, index_of, is_external, resolve_location};
 use crate::wikilink::basename;
 
 /// The classified result of resolving a markdown link `href` (ADR 0006 §3).
@@ -77,7 +77,11 @@ fn apply_bundle_root(path: &str, root: &str, exists: &impl Fn(&str) -> bool) -> 
     if root.is_empty() {
         return path.to_string();
     }
-    let rooted = format!("{root}/{path}");
+    let rooted = if path.is_empty() {
+        root.to_string()
+    } else {
+        format!("{root}/{path}")
+    };
     if exists(&rooted) {
         rooted
     } else {
@@ -114,19 +118,23 @@ pub fn resolve_link(
 
     // The path itself (anchor / query dropped, `.`/`..` collapsed, relative
     // links joined onto the current Concept's directory) is the shared core.
-    let Some(path) = resolve_internal(current_path, raw) else {
+    let Some(path) = resolve_location(current_path, raw) else {
         return ResolvedLink::None;
     };
     // Bundle-absolute links are redirected into a nested OKF root when one is
     // identified and the rooted target exists; relative links never are.
     let path = if raw.starts_with('/') {
         // A rooted folder counts as present when it has an index to open.
-        let present = |p: &str| exists(p) || exists(&format!("{p}/index.md"));
+        let present = |p: &str| exists(p) || exists(&index_of(p));
         apply_bundle_root(&path, bundle_root, &present)
     } else {
         path
     };
     let path = folder_index_fallback(path, &exists);
+    // The root with no index to open stays what it always was: nothing.
+    if path.is_empty() {
+        return ResolvedLink::None;
+    }
     let ex = exists(&path);
     ResolvedLink::Internal {
         path,
@@ -206,6 +214,26 @@ mod tests {
     }
 
     // --- resolve_link (mirrors links.test.ts::resolveLink) -------------------
+
+    #[test]
+    fn a_link_to_the_bundle_root_opens_the_root_index() {
+        let set = paths(&["index.md", "a/b.md", "docs/index.md", "docs/x.md"]);
+        let exists = |p: &str| set.iter().any(|x| x == p);
+        let internal = |path: &str, anchor: Option<&str>| ResolvedLink::Internal {
+            path: path.to_string(),
+            anchor: anchor.map(str::to_string),
+            exists: true,
+        };
+        for (cur, href) in [("x.md", "/"), ("x.md", "./"), ("x.md", "."), ("a/b.md", ".."), ("a/b.md", "../")] {
+            assert_eq!(resolve_link(cur, href, "", exists), internal("index.md", None), "{cur} {href}");
+        }
+        assert_eq!(resolve_link("x.md", "/#Top", "", exists), internal("index.md", Some("Top")));
+        // A nested bundle root's own index wins for a rooted link.
+        assert_eq!(resolve_link("docs/x.md", "/", "docs", exists), internal("docs/index.md", None));
+        // No root index: nothing to open, as before.
+        let bare = |p: &str| p == "a/b.md";
+        assert_eq!(resolve_link("x.md", "/", "", bare), ResolvedLink::None);
+    }
 
     #[test]
     fn a_folder_link_opens_the_folders_index() {

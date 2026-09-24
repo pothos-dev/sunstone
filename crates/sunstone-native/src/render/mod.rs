@@ -5,8 +5,8 @@
 //! only is rendered — frontmatter lives outside the document (ADR 0003) and is
 //! returned separately for the read-only Properties view.
 //!
-//! Link resolution REUSES the existing core logic — `paths::resolve_internal`
-//! for standard markdown links and `wikilink::resolve_wikilink` for `[[name]]`
+//! Link resolution REUSES the existing core logic — `paths::resolve_location`
+//! (plus the folder → `index.md` fallback) for standard markdown links and `wikilink::resolve_wikilink` for `[[name]]`
 //! wikilinks — so the web resolves links by the exact same rules as the desktop
 //! (filename match, shortest-path/alphabetical tie-break, suffix match). The
 //! rules are not reimplemented here; we only decide, per resolved target, how it
@@ -53,7 +53,7 @@ use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
 use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
-use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_internal};
+use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_location};
 use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
@@ -308,7 +308,10 @@ fn mark_link_url(
     if url.is_empty() || url.starts_with('#') {
         return url.to_string(); // in-page anchor / empty — leave to the browser
     }
-    match resolve_internal(source_path, url).map(|p| folder_index_fallback(p, &exists)) {
+    match resolve_location(source_path, url)
+        .map(|p| folder_index_fallback(p, &exists))
+        .filter(|p| !p.is_empty())
+    {
         Some(path) if exists(&path) => format!("{M_INTERNAL}{path}"),
         Some(path) => format!("{M_BROKEN}{path}"),
         None => url.to_string(),
@@ -436,6 +439,15 @@ mod tests {
         let p = render("[guide](guide/)", "a.md", &["a.md", "guide/index.md"]);
         assert!(p.html.contains(r#"data-path="guide/index.md""#), "{}", p.html);
         assert!(!p.html.contains("broken"));
+    }
+
+    #[test]
+    fn a_bundle_root_link_renders_as_a_link_to_the_root_index() {
+        let p = render("[home](/)", "sub/a.md", &["sub/a.md", "index.md"]);
+        assert!(p.html.contains(r#"data-path="index.md""#), "{}", p.html);
+        // Without a root index the link is left to the browser, as before.
+        let p = render("[home](/)", "sub/a.md", &["sub/a.md"]);
+        assert!(p.html.contains(r#"href="/""#), "{}", p.html);
     }
 
     #[test]

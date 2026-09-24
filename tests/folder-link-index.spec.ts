@@ -4,7 +4,8 @@ import { type Page } from '@playwright/test';
 /**
  * A markdown link that points at a FOLDER opens that folder's `index.md`
  * (instead of failing to read a directory). The broken-link decoration agrees:
- * such a link is not marked broken.
+ * such a link is not marked broken. A link to the Bundle root (`/`) opens the
+ * root `index.md`.
  */
 
 type FakeWindow = Window & {
@@ -51,4 +52,22 @@ test('a link to a folder opens its index.md', async ({ page }) => {
   // concepts/index.md lists its children.
   await expect(editor).toContainText('Live preview');
   await expect(editor).not.toContainText('See the concepts folder');
+});
+
+test('a link to the Bundle root opens the root index.md', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('tree')).toBeVisible();
+
+  await createConcept(
+    page,
+    'hub.md',
+    '---\ntype: concept\ntitle: Hub\n---\n\n# Hub\n\nBack to [the start page](/) from here.\n',
+  );
+  await page.getByTestId('tree').locator('[data-path="hub.md"]').click();
+
+  const editor = page.getByTestId('editor');
+  await expect(editor).toContainText('Back to the start page');
+  await clickLink(page, 'the start page');
+  await expect(editor).toContainText('reserved');
+  await expect(page.locator('[data-reserved-path="index.md"]')).toHaveClass(/selected/);
 });
