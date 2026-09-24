@@ -420,6 +420,11 @@
   // --- Explorer keyboard nav + CRUD (unchanged from single-tile) --------------
   let treePane = $state<HTMLDivElement | null>(null);
 
+  // The Explorer row element for `path` (Tree.svelte stamps `data-row-path`).
+  function treeRow(host: ParentNode | null, path: string): HTMLElement | null {
+    return host?.querySelector<HTMLElement>(`.row[data-row-path="${CSS.escape(path)}"]`) ?? null;
+  }
+
   function onTreeKeydown(e: KeyboardEvent) {
     const handled = explorerNav.handleKeydown(e, bundle.tree, {
       isExpanded: (p) => session.isExpanded(p),
@@ -459,9 +464,7 @@
     session.revealLeftSection('explorer');
     explorerNav.setFocused(folder);
     retryFrames(() => {
-      const row = treePane?.querySelector<HTMLElement>(
-        `.row[data-row-path="${CSS.escape(folder)}"]`,
-      );
+      const row = treeRow(treePane, folder);
       if (!row) return false;
       row.scrollIntoView({ block: 'nearest' });
       return true;
@@ -473,9 +476,7 @@
     retryFrames(() => {
       const target = explorerNav.focusedPath;
       if (target === null || !treePane) return true;
-      const row = treePane.querySelector<HTMLElement>(
-        `.row[data-row-path="${CSS.escape(target)}"]`,
-      );
+      const row = treeRow(treePane, target);
       if (!row) return false;
       row.focus();
       return true;
@@ -492,9 +493,7 @@
         const first = rows[0]?.path;
         if (first !== undefined) {
           explorerNav.setFocused(first);
-          const row = treePane.querySelector<HTMLElement>(
-            `.row[data-row-path="${CSS.escape(first)}"]`,
-          );
+          const row = treeRow(treePane, first);
           if (row) {
             row.focus();
             return true;
@@ -554,9 +553,7 @@
     const path = explorerNav.focusedPath;
     if (path === null || !treePane) return;
     if (focus.focusedRegion !== 'explorer') return;
-    const row = treePane.querySelector<HTMLElement>(
-      `.row[data-row-path="${CSS.escape(path)}"]`,
-    );
+    const row = treeRow(treePane, path);
     if (row && document.activeElement !== row) row.focus();
   });
 
