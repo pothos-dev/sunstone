@@ -39,7 +39,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{find_byte, resolve_internal};
-use crate::wikilink::{basename, find_double_close};
+use crate::wikilink::{basename, best_name_match, find_double_close};
 
 /// The Attachment extensions Sunstone renders as an image, matched
 /// case-insensitively (af-1). Non-image Attachments keep their literal
@@ -471,33 +471,8 @@ pub fn resolve_embed_name(attachment_paths: &[String], target: &str) -> Option<S
     if name.is_empty() {
         return None;
     }
-    let lower = name.to_ascii_lowercase();
-    let has_slash = name.contains('/');
-
-    let mut matches: Vec<&String> = attachment_paths
-        .iter()
-        .filter(|c| {
-            let full = c.to_ascii_lowercase();
-            if has_slash {
-                // Partial path -> suffix match (full equality or `/`-bounded).
-                full == lower || full.ends_with(&format!("/{lower}"))
-            } else {
-                // Bare name -> basename match, extension INCLUDED.
-                basename(&full) == lower
-            }
-        })
-        .collect();
-
-    if matches.is_empty() {
-        return None;
-    }
-    // Tie-break: fewest `/` (shortest path), then lexicographically.
-    matches.sort_by(|a, b| {
-        let sa = a.matches('/').count();
-        let sb = b.matches('/').count();
-        sa.cmp(&sb).then_with(|| a.cmp(b))
-    });
-    Some(matches[0].clone())
+    // Mixed corpus: the extension is part of the compared name.
+    best_name_match(attachment_paths, name, |c| Some(c.to_ascii_lowercase()))
 }
 
 #[cfg(test)]

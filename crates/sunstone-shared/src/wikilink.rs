@@ -142,34 +142,52 @@ pub fn resolve_wikilink(all_paths: &[String], source_path: &str, raw: &str) -> O
         // Pure same-file anchor: `[[#heading]]`.
         return Some(source_path.to_string());
     }
-    let lower = t.to_ascii_lowercase();
-    let has_slash = t.contains('/');
+    // Only `.md` Concepts are candidates, compared with `.md` dropped.
+    best_name_match(all_paths, t, |c| {
+        c.to_ascii_lowercase()
+            .ends_with(".md")
+            .then(|| drop_md(c).to_ascii_lowercase())
+    })
+}
 
-    let mut matches: Vec<&String> = all_paths
+/// The name-matching core shared by [`resolve_wikilink`] and
+/// [`crate::embed::resolve_embed_name`]: pick the best `corpus` path for a
+/// (non-empty) `name`.
+///
+/// `key(path)` is the lowercased form a path is compared by (`None` excludes
+/// it). A bare name matches a key's basename; a name containing `/` matches the
+/// whole key or a `/`-bounded suffix of it. Matching is case-insensitive and
+/// literal. Ambiguity is resolved silently: fewest `/`, then lexicographically.
+pub(crate) fn best_name_match(
+    corpus: &[String],
+    name: &str,
+    key: impl Fn(&str) -> Option<String>,
+) -> Option<String> {
+    let lower = name.to_ascii_lowercase();
+    let has_slash = name.contains('/');
+    let suffix = format!("/{lower}");
+
+    corpus
         .iter()
-        .filter(|c| c.to_ascii_lowercase().ends_with(".md"))
         .filter(|c| {
-            let no_ext = drop_md(c).to_ascii_lowercase();
+            let Some(k) = key(c) else {
+                return false;
+            };
             if has_slash {
                 // Partial path -> suffix match (full equality or `/`-bounded).
-                no_ext == lower || no_ext.ends_with(&format!("/{lower}"))
+                k == lower || k.ends_with(&suffix)
             } else {
                 // Bare name -> basename match.
-                drop_md(basename(c)).to_ascii_lowercase() == lower
+                basename(&k) == lower
             }
         })
-        .collect();
-
-    if matches.is_empty() {
-        return None;
-    }
-    // Tie-break: fewest `/` (shortest path), then lexicographically.
-    matches.sort_by(|a, b| {
-        let sa = a.matches('/').count();
-        let sb = b.matches('/').count();
-        sa.cmp(&sb).then_with(|| a.cmp(b))
-    });
-    Some(matches[0].clone())
+        // Tie-break: fewest `/` (shortest path), then lexicographically.
+        .min_by(|a, b| {
+            let sa = a.matches('/').count();
+            let sb = b.matches('/').count();
+            sa.cmp(&sb).then_with(|| a.cmp(b))
+        })
+        .cloned()
 }
 
 /// Scan a Concept body for every wikilink inner text (`[[ ... ]]`), skipping
