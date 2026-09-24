@@ -9,11 +9,11 @@
 //
 // This store holds ONLY the Focused index as a rune plus the pure key-handling
 // logic (delegating clamp index math to `$lib/treeNav`, which is generic — NOT
-// `$lib/listNav`, which WRAPS for modal palettes). It is DOM-free: App.svelte
-// drives DOM focus from `focusedIndex` via roving tabindex + an effect, and the
-// component supplies the side-effecting `activate` callback (scroll the Editor /
-// open the Concept, then move focus to the Editor). Keeping it here mirrors
-// `explorerNav` and keeps App's keydown wiring thin.
+// `$lib/listNav`, which WRAPS for modal palettes). It is DOM-free: `listRegionNav`
+// (wired from App.svelte) drives DOM focus from `focusedIndex` via roving
+// tabindex + an effect, and App supplies the side-effecting `activate` callback
+// (scroll the Editor / open the Concept, then move focus to the Editor).
+// Keeping it here mirrors `explorerNav` and keeps App's keydown wiring thin.
 //
 // Two instances are exported (`outlineNav`, `backlinksNav`) so the Outline and
 // Backlinks Regions navigate independently, each remembering its own position.
