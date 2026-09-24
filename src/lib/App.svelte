@@ -803,7 +803,7 @@
     {/if}
   </div>
 
-  <main class="editor-tile" aria-label="Concept">
+  <main class="editor-main" aria-label="Concept">
     <!-- The editor area: a ROW OF COLUMNS, each a vertical STACK of tiled Tiles,
          with draggable dividers between columns and between tiles. It is the
          single 'editor' Region; the active Tile is where focus lands on entry.
@@ -820,7 +820,7 @@
           {#each col.tiles as slot, ti (slot.id)}
             {@const tile = workspace.tileById(slot.id)}
             {#if tile}
-              <div class="editor-tile" style="flex-grow: {slot.weight}">
+              <div class="tile-slot" style="flex-grow: {slot.weight}">
                 <Tile
                   bind:this={tileRefs[tile.id]}
                   {tile}
@@ -1080,12 +1080,16 @@
     border-radius: var(--radius-sm);
   }
 
-  .editor-tile {
+  /* The editor column of the app shell (between the sidebars), hosting the
+     tiling editor area. */
+  .editor-main {
     position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    min-width: 0;
   }
 
   /* The tiling editor area: a horizontal row of columns. */
@@ -1107,8 +1111,11 @@
     overflow: hidden;
   }
 
-  .editor-tile {
+  /* One tile's slot in a column; the inline `flex-grow` carries its weight. */
+  .tile-slot {
+    position: relative;
     flex: 1 1 0;
+    min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
