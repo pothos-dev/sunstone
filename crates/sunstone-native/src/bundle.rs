@@ -174,7 +174,7 @@ pub fn create_folder(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
 /// `rewrite::rename_and_rewrite`, not by this function. Works for both
 /// Concepts and folders. Returns the resolved `to` absolute path.
 pub fn rename_path(root: &Path, from: &str, to: &str) -> Result<PathBuf, String> {
-    let src = resolve(root, from)?;
+    let src = resolve_entry(root, from)?;
     let dst = resolve_new(root, to)?;
     if dst.exists() {
         return Err(format!("already exists: {to}"));
@@ -191,7 +191,7 @@ pub fn rename_path(root: &Path, from: &str, to: &str) -> Result<PathBuf, String>
 /// Delete `rel_path` (a Concept or a folder, recursively). The path must exist
 /// and stay within the Bundle. The frontend confirms before calling this.
 pub fn delete_path(root: &Path, rel_path: &str) -> Result<(), String> {
-    let resolved = resolve(root, rel_path)?;
+    let resolved = resolve_entry(root, rel_path)?;
     if resolved.is_dir() {
         std::fs::remove_dir_all(&resolved).map_err(|e| e.to_string())
     } else {
@@ -228,6 +228,17 @@ pub fn resolve(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
         return Err(format!("path escapes the bundle: {rel_path}"));
     }
     Ok(canonical)
+}
+
+/// [`resolve`] for an entry *inside* the Bundle: refuses a path that names the
+/// root itself (`""`, `.`), so a delete or rename can never act on the whole
+/// Bundle.
+fn resolve_entry(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
+    let resolved = resolve(root, rel_path)?;
+    if resolved == root {
+        return Err(format!("path names the bundle root: {rel_path:?}"));
+    }
+    Ok(resolved)
 }
 
 /// Resolve a bundle-relative path for a target that may NOT yet exist (create,
@@ -335,6 +346,17 @@ mod tests {
         create_concept(&root, "folder/b.md").unwrap();
         delete_path(&root, "folder").unwrap();
         assert!(!root.join("folder").exists());
+    }
+
+    #[test]
+    fn delete_and_rename_refuse_the_bundle_root() {
+        let root = temp_root();
+        create_concept(&root, "keep.md").unwrap();
+        for rel in ["", ".", "./", "a/.."] {
+            assert!(delete_path(&root, rel).is_err(), "delete {rel:?}");
+            assert!(rename_path(&root, rel, "moved").is_err(), "rename {rel:?}");
+        }
+        assert!(root.join("keep.md").exists());
     }
 
     #[test]
