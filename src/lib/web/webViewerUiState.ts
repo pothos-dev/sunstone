@@ -7,8 +7,8 @@ import type { ThemeMode } from '$lib/state/theme.svelte';
 import { clampSidebarWidth } from '$lib/sidebarResize';
 import type { WebUiState } from './uiState';
 
-/** The live values `WebViewer.svelte` tracks in its own `$state`, mirroring
- *  every field of `WebUiState`. */
+/** The live values `WebViewer.svelte` tracks (its `ui` `$state` object plus
+ *  the theme mode and `expandedFolders`), mirroring every field of `WebUiState`. */
 export interface WebViewerUiFields {
   themeMode: ThemeMode;
   expandedFolders: Set<string>;
@@ -43,9 +43,10 @@ export function snapshotWebViewerUiState(fields: WebViewerUiFields): WebUiState 
 /** A partial set of field updates to apply back onto the component's `$state`,
  *  derived from a loaded (possibly partial/corrupt) `WebUiState`. Sidebar
  *  widths are clamped; `expandedFolders`, when present, is turned into a
- *  fresh `Set`. Only keys actually present in `ui` appear here — the caller
- *  assigns each present key onto its own `$state` variable (Svelte's fine-
- *  grained reactivity needs a per-field assignment, not a merged object). */
+ *  fresh `Set`. Only keys actually present (and well-typed) in `ui` appear
+ *  here, so the caller can `Object.assign` the patch onto its `$state` object
+ *  — each assigned key is still its own fine-grained signal — and absent keys
+ *  keep their defaults. */
 export function restoreWebViewerUiState(
   ui: Partial<WebUiState>,
 ): Partial<WebViewerUiFields> {

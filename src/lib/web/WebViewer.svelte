@@ -140,28 +140,31 @@
   const rootOrdinary = $derived(data.tree ? ordinaryChildren(data.tree) : []);
   const rootReserved = $derived(data.tree ? reservedChildren(data.tree) : []);
 
-  // --- Sidebar Accordion + whole-Sidebar collapse + Properties collapse ---
-  let explorerOpen = $state(true);
-  let tagsOpen = $state(true);
-  let outlineOpen = $state(true);
-  let backlinksOpen = $state(true);
-  let leftSidebarOpen = $state(true);
-  let rightSidebarOpen = $state(true);
-  let propertiesOpen = $state(true);
-
-  // Sidebar content widths (px), drag-resized via the shared SidebarEdge and
-  // persisted to localStorage (the web backend is read-only — no server-side
-  // bundle state). Seeded to the default so the SSR render matches the first
-  // client render; onMount then applies the persisted (clamped) widths.
-  let leftSidebarWidth = $state(DEFAULT_SIDEBAR_WIDTH);
-  let rightSidebarWidth = $state(DEFAULT_SIDEBAR_WIDTH);
+  // --- Persisted UI state: Sidebar Accordion, whole-Sidebar collapse,
+  // Properties collapse and the Sidebar content widths (px, drag-resized via the
+  // shared SidebarEdge). Persisted to localStorage (the web backend is read-only
+  // — no server-side bundle state) together with the theme mode and
+  // `expandedFolders`. Seeded to the defaults so the SSR render matches the
+  // first client render; onMount then applies the persisted (validated,
+  // clamped) values.
+  const ui = $state({
+    explorerOpen: true,
+    tagsOpen: true,
+    outlineOpen: true,
+    backlinksOpen: true,
+    leftSidebarOpen: true,
+    rightSidebarOpen: true,
+    propertiesOpen: true,
+    leftSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+    rightSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  });
   // While an edge is dragged, suppress the width transition so it tracks the
   // pointer instantly (transient — never persisted).
   let leftResizing = $state(false);
   let rightResizing = $state(false);
 
-  const leftCount = $derived((explorerOpen ? 1 : 0) + (tagsPresent && tagsOpen ? 1 : 0));
-  const rightCount = $derived((outlineOpen ? 1 : 0) + (backlinksOpen ? 1 : 0));
+  const leftCount = $derived((ui.explorerOpen ? 1 : 0) + (tagsPresent && ui.tagsOpen ? 1 : 0));
+  const rightCount = $derived((ui.outlineOpen ? 1 : 0) + (ui.backlinksOpen ? 1 : 0));
 
   // --- Outline scroll-to-heading ---
   function scrollToHeading(slug: string) {
@@ -189,20 +192,8 @@
   // --- Persist UI state (localStorage) — gated until the initial load applies. ---
   let uiLoaded = $state(false);
   $effect(() => {
-    // read all deps so this re-runs on any change
-    const state = snapshotWebViewerUiState({
-      themeMode: theme.mode,
-      expandedFolders,
-      explorerOpen,
-      tagsOpen,
-      outlineOpen,
-      backlinksOpen,
-      leftSidebarOpen,
-      rightSidebarOpen,
-      leftSidebarWidth,
-      rightSidebarWidth,
-      propertiesOpen,
-    });
+    // read all deps (spreading `ui` reads every field) so this re-runs on any change
+    const state = snapshotWebViewerUiState({ ...ui, themeMode: theme.mode, expandedFolders });
     if (!uiLoaded) return; // don't clobber storage during the initial seed
     saveUiState(state);
   });
@@ -215,18 +206,14 @@
     void ensureWasm();
 
     // Restore persisted UI state before tracking the OS scheme.
-    const patch = restoreWebViewerUiState(loadUiState());
-    if (patch.themeMode) theme.mode = patch.themeMode;
-    if (typeof patch.explorerOpen === 'boolean') explorerOpen = patch.explorerOpen;
-    if (typeof patch.tagsOpen === 'boolean') tagsOpen = patch.tagsOpen;
-    if (typeof patch.outlineOpen === 'boolean') outlineOpen = patch.outlineOpen;
-    if (typeof patch.backlinksOpen === 'boolean') backlinksOpen = patch.backlinksOpen;
-    if (typeof patch.leftSidebarOpen === 'boolean') leftSidebarOpen = patch.leftSidebarOpen;
-    if (typeof patch.rightSidebarOpen === 'boolean') rightSidebarOpen = patch.rightSidebarOpen;
-    if (typeof patch.leftSidebarWidth === 'number') leftSidebarWidth = patch.leftSidebarWidth;
-    if (typeof patch.rightSidebarWidth === 'number') rightSidebarWidth = patch.rightSidebarWidth;
-    if (typeof patch.propertiesOpen === 'boolean') propertiesOpen = patch.propertiesOpen;
-    if (patch.expandedFolders) expandedFolders = patch.expandedFolders;
+    const {
+      themeMode,
+      expandedFolders: restoredFolders,
+      ...restored
+    } = restoreWebViewerUiState(loadUiState());
+    if (themeMode) theme.mode = themeMode;
+    if (restoredFolders) expandedFolders = restoredFolders;
+    Object.assign(ui, restored);
     const stopTheme = theme.start();
     uiLoaded = true;
 
@@ -286,10 +273,10 @@
        Sidebar go all the way to 0 width. -->
   <ActivityRail
     side="left"
-    sidebarOpen={leftSidebarOpen}
+    sidebarOpen={ui.leftSidebarOpen}
     sidebarLabel="sidebar"
     toggleTestid="rail-toggle-left"
-    onToggleSidebar={() => (leftSidebarOpen = !leftSidebarOpen)}
+    onToggleSidebar={() => (ui.leftSidebarOpen = !ui.leftSidebarOpen)}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
   >
@@ -330,18 +317,18 @@
 
   <aside
     class="side-bar left"
-    class:collapsed={!leftSidebarOpen}
+    class:collapsed={!ui.leftSidebarOpen}
     class:resizing={leftResizing}
     aria-label="Sidebar"
     data-testid="left-side-bar"
-    style="width: {leftSidebarOpen ? leftSidebarWidth : 0}px; --side-w: {leftSidebarWidth}px; --expanded-count: {leftCount}"
+    style="width: {ui.leftSidebarOpen ? ui.leftSidebarWidth : 0}px; --side-w: {ui.leftSidebarWidth}px; --expanded-count: {leftCount}"
   >
     <div class="side-bar-inner">
       <SidebarSection
         title="Explorer"
         testid="explorer-section"
-        expanded={explorerOpen}
-        ontoggle={() => (explorerOpen = !explorerOpen)}
+        expanded={ui.explorerOpen}
+        ontoggle={() => (ui.explorerOpen = !ui.explorerOpen)}
       >
         {#snippet actions()}
           {#if rootReserved.length > 0}
@@ -372,8 +359,8 @@
         <SidebarSection
           title="Tags"
           testid="tags-section"
-          expanded={tagsOpen}
-          ontoggle={() => (tagsOpen = !tagsOpen)}
+          expanded={ui.tagsOpen}
+          ontoggle={() => (ui.tagsOpen = !ui.tagsOpen)}
         >
           <WebTags {tags} version={indexVersion} selected={data.selected} onopen={open} />
         </SidebarSection>
@@ -384,13 +371,13 @@
   <!-- The left Sidebar's border: drag to resize. Collapsing lives on the rail's
        toggle button, so the border is absent while the Sidebar is collapsed. -->
   <div class="edge-slot left-edge-slot">
-    {#if leftSidebarOpen}
+    {#if ui.leftSidebarOpen}
       <SidebarEdge
         side="left"
-        width={leftSidebarWidth}
+        width={ui.leftSidebarWidth}
         label="sidebar"
         testid="left-sidebar-edge"
-        onResize={(w) => (leftSidebarWidth = w)}
+        onResize={(w) => (ui.leftSidebarWidth = w)}
         onResizeStart={() => (leftResizing = true)}
         onResizeEnd={() => (leftResizing = false)}
       />
@@ -433,13 +420,13 @@
         <button
           type="button"
           class="icon-btn"
-          class:active={propertiesOpen}
+          class:active={ui.propertiesOpen}
           data-testid="properties-panel-toggle"
-          title={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-          aria-label={propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-          aria-pressed={propertiesOpen}
+          title={ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}
+          aria-label={ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}
+          aria-pressed={ui.propertiesOpen}
           disabled={!data.rendered}
-          onclick={() => (propertiesOpen = !propertiesOpen)}
+          onclick={() => (ui.propertiesOpen = !ui.propertiesOpen)}
         >
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
             <!-- sliders glyph: two horizontal rails with knobs (properties). -->
@@ -484,7 +471,7 @@
       {:else if data.rendered === null}
         <p class="status" data-testid="reader-empty">Select a Concept to read it.</p>
       {:else}
-        {#if data.rendered.frontmatter.length > 0 && propertiesOpen}
+        {#if data.rendered.frontmatter.length > 0 && ui.propertiesOpen}
           <!-- Read-only Properties (frontmatter); shown/hidden via the concept
                strip's Properties toggle (mirrors the desktop global toggle). -->
           <dl class="properties" data-testid="properties">
@@ -517,13 +504,13 @@
          rendered Concept (no Outline/Backlinks without one), and only while the
          Sidebar is expanded — the right rail's toggle owns collapse/expand. -->
     <div class="edge-slot right-edge-slot">
-      {#if rightSidebarOpen}
+      {#if ui.rightSidebarOpen}
         <SidebarEdge
           side="right"
-          width={rightSidebarWidth}
+          width={ui.rightSidebarWidth}
           label="Outline & Backlinks"
           testid="right-sidebar-edge"
-          onResize={(w) => (rightSidebarWidth = w)}
+          onResize={(w) => (ui.rightSidebarWidth = w)}
           onResizeStart={() => (rightResizing = true)}
           onResizeEnd={() => (rightResizing = false)}
         />
@@ -532,26 +519,26 @@
 
     <aside
       class="side-bar right"
-      class:collapsed={!rightSidebarOpen}
+      class:collapsed={!ui.rightSidebarOpen}
       class:resizing={rightResizing}
       aria-label="Sidebar"
       data-testid="right-side-bar"
-      style="width: {rightSidebarOpen ? rightSidebarWidth : 0}px; --side-w: {rightSidebarWidth}px; --expanded-count: {rightCount}"
+      style="width: {ui.rightSidebarOpen ? ui.rightSidebarWidth : 0}px; --side-w: {ui.rightSidebarWidth}px; --expanded-count: {rightCount}"
     >
       <div class="side-bar-inner">
         <SidebarSection
           title="Outline"
           testid="outline-section"
-          expanded={outlineOpen}
-          ontoggle={() => (outlineOpen = !outlineOpen)}
+          expanded={ui.outlineOpen}
+          ontoggle={() => (ui.outlineOpen = !ui.outlineOpen)}
         >
           <WebOutline outline={data.rendered.outline} onselect={scrollToHeading} />
         </SidebarSection>
         <SidebarSection
           title="Backlinks"
           testid="backlinks-section"
-          expanded={backlinksOpen}
-          ontoggle={() => (backlinksOpen = !backlinksOpen)}
+          expanded={ui.backlinksOpen}
+          ontoggle={() => (ui.backlinksOpen = !ui.backlinksOpen)}
         >
           <WebBacklinks path={data.selected} version={indexVersion} onopen={open} />
         </SidebarSection>
@@ -560,10 +547,10 @@
 
     <ActivityRail
       side="right"
-      sidebarOpen={rightSidebarOpen}
+      sidebarOpen={ui.rightSidebarOpen}
       sidebarLabel="Outline & Backlinks"
       toggleTestid="rail-toggle-right"
-      onToggleSidebar={() => (rightSidebarOpen = !rightSidebarOpen)}
+      onToggleSidebar={() => (ui.rightSidebarOpen = !ui.rightSidebarOpen)}
     />
   {/if}
 </div>
