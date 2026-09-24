@@ -362,8 +362,8 @@ export const fakeBackend: Backend = {
     return conceptPaths();
   },
 
-  // The seeded Attachments, from their OWN map — `FILES` is `.md`-only by
-  // construction, so this can never be a filter over `conceptPaths()`.
+  // The seeded Attachments, from their OWN map — never a filter over `FILES`,
+  // which is the Concept working tree (see `./fake/attachments`).
   async listAttachmentPaths(): Promise<string[]> {
     return attachmentPaths();
   },

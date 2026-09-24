@@ -4,7 +4,7 @@
 // DOM-free logic so it can be unit-tested over plain strings (project
 // convention: pure `.ts`, thin CM wiring elsewhere).
 //
-// The output re-parses cleanly with `editor/criticMarkup.ts`'s `parseCriticMarks`
+// The output re-parses cleanly with the wasm `parseCriticMarks` (`$lib/wasm/exports`)
 // — every mark is well-formed and non-overlapping, and no mark ever straddles a
 // block marker (see the structure-awareness note below).
 //

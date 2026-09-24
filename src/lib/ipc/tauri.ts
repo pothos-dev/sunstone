@@ -114,7 +114,8 @@ export const tauriBackend: Backend = {
   },
 
   movePath(from: string, toDir: string): Promise<RewriteSummary> {
-    // Tauri command arg names are snake_case; `to_dir` matches lib.rs.
+    // Tauri maps the camelCase key to the command's snake_case `to_dir` arg
+    // (src-tauri/src/commands.rs).
     return invoke<RewriteSummary>('move_path', { from, toDir });
   },
 
@@ -161,7 +162,8 @@ export const tauriBackend: Backend = {
   },
 
   saveBundleState(state: BundleState): Promise<void> {
-    // Tauri command arg names are snake_case; `bundle_state` matches lib.rs.
+    // Tauri maps the camelCase key to the command's snake_case `bundle_state`
+    // arg (src-tauri/src/commands.rs).
     return invoke<void>('save_bundle_state', { bundleState: state });
   },
 

@@ -10,7 +10,8 @@ export type { Backend } from './backend';
  *
  * Three targets:
  *  - **web** (build-time `__SUNSTONE_WEB__`, set when `SUNSTONE_TARGET=web`):
- *    the read-only HTTP backend talking to `sunstone-server`. In this build the
+ *    the HTTP backend talking to `sunstone-server` (open reads, JWT-gated
+ *    writes). In this build the
  *    Tauri backend is stubbed out at bundle time (see `vite.config.js`), so
  *    `@tauri-apps/api` never enters the web bundle.
  *  - **desktop**: inside the Tauri webview `__TAURI_INTERNALS__` is present on

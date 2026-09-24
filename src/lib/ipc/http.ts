@@ -325,8 +325,9 @@ export const httpBackend: Backend = {
   },
 
   // --- Filesystem change events over SSE (`/api/events`). -------------------
-  // Every connected browser live-updates when Concepts change on disk (edited
-  // by any external tool — the web app never writes). `EventSource` targets the
+  // Every connected browser live-updates when Concepts change on disk — edited
+  // by an external tool or another web client (this tab's own writes are
+  // dropped by the `isOwnEcho` check below). `EventSource` targets the
   // relative `/api/events` (proxied to the Rust server, streamed un-buffered);
   // it auto-reconnects on a dropped connection. The returned unsubscribe is
   // synchronous (matching the seam contract): it closes the stream at once.

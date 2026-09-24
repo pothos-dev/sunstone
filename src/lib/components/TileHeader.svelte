@@ -50,7 +50,7 @@
     reviewEnabled: boolean;
     /** Tooltip for the review toggle (explains the disabled reason when disabled). */
     reviewTooltip: string;
-    /** Clear the Tile to its empty state. */
+    /** Close this Tile (the button only shows while several Tiles are open). */
     onClose: () => void;
     /** Open this Tile's Concept in a new Column to the right. */
     onSplitRight: () => void;
@@ -275,7 +275,7 @@
     </button>
 
     <!-- Export as PDF: render the Concept to static HTML in a clean preview
-         window (App.svelte's `exportPdf`), not the virtualized editor. -->
+         window (Tile.svelte's `exportPdf`), not the virtualized editor. -->
     <button
       type="button"
       class="icon-btn"

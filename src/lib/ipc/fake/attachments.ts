@@ -10,11 +10,12 @@
 //     built from the bytes seeded right here (ADR-0011: a URL, never bytes, is
 //     what crosses the seam — a `data:` URL is still a URL).
 //  2. **Attachments are a SEPARATE index from Concepts** — the same decision the
-//     ticket makes for the Rust side. `FILES` in `./store` is `.md`-only by
-//     construction: `buildTree` lists every key it holds and `conceptPaths()`
-//     feeds link resolution. Folding Attachments in there would put images in
-//     the Explorer tree and in `listConceptPaths()`. Keeping them in their own
-//     map makes "no Attachment in the tree" hold by construction rather than by
+//     ticket makes for the Rust side. `FILES` in `./store` is the Concept
+//     working tree, seeded `.md`-only: `buildTree` lists every key it holds and
+//     `conceptPaths()` feeds link resolution. (Only seeded that way — a test
+//     hook like `simulateExternalChange` can write any key.) Folding the
+//     Attachments in there would put images in the Explorer tree. Keeping them
+//     in their own map keeps the seeded Attachments out of the tree without
 //     remembering a filter.
 //
 // The payloads are GENUINELY DECODABLE images, not placeholder strings: a

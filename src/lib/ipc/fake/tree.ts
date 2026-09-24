@@ -11,8 +11,8 @@ import { FILES, FOLDERS, fileExists, folderExists, pathExists } from './store';
 
 /**
  * Build the recursive TreeNode for the fixture from the flat FILES map.
- * Directories are inferred from path segments; only `.md` files are listed
- * (the fixture contains only markdown, mirroring an OKF Bundle's focus).
+ * Directories are inferred from path segments; every FILES key is listed (the
+ * seeded fixture is markdown-only; the frontend filters non-`.md` leaves).
  */
 export function buildTree(): TreeNode {
   const root: TreeNode = { name: 'bundle', path: '', isDir: true, children: [] };

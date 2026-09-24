@@ -79,7 +79,8 @@
     onSplitRight: () => void;
     /** Split this Tile's Concept into a new tile below. */
     onSplitDown: () => void;
-    /** Close this tile. */
+    /** Close this Tile (App → `workspace.closeTile`; the sole Tile is cleared
+     *  to its empty state instead of removed). */
     onClose: () => void;
     /** Report the full-document line at this Tile's viewport probe, so the
      *  Outline can highlight the current heading (outline-active-heading).

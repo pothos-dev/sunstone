@@ -32,9 +32,10 @@ import { wikilinkAnchor, wikilinkLabel } from './wikilinkParts';
 // cache and re-resolves the visible links. This piggybacks on the SAME index
 // signal that refreshes broken markdown links.
 //
-// Embeds (`![[ ]]`) are deferred (ADR-0004) — the upstream scanner already
-// matches only `[[ ]]`, so `![[ ]]` renders as a literal `!` plus a wikilink;
-// that is acceptable for v1 and embeds are out of scope.
+// Embeds (`![[ ]]`) are not handled here: they are their own StateField in
+// `embeds.ts` (ADR-0010). The upstream scanner matches `[[ ]]` wherever it
+// occurs, so the `[[ ]]` inside an Embed's source is still scanned as a
+// wikilink.
 // ---------------------------------------------------------------------------
 
 /** Context the wikilink adapter needs from app state. Resolution + the concept
