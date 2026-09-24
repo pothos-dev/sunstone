@@ -1,7 +1,7 @@
 // Shared pointer-capture drag loop for App.svelte's column/tile dividers. The
 // two handlers there differed only in axis (x for columns, y for tile stacks)
 // and in which pure `tileLayout` resize function consumed the fraction — this
-// hoists the identical plumbing (pointer capture, window move/up listeners,
+// hoists the identical plumbing (pointer capture, window move/release listeners,
 // delta-as-fraction math) into one helper.
 
 export type DragAxis = 'x' | 'y';
@@ -34,8 +34,12 @@ export interface DividerDragOptions {
 /**
  * Start a divider drag from a pointerdown. Calls `event.preventDefault()`,
  * best-effort pointer-captures the divider, and tracks the pointer via window
- * listeners until pointerup. The caller is responsible for any pre-checks
- * (primary button, container present) BEFORE calling.
+ * listeners until the release. The drag ends on `pointerup` OR `mouseup`
+ * (whichever the engine delivers first, and only once): WebKitGTK — the
+ * desktop shell's webview — can swallow `pointerup`, which would otherwise
+ * leave a stale move listener dragging on the user's next pointer motion.
+ * The caller is responsible for any pre-checks (primary button, container
+ * present) BEFORE calling.
  */
 export function startDividerDrag({ event, axis, size, onFraction }: DividerDragOptions): void {
   event.preventDefault();
@@ -50,10 +54,20 @@ export function startDividerDrag({ event, axis, size, onFraction }: DividerDragO
     const current = axis === 'x' ? ev.clientX : ev.clientY;
     onFraction(dragFraction(start, current, size));
   };
+  let finished = false;
   const up = () => {
+    if (finished) return;
+    finished = true;
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
+    window.removeEventListener('mouseup', up);
+    try {
+      el.releasePointerCapture(event.pointerId);
+    } catch {
+      /* ignore: capture may already be gone */
+    }
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
+  window.addEventListener('mouseup', up);
 }
