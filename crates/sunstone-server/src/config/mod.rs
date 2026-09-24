@@ -107,14 +107,14 @@ pub const GIT_VAR_PREFIX: &str = "SUNSTONE_GIT_";
 /// The **closed** set of recognised `SUNSTONE_GIT_*` variables (§2.2). Any
 /// other `SUNSTONE_GIT_*` key is [`ConfigError::UnknownGitVar`].
 pub const KNOWN_GIT_VARS: &[&str] = &[
-    "SUNSTONE_GIT_BRANCH",
-    "SUNSTONE_GIT_ORIGIN",
-    "SUNSTONE_GIT_BUNDLE_SUBDIR",
-    "SUNSTONE_GIT_SYNC_INTERVAL_SECS",
-    "SUNSTONE_GIT_SYNC_NAME",
-    "SUNSTONE_GIT_SYNC_EMAIL",
-    "SUNSTONE_GIT_SSH_KEY",
-    "SUNSTONE_GIT_KNOWN_HOSTS",
+    BRANCH_ENV,
+    ORIGIN_ENV,
+    SUBDIR_ENV,
+    INTERVAL_ENV,
+    SYNC_NAME_ENV,
+    SYNC_EMAIL_ENV,
+    SSH_KEY_ENV,
+    KNOWN_HOSTS_ENV,
 ];
 
 /// Bundle root in the plain shape (lenient; empty ⇒ unset ⇒ the dev default).
@@ -134,17 +134,16 @@ pub const DEFAULT_SYNC_NAME: &str = "Sunstone Sync";
 /// Default sync committer email (`SUNSTONE_GIT_SYNC_EMAIL`).
 pub const DEFAULT_SYNC_EMAIL: &str = "sync@sunstone.invalid";
 
-// Individual git keys. Spelled once each here and asserted against the closed
-// [`KNOWN_GIT_VARS`] set by `known_vars_match_the_read_sites`, so a key that is
-// recognised but never read (or vice versa) fails the test suite.
-const BRANCH_ENV: &str = "SUNSTONE_GIT_BRANCH";
-const ORIGIN_ENV: &str = "SUNSTONE_GIT_ORIGIN";
-const SUBDIR_ENV: &str = "SUNSTONE_GIT_BUNDLE_SUBDIR";
-const INTERVAL_ENV: &str = "SUNSTONE_GIT_SYNC_INTERVAL_SECS";
-const SYNC_NAME_ENV: &str = "SUNSTONE_GIT_SYNC_NAME";
-const SYNC_EMAIL_ENV: &str = "SUNSTONE_GIT_SYNC_EMAIL";
-const SSH_KEY_ENV: &str = "SUNSTONE_GIT_SSH_KEY";
-const KNOWN_HOSTS_ENV: &str = "SUNSTONE_GIT_KNOWN_HOSTS";
+// Individual git keys, spelled once each here: [`KNOWN_GIT_VARS`] is built from
+// them, and `boot` imports them for its messages and for §4.2's ssh handling.
+pub(crate) const BRANCH_ENV: &str = "SUNSTONE_GIT_BRANCH";
+pub(crate) const ORIGIN_ENV: &str = "SUNSTONE_GIT_ORIGIN";
+pub(crate) const SUBDIR_ENV: &str = "SUNSTONE_GIT_BUNDLE_SUBDIR";
+pub(crate) const INTERVAL_ENV: &str = "SUNSTONE_GIT_SYNC_INTERVAL_SECS";
+pub(crate) const SYNC_NAME_ENV: &str = "SUNSTONE_GIT_SYNC_NAME";
+pub(crate) const SYNC_EMAIL_ENV: &str = "SUNSTONE_GIT_SYNC_EMAIL";
+pub(crate) const SSH_KEY_ENV: &str = "SUNSTONE_GIT_SSH_KEY";
+pub(crate) const KNOWN_HOSTS_ENV: &str = "SUNSTONE_GIT_KNOWN_HOSTS";
 
 /// `SUNSTONE_API_PORT` — lenient (§2.3): unparseable ⇒ [`crate::DEFAULT_PORT`].
 const API_PORT_ENV: &str = "SUNSTONE_API_PORT";
@@ -1025,22 +1024,8 @@ mod tests {
     // --- Surface bookkeeping ------------------------------------------------
 
     #[test]
-    fn known_vars_match_the_read_sites() {
-        let mut read: Vec<&str> = vec![
-            BRANCH_ENV,
-            ORIGIN_ENV,
-            SUBDIR_ENV,
-            INTERVAL_ENV,
-            SYNC_NAME_ENV,
-            SYNC_EMAIL_ENV,
-            SSH_KEY_ENV,
-            KNOWN_HOSTS_ENV,
-        ];
-        read.sort();
-        let mut known: Vec<&str> = KNOWN_GIT_VARS.to_vec();
-        known.sort();
-        assert_eq!(read, known, "a recognised git var must have a read site");
-        assert!(known.iter().all(|k| k.starts_with(GIT_VAR_PREFIX)));
+    fn known_vars_are_all_in_the_git_namespace() {
+        assert!(KNOWN_GIT_VARS.iter().all(|k| k.starts_with(GIT_VAR_PREFIX)));
         assert!(!KNOWN_GIT_VARS.contains(&"SUNSTONE_GIT_MODE"));
     }
 }

@@ -44,10 +44,11 @@ use std::path::{Path, PathBuf};
 
 use sunstone_native::git::{self, GitEnv};
 
-use crate::config::{Config, GitConfig, SEED_FROM_ENV};
+use crate::auth::SECRET_ENV;
+use crate::config::{Config, GitConfig, BRANCH_ENV, ORIGIN_ENV, SEED_FROM_ENV, SSH_KEY_ENV};
 
 use fsutil::{canonical, copy_dir_contents, dir_is_empty, ensure_dir};
-use ssh::{ssh_command, SSH_KEY_ENV};
+use ssh::ssh_command;
 
 /// Filename of the writability probe (§4.6). **Dot-prefixed on purpose**: §6's
 /// watcher filter drops every path with a dot-prefixed component, so the probe
@@ -284,7 +285,7 @@ pub fn prepare_repo(cfg: &Config) -> Result<RepoAction, String> {
             .map(|()| RepoAction::Cloned)
             .map_err(|e| {
                 format!(
-                    "cloning SUNSTONE_GIT_ORIGIN={origin} (branch {}) into {} failed: {e}. \
+                    "cloning {ORIGIN_ENV}={origin} (branch {}) into {} failed: {e}. \
                      Check the origin URL, that the branch exists, and — for an ssh origin — \
                      that {SSH_KEY_ENV} is a deploy key with access.",
                     git.branch,
@@ -296,7 +297,7 @@ pub fn prepare_repo(cfg: &Config) -> Result<RepoAction, String> {
     Err(format!(
         "{} is not empty and is not a git repository, so it can neither be cloned into nor \
          adopted. Nothing was changed. Empty it (for the compose stack: `docker compose down` \
-         then `docker volume rm <project>_repo`), or unset SUNSTONE_GIT_ORIGIN to run the \
+         then `docker volume rm <project>_repo`), or unset {ORIGIN_ENV} to run the \
          git-local shape over its current contents.",
         repo_root.display()
     ))
@@ -388,9 +389,9 @@ pub fn preflight_bundle_writable(cfg: &Config, bundle_root: &Path) -> Result<(),
     }
     probe_writable(bundle_root).map_err(|e| {
         format!(
-            "{e}. SUNSTONE_JWT_SECRET is set, so this deployment accepts writes and the bundle \
+            "{e}. {SECRET_ENV} is set, so this deployment accepts writes and the bundle \
              must be writable by our uid ({UID_HINT}). If the bundle is a `:ro` mount, either \
-             drop `:ro` or unset SUNSTONE_JWT_SECRET to run read-only — a container that starts \
+             drop `:ro` or unset {SECRET_ENV} to run read-only — a container that starts \
              and then loses an edit is the worse outcome.",
         )
     })
@@ -412,11 +413,11 @@ fn branch_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> S
         None => "has no branch checked out (detached HEAD, or no commits yet)".to_string(),
     };
     format!(
-        "the git repository at {} {found}, but SUNSTONE_GIT_BRANCH={configured}. Nothing was \
+        "the git repository at {} {found}, but {BRANCH_ENV}={configured}. Nothing was \
          changed — the sync loop rebases onto origin/{configured} and pushes HEAD to \
          refs/heads/{configured}, so running it here would republish this branch's content as \
          {configured}. Either check {configured} out in the repository, set \
-         SUNSTONE_GIT_BRANCH to the branch that is checked out, or discard the checkout to clone \
+         {BRANCH_ENV} to the branch that is checked out, or discard the checkout to clone \
          afresh (for the compose stack: `docker compose down` then \
          `docker volume rm <project>_repo`).",
         repo_root.display()
@@ -432,9 +433,9 @@ fn origin_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> S
         None => "has no `origin` remote".to_string(),
     };
     format!(
-        "the git repository at {} {found}, but SUNSTONE_GIT_ORIGIN={configured}. Nothing was \
+        "the git repository at {} {found}, but {ORIGIN_ENV}={configured}. Nothing was \
          changed — syncing a repository to an origin it was not cloned from would push one \
-         project's history into another. Either set SUNSTONE_GIT_ORIGIN to the repository's own \
+         project's history into another. Either set {ORIGIN_ENV} to the repository's own \
          origin, or discard the checkout to clone afresh (for the compose stack: \
          `docker compose down` then `docker volume rm <project>_repo`).",
         repo_root.display()

@@ -6,16 +6,12 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use crate::config::{Config, GitConfig, KNOWN_HOSTS_PATH, SSH_DIR, SSH_KEY_PATH};
+use crate::config::{
+    Config, GitConfig, KNOWN_HOSTS_ENV, KNOWN_HOSTS_PATH, ORIGIN_ENV, SSH_DIR, SSH_KEY_ENV,
+    SSH_KEY_PATH,
+};
 
 use super::fsutil::{ensure_dir, first_line, touch};
-
-// The two variables §4.2 acts on. `config` keeps its per-key constants private,
-// so they are spelled again here and asserted against its closed
-// `KNOWN_GIT_VARS` set by `spelled_env_names_are_in_configs_closed_set` — a
-// rename that misses one fails the suite rather than drifting silently.
-pub(super) const SSH_KEY_ENV: &str = "SUNSTONE_GIT_SSH_KEY";
-pub(super) const KNOWN_HOSTS_ENV: &str = "SUNSTONE_GIT_KNOWN_HOSTS";
 
 /// §4.2 — write the ssh material for a git-synced deployment with an ssh-shaped
 /// origin, then **remove the key from our own environment**.
@@ -49,7 +45,7 @@ pub fn write_ssh_material(cfg: &Config) -> Result<(), String> {
     //    operator reads names the variable either way.
     let pem = git.ssh_key_pem.as_deref().ok_or_else(|| {
         format!(
-            "{SSH_KEY_ENV} is required because SUNSTONE_GIT_ORIGIN is ssh-shaped. Set it to \
+            "{SSH_KEY_ENV} is required because {ORIGIN_ENV} is ssh-shaped. Set it to \
              the base64 of a passphrase-less private deploy key (`base64 -w0 < id_ed25519`), \
              or use an https origin."
         )
@@ -321,18 +317,5 @@ mod tests {
             assert!(write_ssh_material(&cfg).is_ok());
         }
         assert!(!Path::new(SSH_KEY_PATH).exists());
-    }
-
-    #[test]
-    fn spelled_env_names_are_in_configs_closed_set() {
-        // `config` keeps its per-key constants private, so these two are spelled
-        // again in this module; a rename must not drift (§2.2's namespace is
-        // closed, so an unrecognised name is a boot error).
-        for name in [SSH_KEY_ENV, KNOWN_HOSTS_ENV] {
-            assert!(
-                crate::config::KNOWN_GIT_VARS.contains(&name),
-                "{name} is not in config::KNOWN_GIT_VARS"
-            );
-        }
     }
 }
