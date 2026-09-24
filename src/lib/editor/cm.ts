@@ -13,7 +13,6 @@ import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension } from './wiki-links';
 import {
   programmatic,
-  defaultLinkClick,
   editorExtensions,
   modeExtensions,
   DEFAULT_EDITOR_MODE,
@@ -248,7 +247,7 @@ export function setEditorConcept(
     // switch, so the new Concept opens in the same editing/read mode.
     const livePreviewCompartment = ensureLivePreviewCompartment(view);
     const mode = getViewMode(view) ?? DEFAULT_EDITOR_MODE;
-    const theme = getViewMermaidTheme(view) ?? 'light';
+    const theme = viewTheme(view);
     view.setState(
       EditorState.create({
         doc: body,
@@ -321,20 +320,30 @@ export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme)
   const compartment = getLivePreviewCompartment(view);
   if (!compartment || getViewMermaidTheme(view) === resolved) return;
   setViewMermaidTheme(view, resolved);
-  const mode = getEditorMode(view);
-  const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
-  const onCommentEdit = getViewOptions(view)?.onCommentEdit;
-  const currentPath = getViewOptions(view)?.brokenLinkContext?.currentPath;
-  view.dispatch({
-    effects: compartment.reconfigure(
-      modeExtensions(mode, onLinkClick, resolved, onCommentEdit, currentPath),
-    ),
-  });
+  reconfigureMode(view, compartment);
 }
 
 /** The view's current mode (`read` if the view predates mode tracking). */
 function getEditorMode(view: EditorView): EditorMode {
   return getViewMode(view) ?? DEFAULT_EDITOR_MODE;
+}
+
+/** The view's diagram theme (`light` until one has been set). */
+function viewTheme(view: EditorView): ResolvedTheme {
+  return getViewMermaidTheme(view) ?? 'light';
+}
+
+/**
+ * Rebuild the mode Compartment from the view's CURRENT remembered mode + theme
+ * and its build options — the shared tail of `setEditorMode` and
+ * `setEditorMermaidTheme`, which record the new value first.
+ */
+function reconfigureMode(view: EditorView, compartment: Compartment): void {
+  view.dispatch({
+    effects: compartment.reconfigure(
+      modeExtensions(getEditorMode(view), viewTheme(view), getViewOptions(view)),
+    ),
+  });
 }
 
 /**
@@ -347,13 +356,5 @@ export function setEditorMode(view: EditorView, mode: EditorMode): void {
   const compartment = getLivePreviewCompartment(view);
   if (!compartment || getEditorMode(view) === mode) return;
   setViewMode(view, mode);
-  const onLinkClick = getViewOptions(view)?.onLinkClick ?? defaultLinkClick;
-  const onCommentEdit = getViewOptions(view)?.onCommentEdit;
-  const theme = getViewMermaidTheme(view) ?? 'light';
-  const currentPath = getViewOptions(view)?.brokenLinkContext?.currentPath;
-  view.dispatch({
-    effects: compartment.reconfigure(
-      modeExtensions(mode, onLinkClick, theme, onCommentEdit, currentPath),
-    ),
-  });
+  reconfigureMode(view, compartment);
 }

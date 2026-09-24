@@ -197,6 +197,12 @@ function livePreviewBase(): Extension[] {
   ];
 }
 
+/** The build options the mode-dependent slice reads (see `modeExtensions`). */
+export type ModeOptions = Pick<
+  BuildEditorOptions,
+  'onLinkClick' | 'onCommentEdit' | 'brokenLinkContext'
+>;
+
 /**
  * The MODE-DEPENDENT extension slice, held in a Compartment so the host can
  * toggle editing at runtime (`setEditorMode`) without rebuilding the view:
@@ -206,18 +212,22 @@ function livePreviewBase(): Extension[] {
  * The active-line highlight is included for `editing` only — reading view has no
  * editing caret to anchor it.
  *
- * `currentPath` is the open Concept's bundle-relative path — the base a
- * path-model Embed (`![alt](./x.png)`) resolves against. Omitted, Embeds still
- * render, but only the name-model (`![[x.png]]`) and bundle-absolute forms can
- * resolve.
+ * The callbacks come from the view's build options (`opts`, possibly absent):
+ * `onLinkClick` defaults to `defaultLinkClick`, and
+ * `brokenLinkContext.currentPath` doubles as the Embed field's resolution base
+ * — both answer "which Concept is open?", and a relative `![alt](./x.png)`
+ * resolves against it exactly as `[](./x.md)` does, so they are one option and
+ * can never disagree. Without it Embeds still render, but only the name-model
+ * (`![[x.png]]`) and bundle-absolute forms can resolve.
  */
 export function modeExtensions(
   mode: EditorMode,
-  onLinkClick: (url: string) => void,
   theme: ResolvedTheme,
-  onCommentEdit?: OnCommentEdit,
-  currentPath?: () => string,
+  opts: ModeOptions | undefined,
 ): Extension[] {
+  const onLinkClick = opts?.onLinkClick ?? defaultLinkClick;
+  const onCommentEdit = opts?.onCommentEdit;
+  const currentPath = opts?.brokenLinkContext?.currentPath;
   const reading = mode === 'read';
   return [
     tables({ onLinkClick }),
@@ -296,7 +306,7 @@ export function editorExtensions(
   mode: EditorMode,
   theme: ResolvedTheme,
 ): Extension[] {
-  const { onChange, onFrontmatterChange, onBlur, onHistory, onHistoryStep, onLinkClick, brokenLinkContext, wikiLinkContext, onCommentEdit } = opts;
+  const { onChange, onFrontmatterChange, onBlur, onHistory, onHistoryStep, brokenLinkContext, wikiLinkContext } = opts;
 
   // Notify on user edits to the body OR the frontmatter. Frontmatter edits are
   // carried by `setFrontmatter` effects (no doc change), so we watch for both.
@@ -343,19 +353,7 @@ export function editorExtensions(
     ...livePreviewBase(),
     // Mode-dependent slice (decorations + read-only gating) in a Compartment so
     // `setEditorMode` can switch edit/hybrid/view without rebuilding the view.
-    // `brokenLinkContext.currentPath` doubles as the Embed field's resolution
-    // base: both answer the same question ("which Concept is open?"), and a
-    // relative `![alt](./x.png)` resolves against it exactly as `[](./x.md)`
-    // does. Kept as one option rather than two so the two can never disagree.
-    livePreviewCompartment.of(
-      modeExtensions(
-        mode,
-        onLinkClick ?? defaultLinkClick,
-        theme,
-        onCommentEdit,
-        brokenLinkContext?.currentPath,
-      ),
-    ),
+    livePreviewCompartment.of(modeExtensions(mode, theme, opts)),
     // In-Concept Find & Replace: built-in search panel (mounted above the
     // editor) + its keymap, themed as editor chrome. Ctrl/Cmd+F is opened by
     // App.svelte via `openSearch`; the keymap supplies in-panel bindings.
