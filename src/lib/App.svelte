@@ -19,7 +19,7 @@
   import Outline from '$lib/components/Outline.svelte';
   import TagBrowser from '$lib/components/TagBrowser.svelte';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
-  import SidebarEdge from '$lib/components/SidebarEdge.svelte';
+  import Sidebar from '$lib/components/Sidebar.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import Tile from '$lib/components/Tile.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
@@ -95,11 +95,6 @@
   const tileCount = $derived(
     workspace.layout.columns.reduce((n, col) => n + col.tiles.length, 0),
   );
-
-  // While a sidebar edge is being dragged we suppress its width transition so it
-  // tracks the pointer instantly (the transition otherwise lags every frame).
-  let leftResizing = $state(false);
-  let rightResizing = $state(false);
 
   // Quick-nav palette (Ctrl+K) + full-text search (Ctrl+Shift+F) overlays.
   let quickNavOpen = $state(false);
@@ -658,15 +653,17 @@
     user={account}
   />
 
-  <aside
-    class="side-bar"
-    class:collapsed={!session.leftSidebarVisible}
-    class:resizing={leftResizing}
-    aria-label="Sidebar"
-    data-testid="side-bar"
-    style="width: {session.leftSidebarVisible ? session.leftSidebarWidth : 0}px; --side-w: {session.leftSidebarWidth}px; --expanded-count: {expandedCount}"
+  <Sidebar
+    side="left"
+    open={session.leftSidebarVisible}
+    width={session.leftSidebarWidth}
+    label="Sidebar"
+    edgeLabel="sidebar"
+    testid="side-bar"
+    edgeTestid="left-sidebar-edge"
+    {expandedCount}
+    onResize={(w) => session.setLeftSidebarWidth(w)}
   >
-    <div class="side-bar-inner">
     <SidebarSection
       title="Explorer"
       expanded={session.explorerVisible}
@@ -784,24 +781,7 @@
         />
       </SidebarSection>
     {/if}
-    </div>
-  </aside>
-
-  <!-- The left Sidebar's border: drag to resize. Collapsing lives on the rail's
-       toggle button, so the border is absent while the Sidebar is collapsed. -->
-  <div class="edge-slot">
-    {#if session.leftSidebarVisible}
-      <SidebarEdge
-        side="left"
-        width={session.leftSidebarWidth}
-        label="sidebar"
-        testid="left-sidebar-edge"
-        onResize={(w) => session.setLeftSidebarWidth(w)}
-        onResizeStart={() => (leftResizing = true)}
-        onResizeEnd={() => (leftResizing = false)}
-      />
-    {/if}
-  </div>
+  </Sidebar>
 
   <main class="editor-main" aria-label="Concept">
     <!-- The editor area: a ROW OF COLUMNS, each a vertical STACK of tiled Tiles,
@@ -872,81 +852,67 @@
     </div>
   </main>
 
-  <!-- The right Sidebar's border: drag to resize (see the left edge above). -->
-  <div class="edge-slot">
-    {#if session.rightSidebarVisible}
-      <SidebarEdge
-        side="right"
-        width={session.rightSidebarWidth}
-        label="Outline & Backlinks"
-        testid="right-sidebar-edge"
-        onResize={(w) => session.setRightSidebarWidth(w)}
-        onResizeStart={() => (rightResizing = true)}
-        onResizeEnd={() => (rightResizing = false)}
-      />
-    {/if}
-  </div>
-
-  <aside
-    class="side-bar right-side-bar"
-    class:collapsed={!session.rightSidebarVisible}
-    class:resizing={rightResizing}
-    aria-label="Outline & Backlinks"
-    data-testid="right-side-bar"
-    style="width: {session.rightSidebarVisible ? session.rightSidebarWidth : 0}px; --side-w: {session.rightSidebarWidth}px; --expanded-count: {rightExpandedCount}"
+  <Sidebar
+    side="right"
+    open={session.rightSidebarVisible}
+    width={session.rightSidebarWidth}
+    label="Outline & Backlinks"
+    edgeLabel="Outline & Backlinks"
+    testid="right-side-bar"
+    edgeTestid="right-sidebar-edge"
+    expandedCount={rightExpandedCount}
+    onResize={(w) => session.setRightSidebarWidth(w)}
   >
-    <div class="side-bar-inner">
-      <SidebarSection
-        title="Outline"
-        expanded={session.outlineVisible}
-        ontoggle={() => session.setOutlineOpen(!session.outlineOpen)}
-        testid="outline-section"
-        region={{
-          id: 'outline',
-          isPresent: () => editor.path !== null,
-          isVisible: () =>
-            session.rightSidebarVisible && session.outlineVisible && editor.path !== null,
-          reveal: () => session.revealRightSection('outline'),
-        }}
+    <SidebarSection
+      title="Outline"
+      expanded={session.outlineVisible}
+      ontoggle={() => session.setOutlineOpen(!session.outlineOpen)}
+      testid="outline-section"
+      region={{
+        id: 'outline',
+        isPresent: () => editor.path !== null,
+        isVisible: () =>
+          session.rightSidebarVisible && session.outlineVisible && editor.path !== null,
+        reveal: () => session.revealRightSection('outline'),
+      }}
+    >
+      <div
+        class="region-host"
+        bind:this={outlineHost}
+        onkeydown={onOutlineKeydown}
+        role="presentation"
       >
-        <div
-          class="region-host"
-          bind:this={outlineHost}
-          onkeydown={onOutlineKeydown}
-          role="presentation"
-        >
-          <Outline
-            path={editor.path}
-            content={editor.content}
-            viewportLine={activeHeadingLine}
-            onselect={scrollToOutlineLine}
-          />
-        </div>
-      </SidebarSection>
-      <SidebarSection
-        title="Backlinks"
-        expanded={session.backlinksVisible}
-        ontoggle={() => session.setBacklinksOpen(!session.backlinksOpen)}
-        testid="backlinks-section"
-        region={{
-          id: 'backlinks',
-          isPresent: () => editor.path !== null,
-          isVisible: () =>
-            session.rightSidebarVisible && session.backlinksVisible && editor.path !== null,
-          reveal: () => session.revealRightSection('backlinks'),
-        }}
+        <Outline
+          path={editor.path}
+          content={editor.content}
+          viewportLine={activeHeadingLine}
+          onselect={scrollToOutlineLine}
+        />
+      </div>
+    </SidebarSection>
+    <SidebarSection
+      title="Backlinks"
+      expanded={session.backlinksVisible}
+      ontoggle={() => session.setBacklinksOpen(!session.backlinksOpen)}
+      testid="backlinks-section"
+      region={{
+        id: 'backlinks',
+        isPresent: () => editor.path !== null,
+        isVisible: () =>
+          session.rightSidebarVisible && session.backlinksVisible && editor.path !== null,
+        reveal: () => session.revealRightSection('backlinks'),
+      }}
+    >
+      <div
+        class="region-host"
+        bind:this={backlinksHost}
+        onkeydown={onBacklinksKeydown}
+        role="presentation"
       >
-        <div
-          class="region-host"
-          bind:this={backlinksHost}
-          onkeydown={onBacklinksKeydown}
-          role="presentation"
-        >
-          <Backlinks path={editor.path} version={indexStore.version} onopen={openConcept} />
-        </div>
-      </SidebarSection>
-    </div>
-  </aside>
+        <Backlinks path={editor.path} version={indexStore.version} onopen={openConcept} />
+      </div>
+    </SidebarSection>
+  </Sidebar>
 
   <ActivityRail
     side="right"
@@ -1008,51 +974,6 @@
     /* Warm sunlit gradient behind the shell; tiles paint their own solid
        surfaces on top, so it reads through gutters and translucent chrome. */
     background: var(--bg-gradient, var(--bg));
-  }
-
-  /* A stable grid column for a Sidebar's resize edge. The edge itself is
-     rendered only while its Sidebar is expanded (a 0-width Sidebar has nothing
-     to resize), and this empty 0-width slot keeps the remaining shell children
-     in their own columns either way. */
-  .edge-slot {
-    display: flex;
-    height: 100vh;
-  }
-
-  .side-bar {
-    /* Width is driven inline from the persisted `leftSidebarWidth` /
-       `rightSidebarWidth` (0 when collapsed). The inner keeps the FULL width
-       (via `--side-w`) so collapsing slides the content out under the clip
-       rather than reflowing it. */
-    height: 100vh;
-    overflow: hidden;
-    display: flex;
-    justify-content: flex-end;
-    /* No border on the aside itself: the adjacent SidebarEdge draws the single
-       1px seam (matching the rail's border). A border here too would double it. */
-    background: var(--bg-elevated);
-    transition: width 0.22s ease;
-  }
-
-  /* Suppress the transition while dragging the edge so the width tracks the
-     pointer instantly. */
-  .side-bar.resizing {
-    transition: none;
-  }
-
-  .right-side-bar {
-    justify-content: flex-start;
-  }
-
-  .side-bar-inner {
-    flex: none;
-    width: var(--side-w, 280px);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    overflow: hidden;
-    font-size: 0.9rem;
   }
 
   .tree-tile {
