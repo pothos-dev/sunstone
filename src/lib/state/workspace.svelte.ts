@@ -19,9 +19,6 @@ import {
   splitRight as layoutSplitRight,
   splitDown as layoutSplitDown,
   closeTile as layoutCloseTile,
-  resizeColumns as layoutResizeColumns,
-  resizeTiles as layoutResizeTiles,
-  MIN_WEIGHT,
   type Column,
   type Layout,
   type TileSlot,
@@ -417,16 +414,6 @@ export class Workspace {
     this.#tiles.delete(id);
     this.layout = layout;
     if (this.activeId === id && focusId !== null) this.activeId = focusId;
-  }
-
-  /** Drag the boundary between columns `index` and `index + 1` by `delta`. */
-  resizeColumns(index: number, delta: number): void {
-    this.layout = layoutResizeColumns(this.layout, index, delta, MIN_WEIGHT);
-  }
-
-  /** Drag the boundary between tiles `index`/`index + 1` in a column by `delta`. */
-  resizeTiles(columnIndex: number, index: number, delta: number): void {
-    this.layout = layoutResizeTiles(this.layout, columnIndex, index, delta, MIN_WEIGHT);
   }
 
   /**

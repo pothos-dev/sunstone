@@ -184,7 +184,6 @@
         // `initialConcept` (the SSR-selected Concept) opens into it; desktop
         // passes no prop, so this is skipped and behaviour is unchanged.
         if (initialConcept !== null) await editor.open(initialConcept);
-        activeTileRef?.setMode(session.editorMode);
       }
 
       session.endRestore();

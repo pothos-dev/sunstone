@@ -47,7 +47,6 @@
     removeAnnotationAt,
     pendingAnchorRenames,
     commitAnchorBaseline,
-    type EditorMode,
     type CommentEditRequest,
   } from '$lib/editor/cm';
   import { createTileReview } from '$lib/tileReview.svelte';
@@ -631,11 +630,6 @@
     review.exit();
   }
   export { handleSaved };
-  /** Adopt a view mode imperatively, applying it to the live view if built. */
-  export function setMode(mode: EditorMode): void {
-    tile.mode = mode;
-    if (view) setEditorMode(view, mode);
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
