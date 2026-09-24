@@ -10,7 +10,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{dir_of, is_external, normalize_segments};
+use crate::paths::{dir_of, is_external, resolve_internal};
 use crate::wikilink::basename;
 
 /// The classified result of resolving a markdown link `href` (ADR 0006 §3).
@@ -112,45 +112,22 @@ pub fn resolve_link(
         return ResolvedLink::None;
     }
 
-    // Separate the path component from a trailing `#anchor` (and any `?query`).
-    let path_part = raw.split('#').next().unwrap_or("");
-    let path_part = path_part.split('?').next().unwrap_or("");
-    if path_part.is_empty() {
+    // The path itself (anchor / query dropped, `.`/`..` collapsed, relative
+    // links joined onto the current Concept's directory) is the shared core.
+    let Some(path) = resolve_internal(current_path, raw) else {
         return ResolvedLink::None;
-    }
-    let anchor = extract_anchor(raw);
-
-    if let Some(stripped) = path_part.strip_prefix('/') {
-        // Bundle-absolute: resolve from the bundle root (redirected into a
-        // nested OKF root when one is identified and the rooted target exists).
-        let path = normalize_segments(stripped.split('/'));
-        if path.is_empty() {
-            return ResolvedLink::None;
-        }
-        let path = apply_bundle_root(&path, bundle_root, &exists);
-        let ex = exists(&path);
-        return ResolvedLink::Internal {
-            path,
-            anchor,
-            exists: ex,
-        };
-    }
-
-    // Relative: resolve against the current Concept's directory.
-    let dir = dir_of(current_path);
-    let dir_segments: Vec<&str> = if dir.is_empty() {
-        Vec::new()
-    } else {
-        dir.split('/').collect()
     };
-    let path = normalize_segments(dir_segments.into_iter().chain(path_part.split('/')));
-    if path.is_empty() {
-        return ResolvedLink::None;
-    }
+    // Bundle-absolute links are redirected into a nested OKF root when one is
+    // identified and the rooted target exists; relative links never are.
+    let path = if raw.starts_with('/') {
+        apply_bundle_root(&path, bundle_root, &exists)
+    } else {
+        path
+    };
     let ex = exists(&path);
     ResolvedLink::Internal {
         path,
-        anchor,
+        anchor: extract_anchor(raw),
         exists: ex,
     }
 }
@@ -397,6 +374,39 @@ mod tests {
                 exists: true
             }
         );
+    }
+
+    fn internal(path: &str, anchor: Option<&str>, exists: bool) -> ResolvedLink {
+        ResolvedLink::Internal {
+            path: path.to_string(),
+            anchor: anchor.map(str::to_string),
+            exists,
+        }
+    }
+
+    #[test]
+    fn golden_edge_cases() {
+        let cases: &[(&str, &str, &str, ResolvedLink)] = &[
+            // A bare `./` resolves to the current directory itself.
+            ("dir/cur.md", "./", "", internal("dir", None, false)),
+            ("cur.md", "./", "", ResolvedLink::None),
+            // Query-only / empty-anchor / query-before-anchor shapes.
+            ("cur.md", "?x=1", "", ResolvedLink::None),
+            ("cur.md", "x.md#", "", internal("x.md", None, false)),
+            ("a/cur.md", "x.md?q#sec", "", internal("a/x.md", Some("sec"), false)),
+            ("a/cur.md", "x.md#sec?q", "", internal("a/x.md", Some("sec"), false)),
+            // `..` past the root is dropped; `.` / empty segments collapse.
+            ("a/b/cur.md", "../../../x.md", "", internal("x.md", None, false)),
+            ("a/cur.md", "./b//./c.md", "", internal("a/b/c.md", None, false)),
+            // URL-encoded paths pass through undecoded.
+            ("a/cur.md", "my%20note.md", "", internal("a/my%20note.md", None, false)),
+            ("a/cur.md", "/b/%C3%A9.md", "docs", internal("b/%C3%A9.md", None, false)),
+            // Whitespace around a relative link is trimmed.
+            ("a/cur.md", "  ../x.md#h  ", "", internal("x.md", Some("h"), false)),
+        ];
+        for (cur, href, root, want) in cases {
+            assert_eq!(&resolve_link(cur, href, root, no_exists), want, "{cur} {href}");
+        }
     }
 
     // --- find_bundle_root (mirrors links.test.ts::findBundleRoot) ------------
