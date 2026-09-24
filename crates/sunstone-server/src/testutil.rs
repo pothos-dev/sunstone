@@ -63,11 +63,21 @@ pub fn server_state(cfg: Config) -> Arc<ServerState> {
     })
 }
 
+/// A `git` command in `root` with auto-maintenance off. A commit otherwise
+/// spawns a detached `git maintenance run --auto`, whose transient
+/// `.git/objects/maintenance.lock` could land in a test's "the repo is
+/// untouched" tree snapshot.
+fn git_cmd(root: &Path, args: &[&str]) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(root)
+        .args(["-c", "maintenance.auto=false"])
+        .args(args);
+    cmd
+}
+
 /// Run a git command in `root`, asserting success.
 pub fn git(root: &Path, args: &[&str]) {
-    let out = Command::new("git")
-        .current_dir(root)
-        .args(args)
+    let out = git_cmd(root, args)
         .output()
         .unwrap();
     assert!(out.status.success(), "git {args:?} failed: {out:?}");
@@ -75,9 +85,7 @@ pub fn git(root: &Path, args: &[&str]) {
 
 /// Run a git command in `root` and return its trimmed stdout.
 pub fn git_stdout(root: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .current_dir(root)
-        .args(args)
+    let out = git_cmd(root, args)
         .output()
         .unwrap();
     assert!(out.status.success(), "git {args:?} failed: {out:?}");
