@@ -427,7 +427,9 @@
   // last sent (this Tile's own scrolls were dropped while it was inactive).
   // Deferred a frame so App has flipped `workspace.activeId` before it filters.
   $effect(() => {
-    if (active) requestAnimationFrame(reportViewportLine);
+    if (!active) return;
+    const id = requestAnimationFrame(reportViewportLine);
+    return () => cancelAnimationFrame(id);
   });
 
   function scrollToOutlineLine(line: number) {
