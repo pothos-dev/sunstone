@@ -20,8 +20,8 @@
 //!   which is what catches the escape the syntactic check *cannot* see: an
 //!   in-Bundle symlink pointing outside it.
 //!
-//! Both, not one. [`ApiError::from_core`] then maps an escape to `400` and a path that simply
-//! is not there to `404`.
+//! Both, not one. [`ApiError::from_core`] then maps an escape to `400` and a
+//! path that simply is not there to `404`.
 
 use std::sync::Arc;
 

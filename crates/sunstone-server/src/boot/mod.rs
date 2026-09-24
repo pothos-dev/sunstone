@@ -352,7 +352,7 @@ pub fn resolve_bundle_root(cfg: &Config) -> Result<PathBuf, String> {
         ensure_dir(&path, "the bundle root")?;
     }
     // Canonicalize so the seam's path checks compare like with like; fall back
-    // to the path itself exactly as `main.rs` does today, since the plain
+    // to the path itself exactly as the original `main.rs` did, since the plain
     // shape's root (including the dev default) may legitimately be missing.
     Ok(path.canonicalize().unwrap_or(path))
 }
@@ -380,8 +380,8 @@ pub fn preflight_repo_writable(cfg: &Config) -> Result<(), String> {
 ///
 /// Named cost, accepted: that operator gets a container which will not start
 /// rather than one that starts and 401s. Correct — they asked for writes and
-/// cannot have them. Today `write.rs` commits unconditionally, so such a
-/// deployment **500s at request time** with nothing visible at boot: a
+/// cannot have them. Without the preflight such a deployment **500s at request
+/// time** (every Save fails to write the file) with nothing visible at boot: a
 /// container that looks healthy until someone loses an edit is the worst option.
 pub fn preflight_bundle_writable(cfg: &Config, bundle_root: &Path) -> Result<(), String> {
     if cfg.jwt_secret.is_none() {
@@ -832,7 +832,7 @@ pub(super) mod tests {
         let dir = temp_dir("resolve-plain");
         let missing = dir.join("absent");
         let cfg = Config::plain(missing.clone());
-        // `main.rs`'s behaviour today: canonicalize if possible, otherwise pass
+        // The original `main.rs`'s behaviour: canonicalize if possible, otherwise pass
         // the path through — and never create it.
         assert_eq!(resolve_bundle_root(&cfg).unwrap(), missing);
         assert!(!missing.exists());

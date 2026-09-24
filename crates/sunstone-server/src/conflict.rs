@@ -59,7 +59,7 @@
 //!
 //! So **[`Resolution`] carries repo-root-relative paths**, and the strip to the
 //! bundle-relative, forward-slash path §10.2 requires happens **once, at the
-//! notice boundary in `sync.rs`**, via [`Resolution::to_bundle_relative`] before
+//! notice boundary in `sync/mod.rs`**, via [`Resolution::to_bundle_relative`] before
 //! `SyncNotice::from_resolution`. `to_bundle_relative` returns `None` for a path
 //! outside the bundle: that conflict is still resolved, it just produces no
 //! user-facing notice, because a notice naming a path no client can open is
@@ -129,7 +129,7 @@ impl Resolution {
 /// path is not inside the subdir.
 ///
 /// Matches on whole components (`docs` never matches `docsy/a.md`) and tolerates
-/// the surrounding slashes `config.rs`'s `join_bundle_subdir` also trims.
+/// the surrounding slashes `config/mod.rs`'s `join_bundle_subdir` also trims.
 pub fn bundle_relative(repo_relative: &str, bundle_subdir: &str) -> Option<String> {
     let subdir = bundle_subdir.trim().trim_matches('/');
     if subdir.is_empty() {
@@ -299,8 +299,8 @@ fn is_ts_shaped(ts: &str) -> bool {
 /// `P`**: honour it with the same `git rm` and report nothing — the two sides
 /// agree, no content and no intent is lost, so §10.2 has nothing to say.
 ///
-/// Returned paths are **repo-root-relative** (see the module note); `sync.rs`
-/// strips them with [`Resolution::to_bundle_relative`].
+/// Returned paths are **repo-root-relative** (see the module note); the sync
+/// loop strips them with [`Resolution::to_bundle_relative`].
 ///
 /// Returns `Err` for a state the resolver does not recognise; §8.3 then requires
 /// the caller to `rebase --abort`, log the git error text, and retry next tick.
@@ -663,7 +663,7 @@ mod tests {
         assert_eq!(read(&root, "web-only.md"), b"web\n");
         assert_eq!(notes_dir(&root), vec!["f.md".to_string()]);
         // Note this proves the resolver has NOTHING to do on a clean rebase, not
-        // that the loop refrains from calling it — `sync.rs`'s tick owns that,
+        // that the loop refrains from calling it — `sync/mod.rs`'s tick owns that,
         // since a clean rebase simply never reports `Stopped`.
         assert!(resolve_all_unmerged(&root, &mut forks, WEB_TS)
             .unwrap()

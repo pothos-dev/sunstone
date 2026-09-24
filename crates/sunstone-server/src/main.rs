@@ -1,38 +1,12 @@
-//! Sunstone Web's read-only HTTP server.
+//! Sunstone Web's HTTP server: a thin axum binary over `sunstone-native` — the
+//! SAME bundle/index/render/git logic the Tauri desktop shell uses.
 //!
-//! A thin axum binary over `sunstone-native` — the SAME bundle/index logic the
-//! Tauri desktop shell uses. It resolves a Bundle root, builds the index on
-//! startup (reusing `AppState`), and serves three READ-ONLY JSON routes:
-//!
-//! - `GET /api/bundle-root`          → the absolute Bundle root (string)
-//! - `GET /api/tree`                 → the recursive `TreeNode`
-//! - `GET /api/concept?path=<rel>`   → a Concept's raw markdown (string)
-//! - `GET /api/render?path=<rel>`    → rendered `{ html, frontmatter, outline }`
-//! - `GET /api/asset?path=<rel>`     → an Attachment's raw bytes (ADR-0011) —
-//!   the one route answering with bytes rather than JSON/SSE
-//! - `GET /api/search?q=<query>`     → `SearchHit[]` (bundle-wide full-text)
-//! - `GET /api/backlinks?path=<rel>` → source Concept paths linking to it
-//! - `GET /api/tags`                 → `TagCount[]` (tags + counts)
-//! - `GET /api/concepts-by-tag?tag=` → Concept paths carrying the tag
-//! - `GET /api/types`                → distinct frontmatter `type` values
-//! - `GET /api/keys`                 → distinct frontmatter keys used
-//! - `GET /api/concept-paths`        → every Concept path in the index
-//! - `GET /api/events`               → SSE stream of `ServerEvent`s (unnamed
-//!   `FileChange`s + named `sync` divergence notices)
-//! - `GET /api/history?path=`        → `FileHistory` (gated — Spec 2 §11)
-//! - `GET /api/file-at-rev?path=&rev=` → `FileAtRev` (gated — Spec 2 §11)
-//! - `GET /api/sync-status`          → `SyncStatus` (unauthenticated, Spec 2 §10.5)
-//!
-//! There is NO write path here. Every `path` crossing the seam is validated by
-//! `sunstone-native` against the Bundle root (bundle-relative, forward-slash);
-//! `..`/escape attempts are rejected with a 400 — this is now a genuine network
-//! boundary, not just an in-process call.
-//!
-//! Live reload: the core `watcher` runs on startup with a sink that pushes each
-//! `FileChange` into a `tokio::sync::broadcast` channel; every `/api/events`
-//! connection subscribes and streams changes as SSE. Since the web app never
-//! writes, there is nothing to suppress — every change is a genuine external
-//! edit worth delivering to all connected browsers.
+//! `main` parses the environment once ([`config`]), runs the ordered boot
+//! sequence ([`boot`]), builds the index, starts the watcher and (git-synced
+//! shape only) the sync loop, then serves the API. The route table is
+//! [`router`]; handlers live in `routes_read`, `routes_write`, `routes_asset`,
+//! `history` and `sync`. The architecture doc is
+//! `docs/architecture/sunstone-server.md`.
 
 mod api_error;
 mod auth;
@@ -180,8 +154,9 @@ async fn main() {
 
     // Broadcast filesystem changes to every connected SSE client. The core
     // watcher is host-agnostic: it hands us each `FileChange` through a sink;
-    // our sink fans it out over the broadcast channel. No self-write
-    // suppression matters here — the web server never writes.
+    // our sink fans it out over the broadcast channel. The write path mutes the
+    // watcher's echo of its own writes (`note_self_write`) and broadcasts one
+    // `origin`-stamped change instead, so what arrives here is external.
     let (events, _) = broadcast::channel::<ServerEvent>(EVENTS_CHANNEL_CAP);
     let sink_tx = events.clone();
     // Kept bound (NOT dropped) for the process lifetime so watching continues.

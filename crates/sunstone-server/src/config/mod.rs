@@ -215,7 +215,7 @@ pub fn parse_env(
         repo_root,
         bundle_root,
         seed_from: seed_from.map(PathBuf::from),
-        // Pre-existing and lenient, byte-identical to `main.rs`: empty is unset,
+        // Pre-existing and lenient, as the original `main.rs` read it: empty is unset,
         // but the value is passed through untrimmed — a secret's whitespace is
         // part of the secret, and the Node hook mints against the raw value.
         jwt_secret: get(crate::auth::SECRET_ENV)
@@ -365,7 +365,7 @@ fn parse_git_family(
 
 /// Bundle root (§4.5) and the one log-and-ignore case (§2.4).
 ///
-/// `SUNSTONE_BUNDLE` keeps `main.rs`'s exact leniency: whitespace-only counts
+/// `SUNSTONE_BUNDLE` keeps the original `main.rs`'s leniency: whitespace-only counts
 /// as unset, but the surviving value is *not* trimmed.
 fn resolve_roots(
     shape: Shape,
@@ -418,7 +418,7 @@ fn strip_whitespace(value: &str) -> String {
 }
 
 /// The plain shape's dev fallback bundle root when `SUNSTONE_BUNDLE` is unset:
-/// the repo's `examples/` directory, exactly as `main::default_dev_root`. Still
+/// the repo's `examples/` directory. Still
 /// **pure** — `CARGO_MANIFEST_DIR` is resolved at compile time, and
 /// canonicalization is [`crate::boot::resolve_bundle_root`]'s job.
 fn default_dev_bundle_root() -> PathBuf {
@@ -1000,7 +1000,7 @@ mod tests {
 
     #[test]
     fn the_jwt_secret_is_passed_through_untrimmed() {
-        // Byte-identical to `main.rs`: empty is unset, but the surviving value
+        // As the original `main.rs` read it: empty is unset, but the surviving value
         // is *not* trimmed — whitespace is part of the secret the Node hook
         // mints against.
         assert!(ok(&[]).jwt_secret.is_none());

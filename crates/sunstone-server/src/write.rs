@@ -34,8 +34,8 @@
 //!
 //! The one part of §5 that cannot live here is the **sync-loop kick**: it must
 //! happen *after* the write lock is released, so that the loop's first act is to
-//! acquire a free lock — and every op below runs *inside* that lock (`main.rs`'s
-//! `run_write` holds it for the whole call). The kick therefore belongs to the
+//! acquire a free lock — and every op below runs *inside* that lock
+//! (`routes_write.rs`'s `run_write` holds it for the whole call). The kick therefore belongs to the
 //! caller, once, after `run_write` returns: `state.sync.kick()`
 //! ([`crate::sync::SyncState::kick`], a no-op in a shape with no loop).
 
@@ -355,8 +355,8 @@ mod tests {
     // The pre-§5 call shape, kept **only** here: every test below that predates
     // the shape gate exercises the git shape, so these read as `write_concept(…)`
     // rather than repeating `WriteShape::Git.` on every line. Production callers
-    // name the shape (`main.rs`'s `write_shape(&state)`); there is no ungated
-    // free function left for one to reach for by mistake.
+    // name the shape (`routes_write.rs` takes `WriteShape::for_config(&state.cfg)`);
+    // there is no ungated free function left for one to reach for by mistake.
     fn write_concept(
         app: &AppState,
         ident: &CommitIdentity,

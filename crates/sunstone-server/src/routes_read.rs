@@ -3,9 +3,6 @@
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
 //! `/api/attachment-paths`, and `/api/events` (SSE), plus the shared
 //! [`read_index`] helper. Errors map through [`crate::api_error`].
-//!
-//! Split out of `main.rs` verbatim (ticket: split main.rs) — no behavior
-//! change, just relocation.
 
 use std::convert::Infallible;
 use std::sync::Arc;
