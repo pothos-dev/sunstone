@@ -332,27 +332,46 @@ pub fn scan_embeds(body: &str) -> Vec<Embed> {
 /// code-unit offset.
 ///
 /// Both offsets always land on a char boundary — an Embed starts at `!` and ends
-/// one past `)` / `]`, all ASCII — so every offset is a key of the boundary map.
+/// one past `)` / `]`, all ASCII — so every offset is met by the boundary walk.
 /// ASCII bodies short-circuit: there, one byte is one UTF-16 unit.
 fn to_utf16_offsets(body: &str, embeds: &mut [Embed]) {
     if body.is_ascii() || embeds.is_empty() {
         return;
     }
-    let mut map: std::collections::HashMap<usize, usize> =
-        std::collections::HashMap::with_capacity(body.len() + 1);
+    // Only the offsets actually asked about are converted, in one forward walk
+    // over the body. Sorting makes the walk independent of the embeds' order;
+    // an offset that is not a char boundary (or lies past the end) is never
+    // met and so is left as it was.
+    let mut wanted: Vec<usize> = embeds.iter().flat_map(|e| [e.from, e.to]).collect();
+    wanted.sort_unstable();
+    wanted.dedup();
+
+    let mut converted: Vec<(usize, usize)> = Vec::with_capacity(wanted.len());
+    let mut pending = wanted.into_iter().peekable();
     let mut units = 0usize;
-    for (b, c) in body.char_indices() {
-        map.insert(b, units);
-        units += c.len_utf16();
+    let boundaries = body
+        .char_indices()
+        .map(|(b, c)| (b, c.len_utf16()))
+        .chain(std::iter::once((body.len(), 0)));
+    for (b, width) in boundaries {
+        while pending.next_if(|&o| o < b).is_some() {}
+        if pending.next_if_eq(&b).is_some() {
+            converted.push((b, units));
+        }
+        if pending.peek().is_none() {
+            break;
+        }
+        units += width;
     }
-    map.insert(body.len(), units);
+
+    let lookup = |byte: usize| {
+        converted
+            .binary_search_by_key(&byte, |&(b, _)| b)
+            .map_or(byte, |i| converted[i].1)
+    };
     for e in embeds.iter_mut() {
-        if let Some(&u) = map.get(&e.from) {
-            e.from = u;
-        }
-        if let Some(&u) = map.get(&e.to) {
-            e.to = u;
-        }
+        e.from = lookup(e.from);
+        e.to = lookup(e.to);
     }
 }
 
@@ -893,6 +912,31 @@ mod tests {
             .collect();
         assert_eq!(sliced, vec!["![[a.png]]", "![b](c.png)", "![[d.png|12x8]]"]);
         assert_eq!((units[2].width, units[2].height), (Some(12), Some(8)));
+    }
+
+    #[test]
+    fn utf16_offsets_pinned_around_emoji_and_cjk() {
+        // 😀 = 4 bytes / 2 units, 漢字 = 3 bytes / 1 unit each.
+        let body = "😀 ![[a.png]] 漢字 ![b](c.png)😀";
+        let spans: Vec<(usize, usize)> =
+            scan_embeds_utf16(body).iter().map(|e| (e.from, e.to)).collect();
+        assert_eq!(spans, vec![(3, 13), (17, 28)]);
+        let bytes: Vec<(usize, usize)> =
+            scan_embeds(body).iter().map(|e| (e.from, e.to)).collect();
+        assert_eq!(bytes, vec![(5, 15), (23, 34)]);
+    }
+
+    #[test]
+    fn utf16_conversion_tolerates_unsorted_and_out_of_range_offsets() {
+        let body = "漢![[a.png]]";
+        let mut embeds = scan_embeds(body);
+        let mut odd = embeds[0].clone();
+        odd.from = 2; // inside `漢`: not a char boundary, left as-is
+        odd.to = 99; // past the end: left as-is
+        embeds.insert(0, odd);
+        to_utf16_offsets(body, &mut embeds);
+        let spans: Vec<(usize, usize)> = embeds.iter().map(|e| (e.from, e.to)).collect();
+        assert_eq!(spans, vec![(2, 99), (1, 11)]);
     }
 
     #[test]
