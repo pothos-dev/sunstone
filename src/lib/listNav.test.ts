@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { clampIndex, nextIndex, prevIndex } from './listNav';
+import { clampIndex, listKeyIntent, nextIndex, prevIndex, stepIndex } from './listNav';
 
 describe('clampIndex', () => {
   test('returns 0 for an empty list', () => {
@@ -45,5 +45,27 @@ describe('prevIndex', () => {
 
   test('returns 0 for an empty list', () => {
     expect(prevIndex(0, 0)).toBe(0);
+  });
+});
+
+describe('listKeyIntent', () => {
+  test('maps the shared palette keys', () => {
+    expect(listKeyIntent({ key: 'ArrowDown' })).toBe('next');
+    expect(listKeyIntent({ key: 'ArrowUp' })).toBe('prev');
+    expect(listKeyIntent({ key: 'Enter' })).toBe('enter');
+  });
+
+  test('leaves every other key (Escape, letters, Tab) to the caller', () => {
+    for (const key of ['Escape', 'j', 'k', 'Tab', 'Home', 'a']) {
+      expect(listKeyIntent({ key })).toBeNull();
+    }
+  });
+});
+
+describe('stepIndex', () => {
+  test('wraps in both directions', () => {
+    expect(stepIndex('next', 2, 3)).toBe(0);
+    expect(stepIndex('prev', 0, 3)).toBe(2);
+    expect(stepIndex('next', 0, 0)).toBe(0);
   });
 });

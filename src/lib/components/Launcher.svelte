@@ -7,7 +7,7 @@
   import { relativeTime } from '$lib/relativeTime';
   import { launcherRows } from '$lib/launcherRows';
   import { highlightPositions } from '$lib/highlight';
-  import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
+  import { clampIndex, listKeyIntent, stepIndex } from '$lib/listNav';
 
   // The launcher: shown when Sunstone starts with no Bundle (`sunstone` alone).
   // A palette over the previously-opened folders — an auto-focused filter box on
@@ -112,13 +112,11 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown') {
+    const intent = listKeyIntent(e);
+    if (intent === 'next' || intent === 'prev') {
       e.preventDefault();
-      selected = nextIndex(activeIndex, rows.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      selected = prevIndex(activeIndex, rows.length);
-    } else if (e.key === 'Enter') {
+      selected = stepIndex(intent, activeIndex, rows.length);
+    } else if (intent === 'enter') {
       e.preventDefault();
       const row = rows[activeIndex];
       if (row) void open(row.bundle.path);

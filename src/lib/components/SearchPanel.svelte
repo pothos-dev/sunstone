@@ -15,7 +15,7 @@
   import { backend } from '$lib/ipc';
   import { createLatestGuard } from '$lib/asyncGuard';
   import { highlightParts } from '$lib/highlight';
-  import { clampIndex, nextIndex, prevIndex } from '$lib/listNav';
+  import { clampIndex, listKeyIntent, stepIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
   import { focus } from '$lib/state/focus.svelte';
   import type { SearchHit } from '$lib/types';
@@ -129,13 +129,11 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown') {
+    const intent = listKeyIntent(e);
+    if (intent === 'next' || intent === 'prev') {
       e.preventDefault();
-      selected = nextIndex(activeIndex, results.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      selected = prevIndex(activeIndex, results.length);
-    } else if (e.key === 'Enter') {
+      selected = stepIndex(intent, activeIndex, results.length);
+    } else if (intent === 'enter') {
       e.preventDefault();
       const r = results[activeIndex];
       if (r) choose(r);
