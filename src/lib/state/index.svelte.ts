@@ -1,14 +1,6 @@
 import { backend } from '$lib/ipc';
 import { ensureWasm, type BundleIndex, type ResolvedLink } from '$lib/wasm';
 import type { AnchorRename } from '$lib/types';
-import {
-  attachmentCorpus,
-  resolveEmbedIn,
-  EMPTY_CORPUS,
-  type AttachmentCorpus,
-  type EmbedModel,
-  type EmbedResolution,
-} from './embedResolve';
 
 /**
  * The frontend's link-resolution engine (ADR 0006 §3/§4): a thin store over the
@@ -44,9 +36,10 @@ class IndexStore {
    * together would put images into quick-nav, the Explorer tree and the
    * structural bundle-root inference (see the Attachment-index note in
    * `crates/sunstone-native/src/index.rs`). The editor needs it synchronously,
-   * to resolve `![[name.png]]` while building decorations.
+   * to resolve `![[name.png]]` while building decorations. Sorted; `[]` on
+   * SSR, before the first refresh, or for a backend with no Attachments.
    */
-  #attachments: AttachmentCorpus = EMPTY_CORPUS;
+  #attachments: string[] = [];
 
   /** Best-effort OKF bundle root within the opened tree (`''` = opened root). */
   bundleRoot(): string {
@@ -71,23 +64,7 @@ class IndexStore {
    * candidate set. `[]` before the first refresh.
    */
   attachmentPaths(): string[] {
-    return this.#attachments.paths;
-  }
-
-  /** Synchronous existence check for a path-model Embed target. */
-  attachmentExists(path: string): boolean {
-    return this.#attachments.has(path);
-  }
-
-  /**
-   * Resolve one Embed's `target` to `{ path, exists }`, or `null` when there is
-   * nothing to render (a `data:`/remote/anchor target for the path model, no
-   * matching Attachment for the name model). The Embed counterpart of
-   * `resolveLink` / `resolveWikilink`: synchronous, total, and degrading to
-   * `null` while wasm is unavailable. See `./embedResolve.ts`.
-   */
-  resolveEmbed(currentPath: string, target: string, kind: EmbedModel): EmbedResolution | null {
-    return resolveEmbedIn(this.#attachments, currentPath, target, kind);
+    return this.#attachments;
   }
 
   /**
@@ -137,7 +114,7 @@ class IndexStore {
       // previous handle AND the previous Attachment corpus untouched.
       this.#handle?.free();
       this.#handle = wasm ? new wasm.BundleIndex(paths) : null;
-      this.#attachments = attachmentCorpus(attachments);
+      this.#attachments = attachments;
       this.version += 1;
     } catch {
       // Index unavailable: leave the previous handle in place. Broken-link

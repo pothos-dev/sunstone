@@ -43,13 +43,14 @@ import {
 // shared `createEmbedImage` builder, so the editor and the server render
 // (`src/lib/rendered.css`, `src/lib/web/remoteEmbed.ts`) cannot drift.
 //
-// OFFSETS: the field scans with `scanEmbedsUtf16`, not `scanEmbeds`. The kernel
-// reports BYTE offsets by default — the unit the SSR renderer and the rewrite
-// engine slice Rust strings with — and CodeMirror positions are UTF-16 code
-// units, so a byte offset puts every decoration after the first non-ASCII
-// character in the document in the wrong place. The UTF-16 variant lives in
-// `crates/sunstone-shared/src/embed.rs` beside the byte one, exactly as
-// `critic.rs` and `citations.rs` already report this seam (ADR 0006 §4).
+// OFFSETS: the field scans with `scanEmbedsUtf16`, never with byte offsets.
+// The Rust kernel (`embed::scan_embeds`) reports BYTE offsets — the unit the
+// SSR renderer and the rewrite engine slice Rust strings with — and CodeMirror
+// positions are UTF-16 code units, so a byte offset puts every decoration
+// after the first non-ASCII character in the document in the wrong place. The
+// UTF-16 variant lives in `crates/sunstone-shared/src/embed.rs` beside the byte
+// one, exactly as `critic.rs` and `citations.rs` already report this seam
+// (ADR 0006 §4).
 // ---------------------------------------------------------------------------
 
 /**
@@ -280,11 +281,12 @@ function buildEmbeds(
     isImage: isImageAttachment,
     // The name model searches the Attachment corpus, so a miss is known here
     // and becomes the error placeholder immediately. The path model is pure
-    // path math and deliberately does NOT consult `indexStore.attachmentExists`:
-    // the Attachment index is empty until the first refresh, and gating on it
-    // would flash every local Embed as broken on the first frame. A path with
-    // nothing behind it still yields a URL, the `<img>` fails, and `onError`
-    // shows the SAME placeholder — which is exactly what ADR-0010 asks for.
+    // path math and deliberately does NOT check the result against the
+    // Attachment corpus: the Attachment index is empty until the first
+    // refresh, and gating on it would flash every local Embed as broken on the
+    // first frame. A path with nothing behind it still yields a URL, the
+    // `<img>` fails, and `onError` shows the SAME placeholder — which is
+    // exactly what ADR-0010 asks for.
     resolve: (embed) =>
       embed.kind === 'name'
         ? resolveEmbedNameIn(attachments, embed.target)
