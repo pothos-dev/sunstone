@@ -422,6 +422,14 @@
     onViewportLine(line === null ? null : line + frontmatterLineCount(tile.content));
   }
 
+  // App keeps only the ACTIVE Tile's report, so a Tile that becomes active must
+  // re-report: otherwise the Outline keeps the line the previously active Tile
+  // last sent (this Tile's own scrolls were dropped while it was inactive).
+  // Deferred a frame so App has flipped `workspace.activeId` before it filters.
+  $effect(() => {
+    if (active) requestAnimationFrame(reportViewportLine);
+  });
+
   function scrollToOutlineLine(line: number) {
     if (!view) return;
     // Headings sit at the top of the viewport — that's where the eye expects

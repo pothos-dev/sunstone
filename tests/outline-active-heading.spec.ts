@@ -63,3 +63,49 @@ test('the Outline marks the heading whose section is being read', async ({ page 
   await entries2.nth(4).click();
   await expect(current).toHaveText('Very Last Heading');
 });
+
+/**
+ * Only the active Tile feeds the Outline's Current heading, so activating a
+ * different Tile must re-report from THAT Tile's viewport — not keep the line
+ * the previously active Tile last reported.
+ */
+test('the Current heading follows the active Tile when focus moves between tiles', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() =>
+    window.localStorage.setItem(
+      'sunstone:bundleState:/fake/bundle',
+      JSON.stringify({ expandedFolders: ['concepts', 'concepts/editor'] }),
+    ),
+  );
+  await page.reload();
+  const tree = page.getByTestId('tree');
+  await expect(tree).toBeVisible();
+
+  await page.getByTestId('rail-toggle-right').click();
+  await tree.locator('[data-path="concepts/outline-demo.md"]').click();
+  await expect(page.getByTestId('editor')).toContainText('Intro prose under the top-level heading');
+
+  // Split Right → the new (right) tile is active; show a different Concept in it.
+  await page.getByTestId('split-right').first().click();
+  await expect(page.getByTestId('editor')).toHaveCount(2);
+  await tree.locator('[data-path="concepts/codemirror.md"]').click();
+  const tiles = page.getByTestId('tile');
+  await expect(tiles.nth(1).getByTestId('editor')).toContainText('CodeMirror 6 is the editor core');
+
+  // Scroll the INACTIVE left tile (outline-demo) to its end: its report is
+  // dropped while it is inactive, so the Outline still reflects the right tile.
+  await tiles
+    .nth(0)
+    .locator('.cm-scroller')
+    .evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+
+  // Activate the left tile: the Outline lists outline-demo's headings, and the
+  // Current one is where THAT tile is scrolled to — its last heading.
+  await tiles.nth(0).locator('.cm-content').click();
+  await expect(page.locator('[data-testid="tile"].tile-active')).toHaveCount(1);
+  await expect(tiles.nth(0)).toHaveClass(/tile-active/);
+  const entries = page.getByTestId('outline').getByTestId('outline-entry');
+  await expect(entries).toHaveCount(4);
+  const current = page.getByTestId('outline').locator('[data-current="true"]');
+  await expect(current).toHaveText('Second Section');
+});
