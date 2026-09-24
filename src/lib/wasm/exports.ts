@@ -237,9 +237,8 @@ export function rewriteAnchors(
 // is and what it points at. The Attachment corpus is a SEPARATE index from the
 // `BundleIndex` handle's concept set (an Attachment is never a Concept), so it
 // is passed per call. Each degrades to a SAFE default until wasm is registered:
-// no Embeds, nothing resolved — and, for the classifier, the same scheme test
-// inlined, so a `data:` / remote target can never be mistaken for a Bundle file
-// on the degraded path.
+// no Embeds, nothing resolved, nothing an image, every target `otherScheme`
+// (never rendered or fetched).
 
 /**
  * Every Embed in a Concept `body`, with **UTF-16 code-unit** offsets — the unit
@@ -258,25 +257,13 @@ export function scanEmbedsUtf16(body: string): Embed[] {
 /**
  * True when `path`'s extension is one Sunstone renders as an image (`png`,
  * `jpg`/`jpeg`, `gif`, `webp`, `avif`, `bmp`, `svg`, case-insensitively). A
- * non-image Attachment keeps its literal rendering until `af-3`.
- *
- * The degraded path inlines the same extension list, so an Embed is never
- * rendered as an image on the strength of a wasm miss (and never silently
- * dropped before the module is ready either).
+ * non-image Attachment keeps its literal rendering until `af-3`. Degrades to
+ * `false` — unreachable in practice, since without wasm `scanEmbedsUtf16`
+ * finds no Embeds to ask about.
  */
 export function isImageAttachment(path: string): boolean {
-  if (mod) return mod.isImageAttachment(path);
-  const name = (path.split('/').pop() ?? '').split(/[?#]/)[0];
-  const dot = name.lastIndexOf('.');
-  if (dot <= 0) return false;
-  return IMAGE_EXTENSIONS.includes(name.slice(dot + 1).toLowerCase());
+  return mod ? mod.isImageAttachment(path) : false;
 }
-
-/**
- * The image extensions, mirroring `sunstone_shared::embed::IMAGE_EXTENSIONS`.
- * Only the degraded path above reads it — wasm owns the real answer.
- */
-const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg'];
 
 /**
  * Resolve a path-model Embed (`![alt](target)`) written in `sourcePath` to a
@@ -300,15 +287,10 @@ export function resolveEmbedNameIn(attachmentPaths: string[], target: string): s
 /**
  * Classify an Embed target before anything is fetched (ADR-0011): `local`
  * resolves to an Attachment, `remote` is click-to-load, `data` never renders,
- * `otherScheme` is not rendered either. The degraded path inlines the same
- * scheme test so it fails SAFE (a remote/`data:` target is never reported as
- * `local`).
+ * `otherScheme` is not rendered either. Degrades to `otherScheme` so it fails
+ * SAFE (nothing is fetched or rendered) — unreachable in practice, since
+ * without wasm `scanEmbedsUtf16` finds no Embeds to classify.
  */
 export function classifyEmbedTarget(target: string): EmbedTargetKind {
-  if (mod) return mod.classifyEmbedTarget(target);
-  const t = target.trim();
-  if (/^data:/i.test(t)) return 'data';
-  if (/^https?:/i.test(t)) return 'remote';
-  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return 'otherScheme';
-  return 'local';
+  return mod ? mod.classifyEmbedTarget(target) : 'otherScheme';
 }
