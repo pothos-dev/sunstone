@@ -557,7 +557,12 @@
 
 <WebSearch open={searchOpen} onopen={openSearchHit} onclose={() => (searchOpen = false)} />
 
-<WebQuickNav open={quickNavOpen} onopen={open} onclose={() => (quickNavOpen = false)} />
+<WebQuickNav
+  open={quickNavOpen}
+  version={indexVersion}
+  onopen={open}
+  onclose={() => (quickNavOpen = false)}
+/>
 {/if}
 
 <style>

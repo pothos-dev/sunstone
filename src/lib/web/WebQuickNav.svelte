@@ -32,21 +32,28 @@
     onopen: (path: string) => void;
     /** Close the palette. */
     onclose: () => void;
+    /**
+     * Index version, bumped by the viewer on live reload; the cached Concept
+     * paths + tags are refetched on the next open after it changes.
+     */
+    version?: number;
   }
 
-  let { open, onopen, onclose }: Props = $props();
+  let { open, onopen, onclose, version = 0 }: Props = $props();
 
   let query = $state('');
   let selected = $state(0);
   let input = $state<HTMLInputElement | null>(null);
   let list = $state<HTMLUListElement | null>(null);
 
-  // Palette data, lazily loaded from the read-only backend the first time the
-  // palette opens (kept across opens so repeated Ctrl+K is instant). Only ever
+  // Palette data, lazily loaded from the read-only backend when the palette
+  // opens and kept across opens so repeated Ctrl+K is instant — until a live
+  // reload bumps `version`, after which the next open refetches. Only ever
   // fetched on the client (inside the open effect), so SSR never touches it.
   let paths = $state<string[]>([]);
   let tags = $state<string[]>([]);
-  let loaded = false;
+  let loadedVersion: number | null = null;
+  const loadGuard = createLatestGuard();
 
   // Tag drill-down: the tag whose Concepts the list is currently showing (null =
   // normal search). `tagConcepts` holds the resolved paths; `tagGuard` guards a
@@ -74,8 +81,9 @@
     el?.scrollIntoView({ block: 'nearest' });
   });
 
-  // Reset + focus each time the palette transitions to open (tracks `open` only,
-  // so it doesn't re-run on every keystroke). Loads palette data on first open.
+  // Reset + focus each time the palette transitions to open (tracks `open`
+  // and `version` only, so it doesn't re-run on every keystroke). Loads palette data
+  // on the first open and on the first open after a live reload.
   let wasOpen = false;
   $effect(() => {
     if (open && !wasOpen) {
@@ -84,13 +92,14 @@
       selected = 0;
       tagMode = null;
       tagConcepts = [];
-      if (!loaded) {
-        loaded = true;
+      if (loadedVersion !== version) {
+        loadedVersion = version;
+        const token = loadGuard.next();
         void backend.listConceptPaths().then((p) => {
-          paths = p;
+          if (loadGuard.isLatest(token)) paths = p;
         });
         void backend.allTags().then((t) => {
-          tags = t.map((tc) => tc.tag);
+          if (loadGuard.isLatest(token)) tags = t.map((tc) => tc.tag);
         });
       }
       queueMicrotask(() => input?.focus());
