@@ -4,7 +4,7 @@
 // the Rust `sunstone-asset://` scheme handler and the server's `GET /api/asset`
 // route both parse what is asserted here.
 import { describe, expect, test } from 'bun:test';
-import { ATTACHMENTS, attachmentExists, attachmentPaths, fakeAttachmentUrl } from './attachments';
+import { ATTACHMENTS, attachmentPaths, fakeAttachmentUrl } from './attachments';
 import { conceptPaths } from './store';
 import { httpBackend } from '../http';
 import { tauriBackend } from '../tauri';
@@ -27,11 +27,12 @@ describe('the Attachment fixture', () => {
   });
 
   test('covers a square, a landscape and a vector Attachment', () => {
-    expect(attachmentExists('assets/dot.png')).toBe(true); // 16x16
-    expect(attachmentExists('concepts/assets/wide.png')).toBe(true); // 64x16
-    expect(attachmentExists('concepts/assets/mark.svg')).toBe(true); // 48x48
-    expect(attachmentExists('concepts/editor/assets/diagram.png')).toBe(true); // 96x32
-    expect(attachmentExists('nope.png')).toBe(false);
+    const paths = attachmentPaths();
+    expect(paths).toContain('assets/dot.png'); // 16x16
+    expect(paths).toContain('concepts/assets/wide.png'); // 64x16
+    expect(paths).toContain('concepts/assets/mark.svg'); // 48x48
+    expect(paths).toContain('concepts/editor/assets/diagram.png'); // 96x32
+    expect(paths).not.toContain('nope.png');
   });
 
   test('every path is bundle-relative and forward-slash', () => {

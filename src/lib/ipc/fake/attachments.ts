@@ -71,11 +71,6 @@ export function attachmentPaths(): string[] {
   return Object.keys(ATTACHMENTS).sort();
 }
 
-/** True if `path` names a seeded Attachment. */
-export function attachmentExists(path: string): boolean {
-  return Object.prototype.hasOwnProperty.call(ATTACHMENTS, path);
-}
-
 /**
  * URL prefix handed back for a path with no seeded Attachment. Nothing serves
  * it, so the `<img>` fires `error` and the widget shows its error placeholder —

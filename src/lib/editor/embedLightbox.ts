@@ -142,8 +142,3 @@ export function openEmbedLightbox(src: string, alt: string): () => void {
   current = { close: dismiss };
   return dismiss;
 }
-
-/** Close the open lightbox, if there is one. Exposed for teardown. */
-export function closeEmbedLightbox(): void {
-  current?.close();
-}

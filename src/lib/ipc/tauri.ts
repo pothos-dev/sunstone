@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { Backend } from './backend';
+import { setDocumentTitle } from './browserShell';
 import type {
   TreeNode,
   FileChange,
@@ -196,7 +197,7 @@ export const tauriBackend: Backend = {
   },
 
   async setWindowTitle(title: string): Promise<void> {
-    document.title = title;
+    await setDocumentTitle(title);
     await getCurrentWindow().setTitle(title);
   },
 

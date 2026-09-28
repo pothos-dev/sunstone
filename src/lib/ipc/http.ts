@@ -71,14 +71,20 @@ export const CLIENT_ID =
     ? crypto.randomUUID()
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
+/**
+ * The Error for a failed response to `url`: status, status text and the
+ * server's plain-text message body (sent for 4xx, e.g. path escapes), falling
+ * back to the URL when the body is empty or unreadable.
+ */
+async function readError(res: Response, url: string): Promise<Error> {
+  const detail = await res.text().catch(() => '');
+  return new Error(`${res.status} ${res.statusText}: ${detail || url}`);
+}
+
 /** GET `url` and parse the JSON body, mapping a non-2xx to a thrown Error. */
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) {
-    // The server sends a plain-text message body for 4xx (e.g. path escapes).
-    const detail = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${res.statusText}: ${detail || url}`);
-  }
+  if (!res.ok) throw await readError(res, url);
   return (await res.json()) as T;
 }
 
@@ -111,8 +117,7 @@ async function getGatedGit<T>(url: string, unavailable: T): Promise<T> {
   }
   if (res.status === 400) {
     // The ONE rejection the seam permits: an invalid / escaping path.
-    const detail = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${res.statusText}: ${detail || url}`);
+    throw await readError(res, url);
   }
   if (!res.ok) return unavailable;
   try {
