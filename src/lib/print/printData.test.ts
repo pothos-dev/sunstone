@@ -1,7 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import { printPageData } from './printData';
+import { printPageData, printUrl } from './printData';
 
 const at = (query: string) => new URL(`https://example.test/${query}`);
+
+describe('printUrl', () => {
+  test('builds the exact preview URLs', () => {
+    expect(printUrl('a b/c&d.md')).toBe('/?print=a%20b%2Fc%26d.md');
+    expect(printUrl('x.md', true)).toBe('/?print=x.md&toolbar=1');
+  });
+
+  test('round-trips through printPageData', () => {
+    for (const path of ['index.md', 'research/mistral.md', 'a b/ü?#&=+.md']) {
+      for (const toolbar of [false, true]) {
+        const url = new URL(printUrl(path, toolbar), 'https://example.test');
+        expect(printPageData(url)).toEqual({ web: false, print: path, toolbar });
+      }
+    }
+  });
+});
 
 describe('printPageData', () => {
   test('returns null when there is no print param', () => {

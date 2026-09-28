@@ -24,6 +24,7 @@
   import { snapshotWebViewerUiState, restoreWebViewerUiState } from './webViewerUiState';
   import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptTitle } from './conceptUrl';
+  import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
 
@@ -413,7 +414,7 @@
           title="Export as PDF"
           aria-label="Export as PDF"
           disabled={!data.rendered}
-          onclick={() => data.selected && window.open(`/?print=${encodeURIComponent(data.selected)}`, '_blank')}
+          onclick={() => data.selected && window.open(printUrl(data.selected), '_blank')}
         >
           <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
             <path

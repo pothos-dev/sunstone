@@ -13,8 +13,10 @@
  *    default application.
  */
 
+import { printUrl } from '$lib/print/printData';
+
 export async function openPrintTab(path: string): Promise<void> {
-  window.open(`/?print=${encodeURIComponent(path)}&toolbar=1`, '_blank');
+  window.open(printUrl(path, true), '_blank');
 }
 
 export async function noSavePdf(_defaultName: string): Promise<string | null> {

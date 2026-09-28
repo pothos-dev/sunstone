@@ -16,6 +16,15 @@
  */
 export type PrintPageData = { web: false; print: string; toolbar: boolean };
 
+/**
+ * The browser URL of the print/PDF preview for bundle-relative `path`:
+ * `/?print=<path>`, plus `&toolbar=1` for the desktop reader controls. The
+ * inverse of {@link printPageData}.
+ */
+export function printUrl(path: string, toolbar = false): string {
+  return `/?print=${encodeURIComponent(path)}${toolbar ? '&toolbar=1' : ''}`;
+}
+
 export function printPageData(url: URL): PrintPageData | null {
   const print = url.searchParams.get('print');
   if (print === null) return null;
