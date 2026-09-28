@@ -7,6 +7,7 @@ import { session } from '$lib/state/session.svelte';
 import { isReservedFile, reservedStub, type ReservedKind } from '$lib/reserved';
 import { scaffoldConcept } from '$lib/frontmatter';
 import { moveDestination } from '$lib/path';
+import { nodeAt } from '$lib/treeCrud';
 import type { RewriteSummary } from '$lib/types';
 
 /**
@@ -128,19 +129,11 @@ class TreeActionsStore {
    * for `from`, and if the editor still pointed at `from` when that arrived it
    * would clear itself. Remapping first means the editor already points at `to`,
    * so the `removed` event no longer matches and the editor keeps its content.
-   * On failure we roll the open path back.
+   * On failure the follow is undone (see `#relocate`).
    */
   async renamePath(from: string, to: string): Promise<boolean> {
     if (!(await this.#gate('rename', from))) return false;
-    const before = editor.path;
-    this.#followRename(from, to);
-    const ok = await this.#run(async () => {
-      const summary = await backend.renamePath(from, to);
-      this.#showRewriteNotice(summary);
-    });
-    if (ok) session.followRename(from, to);
-    else if (before !== null) this.#followRename(to, before);
-    return ok;
+    return this.#relocate(from, to, () => backend.renamePath(from, to));
   }
 
   /**
@@ -156,14 +149,31 @@ class TreeActionsStore {
   async movePath(from: string, toDir: string): Promise<boolean> {
     if (!(await this.#gate('move', from))) return false;
     const to = this.resolveMove(from, toDir);
-    const before = editor.path;
-    this.#followRename(from, to);
+    return this.#relocate(from, to, () => backend.movePath(from, toDir));
+  }
+
+  /**
+   * The shared body of rename/move: follow `from → to` optimistically, run the
+   * backend call, and on failure undo the follow by mapping `to` back onto
+   * `from` — the inverse of the same remap, so a Concept open *inside* a
+   * renamed folder lands back at its own old path.
+   *
+   * A destination the tree already holds is never followed onto: the backend
+   * refuses it anyway, and the follow would merge `to`'s open Tiles and
+   * Documents with `from`'s so that no rollback could tell them apart again.
+   */
+  async #relocate(
+    from: string,
+    to: string,
+    call: () => Promise<RewriteSummary>,
+  ): Promise<boolean> {
+    const follow = nodeAt(bundle.tree, to) === null;
+    if (follow) this.#followRename(from, to);
     const ok = await this.#run(async () => {
-      const summary = await backend.movePath(from, toDir);
-      this.#showRewriteNotice(summary);
+      this.#showRewriteNotice(await call());
     });
     if (ok) session.followRename(from, to);
-    else if (before !== null) this.#followRename(to, before);
+    else if (follow) this.#followRename(to, from);
     return ok;
   }
 
