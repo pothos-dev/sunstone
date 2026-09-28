@@ -377,12 +377,7 @@ export class Workspace {
    * active Tile yields an empty new tile.
    */
   splitRight(): void {
-    const source = this.activeTile;
-    const tile = this.#create();
-    tile.mode = source.mode;
-    if (source.activePath !== null) tile.adopt(source.activePath);
-    this.layout = layoutSplitRight(this.layout, source.id, tile.id);
-    this.activeId = tile.id;
+    this.#split(layoutSplitRight);
   }
 
   /**
@@ -390,11 +385,19 @@ export class Workspace {
    * current column, and focus it.
    */
   splitDown(): void {
+    this.#split(layoutSplitDown);
+  }
+
+  /**
+   * Clone the active Tile (mode + Concept, adopting its shared Document) into a
+   * new tile placed by `place`, and focus the new tile.
+   */
+  #split(place: (layout: Layout, activeId: string, newId: string) => Layout): void {
     const source = this.activeTile;
     const tile = this.#create();
     tile.mode = source.mode;
     if (source.activePath !== null) tile.adopt(source.activePath);
-    this.layout = layoutSplitDown(this.layout, source.id, tile.id);
+    this.layout = place(this.layout, source.id, tile.id);
     this.activeId = tile.id;
   }
 
