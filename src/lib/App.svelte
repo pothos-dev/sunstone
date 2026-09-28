@@ -333,12 +333,16 @@
   });
 
   // Keep the window title on the active Concept. NOT on the web, where
-  // `WebViewer` owns the document `<title>`. `indexStore.version` re-runs this
+  // `WebViewer` owns the document `<title>`. `indexStore.version` recomputes it
   // once wasm is ready, so the frontmatter `title` is read (see Tile.svelte).
+  // A derived, so a keystroke that leaves the title unchanged never reaches the
+  // backend — the effect below re-runs only when the string itself changes.
+  const title = $derived.by(() => {
+    void indexStore.version;
+    return windowTitle(editor.path, splitFrontmatter(editor.content).yaml);
+  });
   $effect(() => {
     if (__SUNSTONE_WEB__) return;
-    void indexStore.version;
-    const title = windowTitle(editor.path, splitFrontmatter(editor.content).yaml);
     void backend.setWindowTitle(title).catch(() => {});
   });
 
