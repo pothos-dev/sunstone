@@ -1,7 +1,7 @@
-//! Pure link-inner / UTF-8 helpers for link rewriting, shared by the anchor
-//! rewriter (`anchors`) and the move/rename engine (`moves`). The engine's path
-//! math (`relative_path`, `shortest_resolving_suffix`) lives in `relpath`; the
-//! URL `split_suffix` in `crate::paths`.
+//! The pure link-inner helper ([`LinkInner`]) for link rewriting, shared by the
+//! anchor rewriter (`anchors`) and the move/rename engine (`moves`). The
+//! engine's path math (`relative_path`, `shortest_resolving_suffix`) lives in
+//! `relpath`; the URL `split_suffix` in `crate::paths`.
 
 /// The inside of a Markdown link's parens (`[text](inner)`), split so a
 /// rewriter touches only the URL: `{leading ws}{<}{url}{>}{title}`. The URL
@@ -53,21 +53,6 @@ impl<'a> LinkInner<'a> {
     }
 }
 
-/// Byte length of a UTF-8 code point from its leading byte.
-pub fn utf8_len(b: u8) -> usize {
-    if b < 0x80 {
-        1
-    } else if b >> 5 == 0b110 {
-        2
-    } else if b >> 4 == 0b1110 {
-        3
-    } else if b >> 3 == 0b11110 {
-        4
-    } else {
-        1
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
@@ -93,17 +78,5 @@ mod tests {
         assert_eq!(LinkInner::parse("<a b.md>").unwrap().url, "<a");
         assert_eq!(LinkInner::parse(""), None);
         assert_eq!(LinkInner::parse("   "), None);
-    }
-
-    use super::*;
-
-    #[test]
-    fn utf8_len_reads_the_leading_byte() {
-        assert_eq!(utf8_len(b'a'), 1); // ASCII
-        assert_eq!(utf8_len(0xC3), 2); // 2-byte lead (é)
-        assert_eq!(utf8_len(0xE2), 3); // 3-byte lead (€)
-        assert_eq!(utf8_len(0xF0), 4); // 4-byte lead (emoji)
-        assert_eq!(utf8_len(0x80), 1); // continuation byte -> treated as 1
-        assert_eq!(utf8_len(0xFF), 1); // invalid lead -> treated as 1
     }
 }
