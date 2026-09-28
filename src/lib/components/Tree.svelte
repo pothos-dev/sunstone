@@ -8,7 +8,7 @@
   import { dropZoneHandlers } from '$lib/treeDnd';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
   import { indexChild, ordinaryChildren as ordinaryChildrenOf, reservedChildren } from '$lib/treeNav';
-  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
+  import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
 
   interface Props {
@@ -208,20 +208,7 @@
       <span class="twisty" class:open={expanded}>▸</span>
     </button>
     {#each reservedAffordances as r (r.path)}
-      <button
-        class="reserved-btn"
-        class:selected={selected === r.path}
-        type="button"
-        tabindex="-1"
-        title={`Open ${RESERVED_FILES[r.kind]}`}
-        aria-label={`Open ${RESERVED_FILES[r.kind]}`}
-        data-reserved-path={r.path}
-        data-reserved-kind={r.kind}
-        onclick={(e) => {
-          e.stopPropagation();
-          onopen(r.path);
-        }}
-      >{RESERVED_GLYPH[r.kind]}</button>
+      <ReservedFileButton entry={r} selected={selected === r.path} placement="row" {onopen} />
     {/each}
     <button
       class="entry dir-toggle name-toggle"
@@ -334,37 +321,6 @@
   /* The dragged row dims so it reads as "in transit". */
   .row[draggable='true']:active {
     cursor: grabbing;
-  }
-
-  .reserved-btn {
-    flex: 0 0 auto;
-    width: 1.4rem;
-    border: none;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-size: 0.8rem;
-    line-height: 1;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    opacity: 0.55;
-    transition: background 0.12s ease;
-  }
-
-  .reserved-btn:hover {
-    background: var(--hover);
-    opacity: 1;
-  }
-
-  .reserved-btn.selected {
-    opacity: 1;
-    background: var(--accent-soft);
-    color: var(--tag-text);
-  }
-
-  .reserved-btn:focus-visible {
-    outline: 2px solid var(--accent-ring);
-    outline-offset: -1px;
   }
 
   .entry {

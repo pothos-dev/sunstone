@@ -9,8 +9,8 @@
   import { applyTheme, theme } from '$lib/state/theme.svelte';
   import { applyZoom, zoom } from '$lib/state/zoom.svelte';
   import { wheelZoomStep } from '$lib/zoom';
-  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
   import ExplorerPane from '$lib/components/ExplorerPane.svelte';
+  import ReservedFileButton from '$lib/components/ReservedFileButton.svelte';
   import TreeCrud from '$lib/components/TreeCrud.svelte';
   import QuickNav from '$lib/components/QuickNav.svelte';
   import SearchPanel from '$lib/components/SearchPanel.svelte';
@@ -596,16 +596,12 @@
         {#if rootReservedSorted.length > 0}
           <div class="root-reserved" data-testid="root-reserved">
             {#each rootReservedSorted as r (r.path)}
-              <button
-                type="button"
-                class="reserved-btn"
-                class:selected={editor.path === r.path}
-                title={`Open ${RESERVED_FILES[r.kind]} (Bundle root)`}
-                aria-label={`Open ${RESERVED_FILES[r.kind]}`}
-                data-reserved-path={r.path}
-                data-reserved-kind={r.kind}
-                onclick={() => openConcept(r.path)}
-              >{RESERVED_GLYPH[r.kind]}</button>
+              <ReservedFileButton
+                entry={r}
+                selected={editor.path === r.path}
+                placement="header"
+                onopen={openConcept}
+              />
             {/each}
           </div>
         {/if}
@@ -960,41 +956,6 @@
     display: flex;
     align-items: center;
     gap: 0.1rem;
-  }
-
-  .reserved-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 0.85rem;
-    line-height: 1;
-    cursor: pointer;
-    opacity: 0.75;
-    transition: background 0.12s ease;
-  }
-
-  .reserved-btn:hover {
-    background: var(--hover);
-    opacity: 1;
-  }
-
-  .reserved-btn:focus-visible {
-    outline: 2px solid var(--accent-ring);
-    outline-offset: -1px;
-    opacity: 1;
-  }
-
-  .reserved-btn.selected {
-    background: var(--accent-soft);
-    color: var(--tag-text);
-    opacity: 1;
   }
 
 </style>
