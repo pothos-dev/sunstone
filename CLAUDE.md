@@ -43,8 +43,19 @@ and the web write test strategy.
   so it can be unit-tested; `.svelte`/`.svelte.ts` files stay thin over those
   helpers. When component logic grows, extract it this way (precedents:
   `tileEditorMenu.ts`, `treeCrud.ts`, `editor/mermaidRender.ts`,
-  `state/sessionState.ts`, `dividerDrag.ts`). Big components split into child
-  components the same way (`ExplorerPane.svelte`, `Sidebar.svelte` out of `App.svelte`).
+  `state/sessionState.ts`, `dividerDrag.ts`, `editor/lineSpace.ts`,
+  `server/apiProxy.ts`). Big components split into child components the same
+  way (`ExplorerPane.svelte`, `Sidebar.svelte`, `TileGrid.svelte` out of
+  `App.svelte`; `WebReader.svelte` out of `WebViewer.svelte`). An overlay
+  registers with the Escape peel through `useOverlay` (`state/overlay.svelte.ts`),
+  not a hand-rolled `$effect`.
+- **No TS twins of the Rust algorithms** ([ADR 0006](docs/adr/0006-wasm-shared-core-for-frontend-logic.md)):
+  link/code scanning, move/rename and anchor rewrite live in `sunstone-shared`;
+  the `fake` backend calls them through `src/lib/wasm/exports.ts`. Fix or extend
+  the Rust side (goldens in `cargo test`), then `bun run build:wasm`.
+- **Server paths are guarded at the network boundary**: every path a route takes
+  goes through `check_rel_path` / `guard_rel_path` (`sunstone-server/src/api_error.rs`),
+  which also refuses hidden dot-segments such as `.git/`. New routes must too.
 - **Paths crossing the seam** are bundle-relative, forward-slash.
 - **Desktop Playwright runs rewrite `docs/assets/*.png`** (screenshot specs) —
   revert them before committing unless refreshing marketing images.
