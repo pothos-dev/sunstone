@@ -112,11 +112,9 @@ round-tripping when an unrelated scalar is edited.
 `,
 
   // A Concept whose frontmatter contains DUPLICATE top-level keys (`title`
-  // twice). The in-app key-commit path forbids creating duplicates, but a file
-  // authored OUTSIDE the app can still reach this state — `parseProperties`
-  // yields two separate rows with the same key. This fixture lets the Properties
-  // panel's defensive row-id keying be exercised: editing the SECOND duplicate
-  // row must update the second row, not the first matching key.
+  // twice) — a state only a file authored OUTSIDE the app reaches. It was the
+  // fixture for the retired Properties panel's duplicate-row keying; it stays as
+  // a real-world malformed-frontmatter sample in the fixture Bundle.
   'concepts/duplicate-keys.md': `---
 type: concept
 title: First Title

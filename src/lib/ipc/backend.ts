@@ -17,12 +17,13 @@ import type {
  * The Backend interface is the ONLY boundary between the frontend and Rust.
  * The frontend never imports `@tauri-apps/api` outside `src/lib/ipc/`.
  *
- * Two implementations satisfy it:
- *  - `tauri.ts`  — real, via `invoke(...)` / `listen(...)`
+ * Three implementations satisfy it:
+ *  - `tauri.ts`  — desktop, via `invoke(...)` / `listen(...)`
+ *  - `http.ts`   — web, via `fetch` to `/api/...` on sunstone-server
  *  - `fake.ts`   — in-memory over a seeded fixture Bundle (for Chromium/Playwright)
  *
- * When a slice adds a Rust command, add a method here and implement it in BOTH
- * impls. Paths crossing the seam are always bundle-relative, forward-slash.
+ * When a slice adds a Rust command, add a method here and implement it in ALL
+ * THREE impls. Paths crossing the seam are always bundle-relative, forward-slash.
  *
  * See docs/architecture/web-frontend.md "The IPC seam".
  */
@@ -192,7 +193,7 @@ export interface Backend {
 
   /**
    * All distinct top-level frontmatter keys used across the Bundle, sorted.
-   * Fed the Properties panel's key-name autocomplete; awaiting the
+   * Feeds frontmatter key-name autocomplete; awaiting the
    * marker-gated completion of ADR 0009 (key-and-tag
    * autocomplete slice). The OKF recommended keys are merged in client-side, so
    * this is bundle-sourced only (distinct keys from every Concept's frontmatter).

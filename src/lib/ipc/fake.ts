@@ -308,7 +308,7 @@ export const fakeBackend: Backend = {
 
   async renamePath(from: string, to: string): Promise<RewriteSummary> {
     assertSafePath(from, to);
-    await ensureIndexReady(); // the link-rewrite plan resolves links through wasm.
+    await ensureIndexReady(); // the whole link-rewrite plan runs in wasm.
     return renameAndRewrite(from, to);
   },
 
@@ -317,7 +317,7 @@ export const fakeBackend: Backend = {
     if (!from.split('/').some(Boolean)) throw new Error(`invalid source path: ${from}`);
     const to = moveDestination(from, toDir);
     if (to === from) throw new Error(`already in that folder: ${from}`);
-    await ensureIndexReady(); // the link-rewrite plan resolves links through wasm.
+    await ensureIndexReady(); // the whole link-rewrite plan runs in wasm.
     return renameAndRewrite(from, to);
   },
 

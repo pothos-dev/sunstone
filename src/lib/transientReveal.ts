@@ -39,8 +39,8 @@ export const ALL_TRANSIENT_FLAGS: readonly TransientFlag[] = [
  * The transient flags that keep `region` shown — i.e. the ones that must be
  * PRESERVED when focus lands in `region` while every other peeked Region is
  * snapped back. A Sidebar Section needs both its Sidebar's flag and its own
- * Section flag; the Regions that can never be collapse-hidden — Properties (now
- * gated by the global show/hide toggle, not a collapse) and the Editor — keep
+ * Section flag; the Regions that can never be collapse-hidden — Frontmatter
+ * (gated by the global show/hide toggle, not a collapse) and the Editor — keep
  * none. Empty for an unknown id (total + safe).
  */
 export function revealFlagsFor(region: RegionId): readonly TransientFlag[] {

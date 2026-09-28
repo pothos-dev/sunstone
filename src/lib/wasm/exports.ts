@@ -3,15 +3,15 @@
  *
  * These are the per-call kernels (content-in / struct-out) that don't need the
  * `BundleIndex` handle: frontmatter split / line-count / parse. They must be
- * callable SYNCHRONOUSLY (the editor's Property model + the outline scan run in
+ * callable SYNCHRONOUSLY (the editor's frontmatter split + the outline scan run in
  * that mode), so this module keeps a memoized reference to the initialized wasm
  * module and reads it per call — the free-export analogue of `indexStore`'s
  * handle (family 10).
  *
  * Deliberately FREE of the `$app/environment` import that `./index.ts` carries:
  * the browser loader (`ensureWasm`) and the `bun test` preload both register the
- * module here via `setWasmModule`, so bun-reachable consumers (the property
- * model, the fake backend, the outline) can import these kernels without
+ * module here via `setWasmModule`, so bun-reachable consumers (the document
+ * store, the fake backend, the outline) can import these kernels without
  * dragging the SvelteKit-only `$app` virtual module into the unit-test graph.
  *
  * Before the module is registered (SSR, a degraded load, or the very first

@@ -104,7 +104,7 @@
   );
 
   // New-Concept create focuses the `type` field: the path we want focused. The
-  // active Tile's Properties focuses `type` while it matches its open Concept.
+  // active Tile's Frontmatter focuses `type` while it matches its open Concept.
   let focusTypeForPath = $state<string | null>(null);
 
   onMount(() => {

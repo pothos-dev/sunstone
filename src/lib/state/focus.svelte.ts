@@ -17,7 +17,7 @@
 // two predicates that split the old single `isVisible` notion in two
 // (slice: transient-region-auto-reveal):
 //   - `isPresent()` — is there content to focus? FALSE for genuinely absent /
-//     empty Regions (Properties with no open Concept, Tags with no tags). These
+//     empty Regions (Frontmatter with no open Concept, Tags with no tags). These
 //     are SKIPPED by directional movement and never revealed.
 //   - `isVisible()` — is the Region currently SHOWN (rendered, focusable right
 //     now)? FALSE when a collapse hides it. A present-but-not-visible Region is
@@ -50,7 +50,7 @@ export interface RegionRegistration {
   focus: () => boolean;
   /**
    * Whether there is content to focus here. FALSE only when the Region is
-   * genuinely absent/empty (no open Concept → Properties/Outline/Backlinks; no
+   * genuinely absent/empty (no open Concept → Frontmatter/Outline/Backlinks; no
    * tags → Tags). Such Regions are SKIPPED by movement and never revealed. A
    * Region hidden merely by a collapse is still present (`true`).
    */
@@ -330,14 +330,16 @@ class FocusStore {
    * The unified Escape peel — peels EXACTLY ONE layer per press, innermost
    * first (see escape-peel-restore-opener):
    *   1. an IN-FIELD / local peel is active → DEFER (return false; the local
-   *      handler in Properties / PropertyRow / CodeMirror's Find runs instead);
+   *      handler in the Frontmatter YAML editor / CodeMirror / QuickNav's tag
+   *      filter runs instead);
    *   2. an OVERLAY is open → CANCEL the topmost (restore focus to its opener);
    *   3. a NON-EDITOR Region is focused → home to the Editor;
    *   4. the Editor is focused with nothing open → no-op.
    * `localPeelActive` is supplied by the caller (App.svelte): it folds together
-   * the innermost layers the global handler must not steal — the Properties
-   * deeper modes (edit/chips), and CodeMirror's own Find while the editor holds
-   * focus. Returns true when this method handled the press (the caller should
+   * the innermost layers the global handler must not steal — the Frontmatter
+   * Region while its YAML is being edited, CodeMirror's own Escape handling
+   * (Find, …) while the Editor holds focus, and QuickNav's active tag filter
+   * (see `appHotkeys.ts`). Returns true when this method handled the press (the caller should
    * then `preventDefault`); false means "defer to a local handler / no-op".
    */
   escape(localPeelActive: boolean): boolean {

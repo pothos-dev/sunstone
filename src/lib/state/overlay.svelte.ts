@@ -9,6 +9,11 @@
 // "reset on open" logic stays in the component; effects run in declaration
 // order within one flush, so a push here still precedes any focus move the
 // component queues (e.g. `queueMicrotask(() => input.focus())`).
+//
+// ORDERING CONTRACT: call `useOverlay` BEFORE declaring any effect that moves
+// focus on open. The push captures the opener as the CURRENT focused Region, so
+// it is correct only while focus has not yet left the opener — which holds only
+// because this effect is declared (and so runs) first.
 
 import { focus } from '$lib/state/focus.svelte';
 

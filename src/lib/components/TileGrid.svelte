@@ -22,7 +22,7 @@
   import { retryFrames } from '$lib/retryFrames';
 
   interface Props {
-    /** New-Concept create: the path whose Properties should focus `type`. */
+    /** New-Concept create: the path whose Frontmatter should focus `type`. */
     focusTypeForPath: string | null;
     /** A Tile header breadcrumb asked to show `folder` in the Explorer. */
     onRevealFolder: (folder: string) => void;
@@ -55,7 +55,7 @@
 
   /**
    * Move keyboard focus to tile `id`: make it the active Tile (so Outline /
-   * Backlinks / Properties, which track the active Tile, follow) and focus its
+   * Backlinks and the `frontmatter` Region, which track the active Tile, follow) and focus its
    * CodeMirror view. Retries across frames, since the target tile's view may
    * still be building. Focusing the view fires its `focusin`, which keeps the
    * 'editor' Region active.

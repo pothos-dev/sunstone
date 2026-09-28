@@ -4,7 +4,7 @@
 // region-focus-backbone ticket):
 //
 //        col 0 (left)   col 1 (editor)   col 2 (right)
-//   row0  Explorer       Properties       Outline
+//   row0  Explorer       Frontmatter      Outline
 //   row1  Tags           Editor           Backlinks
 //
 // This module owns ONLY the index math for moving the active Region with

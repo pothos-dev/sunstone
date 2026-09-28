@@ -25,7 +25,7 @@ import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
  * EXTENDING (the `recentFiles` field below was added this way): add a rune +
  * accessor here, add the field to `SessionFields` + both mappings in
  * `./sessionState.ts`, and pass it through `load()` / `#snapshot()`. The
- * Backend `BundleState` type and both impls already round-trip unknown fields,
+ * Backend `BundleState` type and all three impls already round-trip unknown fields,
  * so no seam change is needed beyond the new field.
  */
 

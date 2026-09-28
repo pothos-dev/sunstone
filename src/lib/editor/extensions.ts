@@ -143,28 +143,27 @@ export interface BuildEditorOptions {
 }
 
 /**
- * SLICE 5 SEAM — OKF link navigation.
+ * The FALLBACK rendered-link click handler.
  *
  * atomic-editor routes every rendered-link click (inline links + table-cell
- * link icons) through one `onLinkClick(url)` callback. For now we route to a
- * safe default: open external (http/https) URLs in a new tab, and ignore
- * relative/OKF links (`./rel.md`, `/abs.md`) rather than opening a blank tab.
- *
- * Slice 5 plugs OKF navigation in here by passing its own `onLinkClick` via
- * `BuildEditorOptions` — it resolves the OKF path against the open Concept and
- * navigates in-app. No restructuring needed: just provide the callback.
+ * link icons) through one `onLinkClick(url)` callback. A Concept's Tile passes
+ * its own (`Tile.svelte`'s `handleLinkClick`, which resolves OKF links against
+ * the open Concept and navigates in-app), so this default only serves a buffer
+ * built without one — the path-less review buffer (`cm.ts`'s
+ * `buildReviewEditor`), which has no Concept to resolve against. It opens
+ * external (http/https) URLs and ignores relative/OKF links (`./rel.md`,
+ * `/abs.md`) rather than opening a blank tab.
  */
 export function defaultLinkClick(url: string): void {
   if (typeof window === 'undefined') return;
-  // External links: open in a new tab. Relative / OKF links are left for
-  // slice 5; opening them as URLs here would be wrong, so we no-op.
+  // External links: open outside the app. Relative / OKF links have no Concept
+  // to resolve against here; opening them as URLs would be wrong, so no-op.
   if (/^https?:\/\//i.test(url)) {
     // Route through the backend seam: WebKitGTK swallows `window.open`, so the
     // desktop impl hands the URL to the OS's default browser via the opener
     // plugin (the fake/HTTP impls open a new tab).
     void backend.openExternal(url);
   }
-  // else: relative/OKF link — TODO(slice 5): resolve + navigate in-app.
 }
 
 /**

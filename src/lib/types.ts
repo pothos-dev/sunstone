@@ -280,8 +280,8 @@ export type FileAtRev =
   | { status: 'gitMissing' };
 
 /**
- * One frontmatter entry for the read-only Properties view of a rendered
- * Concept. A scalar has a single value; a sequence (e.g. `tags`) has several.
+ * One frontmatter entry for the web reader's read-only frontmatter view of a
+ * rendered Concept (`WebReader`'s "Properties" panel). A scalar has a single value; a sequence (e.g. `tags`) has several.
  * Matches the Rust `FrontmatterField` (`serde rename_all = "camelCase"`).
  */
 export interface FrontmatterField {

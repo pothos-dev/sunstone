@@ -310,10 +310,11 @@ export class Tile {
  * one live buffer (an edit/autosave in one reflects in the others).
  *
  * `activeId` names the focused tile; `activeTile` is the Tile the `editor` facade
- * (and thus Outline / Backlinks / Properties) tracks. Splitting clones the active
- * Tile's Concept into a new tile (adopting the shared Document without a reload);
- * closing a tile focuses a neighbour, and closing the last tile clears it to the
- * empty state (keeping the Tile + its history — Back can still re-open).
+ * (and thus Outline / Backlinks) tracks; the `frontmatter` Region is the active
+ * Tile's own. Splitting clones the active Tile's Concept into a new tile
+ * (adopting the shared Document without a reload); closing a tile focuses a
+ * neighbour, and closing the last tile clears it to the empty state (keeping the
+ * Tile + its history — Back can still re-open).
  */
 export class Workspace {
   #registry = new DocumentRegistry();

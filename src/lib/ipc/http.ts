@@ -395,7 +395,7 @@ export const httpBackend: Backend = {
     return getJson<string[]>(`/api/concepts-by-tag?tag=${encodeURIComponent(tag)}`);
   },
 
-  // New-concept `type` autocomplete + Properties key autocomplete, served by
+  // New-concept `type` autocomplete + frontmatter key autocomplete, served by
   // the core in-memory index over the read-only `/api/types` + `/api/keys`
   // routes (the OKF recommended keys are merged in client-side).
   allTypes(): Promise<string[]> {
