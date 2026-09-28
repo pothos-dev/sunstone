@@ -127,8 +127,10 @@ fn rewrite_wikilink_anchor(
 }
 
 /// Rewrite a markdown link's `#anchor` if the link resolves to `target` and its
-/// anchor slug was renamed. Only the anchor within the URL's suffix is touched,
-/// the path is preserved.
+/// anchor slug was renamed. Only the anchor within the URL's suffix is touched;
+/// the path and any `?query` (before or after the anchor) are preserved. The
+/// anchor is found at the first `#` anywhere in the suffix, matching
+/// `links::extract_anchor`, so `page.md?q=1#sec` is rewritten too.
 fn rewrite_md_anchor(
     source: &str,
     inner: &str,
@@ -142,21 +144,21 @@ fn rewrite_md_anchor(
     }
 
     let (path_part, suffix) = split_suffix(url_core);
-    if path_part.is_empty() || !suffix.starts_with('#') {
+    if path_part.is_empty() {
         return None;
     }
-    let anchor_end = suffix[1..]
-        .find('?')
-        .map(|p| p + 1)
-        .unwrap_or(suffix.len());
-    let anchor = &suffix[1..anchor_end];
-    let tail = &suffix[anchor_end..];
+    let hash = suffix.find('#')?;
+    let pre = &suffix[..hash]; // a `?query` preceding the anchor, if any
+    let frag = &suffix[hash + 1..];
+    let anchor_end = frag.find('?').unwrap_or(frag.len());
+    let anchor = &frag[..anchor_end];
+    let tail = &frag[anchor_end..];
 
     if resolve_internal(source, path_part)? != target {
         return None;
     }
     let new_anchor = new_anchor_for(anchor, renames)?;
-    Some(link.with_url(&format!("{path_part}#{new_anchor}{tail}")))
+    Some(link.with_url(&format!("{path_part}{pre}#{new_anchor}{tail}")))
 }
 
 #[cfg(test)]
@@ -288,6 +290,36 @@ mod tests {
         );
         assert_eq!(out, "[it](/target.md#new?x=1 \"Title\")");
         assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn markdown_anchor_after_a_query_is_rewritten_and_query_kept() {
+        // `links::extract_anchor` follows `#foo` even after a `?query`, so the
+        // rewrite must reach it too or the link breaks on a heading rename.
+        let all = paths(&["a.md", "index.md"]);
+        let (out, n) = rewrite_anchors_in(
+            "a.md",
+            "[x](index.md?q=1#foo) [y](index.md?q=1#foo?z \"T\")",
+            "index.md",
+            &renames(&[("foo", "bar")]),
+            &all,
+        );
+        assert_eq!(out, "[x](index.md?q=1#bar) [y](index.md?q=1#bar?z \"T\")");
+        assert_eq!(n, 2);
+    }
+
+    #[test]
+    fn markdown_query_without_anchor_is_untouched() {
+        let all = paths(&["a.md", "index.md"]);
+        let (out, n) = rewrite_anchors_in(
+            "a.md",
+            "[x](index.md?foo)",
+            "index.md",
+            &renames(&[("foo", "bar")]),
+            &all,
+        );
+        assert_eq!(out, "[x](index.md?foo)");
+        assert_eq!(n, 0);
     }
 
     #[test]
