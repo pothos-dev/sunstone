@@ -340,6 +340,16 @@ mod tests {
     }
 
     #[test]
+    fn inbound_sources_finds_folder_linkers_on_a_folder_rename() {
+        let idx = index_of(&[
+            ("a.md", "[S](./sub/)"),
+            ("sub/index.md", "# Sub"),
+        ]);
+        let moves = build_move_map(&idx, "sub", "sub2");
+        assert_eq!(inbound_sources(&idx, &moves), vec!["a.md"]);
+    }
+
+    #[test]
     fn inbound_sources_dedupes_and_sorts_across_multiple_moves() {
         let idx = index_of(&[
             ("z.md", "[x](/docs/x.md) and [y](/docs/y.md)"),

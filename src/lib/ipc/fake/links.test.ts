@@ -68,6 +68,23 @@ describe('outboundLinks — wikilinks', () => {
   });
 });
 
+describe('outboundLinks — folder links', () => {
+  test("a link to a folder is a Backlinks edge of the folder's index.md", () => {
+    const snapshot = { ...FILES };
+    try {
+      for (const k of Object.keys(FILES)) delete FILES[k];
+      Object.assign(FILES, { 'sub/index.md': concept('# Sub'), 'index.md': concept('# Home') });
+      expect(outboundLinks('a.md', concept('[S](./sub/) [home](/)')).sort()).toEqual([
+        'index.md',
+        'sub/index.md',
+      ]);
+    } finally {
+      for (const k of Object.keys(FILES)) delete FILES[k];
+      Object.assign(FILES, snapshot);
+    }
+  });
+});
+
 describe('outboundLinks — inline code spans (CommonMark, as the Rust scanner)', () => {
   const links = (body: string) => outboundLinks('index.md', concept(body));
 
@@ -300,6 +317,12 @@ describe('planRewrites — markdown links (through the shared wasm engine)', () 
     setFiles({ 'old.md': concept('# Old'), 'a.md': concept('[[old|x#y]]') });
     const { writes } = planRewrites('old.md', 'new.md');
     expect(writes.get('a.md')).toContain('[[new|x#y]]');
+  });
+
+  test('a link to a renamed folder follows it, keeping its trailing slash', () => {
+    setFiles({ 'sub/index.md': concept('# Sub'), 'a.md': concept('[S](./sub/) [T](/sub/)') });
+    const { writes } = planRewrites('sub', 'sub2');
+    expect(writes.get('a.md')).toContain('[S](./sub2/) [T](/sub2/)');
   });
 
   test('renaming a Concept that is not in the corpus plans nothing', () => {

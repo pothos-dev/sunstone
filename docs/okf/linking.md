@@ -148,7 +148,7 @@ Broken links are **tolerated**, never blocked (OKF [§6.1](/okf/spec.md#61-links
 
 ## Backlinks
 
-The inverse of an outbound link. `Index::backlinks(path)` in `sunstone-native/src/index.rs` returns every Concept that links *to* a given Concept, powering the **Backlinks** [Section](/GLOSSARY.md) — reached as the `backlinks` Tauri command (`src-tauri/src/commands.rs`) on the desktop and `GET /api/backlinks` on the server. It is built from outbound-link extraction in `sunstone-native/src/index/links.rs` over the `sunstone-shared` link/wikilink kernels, mirrored by `outboundLinks` in `src/lib/ipc/fake/links.ts`. Both markdown links and wikilinks feed backlinks; self-edges (e.g. a pure same-file `[[#heading]]`) are dropped. Extraction masks fenced code blocks and inline code first (`maskCode`) so `[[ … ]]` written inside code is never picked up.
+The inverse of an outbound link. `Index::backlinks(path)` in `sunstone-native/src/index.rs` returns every Concept that links *to* a given Concept, powering the **Backlinks** [Section](/GLOSSARY.md) — reached as the `backlinks` Tauri command (`src-tauri/src/commands.rs`) on the desktop and `GET /api/backlinks` on the server. It is built from outbound-link extraction in `sunstone-native/src/index/links.rs` over the `sunstone-shared` link/wikilink kernels, mirrored by `outboundLinks` in `src/lib/ipc/fake/links.ts`. Both markdown links and wikilinks feed backlinks; a link to a folder (`./sub/`, or `/` for the Bundle root) counts as a Backlink of that folder's `index.md`, the Concept it opens; self-edges (e.g. a pure same-file `[[#heading]]`) are dropped. Extraction masks fenced code blocks and inline code first (`maskCode`) so `[[ … ]]` written inside code is never picked up.
 
 ## Rename & move rewrite
 
@@ -156,6 +156,7 @@ When a Concept or folder is renamed/moved, Sunstone **automatically rewrites the
 
 - **Inbound absolute** links (`/old.md`) → the new absolute path.
 - **Inbound & outbound relative** links → recomputed from the source's own directory, preserving relative style (`./`, `../`).
+- **Folder links** (`./sub/`, `/sub`) open the folder's `index.md`, so they follow a **moved folder** (its `index.md` and every Concept under it moved) to the new folder path, keeping absolute vs relative and a trailing `/`. Renaming only a folder's `index.md` leaves them alone. The Bundle root (`/`) never moves; a moved Concept's relative root link (`./`) is recomputed like any relative link.
 - **Wikilinks** (`[[old]]`, `[[a/old]]`) whose target moved are left **byte-for-byte** when the written name still resolves (by `resolve_wikilink`, over the post-move path set) to the moved Concept — so a pure folder move keeps `[[Old]]` or `[[old.md]]` as written. Otherwise the name becomes the **shortest suffix that resolves** to the new path: the new basename on a plain rename, or more segments when the basename alone would land on another Concept (`[[x]]` → `[[a/y]]` when renaming `a/x.md` to `a/y.md` next to a root `y.md`; `[[x]]` → `[[c/x]]` when a move makes `a/b/c/x.md` lose the fewest-`/` tie-break).
 - `|alias`, `#anchor`, `?query`, link titles, link text and external links are all preserved verbatim; only links whose resolved target actually moved change.
 

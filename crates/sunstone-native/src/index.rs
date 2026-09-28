@@ -21,7 +21,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::paths::{bundle_walker, md_files};
-use sunstone_shared::paths::to_rel_string;
+use sunstone_shared::paths::{folder_index_fallback, to_rel_string};
 use sunstone_shared::wikilink;
 
 pub mod frontmatter;
@@ -123,12 +123,16 @@ impl Index {
         let all_paths: Vec<String> = self.concepts.keys().cloned().collect();
         let mut reverse: HashMap<String, BTreeSet<String>> = HashMap::new();
         for (source, entry) in &self.concepts {
-            // Markdown links (already resolved by path).
+            // Markdown links (already resolved by path). A link to a folder
+            // opens its `index.md`, so it is a Backlink of that index — the
+            // same `folder_index_fallback` the link resolver applies. A root
+            // link with no root index, and a self-edge, contribute nothing.
             for target in &entry.links {
-                reverse
-                    .entry(target.clone())
-                    .or_default()
-                    .insert(source.clone());
+                let target =
+                    folder_index_fallback(target.clone(), &|p| self.concepts.contains_key(p));
+                if !target.is_empty() && target != *source {
+                    reverse.entry(target).or_default().insert(source.clone());
+                }
             }
             // Wikilinks resolve by NAME against every concept. Each resolved
             // target feeds the same reverse map -> Backlinks works unchanged.
@@ -418,6 +422,21 @@ mod tests {
         assert_eq!(idx.backlinks("c.md"), vec!["a.md", "b.md"]);
         assert_eq!(idx.backlinks("b.md"), vec!["a.md"]);
         assert!(idx.backlinks("a.md").is_empty());
+    }
+
+    #[test]
+    fn a_folder_link_is_a_backlink_of_the_folders_index() {
+        let mut idx = Index::default();
+        idx.insert_concept("a.md", "[S](./sub/) and [home](/)");
+        idx.insert_concept("b.md", "[no index](./bare/)");
+        idx.insert_concept("sub/index.md", "# Sub");
+        idx.insert_concept("bare/page.md", "# Page");
+        idx.insert_concept("index.md", "# Home");
+        idx.rebuild_reverse();
+        assert_eq!(idx.backlinks("sub/index.md"), vec!["a.md"]);
+        assert_eq!(idx.backlinks("index.md"), vec!["a.md"]);
+        // A folder without an index gains no edge anywhere.
+        assert!(idx.backlinks("bare/page.md").is_empty());
     }
 
     #[test]

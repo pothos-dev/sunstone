@@ -16,7 +16,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{dir_of, is_external, resolve_internal};
+use crate::paths::{dir_of, index_of, is_external, resolve_location};
+#[cfg(test)]
+use crate::paths::resolve_internal;
 use crate::wikilink::{self, parse_target};
 
 use super::relpath::{relative_path, shortest_resolving_suffix};
@@ -204,7 +206,8 @@ fn rewrite_links_in(
             None => format!("[[{raw}]]"),
         },
         |inner, _is_image| {
-            let replacement = rewrite_target(old_source, new_source, moved, inner, moves)?;
+            let replacement =
+                rewrite_target(old_source, new_source, moved, inner, moves, all_paths)?;
             count.set(count.get() + 1);
             Some(replacement)
         },
@@ -216,12 +219,19 @@ fn rewrite_links_in(
 /// target resolves to a moved Concept and, if so, return the rewritten inner
 /// text (new target, original anchor/query/title preserved). `None` means leave
 /// the link unchanged.
+///
+/// A link to a FOLDER (`./sub/`, `/sub`) opens the folder's `index.md`, so it
+/// follows the folder when that folder moved (see [`moved_folder`]). The
+/// Bundle root (`/`, `./` at the top level) never moves, but a moved source's
+/// relative root link is recomputed like any other relative link. A trailing
+/// `/` survives the rewrite.
 fn rewrite_target(
     old_source: &str,
     new_source: &str,
     moved: bool,
     inner: &str,
     moves: &HashMap<String, String>,
+    all_paths: &[String],
 ) -> Option<String> {
     // Split off leading whitespace, an optional `<...>` and a trailing title so
     // we only touch the URL itself.
@@ -240,12 +250,17 @@ fn rewrite_target(
 
     let is_absolute = path_part.starts_with('/');
 
-    // Resolve as the author wrote it, from the source's ORIGINAL location.
-    let resolved = resolve_internal(old_source, path_part)?;
-    // The target's NEW location: if the target itself moved, its mapped path;
-    // otherwise it stays where it is.
-    let target_moved = moves.contains_key(&resolved);
-    let new_target = moves.get(&resolved).cloned().unwrap_or(resolved);
+    // Resolve as the author wrote it, from the source's ORIGINAL location
+    // (`""` = the Bundle root folder).
+    let resolved = resolve_location(old_source, path_part)?;
+    // The target's NEW location: if the target itself (or, for a folder link,
+    // the folder) moved, its mapped path; otherwise it stays where it is.
+    let moved_to = moves
+        .get(&resolved)
+        .cloned()
+        .or_else(|| moved_folder(&resolved, moves, all_paths));
+    let target_moved = moved_to.is_some();
+    let new_target = moved_to.unwrap_or(resolved);
 
     // Decide whether this link needs rewriting at all:
     //   * ABSOLUTE links only change when their TARGET moved (a moved source's
@@ -260,7 +275,7 @@ fn rewrite_target(
         return None;
     }
 
-    let new_path = if is_absolute {
+    let mut new_path = if is_absolute {
         // Absolute links always point from the root: use the new absolute path.
         format!("/{new_target}")
     } else {
@@ -268,6 +283,9 @@ fn rewrite_target(
         // location, preserving the relative style.
         relative_path(dir_of(new_source), &new_target)
     };
+    if path_part.ends_with('/') && !new_path.ends_with('/') {
+        new_path.push('/');
+    }
 
     if new_path == path_part {
         // No textual change (e.g. recomputed to the identical relative string).
@@ -275,6 +293,25 @@ fn rewrite_target(
     }
 
     Some(link.with_url(&format!("{new_path}{suffix}")))
+}
+
+/// The NEW path of folder `dir` when a link to it must follow a move: `dir` is
+/// not itself a Concept, its `index.md` (what the link opens) moved to another
+/// folder's `index.md`, and every Concept under `dir/` moved with it — i.e. the
+/// folder itself moved, not just its index. The Bundle root never moves.
+fn moved_folder(dir: &str, moves: &HashMap<String, String>, all_paths: &[String]) -> Option<String> {
+    if dir.is_empty() {
+        return None;
+    }
+    let new_index = moves.get(&index_of(dir))?;
+    let new_dir = new_index.strip_suffix("/index.md")?;
+    let prefix = format!("{dir}/");
+    let folder_moved = !all_paths.iter().any(|p| p == dir)
+        && all_paths
+            .iter()
+            .filter(|p| p.starts_with(&prefix))
+            .all(|p| moves.contains_key(p));
+    folder_moved.then(|| new_dir.to_string())
 }
 
 /// Decide whether a wikilink (raw inner text of `[[ ... ]]`) needs rewriting
@@ -514,6 +551,62 @@ mod tests {
             "[ext](https://example.com) and [other](/keep.md) and [B](/folder/b.md)"
         );
         assert_eq!(summary.links_changed, 1);
+    }
+
+    // --- Folder links (a link to a folder opens its index.md) ----------------
+
+    #[test]
+    fn folder_links_follow_a_folder_rename_keeping_their_style() {
+        let files = &[
+            ("a.md", "[S](./sub/) [T](/sub/#x) [U](./sub) [V](sub/page.md)"),
+            ("deep/b.md", "[S](../sub/)"),
+            ("sub/index.md", "# Sub"),
+            ("sub/page.md", "# Page"),
+        ];
+        let m = moves(&[("sub/index.md", "sub2/index.md"), ("sub/page.md", "sub2/page.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["a.md"], "[S](./sub2/) [T](/sub2/#x) [U](./sub2) [V](./sub2/page.md)");
+        assert_eq!(result["deep/b.md"], "[S](../sub2/)");
+        assert_eq!(summary.links_changed, 5);
+    }
+
+    #[test]
+    fn a_link_from_inside_a_moved_folder_to_that_folder_stays_put() {
+        let files = &[("sub/page.md", "[up](./) [self](../sub/)"), ("sub/index.md", "# Sub")];
+        let m = moves(&[("sub/index.md", "sub2/index.md"), ("sub/page.md", "sub2/page.md")]);
+        let (result, _) = run(files, &m);
+        // `./` is still the folder; `../sub/` follows it, recomputed to the
+        // shortest relative form like every rewritten relative link.
+        assert_eq!(result["sub2/page.md"], "[up](./) [self](./)");
+    }
+
+    #[test]
+    fn renaming_only_a_folders_index_leaves_folder_links_alone() {
+        // The folder itself did not move (sub/other.md stays): keep `./sub/`.
+        let files = &[
+            ("a.md", "[S](./sub/)"),
+            ("sub/index.md", "# Sub"),
+            ("sub/other.md", "# Other"),
+        ];
+        let m = moves(&[("sub/index.md", "sub/overview.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["a.md"], "[S](./sub/)");
+        assert_eq!(summary.links_changed, 0);
+    }
+
+    #[test]
+    fn a_moved_concepts_folder_and_root_links_keep_pointing_there() {
+        // Recomputed relative links keep their trailing `/`; the Bundle root
+        // (`./` from the top level) is recomputed too, `/` never changes.
+        let files = &[
+            ("a.md", "[S](./sub/) [r](./) [R](/)"),
+            ("sub/index.md", "# Sub"),
+            ("index.md", "# Home"),
+        ];
+        let m = moves(&[("a.md", "d/a.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["d/a.md"], "[S](../sub/) [r](../) [R](/)");
+        assert_eq!(summary.links_changed, 2);
     }
 
     // --- build_move_map (pure form over a path set) --------------------------

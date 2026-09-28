@@ -1,24 +1,27 @@
 //! Outbound markdown-link extraction for the Bundle index.
 //!
 //! Finds every internal markdown link target in a Concept body and resolves it
-//! to a bundle-relative path via `sunstone_shared::paths::resolve_internal`
+//! to a bundle-relative path via `sunstone_shared::paths::resolve_location`
 //! (external `scheme:`, pure-anchor, and empty links are ignored) — the same
 //! resolver the frontend runs through wasm, so its broken-link decoration can
-//! trust the Rust index.
+//! trust the Rust index. A folder target (`""` for the Bundle root) is kept as
+//! the folder; `Index::rebuild_reverse`, which has the Concept set, maps it
+//! onto the folder's `index.md`.
 
 use std::collections::BTreeSet;
 
 use crate::index::frontmatter::strip_frontmatter;
-use sunstone_shared::paths::{find_byte, resolve_internal};
+use sunstone_shared::paths::{find_byte, resolve_location};
 
 /// Extract all internal markdown link targets from a Concept body, resolved to
-/// bundle-relative paths. External (`scheme:`), pure-anchor, and empty links are
+/// bundle-relative paths (a folder link resolves to the folder, `""` for the
+/// Bundle root). External (`scheme:`), pure-anchor, and empty links are
 /// skipped. De-duplicated, insertion order preserved-ish (sorted for stability).
 pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
     let body = strip_frontmatter(content);
     let mut out: BTreeSet<String> = BTreeSet::new();
     for href in markdown_link_hrefs(body) {
-        if let Some(target) = resolve_internal(current_path, &href) {
+        if let Some(target) = resolve_location(current_path, &href) {
             out.insert(target);
         }
     }
