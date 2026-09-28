@@ -240,10 +240,7 @@ where
 {
     let state = state.clone();
     let joined = tokio::task::spawn_blocking(move || -> Result<WriteResult, String> {
-        let _guard = state
-            .write_lock
-            .lock()
-            .map_err(|_| "write lock poisoned".to_string())?;
+        let _guard = state.lock_writes();
         op(&state.app)
     })
     .await;
@@ -466,5 +463,33 @@ mod tests {
         assert_eq!(std::fs::read_to_string(root.join(".git/config")).unwrap(), "[core]");
         assert!(root.join("note.md").exists());
         assert!(!root.join(".hidden").exists());
+    }
+
+    /// A panic inside one write (caught by `spawn_blocking` as a `JoinError`)
+    /// poisons the write lock; that says nothing about whether the Bundle is
+    /// writable, so the NEXT write must still go through instead of 500ing
+    /// until a restart.
+    #[tokio::test]
+    async fn a_poisoned_write_lock_does_not_block_later_writes() {
+        let root = temp_bundle();
+        let state = server_state(Config::plain(root.clone()));
+        let poisoner = state.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.write_lock.lock().unwrap();
+            panic!("a write op panicked while holding the lock");
+        })
+        .join();
+        assert!(state.write_lock.is_poisoned());
+
+        let user = AuthedUser {
+            name: "Ada Lovelace".to_string(),
+            email: "ada@example.com".to_string(),
+        };
+        let body = WriteConceptBody { path: "note.md".into(), content: "after".into() };
+        let status = write_concept_handler(State(state), user, HeaderMap::new(), Json(body))
+            .await
+            .unwrap_or_else(|e| panic!("write failed: {}", e.0));
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert_eq!(std::fs::read_to_string(root.join("note.md")).unwrap(), "after");
     }
 }

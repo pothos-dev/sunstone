@@ -88,6 +88,17 @@ pub(crate) struct ServerState {
     pub(crate) sync: SyncState,
 }
 
+impl ServerState {
+    /// Take [`ServerState::write_lock`], recovering from poisoning. A panic in
+    /// some other holder (a write op, a sync tick) says nothing about whether
+    /// the Bundle or its git repository is usable; treating it as fatal would
+    /// turn the server read-only — or stop syncing — for the rest of the
+    /// process's life. The one way every holder takes the lock.
+    pub(crate) fn lock_writes(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.write_lock.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // §4.1 — one pure parse of the environment, via `parse_env` and NOT `parse`:

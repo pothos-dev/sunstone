@@ -133,15 +133,10 @@ async fn run_tick(state: &Arc<ServerState>, repo_root: &Path) {
     let owned = state.clone();
     let root = repo_root.to_path_buf();
     let joined = tokio::task::spawn_blocking(move || -> Result<Vec<SyncNotice>, String> {
-        // Recover from poisoning, exactly as `SyncState::lock` does: a panic in
-        // some other holder of this mutex says nothing about whether the git
-        // repository is usable, and treating it as fatal would silently stop
-        // syncing for the rest of the process's life — one deduped log line while
-        // `pendingCommits` climbs.
-        let _guard = owned
-            .write_lock
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        // Recovers from poisoning (see `lock_writes`): otherwise one panic would
+        // silently stop syncing for the rest of the process's life — one deduped
+        // log line while `pendingCommits` climbs.
+        let _guard = owned.lock_writes();
         tick(&owned.cfg, &root, &owned.sync)
     })
     .await;
