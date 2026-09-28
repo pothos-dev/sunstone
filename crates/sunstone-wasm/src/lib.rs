@@ -23,6 +23,7 @@ use sunstone_shared::frontmatter::{
 };
 use sunstone_shared::outline::{self, OutlineHeading};
 use sunstone_shared::rewrite::{build_move_map, plan_rewrites, ConceptContent, MovePlan};
+use sunstone_shared::scan;
 use sunstone_shared::url;
 use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
@@ -237,6 +238,22 @@ pub fn concept_to_url(path: String) -> String {
 // own set, source == target) does not expose. These handle-less exports run the
 // SAME `sunstone_shared` kernels parameterized by an explicit path-set, so the
 // fake consumes the single source instead of a forked TS re-impl.
+
+/// Every non-Embed markdown-link target `[text](target)` in a Concept `body`,
+/// in document order — the fence-aware shared scan native Backlinks extraction
+/// runs (`scan::markdown_link_hrefs`): a link in a fenced code block is none.
+#[wasm_bindgen(js_name = markdownLinkHrefs)]
+pub fn markdown_link_hrefs(body: String) -> Vec<String> {
+    scan::markdown_link_hrefs(&body)
+}
+
+/// Every non-Embed wikilink's RAW inner text in a Concept `body` (outside
+/// fenced / inline code), in document order — `wikilink::wikilink_raws`, the
+/// scan native Backlinks extraction runs. Resolve each via `resolveWikilinkIn`.
+#[wasm_bindgen(js_name = wikilinkRaws)]
+pub fn wikilink_raws(body: String) -> Vec<String> {
+    wikilink::wikilink_raws(&body)
+}
 
 /// Resolve a markdown link `href` from `current_path` against an explicit
 /// concept path-set (the fake's corpus). The bundle root + membership are

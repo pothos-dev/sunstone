@@ -183,6 +183,23 @@ export function conceptToUrl(path: string): string {
 // `ensureWasm`).
 
 /**
+ * Every non-Embed markdown-link target in a Concept `body`, in document order,
+ * skipping fenced code (single source `scan::markdown_link_hrefs`, the scan
+ * native Backlinks extraction runs). Degrades to `[]`.
+ */
+export function markdownLinkHrefs(body: string): string[] {
+  return mod ? mod.markdownLinkHrefs(body) : [];
+}
+
+/**
+ * Every non-Embed wikilink's raw inner text in a Concept `body`, skipping fenced
+ * and inline code (single source `wikilink::wikilink_raws`). Degrades to `[]`.
+ */
+export function wikilinkRaws(body: string): string[] {
+  return mod ? mod.wikilinkRaws(body) : [];
+}
+
+/**
  * Resolve a markdown link `href` from `currentPath` against an explicit concept
  * path-set (the fake's corpus). Degrades to `none`.
  */

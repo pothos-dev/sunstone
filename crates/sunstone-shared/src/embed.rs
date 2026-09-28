@@ -33,8 +33,8 @@
 //! `scan::scan_replace`: it needs byte offsets and it must see the very spans
 //! the shared scanner is required to ignore. The mask runs on the same
 //! `scan::walk_code` state machine, so the code-skipping rules (fenced blocks,
-//! inline code spans) exist once, and the mask is length-preserving so every offset indexes the ORIGINAL body — the same
-//! invariant `maskCode` holds in the TS twin.
+//! inline code spans) exist once, and the mask is length-preserving so every
+//! offset indexes the ORIGINAL body.
 
 use serde::{Deserialize, Serialize};
 

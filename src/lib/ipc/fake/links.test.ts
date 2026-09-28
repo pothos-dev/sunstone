@@ -68,6 +68,22 @@ describe('outboundLinks — wikilinks', () => {
   });
 });
 
+describe('outboundLinks — markdown links in code', () => {
+  test('a markdown link inside a fenced code block is not an outbound link', () => {
+    // Native extraction runs the shared fence-aware scan
+    // (`scan::markdown_link_hrefs`): a fenced link is no Backlinks edge.
+    const body = ['```', '[x](/concepts/bundle.md)', '```', '', '[y](/concepts/codemirror.md)'].join('\n');
+    const out = outboundLinks('index.md', concept(body));
+    expect(out).not.toContain('concepts/bundle.md');
+    expect(out).toContain('concepts/codemirror.md');
+  });
+
+  test('a markdown link inside an inline code span IS an outbound link (code-agnostic)', () => {
+    const out = outboundLinks('index.md', concept('`[x](/concepts/bundle.md)`'));
+    expect(out).toContain('concepts/bundle.md');
+  });
+});
+
 describe('outboundLinks — folder links', () => {
   test("a link to a folder is a Backlinks edge of the folder's index.md", () => {
     const snapshot = { ...FILES };
