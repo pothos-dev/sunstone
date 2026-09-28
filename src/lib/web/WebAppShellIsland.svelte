@@ -48,6 +48,7 @@
     type GatedStructuralOp,
   } from './concurrency';
   import { matchesHotkey } from '$lib/matchesHotkey';
+  import { basename, stripMd } from '$lib/path';
   import { conceptHref, urlSyncAction } from './urlSync';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
   import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
@@ -82,11 +83,6 @@
   // The lazily-loaded desktop App shell, resolved in `onMount` (client only) so
   // nothing here is import-time heavy.
   let AppComponent = $state<Component | null>(null);
-
-  function basename(p: string): string {
-    const last = p.split('/').pop() ?? p;
-    return last.replace(/\.md$/, '');
-  }
 
   // --- (7) URL ⇄ Concept sync (web-only; rule + rationale in `urlSync.ts`) ----
   // The address bar is a projection of the single Tile's Concept. `page.state`
@@ -158,7 +154,7 @@
   // Concept name for the active modal (only one shows at a time). Leave/structural
   // name their outgoing buffer; conflict/deleted name the active Concept.
   const conceptName = $derived(
-    basename(leave?.doc.path ?? structural?.doc.path ?? editor.path ?? ''),
+    stripMd(basename(leave?.doc.path ?? structural?.doc.path ?? editor.path ?? '')),
   );
 
   // Debounce a burst of external changes into a single (re-)raise of the blocking

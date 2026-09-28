@@ -12,7 +12,7 @@
    * outline-entry, outline-empty), dropping the `outlineNav`/`focus` keyboard
    * Region infra.
    */
-  import type { OutlineHeading } from './render';
+  import type { OutlineHeading } from '$lib/types';
 
   interface Props {
     /** Headings from the render payload (level, text, slug). */

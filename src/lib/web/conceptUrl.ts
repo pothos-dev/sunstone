@@ -9,7 +9,7 @@
 // derivation, which reads the `RenderPayload` — no Rust twin (ADR 0006 §3) —
 // and `urlToConceptInline`, the SSR-only mirror of `urlToConcept` (see below).
 
-import type { RenderPayload } from './render';
+import type { RenderPayload } from '$lib/types';
 import { stripMd } from '$lib/path';
 
 /**

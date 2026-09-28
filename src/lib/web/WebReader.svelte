@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { TreeNode, TagCount } from '$lib/types';
-  import type { RenderPayload } from './render';
+  import type { RenderPayload, TagCount, TreeNode } from '$lib/types';
   import type { WebUser } from './loadConcept';
   import { onMount } from 'svelte';
   import { goto, invalidateAll } from '$app/navigation';

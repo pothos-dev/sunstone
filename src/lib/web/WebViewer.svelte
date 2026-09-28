@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { TreeNode } from '$lib/types';
-  import type { RenderPayload } from './render';
+  import type { RenderPayload, TreeNode } from '$lib/types';
   import type { WebUser } from './loadConcept';
   import { onMount } from 'svelte';
   import { theme } from '$lib/state/theme.svelte';

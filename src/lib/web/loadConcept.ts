@@ -1,6 +1,5 @@
 import { error } from '@sveltejs/kit';
-import type { TreeNode } from '$lib/types';
-import type { RenderPayload } from './render';
+import type { RenderPayload, TreeNode } from '$lib/types';
 import { ensureWasm } from '$lib/wasm';
 import { urlToConceptInline } from './conceptUrl';
 

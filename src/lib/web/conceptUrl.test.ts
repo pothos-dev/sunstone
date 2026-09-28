@@ -7,7 +7,7 @@
 // below pin both its goldens and parity with the shipped wasm handle.
 import { describe, expect, test } from 'bun:test';
 import * as wasm from '$lib/wasm/pkg';
-import type { RenderPayload } from './render';
+import type { RenderPayload } from '$lib/types';
 import { conceptTitle, urlToConceptInline } from './conceptUrl';
 
 describe('urlToConceptInline', () => {
