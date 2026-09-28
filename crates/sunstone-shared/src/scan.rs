@@ -120,8 +120,8 @@ fn scan_core(
         // --- Wikilink `[[ ... ]]` --------------------------------------------
         if !in_inline_code && b == b'[' && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
             if let Some(close) = find_double_close(bytes, i + 2) {
-                // Embeds (`![[ ... ]]`) are OUT OF SCOPE for v1 — copied
-                // verbatim, like `![](...)` images.
+                // Embeds (`![[ ... ]]`) are copied verbatim, deliberately —
+                // see the scanner-asymmetry note in `embed.rs`.
                 let is_embed = i > 0 && bytes[i - 1] == b'!';
                 if !is_embed {
                     // Flush the verbatim run, splice the replacement for the

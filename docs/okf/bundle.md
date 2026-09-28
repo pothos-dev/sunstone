@@ -55,7 +55,7 @@ The link/backlink logic is implemented **once**, in [sunstone-shared](/architect
 
 ### The Bundle is git-committed content
 
-Sunstone leans into the spec's "git repository (recommended)" distribution: the Bundle _is_ the tracked working tree, and the **web write path commits edits straight back into it**. `crates/sunstone-native/src/git.rs` stages bundle-relative paths and either creates a fresh `edit … via web` commit (`commit`) or folds an anchor-relink write into the preceding one (`amend`, `--no-edit`, preserving author + author-date — only while that commit is unpushed). Author == committer, set via `GIT_*` env so the commit is independent of any repo-level `user.name` — except under the **git-synced** deployment shape, where the sync loop is the *committer* of a replayed commit while the OIDC user stays its author ([ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md)). See [Testing](/architecture/testing.md) for the write flow and its test strategy, and `docker/README.md` at the repo root for the three web deployment shapes.
+Sunstone leans into the spec's "git repository (recommended)" distribution: the Bundle _is_ the tracked working tree, and the **web write path commits edits straight back into it**. `crates/sunstone-native/src/git/` (`commit.rs`) stages bundle-relative paths and either creates a fresh `edit … via web` commit (`commit`) or folds an anchor-relink write into the preceding one (`amend`, `--no-edit`, preserving author + author-date — only while that commit is unpushed). Author == committer, set via `GIT_*` env so the commit is independent of any repo-level `user.name` — except under the **git-synced** deployment shape, where the sync loop is the *committer* of a replayed commit while the OIDC user stays its author ([ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md)). See [Testing](/architecture/testing.md) for the write flow and its test strategy, and `docker/README.md` at the repo root for the three web deployment shapes.
 
 ### What is _not_ part of the Bundle
 
@@ -68,7 +68,7 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 | Bundle root | Known a priori; absolute links resolve from it | **Inferred** via `find_bundle_root`, with a safe existence-gated fallback ([Linking](/okf/linking.md#nested-bundle-root)) |
 | Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
-| Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git.rs`) |
+| Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git/`) |
 | `okf_version` | May be declared in root `index.md` | Recognised on the root `index.md` only; not required |
 
 ## Related

@@ -8,10 +8,10 @@
 //! exactly**, since the `[[ ]]` links originate from Obsidian vaults.
 //!
 //! This module is the single source of truth for both behaviours that consume
-//! wikilinks in the Rust backend: outbound-link extraction / backlinks
-//! (`index.rs`) and rename-rewrite (`rewrite.rs`). The editor and the TS fake
-//! backend (`src/lib/ipc/fake/links.ts`) call `resolve_wikilink` through the
-//! wasm build, so the editor's broken-link decoration can trust this index.
+//! wikilinks: outbound-link extraction / Backlinks (`sunstone-native`'s
+//! `index.rs`) and rename-rewrite (`rewrite::moves`). The editor and the TS
+//! fake backend (`src/lib/ipc/fake/links.ts`) call `resolve_wikilink` through
+//! the wasm build, so the editor's broken-link decoration can trust this index.
 
 use crate::paths::find_byte;
 
@@ -56,13 +56,6 @@ pub struct WikiTarget {
     pub anchor: Option<String>,
 }
 
-/// Split a raw `[[ ... ]]` inner text into `{ name, alias, anchor }`.
-///
-/// The alias begins at the first `|`; the anchor at the first `#`. Whichever
-/// comes first bounds the name (Obsidian accepts both `[[name#anchor|alias]]`
-/// and `[[name|alias#anchor]]`; we split on the earliest delimiter so the name
-/// is always the leading filename part). A trailing `.md` (case-insensitive) on
-/// the name is dropped to match the algorithm in the shared spec.
 /// Byte offset where a wikilink's NAME portion ends: the earliest of the first
 /// `|` (alias) or first `#` (anchor), or the whole string when neither is
 /// present. Shared by [`parse_target`] and the rename rewriter so the two agree
@@ -78,6 +71,13 @@ pub fn pipe_suffix(raw: &str) -> Option<&str> {
     Some(&after[..after.find('#').unwrap_or(after.len())])
 }
 
+/// Split a raw `[[ ... ]]` inner text into `{ name, alias, anchor }`.
+///
+/// The alias begins at the first `|`; the anchor at the first `#`. Whichever
+/// comes first bounds the name (Obsidian accepts both `[[name#anchor|alias]]`
+/// and `[[name|alias#anchor]]`; we split on the earliest delimiter so the name
+/// is always the leading filename part). A trailing `.md` (case-insensitive) on
+/// the name is dropped to match the algorithm in the shared spec.
 pub fn parse_target(raw: &str) -> WikiTarget {
     // The name ends at the earliest `|` / `#`. Drop a trailing `.md`
     // (case-insensitive) — `[[name.md]]` is accepted.
@@ -191,9 +191,11 @@ pub(crate) fn best_name_match(
 /// the markdown-link scanner does. Returns the RAW inner texts (alias/anchor
 /// included) for the caller to resolve via [`resolve_wikilink`].
 ///
-/// NOTE: embeds (`![[ ... ]]`, a leading `!`) are OUT OF SCOPE for v1 and are
-/// skipped here, the same way `![](...)` images are skipped by the markdown
-/// scanner. Embed support is DEFERRED to a later phase.
+/// NOTE: Embeds (`![[ ... ]]`, a leading `!`) are skipped here, the same way
+/// `![](...)` Embeds are skipped by markdown-link extraction — deliberately:
+/// an Embed is no Backlinks edge and a move never invalidates a name-resolved
+/// Embed. They are found by `embed::scan_embeds`; see the scanner-asymmetry
+/// note in `embed.rs`.
 pub fn wikilink_raws(body: &str) -> Vec<String> {
     // One scanner, two products: extraction is replacement that collects and
     // splices the span back unchanged, so the two can never disagree on which

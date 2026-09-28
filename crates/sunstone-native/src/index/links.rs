@@ -33,7 +33,9 @@ use sunstone_shared::scan::markdown_link_hrefs;
 /// so it must never create a Backlinks edge — which is what this drop
 /// guarantees. That an Embed's *path* is still rewritten on a move is a
 /// different question with a different answer; see the twin comment in
-/// `rewrite_links_in` and the module note in `sunstone-shared/src/embed.rs`.
+/// `rewrite_links_in` (site 2), the TS fake's extraction twin
+/// `src/lib/ipc/fake/links.ts::outboundLinks` (site 3), and the module note in
+/// `sunstone-shared/src/embed.rs`.
 pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
     let body = strip_frontmatter(content);
     let mut out: BTreeSet<String> = BTreeSet::new();

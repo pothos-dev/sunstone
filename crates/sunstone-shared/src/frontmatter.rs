@@ -11,9 +11,10 @@
 //!   - [`parse_frontmatter`] — the `type` / `tags` / top-level keys the Bundle
 //!     index cares about (former native `parse_frontmatter` + the fake's
 //!     `parseFrontmatter` / `parseFrontmatterKeys`);
-//!   - [`frontmatter_fields`] — every top-level entry as `key` + value(s) for the
-//!     read-only Properties view (former native `render.rs::frontmatter_fields` +
-//!     the fake's `parseFrontmatterFields`).
+//!   - [`frontmatter_fields`] — every top-level entry as `key` + value(s) for
+//!     the render payload (the web viewer's read-only frontmatter list and its
+//!     `title` lookup; former native `render.rs::frontmatter_fields` + the fake's
+//!     `parseFrontmatterFields`). Desktop editing is YAML text (ADR-0008).
 //!
 //! Broken/invalid frontmatter is TOLERATED, never blocked (docs/GLOSSARY.md):
 //! parsing returns empty aggregates rather than erroring. The editor's verbatim
@@ -55,7 +56,7 @@ pub struct SplitConcept {
     pub close: String,
 }
 
-/// One frontmatter entry for the read-only Properties view. A scalar has a
+/// One frontmatter entry for the render payload's read-only frontmatter list. A scalar has a
 /// single value; a sequence (e.g. `tags`) has several (ADR 0006 §6 —
 /// tsify-canonical; native `render.rs` re-points its `RenderPayload` here).
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]

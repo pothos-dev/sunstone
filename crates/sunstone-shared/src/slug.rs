@@ -1,12 +1,11 @@
 //! GitHub-style heading slugs.
 //!
-//! MUST mirror `slugify` in `src/lib/slug.ts` EXACTLY, the same way
-//! `wikilink::resolve_wikilink` mirrors `resolveWikilink`: the anchor-rewrite
-//! (`rewrite/anchors.rs`) compares a link's anchor slug to a rename's old slug,
-//! and the frontend computes those old/new slugs with the TS `slugify`, so the
-//! two implementations have to agree.
+//! The ONE slug implementation: there is no TS twin. The frontend gets its
+//! heading slugs from the wasm `scanHeadings` export (`outline::scan_headings`,
+//! which runs [`slugify_headings`]), so the old/new slugs it hands the
+//! anchor-rewrite (`rewrite/anchors.rs`) are computed by this very code.
 //!
-//! Algorithm (see the TS module for the rationale): trim, lowercase, then keep
+//! Algorithm: trim, lowercase, then keep
 //! letters/digits/`-`/`_`, turn each whitespace char into `-`, and drop
 //! everything else. De-duplication ([`slugify_headings`]) is document-order
 //! state: an outline scan computes the whole ordered list at once (family 13

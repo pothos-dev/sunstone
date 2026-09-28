@@ -1,7 +1,8 @@
 //! One **pure** parse of the whole environment surface, done once at boot
 //! (Spec 2 §2).
 //!
-//! `main()` passes `|k| std::env::var(k).ok()`; the resulting [`Config`] is
+//! `main()` calls [`parse_env`] with the real variable names and
+//! `|k| std::env::var(k).ok()`; the resulting [`Config`] is
 //! stored in `ServerState`, so neither the sync loop nor the write path ever
 //! re-reads the environment. Three reasons, by weight (ticket 12):
 //!

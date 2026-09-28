@@ -87,8 +87,8 @@ pub enum EmbedTargetKind {
 /// NOTE the unit: unlike `critic.rs` / `citations.rs`, whose spans count UTF-16
 /// code units because they feed CodeMirror decorations directly (ADR 0006 §4),
 /// these are Rust byte offsets — the unit the SSR renderer and the rewrite
-/// engine slice with. A CodeMirror consumer must convert (or scan the buffer in
-/// TS), or a decoration lands wrong after any non-ASCII character.
+/// engine slice with. A CodeMirror consumer must use [`scan_embeds_utf16`]
+/// instead, or a decoration lands wrong after any non-ASCII character.
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
