@@ -128,15 +128,16 @@ impl Resolution {
 /// bundle-relative forward-slash path §10.2's payload carries. `None` when the
 /// path is not inside the subdir.
 ///
-/// Matches on whole components (`docs` never matches `docsy/a.md`) and tolerates
-/// the surrounding slashes `config/mod.rs`'s `join_bundle_subdir` also trims.
+/// Matches on whole components (`docs` never matches `docsy/a.md`). The subdir
+/// goes through the same [`crate::config::normalise_bundle_subdir`] the parse
+/// stores it in, so `./docs/` matches git's `docs/a.md`.
 pub fn bundle_relative(repo_relative: &str, bundle_subdir: &str) -> Option<String> {
-    let subdir = bundle_subdir.trim().trim_matches('/');
+    let subdir = crate::config::normalise_bundle_subdir(bundle_subdir);
     if subdir.is_empty() {
         return Some(repo_relative.to_string());
     }
     let rest = repo_relative
-        .strip_prefix(subdir)?
+        .strip_prefix(subdir.as_str())?
         .strip_prefix('/')
         .filter(|rest| !rest.is_empty())?;
     Some(rest.to_string())
@@ -505,11 +506,15 @@ mod tests {
             bundle_relative("docs/wiki/notes/f.md", "docs/wiki").as_deref(),
             Some("notes/f.md")
         );
-        // Surrounding slashes are tolerated, as in `config::join_bundle_subdir`.
-        assert_eq!(
-            bundle_relative("docs/wiki/f.md", "/docs/wiki/").as_deref(),
-            Some("f.md")
-        );
+        // Any spelling `config::normalise_bundle_subdir` accepts matches.
+        for subdir in ["/docs/wiki/", "./docs/wiki", "docs//wiki", "docs/./wiki/"] {
+            assert_eq!(
+                bundle_relative("docs/wiki/f.md", subdir).as_deref(),
+                Some("f.md"),
+                "{subdir}"
+            );
+        }
+        assert_eq!(bundle_relative("f.md", ".").as_deref(), Some("f.md"));
         // Outside the bundle: resolved, but nothing to tell a client.
         assert_eq!(bundle_relative("README.md", "docs"), None);
         assert_eq!(bundle_relative("docsy/f.md", "docs"), None);

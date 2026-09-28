@@ -295,6 +295,9 @@ fn parse_git_family(
             // by-construction containment assumes this error already fired.
             subdir = String::new();
         }
+        // Stored in git's own form, so `conflict::bundle_relative` can strip it
+        // off the repo-relative paths git reports.
+        subdir = normalise_bundle_subdir(&subdir);
 
         let sync_interval = match non_empty(get, INTERVAL_ENV) {
             None => Duration::from_secs(DEFAULT_SYNC_INTERVAL_SECS),
@@ -431,12 +434,26 @@ pub fn non_empty(get: &impl Fn(&str) -> Option<String>, key: &str) -> Option<Str
     get(key).map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
+/// A `SUNSTONE_GIT_BUNDLE_SUBDIR` in the form git reports repo-relative paths
+/// in: empty and `.` components dropped (`./docs/`, `docs//x` → `docs`,
+/// `docs/x`; `.` → `""`, the repo root). Pure and idempotent. `\` is left
+/// alone — on Linux it is a filename byte, not a separator — and `..` is
+/// [`ConfigError::BundleSubdirEscapes`]'s job, not this function's.
+pub fn normalise_bundle_subdir(subdir: &str) -> String {
+    subdir
+        .trim()
+        .split('/')
+        .filter(|part| !part.is_empty() && *part != ".")
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 /// Join [`REPO_DIR`] with a validated `SUNSTONE_GIT_BUNDLE_SUBDIR` (§4.5).
 /// Pure and unit-testable; `""` yields the repo root unchanged. Containment is
 /// guaranteed by [`ConfigError::BundleSubdirEscapes`] having already fired for
 /// an absolute or `..`-bearing value.
 pub fn join_bundle_subdir(repo_root: &std::path::Path, subdir: &str) -> PathBuf {
-    let subdir = subdir.trim().trim_matches('/');
+    let subdir = normalise_bundle_subdir(subdir);
     if subdir.is_empty() {
         repo_root.to_path_buf()
     } else {
@@ -780,6 +797,51 @@ mod tests {
     fn a_dot_prefixed_subdir_component_is_not_a_dotdot_escape() {
         let cfg = ok(&[(BRANCH_ENV, "main"), (SUBDIR_ENV, "..docs")]);
         assert_eq!(cfg.bundle_root, PathBuf::from("/srv/repo/..docs"));
+    }
+
+    #[test]
+    fn a_subdir_is_stored_in_git_normalised_form() {
+        // `conflict::bundle_relative` strips this off git's normalised
+        // repo-relative paths, so a `./`, doubled or trailing slash must not
+        // survive into `GitConfig::bundle_subdir`.
+        for (value, subdir) in [
+            ("./docs", "docs"),
+            ("docs/", "docs"),
+            ("docs//x", "docs/x"),
+            ("./docs/./wiki/", "docs/wiki"),
+        ] {
+            let cfg = ok(&[(BRANCH_ENV, "main"), (SUBDIR_ENV, value)]);
+            assert_eq!(cfg.git().unwrap().bundle_subdir, subdir, "{value}");
+            assert_eq!(
+                cfg.bundle_root,
+                Path::new(REPO_DIR).join(subdir),
+                "{value}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_dot_subdir_is_the_repo_root() {
+        for value in [".", "./", "./."] {
+            let cfg = ok(&[(BRANCH_ENV, "main"), (SUBDIR_ENV, value)]);
+            assert_eq!(cfg.git().unwrap().bundle_subdir, "", "{value}");
+            assert_eq!(cfg.bundle_root, PathBuf::from(REPO_DIR), "{value}");
+        }
+    }
+
+    #[test]
+    fn a_parsed_subdir_strips_off_a_git_conflict_path() {
+        // End to end: the sync loop feeds git's `docs/a.md` through the parsed
+        // subdir; before normalisation `./docs` dropped every sync notice.
+        for value in ["./docs", "docs/", "docs//"] {
+            let cfg = ok(&[(BRANCH_ENV, "main"), (SUBDIR_ENV, value)]);
+            let subdir = &cfg.git().unwrap().bundle_subdir;
+            assert_eq!(
+                crate::conflict::bundle_relative("docs/a.md", subdir).as_deref(),
+                Some("a.md"),
+                "{value}"
+            );
+        }
     }
 
     #[test]
