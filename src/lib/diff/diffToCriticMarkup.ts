@@ -40,9 +40,15 @@
 // mark on its own line, so a stray newline survives if a reviewer later rejects a
 // whole-line addition (a rendering/acceptance concern for a later ticket, not a
 // re-parse concern).
+//
+// Known edge cases (documented, not handled): the input is NOT escaped, so text
+// that already contains CriticMarkup ends up nested inside our marks
+// (`{--a {++b++} c--}`), and a changed span containing a literal closing
+// delimiter (`--}` inside a deletion, `++}` inside an addition) closes the mark
+// early. Either way the output no longer re-parses to the intended marks.
 
 /** A coalesced run of one diff operation over an array of items (lines or tokens). */
-interface DiffRun {
+export interface DiffRun {
   op: 'equal' | 'delete' | 'insert';
   items: string[];
 }
@@ -52,18 +58,22 @@ interface DiffRun {
  * runs in output order. Within a replaced region all deletes precede all inserts
  * (the tie-break prefers `delete`), so substitutions surface as `{--old--}` then
  * `{++new++}`.
+ *
+ * The O(n·m) table is built only over the MIDDLE left after trimming the common
+ * prefix and a "safe" common suffix, so a small edit in a large document costs
+ * roughly the size of the edit. The trim is exact — the runs are identical to
+ * the untrimmed table's (pinned by a reference test):
+ *   - the prefix: the backtrack takes a match greedily, so it walks the common
+ *     prefix as `equal` whatever the table says, and the table over the rest
+ *     (LCS of suffixes) does not depend on the prefix;
+ *   - the suffix only while none of its VALUES occurs in either middle: then no
+ *     match can pair a middle item with a suffix item, every table entry over
+ *     the middle is the middle's entry + the suffix length, and every
+ *     delete/insert tie-break comes out the same. (A suffix value that also
+ *     occurs in the middle — e.g. a blank line — could be matched there instead,
+ *     so such a suffix is shortened until it is safe, falling back to less trim.)
  */
-function lcsDiff(a: string[], b: string[]): DiffRun[] {
-  const n = a.length;
-  const m = b.length;
-  // dp[i][j] = LCS length of a[i..] and b[j..].
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-
+export function lcsDiff(a: string[], b: string[]): DiffRun[] {
   const runs: DiffRun[] = [];
   const push = (op: DiffRun['op'], item: string) => {
     const last = runs[runs.length - 1];
@@ -71,24 +81,90 @@ function lcsDiff(a: string[], b: string[]): DiffRun[] {
     else runs.push({ op, items: [item] });
   };
 
-  let i = 0;
-  let j = 0;
-  while (i < n && j < m) {
-    if (a[i] === b[j]) {
-      push('equal', a[i]);
-      i++;
-      j++;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      push('delete', a[i]);
-      i++;
-    } else {
-      push('insert', b[j]);
-      j++;
+  let prefix = 0;
+  while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) {
+    push('equal', a[prefix]);
+    prefix++;
+  }
+  const suffix = safeSuffixLength(a, b, prefix);
+
+  const n = a.length - suffix;
+  const m = b.length - suffix;
+  const rows = n - prefix;
+  const cols = m - prefix;
+  // dp[r][c] = LCS length of a[prefix + r .. n) and b[prefix + c .. m).
+  const dp: number[][] = Array.from({ length: rows + 1 }, () => new Array<number>(cols + 1).fill(0));
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      dp[r][c] =
+        a[prefix + r] === b[prefix + c] ? dp[r + 1][c + 1] + 1 : Math.max(dp[r + 1][c], dp[r][c + 1]);
     }
   }
-  while (i < n) push('delete', a[i++]);
-  while (j < m) push('insert', b[j++]);
+
+  let r = 0;
+  let c = 0;
+  while (r < rows && c < cols) {
+    if (a[prefix + r] === b[prefix + c]) {
+      push('equal', a[prefix + r]);
+      r++;
+      c++;
+    } else if (dp[r + 1][c] >= dp[r][c + 1]) {
+      push('delete', a[prefix + r]);
+      r++;
+    } else {
+      push('insert', b[prefix + c]);
+      c++;
+    }
+  }
+  while (r < rows) push('delete', a[prefix + r++]);
+  while (c < cols) push('insert', b[prefix + c++]);
+  for (let k = n; k < a.length; k++) push('equal', a[k]);
   return runs;
+}
+
+/**
+ * The longest common suffix of `a` and `b` (after the first `prefix` items)
+ * whose values occur in neither remaining middle — the suffix `lcsDiff` may trim
+ * without changing its runs (see there). Linear: grows the suffix one item at a
+ * time, tracking how often each value still occurs in the middles and how many
+ * suffix values are still "in conflict" (occur there).
+ */
+function safeSuffixLength(a: string[], b: string[], prefix: number): number {
+  let common = 0;
+  while (
+    common < a.length - prefix &&
+    common < b.length - prefix &&
+    a[a.length - 1 - common] === b[b.length - 1 - common]
+  ) {
+    common++;
+  }
+  if (common === 0) return 0;
+
+  // Occurrences of each value in the middles for suffix length 0.
+  const inMiddle = new Map<string, number>();
+  const count = (v: string, d: number) => inMiddle.set(v, (inMiddle.get(v) ?? 0) + d);
+  for (let i = prefix; i < a.length; i++) count(a[i], 1);
+  for (let j = prefix; j < b.length; j++) count(b[j], 1);
+
+  const inSuffix = new Set<string>();
+  let conflicts = 0; // suffix values that still occur in a middle
+  let best = 0;
+  for (let s = 1; s <= common; s++) {
+    // Move a[n-s] and b[m-s] (equal values) from the middles into the suffix.
+    const v = a[a.length - s];
+    const wasInSuffix = inSuffix.has(v);
+    const before = inMiddle.get(v) ?? 0;
+    const after = before - 2;
+    inMiddle.set(v, after);
+    if (!wasInSuffix) {
+      inSuffix.add(v);
+      if (after > 0) conflicts++;
+    } else if (before > 0 && after === 0) {
+      conflicts--;
+    }
+    if (conflicts === 0) best = s;
+  }
+  return best;
 }
 
 /** A line split into its leading block marker (kept outside marks) and content. */
