@@ -373,6 +373,13 @@
     void editor.open(path);
   }
 
+  // Open a Concept and land keyboard focus in its editor (keyboard activation
+  // from the Explorer, Tags, or quick-nav).
+  function openConceptAndFocus(path: string) {
+    openConcept(path);
+    focusEditorWhenReady();
+  }
+
   // Close a tile, then land keyboard focus in the neighbour that inherited the
   // active slot (workspace.closeTile picks it). Closing the last tile clears the
   // Tile to the empty state (no view to focus — focusEditorWhenReady no-ops).
@@ -463,11 +470,6 @@
   function onCrudCancel() {
     refocusExplorerAt(explorerNav.focusedPath);
     pendingDeleteNeighbor = null;
-  }
-
-  function openConceptFromTree(path: string) {
-    openConcept(path);
-    focusEditorWhenReady();
   }
 
   // Move keyboard focus to tile `id`: make it the active Tile (so Outline /
@@ -613,7 +615,7 @@
         crud={treeCrud}
         selected={editor.path}
         onopen={openConcept}
-        onopenFocus={openConceptFromTree}
+        onopenFocus={openConceptAndFocus}
         ondeleterequest={(neighbor) => (pendingDeleteNeighbor = neighbor)}
       />
     </SidebarSection>
@@ -635,10 +637,7 @@
           version={indexStore.version}
           selected={editor.path}
           onopen={openConcept}
-          onopenFocus={(p) => {
-            openConcept(p);
-            focusEditorWhenReady();
-          }}
+          onopenFocus={openConceptAndFocus}
         />
       </SidebarSection>
     {/if}
@@ -790,10 +789,7 @@
     recent={session.recentFiles}
     conceptsForTag={(tag) => backend.conceptsByTag(tag)}
     bind:tagActive={quickNavTagActive}
-    onopen={(p) => {
-      openConcept(p);
-      focusEditorWhenReady();
-    }}
+    onopen={openConceptAndFocus}
     onclose={() => (quickNavOpen = false)}
   />
 
