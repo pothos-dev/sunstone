@@ -10,7 +10,8 @@
 //! the `<rev>:./<path>` object syntax resolve relative to the Bundle even when
 //! the Bundle is a subdirectory of a larger repository.
 //!
-//! Pure parsing (`parse_log`) is unit-tested; the process plumbing stays thin.
+//! Pure parsing (`history`'s `parse_log`) is unit-tested; the process plumbing
+//! stays thin.
 //!
 //! Submodules, split by concern (mechanical split, no behavior change):
 //!   - [`history`]: read-only history (`file_history`, `file_at_rev`, …).
@@ -30,7 +31,7 @@ mod sync;
 
 pub use commit::{amend, commit, head_commit, CommitIdentity, HeadCommit};
 pub use env::{configure, GitEnv};
-pub use history::{file_at_rev, file_history, parse_log, FileAtRev, FileCommit, FileHistory};
+pub use history::{file_at_rev, file_history, FileAtRev, FileCommit, FileHistory};
 pub use sync::{
     add_paths, anything_staged, checkout_ours, clone, current_branch, diff_name_status, fetch,
     init, is_push_rejected, is_pushed, is_repo, push, rebase_abort, rebase_continue,

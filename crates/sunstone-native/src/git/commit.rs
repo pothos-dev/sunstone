@@ -2,14 +2,14 @@
 //!
 //! The desktop never commits (it writes files and lets the user's own git
 //! workflow handle history); the web `sunstone-server` is the sole committer.
-//! These primitives reuse `run_git`'s cwd=Bundle-root plumbing from
+//! These primitives go through the shared cwd=Bundle-root plumbing in
 //! [`super::internal`]. Orchestration (the global write lock, sequencing,
 //! self-write bookkeeping) lives in the server.
 
 use std::path::Path;
 
 use super::history::FIELD_SEP;
-use super::internal::{run_git, run_git_env, unit};
+use super::internal::{add, git_out_env, run_git, stdout_value, unit};
 
 /// The author + committer identity for a commit (the authenticated OIDC user;
 /// per tickets 04/05, author == committer). Set via `GIT_*` env so the commit
@@ -41,9 +41,7 @@ pub fn commit(
 ) -> Result<(), String> {
     stage(root, paths)?;
     let env = identity_env(identity);
-    let output = run_git_env(root, &["commit", "-m", msg], &env)
-        .ok_or_else(|| "git is not available".to_string())?;
-    unit("commit", output)
+    unit("commit", git_out_env(root, &["commit", "-m", msg], &env)?)
 }
 
 /// Stage `paths` and amend HEAD (`git commit --amend --no-edit`), preserving the
@@ -60,9 +58,7 @@ pub fn commit(
 pub fn amend(root: &Path, paths: &[&str], identity: &CommitIdentity) -> Result<(), String> {
     stage(root, paths)?;
     let env = identity_env(identity);
-    let output = run_git_env(root, &["commit", "--amend", "--no-edit"], &env)
-        .ok_or_else(|| "git is not available".to_string())?;
-    unit("amend", output)
+    unit("amend", git_out_env(root, &["commit", "--amend", "--no-edit"], &env)?)
 }
 
 /// Read HEAD's subject + author name/email, or `None` when there is no HEAD
@@ -71,11 +67,7 @@ pub fn amend(root: &Path, paths: &[&str], identity: &CommitIdentity) -> Result<(
 /// match the write it is about to fold in.
 pub fn head_commit(root: &Path) -> Option<HeadCommit> {
     let format = format!("--format=%s{FIELD_SEP}%an{FIELD_SEP}%ae");
-    let output = run_git(root, &["log", "-1", &format])?;
-    if !output.status.success() {
-        return None;
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = stdout_value(&run_git(root, &["log", "-1", &format])?)?;
     let line = stdout.lines().next()?;
     let mut parts = line.split(FIELD_SEP);
     let subject = parts.next()?.to_string();
@@ -93,10 +85,7 @@ pub fn head_commit(root: &Path) -> Option<HeadCommit> {
 /// (git ≥ 2), which the structural ops (rename/move) and the anchor-relink amend
 /// rely on to pick up every rewritten file they do not enumerate.
 fn stage(root: &Path, paths: &[&str]) -> Result<(), String> {
-    let mut args: Vec<&str> = vec!["add", "-A", "--"];
-    args.extend(paths.iter().copied());
-    let output = run_git(root, &args).ok_or_else(|| "git is not available".to_string())?;
-    unit("add", output)
+    add(root, &["-A"], paths)
 }
 
 /// The four `GIT_AUTHOR_*` / `GIT_COMMITTER_*` env pairs for `identity`, so the

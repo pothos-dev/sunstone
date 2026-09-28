@@ -26,14 +26,31 @@ use serde::Serialize;
 
 use super::internal::{is_not_a_repo, run_git};
 
+/// [`FIELD_SEP`] as a literal, so `concat!` can build [`LOG_FORMAT`] from it.
+macro_rules! field_sep {
+    () => {
+        "\x1f"
+    };
+}
+
 /// Field separator inside a `git log` record (ASCII Unit Separator). Chosen
 /// because it never appears in a commit subject/author/date, so splitting is
 /// unambiguous without shell-quoting worries.
-pub(super) const FIELD_SEP: char = '\x1f';
+pub(super) const FIELD_SEP: &str = field_sep!();
 
 /// `--format` for one commit per line: short-hash, subject, author name,
 /// author date (ISO-strict), relative author date — `FIELD_SEP`-delimited.
-const LOG_FORMAT: &str = "--format=%h\x1f%s\x1f%an\x1f%ad\x1f%ar";
+const LOG_FORMAT: &str = concat!(
+    "--format=%h",
+    field_sep!(),
+    "%s",
+    field_sep!(),
+    "%an",
+    field_sep!(),
+    "%ad",
+    field_sep!(),
+    "%ar"
+);
 
 /// One commit touching a file. Matches the TS `FileCommit`
 /// (`serde rename_all = "camelCase"`).
@@ -169,7 +186,7 @@ pub fn file_at_rev(root: &Path, rel_path: &str, rev: &str) -> FileAtRev {
 /// record's fields are [`FIELD_SEP`]-separated. Blank lines and records with
 /// too few fields (or an empty hash) are skipped, so partial/garbage output
 /// never panics.
-pub fn parse_log(stdout: &str) -> Vec<FileCommit> {
+fn parse_log(stdout: &str) -> Vec<FileCommit> {
     stdout.lines().filter_map(parse_log_line).collect()
 }
 
@@ -203,7 +220,13 @@ mod tests {
     use crate::git::test_support::{git_available, init_repo, temp_dir};
 
     fn line(hash: &str, subject: &str, author: &str, date: &str, rel: &str) -> String {
-        format!("{hash}\x1f{subject}\x1f{author}\x1f{date}\x1f{rel}")
+        [hash, subject, author, date, rel].join(FIELD_SEP)
+    }
+
+    #[test]
+    fn log_format_is_field_sep_delimited() {
+        assert_eq!(LOG_FORMAT, "--format=%h\x1f%s\x1f%an\x1f%ad\x1f%ar");
+        assert_eq!(FIELD_SEP, "\x1f");
     }
 
     #[test]

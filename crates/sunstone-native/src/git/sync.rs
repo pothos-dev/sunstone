@@ -11,7 +11,9 @@
 use std::path::Path;
 use std::process::Output;
 
-use super::internal::{git_err, git_message, git_out, git_out_env, run_git, run_git_env, unit};
+use super::internal::{
+    add, git_err, git_message, git_out, git_out_env, run_git, run_git_env, stdout_value, unit,
+};
 
 /// How a `rebase` / `rebase --continue` / `--skip` invocation ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -251,17 +253,16 @@ pub fn rm_path(root: &Path, path: &str) -> Result<(), String> {
     unit("rm", git_out(root, &["rm", "-f", "-q", "--", path])?)
 }
 
-/// Stage `paths` explicitly (`git add -- <paths>`), the public face of the
-/// existing private `stage` helper. The resolver needs it to add a fork it wrote
+/// Stage `paths` explicitly (`git add -- <paths>`, via the shared
+/// [`super::internal::add`]); an empty list stages nothing (unlike `commit`'s
+/// `-A` stage, where it means the whole tree). The resolver needs it to add a fork it wrote
 /// with plain filesystem calls — **never** through the server's rename/move
 /// path, which would rewrite the whole bundle's links onto the fork (§9.2).
 pub fn add_paths(root: &Path, paths: &[&str]) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
-    let mut args: Vec<&str> = vec!["add", "--"];
-    args.extend(paths.iter().copied());
-    unit("add", git_out(root, &args)?)
+    add(root, &[], paths)
 }
 
 /// Whether anything is staged relative to HEAD (`git diff --cached --quiet`).
@@ -355,16 +356,6 @@ pub fn current_branch(root: &Path) -> Option<String> {
 /// loudly and touches nothing.**
 pub fn remote_url(root: &Path) -> Option<String> {
     stdout_value(&run_git(root, &["remote", "get-url", "origin"])?)
-}
-
-/// The trimmed stdout of a successful git query, or `None` when it failed or
-/// printed nothing.
-fn stdout_value(output: &Output) -> Option<String> {
-    if !output.status.success() {
-        return None;
-    }
-    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    (!value.is_empty()).then_some(value)
 }
 
 /// `git diff --name-status <range>` as `(status letter, path)` pairs — e.g.

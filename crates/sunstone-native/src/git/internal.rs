@@ -65,14 +65,36 @@ pub(super) fn git_message(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
-/// Collapse an [`Output`] into `Ok(())` / `Err(git's stderr)`, the convention the
-/// pre-existing `commit` / `stage` path already uses.
+/// Collapse an [`Output`] into `Ok(())` / `Err(git's stderr)`, the convention
+/// every write primitive uses.
 pub(super) fn unit(op: &str, output: Output) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {
         Err(git_err(op, &output))
     }
+}
+
+/// `git add <flags> -- <paths>`, the one staging primitive behind `commit`'s
+/// `stage` (`-A`, so deletions stage too) and `sync::add_paths` (no flags).
+/// Empty `paths` passes no pathspec, so git's own "whole tree" default applies;
+/// callers that must not stage everything guard against that themselves.
+pub(super) fn add(root: &Path, flags: &[&str], paths: &[&str]) -> Result<(), String> {
+    let mut args: Vec<&str> = vec!["add"];
+    args.extend_from_slice(flags);
+    args.push("--");
+    args.extend_from_slice(paths);
+    unit("add", git_out(root, &args)?)
+}
+
+/// The trimmed stdout of a successful git query, or `None` when it failed or
+/// printed nothing.
+pub(super) fn stdout_value(output: &Output) -> Option<String> {
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!value.is_empty()).then_some(value)
 }
 
 /// Whether git's stderr indicates the directory is outside any repository.
