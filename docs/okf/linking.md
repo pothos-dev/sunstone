@@ -29,9 +29,9 @@ All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-test
 | Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
 | Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
 | Citation refs | `citations.rs` (`find_citation_refs`, `find_citation_defs`, `citation_def_pos`) | `findCitationRefs`, `citationDefPos` |
-| Rename/move rewrite | — (host-side path math: `sunstone-native/src/rewrite/{engine,paths}.rs`) | `planRewrites` in `src/lib/ipc/fake/links.ts` |
+| Rename/move rewrite | `rewrite/moves.rs` (`plan_rewrites`, `build_move_map`), `rewrite/relpath.rs` (path math) | `planMoveRewrites` (the fake backend's `planRewrites`) |
 
-Rename/move rewrite is the **one remaining twin**: the fake backend's `planRewrites` ports the Rust `rewrite` path math into TS so the exact same behaviour runs under Chromium/Playwright. Everything else has a single implementation. The CodeMirror extensions (`src/lib/editor/*.ts`) are the thin **view/authoring** layer over those wasm exports, never a second copy of the logic.
+Rename/move rewrite has a single implementation too: native `rename_and_rewrite` drives it around the filesystem, and the fake backend's `planRewrites` hands its in-memory corpus to `planMoveRewrites`, so Chromium/Playwright exercise the same engine. The one remaining TS stand-in is the fake's Backlinks extraction (`outboundLinks` in `src/lib/ipc/fake/links.ts`, over the wasm resolvers). The CodeMirror extensions (`src/lib/editor/*.ts`) are the thin **view/authoring** layer over those wasm exports, never a second copy of the logic.
 
 ```mermaid
 flowchart TD
@@ -152,7 +152,7 @@ The inverse of an outbound link. `Index::backlinks(path)` in `sunstone-native/sr
 
 ## Rename & move rewrite
 
-When a Concept or folder is renamed/moved, Sunstone **automatically rewrites the affected links** so nothing breaks — inbound links from other Concepts and the moved Concept's own outbound links. `planRewrites(from, to)` in `src/lib/ipc/fake/links.ts` mirrors the Rust `rewrite` engine:
+When a Concept or folder is renamed/moved, Sunstone **automatically rewrites the affected links** so nothing breaks — inbound links from other Concepts and the moved Concept's own outbound links. The engine is `plan_rewrites` in `sunstone-shared/src/rewrite/moves.rs` — run natively by `rename_and_rewrite` and, for the fake backend, through the `planMoveRewrites` wasm export:
 
 - **Inbound absolute** links (`/old.md`) → the new absolute path.
 - **Inbound & outbound relative** links → recomputed from the source's own directory, preserving relative style (`./`, `../`).

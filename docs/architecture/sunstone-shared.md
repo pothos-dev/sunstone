@@ -32,14 +32,14 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `links` | Markdown link resolution — `resolve_link` (→ `ResolvedLink`, `internal` carries `exists`), `find_bundle_root`, `RewriteBody`, `WikilinkTarget`. |
 | `wikilink` | `[[name]]` parsing (`parse_target`, `parse_target_parts`) and **name-based** resolution (`resolve_wikilink`) — case-insensitive, basename or path-suffix, shortest-path tie-break. |
 | `slug` | GitHub-style heading `slugify` for anchor links (no de-duplication). |
-| `rewrite` | Same-file and corpus-wide anchor rewriting (`rewrite_anchors_in`, `AnchorRename`, `AnchorRewrite`) plus pure rename/move path math. |
+| `rewrite` | Same-file and corpus-wide anchor rewriting (`anchors`: `rewrite_anchors_in`, `AnchorRename`, `AnchorRewrite`) and the move/rename engine (`moves`: `plan_rewrites`, `build_move_map`, `RewriteSummary`, `MovePlan`) with its path math (`relpath`: `relative_path`, `shortest_resolving_suffix`, `basename_of`). |
 | `paths` | Pure path helpers — `to_rel_string`, `resolve_internal`, `is_external`, `find_byte` — shared so native tree/index/search and the browser cannot drift. |
 | `frontmatter` | Verbatim `split` / `split_concept` (byte-preserving), `frontmatter_line_count`, and the index-parse kernels (`parse_frontmatter`, `frontmatter_fields`). |
 | `outline` | ATX-only heading scan (`scan_headings` → `OutlineHeading`) and `find_heading_line`. |
 | `critic` | CriticMarkup parse/group — `parse_critic_marks`, `pair_annotations`, `annotation_at` (offset-span structs). |
 | `citations` | Inline citation scanning — `find_citation_refs`, `find_citation_defs`, `citation_def_pos`. |
 | `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
-| `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, and sunstone-native's rename rewriter all walk — extraction and rewriting can never disagree on what counts as a link. |
+| `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, and the move/rename engine (`rewrite::moves`) all walk — extraction and rewriting can never disagree on what counts as a link. |
 
 ## Two consumers, one source
 
@@ -76,7 +76,8 @@ It exposes two shapes over the shared kernels:
   (`splitFrontmatter`, `parseFrontmatter*`), render-derived scanners
   (`scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `conceptToUrl`),
   and the fake backend's corpus-walking variants (`resolveLinkIn`,
-  `rewriteAnchors`, …) that take an explicit path-set rather than the handle's.
+  `rewriteAnchors`, `planMoveRewrites`, …) that take an explicit path-set or
+  corpus rather than the handle's.
 
 The frontend loads and calls all of this through `src/lib/wasm/` — see the
 [web frontend](/architecture/web-frontend.md#the-wasm-seam).

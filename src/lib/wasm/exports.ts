@@ -34,6 +34,8 @@ import type {
   WikilinkParts,
   AnchorRewrite,
   AnchorRename,
+  ConceptContent,
+  MovePlan,
   Embed,
   EmbedKind,
   EmbedTargetKind,
@@ -53,6 +55,8 @@ export type {
   WikilinkTarget,
   WikilinkParts,
   AnchorRewrite,
+  ConceptContent,
+  MovePlan,
   Embed,
   EmbedKind,
   EmbedTargetKind,
@@ -169,12 +173,12 @@ export function conceptToUrl(path: string): string {
 
 // --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
 //
-// The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE
-// rename command) resolves + rewrites over arbitrary OLD/NEW corpus path-sets
-// with `target != source` — a shape the live `BundleIndex` handle does not
-// expose. These handle-less kernels run the SAME shared Rust source over an
-// explicit path-set, so the fake consumes the single source (no forked TS
-// re-impl). Each degrades to a SAFE no-op until the module is registered; the
+// The fake backend's Layer-2 commands (Backlinks extraction, anchor rewrite,
+// rename/move planning — twins of the NATIVE commands) resolve + rewrite over
+// an explicit corpus with `target != source` — a shape the live `BundleIndex`
+// handle does not expose. These handle-less kernels run the SAME shared Rust
+// source over an explicit path-set / corpus, so the fake consumes the single
+// source (no forked TS re-impl). Each degrades to a SAFE no-op until the module is registered; the
 // fake backend only runs after wasm has initialized (bun preload / browser
 // `ensureWasm`).
 
@@ -227,6 +231,19 @@ export function rewriteAnchors(
   return mod
     ? mod.rewriteAnchors(source, content, target, renames, paths)
     : { content, count: 0 };
+}
+
+/**
+ * Plan the link rewrites for moving `from` → `to` over an in-memory corpus
+ * (`concepts`: every Concept path + its pre-move content) with the shared
+ * move/rename engine — the one native `rename_and_rewrite` runs. Returns the
+ * rewritten Concepts keyed by their POST-move path plus the summary. Degrades to
+ * an empty plan (nothing rewritten; the rename itself still happens).
+ */
+export function planMoveRewrites(from: string, to: string, concepts: ConceptContent[]): MovePlan {
+  return mod
+    ? mod.planMoveRewrites(from, to, concepts)
+    : { summary: { linksChanged: 0, filesChanged: 0 }, writes: [] };
 }
 
 // --- Free Embed exports (af-1) ---------------------------------------------

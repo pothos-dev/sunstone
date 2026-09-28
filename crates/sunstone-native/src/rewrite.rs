@@ -25,14 +25,18 @@
 //! resolved target IS a moved Concept. External (`scheme:`) and pure-anchor
 //! links are never touched.
 //!
-//! Links resolve through `sunstone_shared::paths::resolve_internal`, as in
-//! `index.rs` (bundle-relative, '/'-separated; `.`/`..` collapse with
-//! leading-`..` escapes dropped). The fake backend
-//! (`src/lib/ipc/fake/links.ts`) drives the same shared code through wasm so
-//! the behaviour is testable in Chromium.
+//! The rewrite ENGINE is pure and lives in `sunstone-shared`
+//! (`sunstone_shared::rewrite::moves` + its path math in `rewrite::relpath`),
+//! so the fake backend runs the very same code through the wasm
+//! `planMoveRewrites` export under Chromium/Playwright (ADR 0006). Links
+//! resolve through `sunstone_shared::paths::resolve_internal` (bundle-relative,
+//! '/'-separated; `.`/`..` collapse with leading-`..` escapes dropped).
 //!
-//! Pure module logic — the host wrappers (`src-tauri/src/commands.rs`, the
-//! server's routes) stay thin.
+//! This module is the native IO orchestration around it: it snapshots the index
+//! (move map over the Concept set, inbound linkers from the reverse map), reads
+//! source content, performs the filesystem move, writes the rewrites and
+//! refreshes the index. The host wrappers (`src-tauri/src/commands.rs`, the
+//! server's routes) stay thin over it.
 
 use std::collections::HashMap;
 
@@ -40,15 +44,12 @@ use crate::app_state::AppState;
 use crate::bundle;
 use crate::index::Index;
 
-mod engine;
-mod paths;
-
-// The anchor-rewrite algorithm + its `AnchorRename` DTO moved to
-// `sunstone-shared` (family 10). Re-export the DTO so native's command surface
-// (`sunstone_native::rewrite::AnchorRename`, consumed by src-tauri /
-// sunstone-server) keeps its shape — one definition, surfaced (ADR 0006 §6).
-pub(crate) use engine::plan_rewrites;
-pub use engine::RewriteSummary;
+// The anchor-rewrite and move/rename engines + their DTOs live in
+// `sunstone-shared` (ADR 0006). Re-export them so native's command surface
+// (`sunstone_native::rewrite::{AnchorRename, RewriteSummary, plan_rewrites}`,
+// consumed by src-tauri / sunstone-server) keeps its shape — one definition,
+// surfaced (ADR 0006 §6).
+pub use sunstone_shared::rewrite::moves::{plan_rewrites, RewriteSummary};
 pub use sunstone_shared::AnchorRename;
 
 // ---------------------------------------------------------------------------
@@ -63,21 +64,9 @@ pub use sunstone_shared::AnchorRename;
 /// with the `from/` prefix means `from` is a folder. A `from` that is itself a
 /// `.md` path is treated as a single Concept move.
 pub(crate) fn build_move_map(index: &Index, from: &str, to: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
-    // A `.md` source is a single Concept move (whether or not it is already in
-    // the index — a freshly-created Concept still has its own outbound links to
-    // recompute). A non-`.md` source is a folder: remap every Concept under it.
-    if from.ends_with(".md") {
-        map.insert(from.to_string(), to.to_string());
-        return map;
-    }
-    let from_prefix = format!("{from}/");
-    for path in index.concept_paths() {
-        if let Some(rest) = path.strip_prefix(&from_prefix) {
-            map.insert(path.clone(), format!("{to}/{rest}"));
-        }
-    }
-    map
+    // The pure rule (a `.md` source is one move, a folder remaps every Concept
+    // under `from/`) is shared with the wasm-driven fake backend.
+    sunstone_shared::rewrite::build_move_map(&index.concept_paths(), from, to)
 }
 
 /// The set of source Concepts that link INTO any moved Concept (the inbound

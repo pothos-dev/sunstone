@@ -11,7 +11,7 @@
 //! CodeMirror decorations resolve against the unsaved buffer with the SAME
 //! algorithm that runs natively (the single-source goal of ADR 0006).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -22,6 +22,7 @@ use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
 use sunstone_shared::outline::{self, OutlineHeading};
+use sunstone_shared::rewrite::{build_move_map, plan_rewrites, ConceptContent, MovePlan};
 use sunstone_shared::url;
 use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
@@ -230,10 +231,10 @@ pub fn concept_to_url(path: String) -> String {
 
 // --- Free link-family exports for the fake backend (ADR 0006 family 12) -----
 //
-// The fake backend's Layer-2 rename/move orchestration (twin of the NATIVE
-// rename command) walks ARBITRARY corpus path-sets (old/new) with
-// `target != source` — a shape the live `BundleIndex` handle (bound to its own
-// set, source == target) does not expose. These handle-less exports run the
+// The fake backend's Layer-2 commands (Backlinks extraction, anchor rewrite,
+// rename/move planning — twins of the NATIVE commands) walk an explicit corpus
+// with `target != source` — a shape the live `BundleIndex` handle (bound to its
+// own set, source == target) does not expose. These handle-less exports run the
 // SAME `sunstone_shared` kernels parameterized by an explicit path-set, so the
 // fake consumes the single source instead of a forked TS re-impl.
 
@@ -283,6 +284,37 @@ pub fn rewrite_anchors(
 ) -> AnchorRewrite {
     let (content, count) = rewrite_anchors_in(&source, &body, &target, &renames, &paths);
     AnchorRewrite { content, count }
+}
+
+/// Plan the link rewrites for moving `from` to `to` over an in-memory corpus of
+/// Concepts (`concepts`: every `.md` path + its content, pre-move) — the fake
+/// backend's `renamePath` / `movePath`, driving the SAME
+/// `sunstone_shared::rewrite::moves` engine native `rename_and_rewrite` does.
+///
+/// The move map comes from `build_move_map` over the corpus paths. Every corpus
+/// Concept is a candidate source (the engine only emits writes for real
+/// changes); a moved `.md` absent from the corpus reads as empty, so it plans
+/// nothing and the caller's own rename reports the missing file. Returns the
+/// writes keyed by their POST-move path plus the summary.
+#[wasm_bindgen(js_name = planMoveRewrites)]
+pub fn plan_move_rewrites(from: String, to: String, concepts: Vec<ConceptContent>) -> MovePlan {
+    let all_paths: Vec<String> = concepts.iter().map(|c| c.path.clone()).collect();
+    let lookup: HashMap<&str, &str> = concepts
+        .iter()
+        .map(|c| (c.path.as_str(), c.content.as_str()))
+        .collect();
+    let moves = build_move_map(&all_paths, &from, &to);
+    let read = |p: &str| Ok(lookup.get(p).map(|c| c.to_string()).unwrap_or_default());
+    // `read` never fails, so neither does the plan.
+    let (writes, summary) =
+        plan_rewrites(&moves, &all_paths, &all_paths, read).unwrap_or_default();
+    MovePlan {
+        summary,
+        writes: writes
+            .into_iter()
+            .map(|(path, content)| ConceptContent { path, content })
+            .collect(),
+    }
 }
 
 // --- Free Embed exports (af-1) ---------------------------------------------

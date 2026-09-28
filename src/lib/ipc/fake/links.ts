@@ -1,16 +1,15 @@
 // Outbound-link extraction + automatic link rewriting on rename/move for the
 // fake backend (slice: link-auto-rewrite).
 //
-// Ports the Rust `rewrite.rs` path math so the same two-directional, path-aware
-// behaviour is exercised under Chromium/Playwright:
-//   * inbound links (absolute -> new absolute; relative -> recomputed from the
-//     source's own dir, preserving relative style);
-//   * the moved Concept's own relative outbound links (recomputed from its NEW
-//     dir; absolute links untouched);
-//   * folder moves apply both to every contained Concept (co-moved siblings'
-//     internal relative links stay valid, never double-broken).
-// Only links whose resolved target IS a moved Concept change; anchors, queries,
-// titles, link text and external links are preserved.
+// The move/rename rewrite ENGINE is not ported here: `planRewrites` hands the
+// in-memory corpus to the wasm `planMoveRewrites` export, which runs the same
+// `sunstone_shared::rewrite::moves` engine as native `rename_and_rewrite`
+// (ADR 0006 — no divergent TS twin). Inbound links (absolute -> new absolute;
+// relative -> recomputed, style preserved), a moved Concept's own relative
+// outbound links, folder moves, wikilinks and path-model Embeds all behave
+// exactly as on the desktop / web backends.
+//
+// `outboundLinks` (Backlinks extraction) is still TS over the wasm resolvers.
 //
 // Reads the shared `FILES` state (imported live from `store`, never copied).
 
@@ -19,17 +18,9 @@ import {
   splitFrontmatter,
   resolveLinkIn,
   resolveWikilinkIn,
-  splitWikilinkTarget,
+  planMoveRewrites,
 } from '$lib/wasm/exports';
-import { dirname, remapPath } from '$lib/path';
 import { FILES, conceptPaths } from './store';
-
-/**
- * True for links handled by the OS/browser, not in-app nav (`scheme:` URLs). A
- * trivial scheme regex inlined at this one call site (ADR 0006 family 10) —
- * not worth a wasm hop, and not a resurrected `links.ts` module.
- */
-const isExternalLink = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href);
 
 /**
  * Blank out fenced code blocks (``` / ~~~) and inline code spans in a markdown
@@ -144,7 +135,7 @@ function wikilinkTargets(sourcePath: string, body: string): string[] {
  *
  * ## The `!`-asymmetry is DELIBERATE (af-1) — site 3 of 4
  *
- * EXTRACTION drops `!`; REWRITE (`rewriteLinksIn` below) does not. Do not
+ * EXTRACTION drops `!`; REWRITE (the shared engine behind `planRewrites`) does not. Do not
  * "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
  * so it must never create a Backlinks edge — which is what this drop
  * guarantees. That an Embed's *path* is still rewritten on a move is a
@@ -172,271 +163,21 @@ export function outboundLinks(path: string, content: string): string[] {
   return [...targets];
 }
 
-/** Relative path FROM `fromDir` TO bundle-relative `target`, with `./`/`../`. */
-function relativePath(fromDir: string, target: string): string {
-  const from = fromDir === '' ? [] : fromDir.split('/');
-  const to = target === '' ? [] : target.split('/');
-  let common = 0;
-  while (common < from.length && common < to.length && from[common] === to[common]) common++;
-  const parts: string[] = [];
-  for (let i = common; i < from.length; i++) parts.push('..');
-  for (let i = common; i < to.length; i++) parts.push(to[i]);
-  if (parts.length === 0) return '.';
-  return parts[0] === '..' ? parts.join('/') : `./${parts.join('/')}`;
-}
-
-/** Split a URL into its path part and the `#anchor`/`?query` suffix (verbatim). */
-function splitSuffix(url: string): { path: string; suffix: string } {
-  const hash = url.indexOf('#');
-  const query = url.indexOf('?');
-  let cut = -1;
-  if (hash !== -1 && query !== -1) cut = Math.min(hash, query);
-  else if (hash !== -1) cut = hash;
-  else if (query !== -1) cut = query;
-  return cut === -1 ? { path: url, suffix: '' } : { path: url.slice(0, cut), suffix: url.slice(cut) };
-}
-
-/**
- * Build the old->new move map for relocating `from` to `to`. A `.md` source is a
- * single Concept; otherwise it is a folder (remap every Concept under it).
- */
-function buildMoveMap(from: string, to: string): Map<string, string> {
-  const map = new Map<string, string>();
-  if (from.endsWith('.md')) {
-    map.set(from, to);
-    return map;
-  }
-  // A folder: every Concept beneath it (never `from` itself — it has no `.md`).
-  for (const path of conceptPaths()) {
-    const dest = remapPath(path, from, to);
-    if (dest !== null) map.set(path, dest);
-  }
-  return map;
-}
-
-/**
- * Rewrite the links in one Concept's `content`. `oldSource` is the source's
- * pre-move path (resolution base as authored); `newSource` is its post-move path
- * (used to re-resolve + recompute relative links). Returns the new content and
- * the count of links changed.
- *
- * ## The `!`-asymmetry is DELIBERATE (af-1) — site 4 of 4
- *
- * REWRITE does NOT drop `!`; EXTRACTION (`outboundLinks` above) does. Do not
- * "restore symmetry" here. The two questions are different:
- *
- *  - an Embed is not a Concept-to-Concept relationship -> no Backlinks edge
- *    (extraction drops it);
- *  - a PATH-resolved Embed is still a path, and moving the Concept that writes
- *    it invalidates that path exactly as it invalidates a link -> rewrite it.
- *
- * `rewriteWikilinksIn` still skips `![[ … ]]`, for the third reason: a
- * NAME-resolved Embed resolves bundle-wide by name and suffix, so a Concept move
- * can never invalidate it. Twin of
- * `crates/sunstone-native/src/rewrite/engine.rs::rewrite_links_in`.
- */
-function rewriteLinksIn(
-  oldSource: string,
-  newSource: string,
-  content: string,
-  moves: Map<string, string>,
-): { content: string; count: number } {
-  const moved = oldSource !== newSource;
-  // Match `[text](inner)` AND Embeds `![alt](src)` — the `!` is captured so it
-  // survives the replacement verbatim (see the asymmetry note above).
-  const re = /(!?)(\[[^\]]*\]\()([^)]*)(\))/g;
-  let count = 0;
-  let out = content.replace(re, (whole, bang: string, open: string, inner: string, close: string) => {
-    const rewritten = rewriteTarget(oldSource, newSource, moved, inner, moves);
-    if (rewritten === null) return whole;
-    count++;
-    return `${bang}${open}${rewritten}${close}`;
-  });
-  const wiki = rewriteWikilinksIn(oldSource, out, moves);
-  return { content: wiki.content, count: count + wiki.count };
-}
-
-/**
- * Old + new bundle path sets, used to resolve wikilinks before/after the move.
- * The "new" set is the current concept paths with the move map applied.
- */
-function pathSetsFor(moves: Map<string, string>): { oldPaths: string[]; newPaths: string[] } {
-  const oldPaths = conceptPaths();
-  const newPaths = oldPaths.map((p) => moves.get(p) ?? p);
-  return { oldPaths, newPaths };
-}
-
-/**
- * Shortest wikilink target that resolves to `newTarget` in the NEW bundle:
- * try the bare basename first, then progressively longer path suffixes, and
- * pick the first whose §1 resolution points back at `newTarget`. Falls back to
- * the full path if no shorter suffix resolves unambiguously.
- */
-function shortestResolvingSuffix(newPaths: string[], newSource: string, newTarget: string): string {
-  const noExt = newTarget.replace(/\.md$/i, '');
-  const segs = noExt.split('/');
-  for (let take = 1; take <= segs.length; take++) {
-    const candidate = segs.slice(segs.length - take).join('/');
-    const resolved = resolveWikilinkIn(newPaths, newSource, candidate);
-    if (resolved && resolved.path === newTarget) return candidate;
-  }
-  return noExt;
-}
-
-/**
- * Rewrite wikilinks (`[[ … ]]`, never Embeds `![[ … ]]` — they are move-proof)
- * that target a moved
- * Concept (§4). Resolution is from the source's OLD location against the OLD
- * bundle; only links whose resolved target moved are rewritten:
- *   - BARE `[[old]]`: rewrites only when the target's basename changed (a pure
- *     folder move leaves it untouched, since bare names resolve bundle-wide);
- *   - PARTIAL PATH `[[a/old]]`: rewrites to the shortest suffix that resolves to
- *     the new path in the new bundle.
- * `|alias` and `#anchor` are preserved verbatim. Code regions are skipped.
- */
-function rewriteWikilinksIn(
-  oldSource: string,
-  content: string,
-  moves: Map<string, string>,
-): { content: string; count: number } {
-  const { oldPaths, newPaths } = pathSetsFor(moves);
-  const newSource = moves.get(oldSource) ?? oldSource;
-  const masked = maskCode(content);
-
-  let count = 0;
-  let result = '';
-  let last = 0;
-  let m: RegExpExecArray | null;
-  WIKILINK_RE.lastIndex = 0;
-  while ((m = WIKILINK_RE.exec(masked)) !== null) {
-    // A NAME-resolved Embed resolves bundle-wide by name and suffix, so a
-    // Concept move can never invalidate it — skipped on the rewrite side too,
-    // unlike the path-model Embed in `rewriteLinksIn` (af-1).
-    if (m[1] === '!') continue;
-    const start = m.index;
-    const inner = m[2]; // same offsets in masked & original (length-preserving)
-    const innerStart = start + m[1].length + 2; // after `(!?)[[`
-    const origInner = content.slice(innerStart, innerStart + inner.length);
-
-    const { name, alias, anchor } = splitWikilinkTarget(origInner);
-    const resolved = resolveWikilinkIn(oldPaths, oldSource, origInner);
-    if (!resolved || !moves.has(resolved.path)) continue;
-    const newTarget = moves.get(resolved.path)!;
-
-    const nameTrimmed = name.trim();
-    const isPartial = nameTrimmed.includes('/');
-    let newName: string | null = null;
-    if (isPartial) {
-      newName = shortestResolvingSuffix(newPaths, newSource, newTarget);
-    } else {
-      // Bare name: only rewrite if the basename changed.
-      const oldBase = resolved.path.replace(/\.md$/i, '').split('/').pop()!;
-      const newBase = newTarget.replace(/\.md$/i, '').split('/').pop()!;
-      if (oldBase !== newBase) newName = newBase;
-    }
-    if (newName === null) continue; // no change needed
-
-    // Reassemble inner text, preserving alias/anchor verbatim.
-    const anchorPart = anchor !== null ? `#${anchor}` : '';
-    const aliasPart = alias !== null ? `|${alias}` : '';
-    const newInner = `${newName}${anchorPart}${aliasPart}`;
-    if (newInner === origInner) continue;
-
-    result += content.slice(last, innerStart) + newInner;
-    last = innerStart + inner.length;
-    count++;
-  }
-  result += content.slice(last);
-  return { content: result, count };
-}
-
-/**
- * Decide whether a link's inner parens text targets a moved Concept and, if so,
- * return the rewritten inner text (new target; anchor/query/title preserved).
- * `null` means leave unchanged.
- */
-function rewriteTarget(
-  oldSource: string,
-  newSource: string,
-  moved: boolean,
-  inner: string,
-  moves: Map<string, string>,
-): string | null {
-  const leadingWs = inner.length - inner.trimStart().length;
-  const leading = inner.slice(0, leadingWs);
-  const rest = inner.slice(leadingWs);
-
-  const wsIdx = rest.search(/\s/);
-  const urlRaw = wsIdx === -1 ? rest : rest.slice(0, wsIdx);
-  const title = wsIdx === -1 ? '' : rest.slice(wsIdx);
-  if (urlRaw === '') return null;
-
-  let angleOpen = '';
-  let angleClose = '';
-  let urlCore = urlRaw;
-  if (urlRaw.startsWith('<') && urlRaw.endsWith('>')) {
-    angleOpen = '<';
-    angleClose = '>';
-    urlCore = urlRaw.slice(1, -1);
-  }
-
-  if (isExternalLink(urlCore) || urlCore.startsWith('#')) return null;
-
-  const { path: pathPart, suffix } = splitSuffix(urlCore);
-  if (pathPart === '') return null;
-
-  const isAbsolute = pathPart.startsWith('/');
-
-  // Resolve as authored, from the source's ORIGINAL location (the OLD corpus).
-  const resolved = resolveLinkIn(oldSource, pathPart, conceptPaths());
-  if (resolved.kind !== 'internal') return null;
-
-  const targetMoved = moves.has(resolved.path);
-  const newTarget = moves.get(resolved.path) ?? resolved.path;
-
-  if (isAbsolute) {
-    if (!targetMoved) return null;
-  } else if (!targetMoved && !moved) {
-    return null;
-  }
-
-  const newPath = isAbsolute ? `/${newTarget}` : relativePath(dirname(newSource), newTarget);
-  if (newPath === pathPart) return null;
-
-  return `${leading}${angleOpen}${newPath}${suffix}${angleClose}${title}`;
-}
-
 /**
  * Auto-rewrite links for a move of `from`->`to`, planned against the in-memory
- * FILES. Reads content BEFORE the rename (snapshot), so callers MUST call this
- * BEFORE mutating FILES with the rename. Returns the rewrite summary and a map
- * of new-path -> rewritten content to apply AFTER the rename.
+ * FILES by the shared wasm engine. Reads content BEFORE the rename (snapshot),
+ * so callers MUST call this BEFORE mutating FILES with the rename. Returns the
+ * rewrite summary and a map of new-path -> rewritten content to apply AFTER the
+ * rename.
  */
 export function planRewrites(from: string, to: string): {
   summary: RewriteSummary;
   writes: Map<string, string>;
 } {
-  const moves = buildMoveMap(from, to);
-  const writes = new Map<string, string>();
-  let linksChanged = 0;
-  let filesChanged = 0;
-  if (moves.size === 0) return { summary: { linksChanged, filesChanged }, writes };
-
-  // Candidate sources: every Concept (cheap for the fixture) — inbound linkers
-  // plus the moved files themselves. plan only emits writes for real changes.
-  const sources = new Set<string>(conceptPaths());
-  for (const old of moves.keys()) sources.add(old);
-
-  for (const oldSource of [...sources].sort()) {
-    const content = FILES[oldSource];
-    if (content === undefined) continue;
-    const newSource = moves.get(oldSource) ?? oldSource;
-    const { content: rewritten, count } = rewriteLinksIn(oldSource, newSource, content, moves);
-    if (count > 0) {
-      linksChanged += count;
-      filesChanged++;
-      writes.set(newSource, rewritten);
-    }
-  }
-  return { summary: { linksChanged, filesChanged }, writes };
+  const concepts = conceptPaths().map((path) => ({ path, content: FILES[path] }));
+  const plan = planMoveRewrites(from, to, concepts);
+  return {
+    summary: plan.summary,
+    writes: new Map(plan.writes.map((w) => [w.path, w.content])),
+  };
 }

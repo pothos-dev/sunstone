@@ -1,17 +1,16 @@
-//! Pure path math for the move/rename engine: relative-path computation and
-//! wikilink basename / shortest-resolving-suffix. The URL `split_suffix` and
-//! `utf8_len` helpers moved to `sunstone-shared::rewrite::paths` (family 10);
-//! the engine imports them from there.
+//! Pure path math for the move/rename engine ([`super::moves`]): relative-path
+//! computation and wikilink basename / shortest-resolving-suffix. The URL
+//! `split_suffix` / `LinkInner` helpers live beside it in [`super::text`].
 //!
-//! All bundle-relative, '/'-separated; mirrors `index.rs` EXACTLY (`.`/`..`
-//! collapse, leading-`..` escapes dropped). No IO — each function is a pure
-//! transform, exhaustively unit-testable.
+//! All bundle-relative, '/'-separated; mirrors `paths::resolve_internal`
+//! EXACTLY (`.`/`..` collapse, leading-`..` escapes dropped). No IO — each
+//! function is a pure transform, exhaustively unit-testable.
 
-use sunstone_shared::wikilink::{self, basename, drop_md};
+use crate::wikilink::{self, basename, drop_md};
 
 /// Basename (after the last `/`) of a bundle path, with `.md` dropped — the
 /// literal filename to write into a rewritten wikilink (preserves new casing).
-pub(super) fn basename_of(path: &str) -> &str {
+pub fn basename_of(path: &str) -> &str {
     drop_md(basename(path))
 }
 
@@ -20,7 +19,7 @@ pub(super) fn basename_of(path: &str) -> &str {
 /// basename and adds leading segments until resolution is unambiguous, falling
 /// back to the full path. Keeps a rewritten partial-path wikilink pointing at
 /// the moved file.
-pub(super) fn shortest_resolving_suffix(paths: &[String], source: &str, target: &str) -> String {
+pub fn shortest_resolving_suffix(paths: &[String], source: &str, target: &str) -> String {
     let no_ext = drop_md(target);
     let segments: Vec<&str> = no_ext.split('/').collect();
     // Try suffixes from shortest (basename) to longest (full path).
@@ -38,7 +37,7 @@ pub(super) fn shortest_resolving_suffix(paths: &[String], source: &str, target: 
 /// `target`, preferring an explicit `./` for a same-directory target and `../`
 /// for ancestors (the Obsidian/markdown convention authors expect). Both inputs
 /// are bundle-relative, '/'-separated; `from_dir` is '' for the bundle root.
-pub(super) fn relative_path(from_dir: &str, target: &str) -> String {
+pub fn relative_path(from_dir: &str, target: &str) -> String {
     let from: Vec<&str> = if from_dir.is_empty() {
         Vec::new()
     } else {

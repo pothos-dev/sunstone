@@ -3,6 +3,11 @@
 // §1–§4 behaviour (see docs/adr/0004 + the wikilink spec) so backlinks and
 // auto-rewrite work identically under Chromium/Playwright.
 //
+// `planRewrites` runs the SHARED Rust move/rename engine through the real wasm
+// (`planMoveRewrites`, preloaded by bunfig.toml) — these tests pin the fake's
+// seam over it (corpus in, writes keyed by post-move path out); the algorithm's
+// goldens live in `crates/sunstone-shared/src/rewrite/moves.rs`.
+//
 // `outboundLinks` resolves wikilinks against the LIVE fixture (`conceptPaths()`),
 // so the bare names below (`codemirror`, `bundle`, …) match the seeded fixture.
 // The rewrite tests mutate `FILES` and restore it afterwards.
@@ -220,5 +225,69 @@ describe('planRewrites — Embeds (the af-1 `!`-asymmetry)', () => {
     const { summary, writes } = planRewrites('b.md', 'folder/b.md');
     expect(writes.get('a.md')).toContain('![img](/folder/b.md)');
     expect(summary.linksChanged).toBe(1);
+  });
+});
+
+describe('planRewrites — markdown links (through the shared wasm engine)', () => {
+  let snapshot: Record<string, string>;
+  const setFiles = (files: Record<string, string>) => {
+    snapshot = { ...FILES };
+    for (const k of Object.keys(FILES)) delete FILES[k];
+    Object.assign(FILES, files);
+  };
+  afterEach(() => {
+    if (snapshot) {
+      for (const k of Object.keys(FILES)) delete FILES[k];
+      Object.assign(FILES, snapshot);
+      snapshot = undefined as unknown as Record<string, string>;
+    }
+  });
+
+  test('an inbound absolute link follows its target; anchor/query/title survive', () => {
+    setFiles({ 'b.md': concept('# B'), 'a.md': concept('[B](/b.md#sec?x=1 "T") [k](/keep.md)') });
+    const { summary, writes } = planRewrites('b.md', 'folder/b.md');
+    expect(writes.get('a.md')).toContain('[B](/folder/b.md#sec?x=1 "T") [k](/keep.md)');
+    expect(summary).toEqual({ linksChanged: 1, filesChanged: 1 });
+  });
+
+  test('an inbound relative link is recomputed from the linker’s own folder', () => {
+    setFiles({ 'b.md': concept('# B'), 'sub/c.md': concept('[B](../b.md)') });
+    const { writes } = planRewrites('b.md', 'folder/b.md');
+    expect(writes.get('sub/c.md')).toContain('[B](../folder/b.md)');
+  });
+
+  test("a moved Concept's own relative links are recomputed; absolute ones are not", () => {
+    setFiles({ 'd.md': concept('# D'), 'b.md': concept('[D](./d.md) [E](/d.md)') });
+    const { summary, writes } = planRewrites('b.md', 'folder/b.md');
+    // Keyed by the POST-move path: the caller writes it after the rename.
+    expect(writes.get('folder/b.md')).toContain('[D](../d.md) [E](/d.md)');
+    expect(summary.linksChanged).toBe(1);
+  });
+
+  test('a folder move leaves links between co-moved siblings untouched', () => {
+    setFiles({ 'f/x.md': concept('[Y](./y.md)'), 'f/y.md': concept('# Y') });
+    const { summary, writes } = planRewrites('f', 'dest');
+    expect(writes.size).toBe(0);
+    expect(summary.linksChanged).toBe(0);
+  });
+
+  test('a markdown link inside a fenced code block is not rewritten', () => {
+    // Native truth: the shared scanner copies fenced code verbatim.
+    setFiles({ 'b.md': concept('# B'), 'a.md': concept('```\n[x](/b.md)\n```\n[y](/b.md)') });
+    const { writes } = planRewrites('b.md', 'folder/b.md');
+    expect(writes.get('a.md')).toContain('```\n[x](/b.md)\n```\n[y](/folder/b.md)');
+  });
+
+  test('a wikilink keeps its alias/anchor tail byte-for-byte', () => {
+    setFiles({ 'old.md': concept('# Old'), 'a.md': concept('[[old|x#y]]') });
+    const { writes } = planRewrites('old.md', 'new.md');
+    expect(writes.get('a.md')).toContain('[[new|x#y]]');
+  });
+
+  test('renaming a Concept that is not in the corpus plans nothing', () => {
+    setFiles({ 'a.md': concept('[[nope]]') });
+    const { summary, writes } = planRewrites('nope.md', 'z/nope.md');
+    expect(writes.size).toBe(0);
+    expect(summary).toEqual({ linksChanged: 0, filesChanged: 0 });
   });
 });

@@ -1,7 +1,7 @@
-//! Pure URL / UTF-8 helpers for link rewriting (the wasm-safe subset of the
-//! former `sunstone-native::rewrite::paths`). The move/rename engine's
-//! path-math (`basename_of`, `relative_path`, `shortest_resolving_suffix`)
-//! stays native; only what the shared anchor rewriter needs lives here.
+//! Pure URL / UTF-8 helpers for link rewriting, shared by the anchor rewriter
+//! (`anchors`) and the move/rename engine (`moves`). The engine's path math
+//! (`basename_of`, `relative_path`, `shortest_resolving_suffix`) lives in
+//! `relpath`.
 
 /// Split a URL into its path part and the `#anchor`/`?query` suffix (preserved
 /// verbatim, including the leading `#` or `?`). The suffix begins at the first

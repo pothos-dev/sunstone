@@ -1,25 +1,34 @@
-//! Pure link-rewrite engine: given a move map and source content, compute the
-//! rewritten content for every affected link. No filesystem or index access —
-//! exhaustively unit-testable (see the tests at the bottom of this file). The
-//! orchestration in `rewrite.rs` reads/writes files and drives this engine.
+//! Pure move/rename link-rewrite engine: given a move map and source content,
+//! compute the rewritten content for every affected link. No filesystem or
+//! index access — exhaustively unit-testable (see the tests at the bottom of
+//! this file) and wasm-safe (ADR 0006 §2).
 //!
-//! Links resolve through `sunstone_shared::paths::resolve_internal`, as in
-//! `index.rs` (bundle-relative, '/'-separated; `.`/`..` collapse with
-//! leading-`..` escapes dropped).
+//! Two drivers run this ONE engine: native `sunstone-native::rewrite`
+//! (`rename_and_rewrite`) reads/writes files around it, and the wasm
+//! `planMoveRewrites` export drives it over the fake backend's in-memory
+//! corpus, so the desktop Playwright suite exercises the same algorithm.
+//!
+//! Links resolve through [`crate::paths::resolve_internal`], as in the native
+//! index (bundle-relative, '/'-separated; `.`/`..` collapse with leading-`..`
+//! escapes dropped).
 
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use sunstone_shared::paths::{dir_of, is_external, resolve_internal};
-use sunstone_shared::wikilink::{self, parse_target};
+use crate::paths::{dir_of, is_external, resolve_internal};
+use crate::wikilink::{self, parse_target};
 
-use super::paths::{basename_of, relative_path, shortest_resolving_suffix};
-use sunstone_shared::rewrite::text::{split_suffix, LinkInner};
+use super::relpath::{basename_of, relative_path, shortest_resolving_suffix};
+use super::text::{split_suffix, LinkInner};
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
 /// changed. Matches the TS `{ linksChanged, filesChanged }`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+///
+/// Crosses both seams: the native IPC/HTTP command result (re-exported as
+/// `sunstone_native::rewrite::RewriteSummary`) and the wasm [`MovePlan`].
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RewriteSummary {
     pub links_changed: usize,
@@ -101,6 +110,51 @@ where
     Ok((writes, summary))
 }
 
+/// Build the `old -> new` move map for relocating `from` to `to` (both
+/// bundle-relative) over the Bundle's Concept path set `concept_paths`.
+///
+/// A `.md` source is a single Concept move — whether or not it is in
+/// `concept_paths` (a freshly-created Concept still has its own outbound links
+/// to recompute). A non-`.md` source is a folder: every Concept under the
+/// `from/` prefix is remapped under `to` (a `fromx/…` sibling never matches).
+pub fn build_move_map(concept_paths: &[String], from: &str, to: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    if from.ends_with(".md") {
+        map.insert(from.to_string(), to.to_string());
+        return map;
+    }
+    let from_prefix = format!("{from}/");
+    for path in concept_paths {
+        if let Some(rest) = path.strip_prefix(&from_prefix) {
+            map.insert(path.clone(), format!("{to}/{rest}"));
+        }
+    }
+    map
+}
+
+/// One Concept's bundle-relative `path` and raw `content` — an input source
+/// for a wasm-driven move plan, and an output write of one.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(from_wasm_abi, into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConceptContent {
+    pub path: String,
+    pub content: String,
+}
+
+/// The result of planning a move: every rewritten Concept (keyed by the path
+/// it must be written AT after the move) plus the aggregate summary. The wasm
+/// shape of [`plan_rewrites`]' `(writes, summary)` tuple.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePlan {
+    pub summary: RewriteSummary,
+    pub writes: Vec<ConceptContent>,
+}
+
 /// Rewrite every link in `content` whose resolved target is a moved Concept.
 ///
 /// `old_source` is the path the link resolution base would use BEFORE the move
@@ -140,7 +194,7 @@ fn rewrite_links_in(
     // `sunstone-shared`'s "one scanner for extraction and rewrite" invariant
     // therefore survives intact; see the module note in `shared/src/embed.rs`.
     let count = std::cell::Cell::new(0usize);
-    let out = sunstone_shared::scan::scan_replace_links(
+    let out = crate::scan::scan_replace_links(
         content,
         |raw| match rewrite_wikilink(old_source, raw, moves, all_paths, new_paths) {
             Some(new_raw) => {
@@ -465,6 +519,29 @@ mod tests {
             "[ext](https://example.com) and [other](/keep.md) and [B](/folder/b.md)"
         );
         assert_eq!(summary.links_changed, 1);
+    }
+
+    // --- build_move_map (pure form over a path set) --------------------------
+
+    fn paths(ps: &[&str]) -> Vec<String> {
+        ps.iter().map(|p| p.to_string()).collect()
+    }
+
+    #[test]
+    fn move_map_md_source_is_a_single_move_even_when_absent() {
+        let map = build_move_map(&paths(&["other.md"]), "new.md", "moved/new.md");
+        assert_eq!(map, moves(&[("new.md", "moved/new.md")]));
+    }
+
+    #[test]
+    fn move_map_folder_remaps_descendants_but_not_prefix_siblings() {
+        let all = paths(&["docs/a.md", "docs/deep/b.md", "outside.md", "docsx/c.md"]);
+        let map = build_move_map(&all, "docs", "notes");
+        assert_eq!(
+            map,
+            moves(&[("docs/a.md", "notes/a.md"), ("docs/deep/b.md", "notes/deep/b.md")])
+        );
+        assert!(build_move_map(&all, "no-such-folder", "x").is_empty());
     }
 
     // --- Embeds: the deliberate `!`-asymmetry (af-1) --------------------------

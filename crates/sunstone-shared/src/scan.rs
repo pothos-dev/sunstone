@@ -1,8 +1,7 @@
 //! The ONE code-aware markdown scanner shared by every module that walks a
 //! Concept body looking for links: wikilink extraction/replacement
 //! (`wikilink::replace_wikilinks` / `wikilink_raws`), anchor rewrite
-//! (`rewrite::anchors`), and the native move/rename engine
-//! (`sunstone-native::rewrite::engine`). Its fence / inline-code state machine
+//! (`rewrite::anchors`), and the move/rename engine (`rewrite::moves`). Its fence / inline-code state machine
 //! ([`walk_code`]) also drives `embed`'s code masking.
 //!
 //! The scanning contract, shared verbatim by all consumers:

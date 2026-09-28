@@ -7,7 +7,7 @@
 //! `notify`, `grep-*`, `dirs`) can leak into the wasm build.
 //!
 //! It is the ONE source of truth for the link family (family 10): wikilink /
-//! slug / link resolution / anchor rewrite / pure paths. `sunstone-native`
+//! slug / link resolution / anchor + move/rename rewrite / pure paths. `sunstone-native`
 //! depends on it and re-points its call sites here; `sunstone-wasm` wraps it
 //! for the browser frontend.
 

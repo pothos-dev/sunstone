@@ -66,7 +66,8 @@ import { loadBundleState, saveBundleState } from './bundleState';
  *   - `tree`    — TreeNode construction + path-mutating rename/delete;
  *   - `frontmatter` — the test-only `stripTagsFromFrontmatter` affordance (the
  *                 index-parse kernels are wasm FREE exports, `$lib/wasm/exports`);
- *   - `links`   — outbound-link extraction + the rename/move link-rewrite engine;
+ *   - `links`   — outbound-link extraction + `planRewrites`, the corpus seam over
+ *                 the shared wasm move/rename engine (`planMoveRewrites`);
  *   - `git`     — the canned commit history + committed-content-at-rev fixture;
  *   - `search`  — the capped full-text search over the fixture;
  *   - `launcher` — the localStorage/sessionStorage-backed launcher store.
