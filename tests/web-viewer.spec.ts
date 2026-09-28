@@ -358,6 +358,8 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
 }) => {
   await page.goto('/good');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+  // Gate on hydration before clicking the rail (see the quick-nav spec).
+  await expect(page.getByTestId('tag-browser')).toBeVisible();
 
   // The far-left activity rail carries quick-nav + search + a bottom theme
   // toggle + a user slot; the menu stub is gone.
@@ -478,6 +480,9 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
 
   // --- Persistence across reload ---
   await page.goto('/good');
+  // Gate on hydration before clicking (the Tags Section renders from a
+  // client-side fetch in the same cycle that wires the tree's click handlers).
+  await expect(page.getByTestId('tag-browser')).toBeVisible();
   // The guide folder holds an index.md, so it defaults COLLAPSED. EXPAND it (a
   // non-default folder state), and collapse the Tags Section and Properties, so
   // the reload below proves all three UI choices round-trip through localStorage.
