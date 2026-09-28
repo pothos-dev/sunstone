@@ -39,7 +39,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{find_byte, resolve_internal};
-use crate::scan::{walk_code, CodeClass};
+use crate::scan::{link_target, walk_code, CodeClass};
 use crate::wikilink::{basename, best_name_match, find_double_close};
 
 /// The Attachment extensions Sunstone renders as an image, matched
@@ -176,19 +176,6 @@ pub fn accessible_name(target: &str, alt: Option<&str>) -> String {
     }
 }
 
-/// From the inside of a markdown Embed's parens (`target "title"`), return just
-/// the target. Mirrors `extract_href` in `sunstone-native`'s index scanner,
-/// including its limitation: a `<…>`-wrapped target containing whitespace is cut
-/// at the whitespace, exactly as it is there.
-fn extract_target(raw: &str) -> String {
-    let trimmed = raw.trim();
-    let url = trimmed
-        .split_once(char::is_whitespace)
-        .map(|(u, _)| u)
-        .unwrap_or(trimmed);
-    url.trim_matches(['<', '>']).to_string()
-}
-
 /// Split a raw `![[ … ]]` inner text into `(name, size suffix)`.
 ///
 /// The name ends at the earliest `|` or `#`, mirroring
@@ -297,7 +284,7 @@ pub fn scan_embeds(body: &str) -> Vec<Embed> {
                 if close + 1 < bytes.len() && bytes[close + 1] == b'(' {
                     if let Some(paren) = find_byte(bytes, close + 2, b')') {
                         let raw_alt = &body[i + 2..close];
-                        let target = extract_target(&body[close + 2..paren]);
+                        let target = link_target(&body[close + 2..paren]);
                         // The size lives in the ALT TEXT here, and is only a size
                         // when the alt is nothing BUT a size. The known false
                         // positive (`![404](x.png)` sizes rather than describes)

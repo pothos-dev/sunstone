@@ -1,8 +1,10 @@
 //! The ONE code-aware markdown scanner shared by every module that walks a
 //! Concept body looking for links: wikilink extraction/replacement
-//! (`wikilink::replace_wikilinks` / `wikilink_raws`), anchor rewrite
-//! (`rewrite::anchors`), and the move/rename engine (`rewrite::moves`). Its fence / inline-code state machine
-//! ([`walk_code`]) also drives `embed`'s code masking.
+//! (`wikilink::replace_wikilinks` / `wikilink_raws`), markdown-link
+//! extraction for Backlinks ([`markdown_link_hrefs`]), anchor rewrite
+//! (`rewrite::anchors`), and the move/rename engine (`rewrite::moves`). Its
+//! fence / inline-code state machine ([`walk_code`]) also drives `embed`'s
+//! code masking.
 //!
 //! The scanning contract, shared verbatim by all consumers:
 //!
@@ -50,6 +52,48 @@ where
     M: FnMut(&str, bool) -> Option<String>,
 {
     scan_core(body, &mut wikilink, Some(&mut md_link))
+}
+
+/// Every markdown-link target `[text](target)` in `body`, in document order,
+/// as [`link_target`] extracts it — the extraction twin of the move/rename
+/// engine's markdown-link rewrite, run over the SAME scan
+/// ([`scan_replace_links`] with a collecting identity callback, the way
+/// `wikilink::wikilink_raws` collects wikilinks). So a link in a fenced code
+/// block is never extracted (the engine never rewrites it), while one inside
+/// an inline code span IS (the engine rewrites it too — the markdown-link half
+/// is code-agnostic, see the module docs).
+///
+/// Embeds (`![alt](src)`) are skipped: an Embed is not a Concept-to-Concept
+/// relationship, so it must never create a Backlinks edge — see the
+/// `!`-asymmetry note on `rewrite::moves::rewrite_links_in`.
+pub fn markdown_link_hrefs(body: &str) -> Vec<String> {
+    let mut hrefs = Vec::new();
+    scan_replace_links(
+        body,
+        |raw| format!("[[{raw}]]"),
+        |inner, is_image| {
+            if !is_image {
+                hrefs.push(link_target(inner));
+            }
+            None
+        },
+    );
+    hrefs
+}
+
+/// From the inside of a markdown link's parens (`target "title"`), return just
+/// the target: surrounding whitespace, a trailing title and enclosing angle
+/// brackets dropped. Known limitation: a `<…>`-wrapped target containing
+/// whitespace is cut at the whitespace. Shared by Backlinks extraction
+/// ([`markdown_link_hrefs`]) and `embed::scan_embeds`.
+pub fn link_target(inner: &str) -> String {
+    let trimmed = inner.trim();
+    // A title is ` "..."` or ` '...'` after the URL.
+    let url = trimmed
+        .split_once(char::is_whitespace)
+        .map(|(u, _)| u)
+        .unwrap_or(trimmed);
+    url.trim_matches(['<', '>']).to_string()
 }
 
 /// `md_link(inner, is_image)` callback: an optional replacement for a Markdown
@@ -450,6 +494,21 @@ mod tests {
         // Historical, code-agnostic behaviour of the markdown-link half.
         assert_eq!(md_inners("`[a](b.md)`"), vec![("b.md".to_string(), false)]);
         assert_eq!(md_inners("![i](p.png)"), vec![("p.png".to_string(), true)]);
+    }
+
+    #[test]
+    fn markdown_link_hrefs_skips_fences_and_embeds_but_not_inline_code() {
+        let body = "[a](a.md) ![i](i.png) `[c](c.md)`\n```\n[f](f.md)\n```\n[t](<t.md> \"T\")";
+        assert_eq!(markdown_link_hrefs(body), vec!["a.md", "c.md", "t.md"]);
+    }
+
+    #[test]
+    fn link_target_drops_whitespace_title_and_angle_brackets() {
+        assert_eq!(link_target(" a.md "), "a.md");
+        assert_eq!(link_target("a.md \"title\""), "a.md");
+        assert_eq!(link_target("<a.md> 'title'"), "a.md");
+        assert_eq!(link_target("<a b.md>"), "a");
+        assert_eq!(link_target(""), "");
     }
 
     #[test]

@@ -11,12 +11,29 @@
 use std::collections::BTreeSet;
 
 use crate::index::frontmatter::strip_frontmatter;
-use sunstone_shared::paths::{find_byte, resolve_location};
+use sunstone_shared::paths::resolve_location;
+use sunstone_shared::scan::markdown_link_hrefs;
 
 /// Extract all internal markdown link targets from a Concept body, resolved to
 /// bundle-relative paths (a folder link resolves to the folder, `""` for the
 /// Bundle root). External (`scheme:`), pure-anchor, and empty links are
-/// skipped. De-duplicated, insertion order preserved-ish (sorted for stability).
+/// skipped. De-duplicated and sorted for stability. Reference-style links are
+/// out of scope (the fixtures and OKF Concepts use inline links).
+///
+/// The links come from [`markdown_link_hrefs`], the shared scan the move/rename
+/// engine rewrites over, so an edge exists exactly where a move would rewrite
+/// the link: a link in a fenced code block is no edge, one in an inline code
+/// span is (the markdown-link half of the scanner is code-agnostic).
+///
+/// # The `!`-asymmetry is DELIBERATE (af-1) — site 1 of 3
+///
+/// EXTRACTION drops `!` (`markdown_link_hrefs` skips Embeds); REWRITE
+/// (`sunstone-shared/src/rewrite/moves.rs::rewrite_links_in`) does not. Do not
+/// "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
+/// so it must never create a Backlinks edge — which is what this drop
+/// guarantees. That an Embed's *path* is still rewritten on a move is a
+/// different question with a different answer; see the twin comment in
+/// `rewrite_links_in` and the module note in `sunstone-shared/src/embed.rs`.
 pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
     let body = strip_frontmatter(content);
     let mut out: BTreeSet<String> = BTreeSet::new();
@@ -26,63 +43,6 @@ pub(super) fn extract_links(current_path: &str, content: &str) -> Vec<String> {
         }
     }
     out.into_iter().collect()
-}
-
-/// Find every markdown inline-link `href`: the `target` in `[text](target)`.
-/// Embeds `![alt](src)` are skipped. Handles a trailing `"title"` inside the
-/// parens. Reference-style links are out of scope (the fixtures and OKF
-/// Concepts use inline links).
-///
-/// # The `!`-asymmetry is DELIBERATE (af-1) — site 1 of 4
-///
-/// EXTRACTION drops `!`; REWRITE (`rewrite/engine.rs`) does not. Do not
-/// "restore symmetry" here: an Embed is not a Concept-to-Concept relationship,
-/// so it must never create a Backlinks edge — which is what this drop
-/// guarantees. That an Embed's *path* is still rewritten on a move is a
-/// different question with a different answer; see the twin comment in
-/// `rewrite/engine.rs::rewrite_links_in` (and `src/lib/ipc/fake/links.ts` for
-/// the TS twin of both halves).
-fn markdown_link_hrefs(body: &str) -> Vec<String> {
-    let bytes = body.as_bytes();
-    let mut hrefs = Vec::new();
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes[i] == b'[' {
-            // Skip Embeds: a `!` immediately before `[`. No Backlinks edge —
-            // see the asymmetry note on this function.
-            let is_image = i > 0 && bytes[i - 1] == b'!';
-            // Find the matching `]` (no nested brackets in OKF link text).
-            if let Some(close) = find_byte(bytes, i + 1, b']') {
-                // Must be immediately followed by `(`.
-                if close + 1 < bytes.len() && bytes[close + 1] == b'(' {
-                    if let Some(paren) = find_byte(bytes, close + 2, b')') {
-                        if !is_image {
-                            let raw = &body[close + 2..paren];
-                            hrefs.push(extract_href(raw));
-                        }
-                        i = paren + 1;
-                        continue;
-                    }
-                }
-                i = close + 1;
-                continue;
-            }
-        }
-        i += 1;
-    }
-    hrefs
-}
-
-/// From the inside of a link's parens (`target "title"`), return just the
-/// target (drop a trailing title and surrounding whitespace / angle brackets).
-fn extract_href(raw: &str) -> String {
-    let trimmed = raw.trim();
-    // A title is ` "..."` or ` '...'` after the URL.
-    let url = trimmed
-        .split_once(char::is_whitespace)
-        .map(|(u, _)| u)
-        .unwrap_or(trimmed);
-    url.trim_matches(['<', '>']).to_string()
 }
 
 #[cfg(test)]

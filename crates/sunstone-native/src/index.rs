@@ -440,6 +440,17 @@ mod tests {
     }
 
     #[test]
+    fn a_link_in_a_fenced_code_block_is_not_a_backlink() {
+        // The move/rename engine never rewrites a link inside a fence, so the
+        // index must not count it either — the two share one scanner.
+        let mut idx = Index::default();
+        idx.insert_concept("a.md", "```\n[b](/b.md) [[b]]\n```\n~~~\n[b](./b.md)\n~~~");
+        idx.insert_concept("b.md", "# B");
+        idx.rebuild_reverse();
+        assert!(idx.backlinks("b.md").is_empty());
+    }
+
+    #[test]
     fn backlinks_via_wikilink() {
         // a links to b by bare wikilink (basename match); c links to b by a
         // partial-path wikilink. Both edges feed the reverse map.

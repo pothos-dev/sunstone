@@ -179,9 +179,10 @@ fn rewrite_links_in(
     // inline code for wikilinks and hands markdown-link inners through with
     // their original code-agnostic behaviour. Embeds / images arrive flagged.
     //
-    // # The `!`-asymmetry is DELIBERATE (af-1) — site 2 of 4
+    // # The `!`-asymmetry is DELIBERATE (af-1) — site 2 of 3
     //
-    // REWRITE does NOT drop `!`; EXTRACTION (`index/links.rs`) does. Do not
+    // REWRITE does NOT drop `!`; EXTRACTION (`scan::markdown_link_hrefs`, used
+    // by `sunstone-native/src/index/links.rs`) does. Do not
     // "restore symmetry" here. The two questions are different:
     //
     //  * an Embed is not a Concept-to-Concept relationship -> no Backlinks edge
