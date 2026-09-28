@@ -57,6 +57,7 @@
   import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
   import { bundle } from '$lib/state/bundle.svelte';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
+  import { fileLineToBody, bodyLineToFile } from '$lib/editor/lineSpace';
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
   import Frontmatter from '$lib/components/Frontmatter.svelte';
@@ -419,7 +420,7 @@
     const line = atEnd
       ? lineAtViewportTop(view, sc.clientHeight)
       : lineAtViewportTop(view, ACTIVE_HEADING_PROBE_PX);
-    onViewportLine(line === null ? null : line + frontmatterLineCount(tile.content));
+    onViewportLine(line === null ? null : bodyLineToFile(line, frontmatterLineCount(tile.content)));
   }
 
   // App keeps only the ACTIVE Tile's report, so a Tile that becomes active must
@@ -436,7 +437,7 @@
     if (!view) return;
     // Headings sit at the top of the viewport — that's where the eye expects
     // them after an outline jump, not floating in the vertical middle.
-    scrollToLine(view, line - frontmatterLineCount(tile.content), 'start');
+    scrollToLine(view, fileLineToBody(line, frontmatterLineCount(tile.content)), 'start');
     // A jump that lands where we already were emits no scroll event.
     requestAnimationFrame(reportViewportLine);
   }
@@ -540,7 +541,8 @@
     }
 
     if (pendingScrollLine !== null && view) {
-      scrollToLine(view, pendingScrollLine);
+      // A search hit's line counts the frontmatter; the editor holds the body.
+      scrollToLine(view, fileLineToBody(pendingScrollLine, frontmatterLineCount(content)));
       pendingScrollLine = null;
       tile.pendingScrollOffset = null; // the search-result line wins
     }
@@ -614,10 +616,13 @@
   export function scrollToDocLine(fullDocLine: number): void {
     scrollToOutlineLine(fullDocLine);
   }
-  /** Open `path` in this Tile and scroll to `line` once loaded (search result). */
+  /**
+   * Open `path` in this Tile and scroll to `line` once loaded (search result).
+   * `line` is the FILE line (frontmatter included), as search hits report it.
+   */
   export function openWithScrollLine(path: string, line: number): void {
     if (tile.activePath === path) {
-      if (view) scrollToLine(view, line);
+      if (view) scrollToLine(view, fileLineToBody(line, frontmatterLineCount(tile.content)));
     } else {
       pendingScrollLine = line;
       void tile.open(path);

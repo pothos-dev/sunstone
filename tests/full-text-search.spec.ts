@@ -48,3 +48,37 @@ test('full-text search: query bodies, list matches, open a result', async ({ pag
   await expect(page.getByTestId('editor')).toContainText('CodeMirror 6 is the editor core');
   await expect(page.getByTestId('editor')).toContainText('marmalade');
 });
+
+// Search hits carry the FILE's line (frontmatter included) but the editor holds
+// only the body, so the hit line must be shifted past the frontmatter block —
+// both when the result opens a new Concept and when it is already open.
+test('full-text search: a hit in a Concept with frontmatter lands on its own line', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.getByTestId('tree')).toBeVisible();
+  const panel = page.getByTestId('search-panel');
+  const editor = page.getByTestId('editor');
+
+  // --- Opening the Concept from the hit (pending-scroll path) ---
+  await page.keyboard.press('Control+Shift+F');
+  await expect(panel).toBeVisible();
+  await page.getByTestId('search-input').fill('pomegranate line 20');
+  const hit = panel.locator('[data-path="concepts/search-overflow.md"]');
+  await expect(hit).toHaveCount(1);
+  await hit.click();
+  await expect(panel).toBeHidden();
+  // Read is the default; the active-line highlight (which marks where the
+  // search put the cursor) is an editing-only extension.
+  await page.getByTestId('edit-toggle').click();
+  await expect(editor.locator('.cm-activeLine')).toContainText('pomegranate line 20');
+
+  // --- Choosing a hit in the Concept that is already open ---
+  await page.keyboard.press('Control+Shift+F');
+  await expect(panel).toBeVisible();
+  await page.getByTestId('search-input').fill('pomegranate line 05');
+  await expect(hit).toHaveCount(1);
+  await hit.click();
+  await expect(panel).toBeHidden();
+  await expect(editor.locator('.cm-activeLine')).toContainText('pomegranate line 05');
+});
