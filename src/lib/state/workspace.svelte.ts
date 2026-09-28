@@ -210,12 +210,16 @@ export class Tile {
    * Attach the Tile to the Document at `path` and load it from disk. Resolves the
    * outgoing Document first (flush on desktop; the dirty-leave gate on web) so
    * navigating never silently loses edits. A web gate CANCEL aborts the load.
+   *
+   * A Document that is already DIRTY is attached without a reload: its buffer
+   * (live in another Tile, or a held write) is newer than the disk, and a
+   * `load()` would replace it — the same reason `adopt` never loads.
    */
   async #loadInto(path: string): Promise<void> {
     if (!(await this.requestLeave())) return;
     this.recordScroll();
     const doc = this.#registry.get(path);
-    await doc.load();
+    if (!doc.dirty) await doc.load();
     this.activePath = path;
   }
 
