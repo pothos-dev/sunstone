@@ -25,6 +25,7 @@
   import { session } from '$lib/state/session.svelte';
   import { theme } from '$lib/state/theme.svelte';
   import { focus } from '$lib/state/focus.svelte';
+  import { useOverlay } from '$lib/state/overlay.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { minimalChange } from '$lib/minimalChange';
   import type { Tile } from '$lib/state/workspace.svelte';
@@ -278,15 +279,10 @@
     items: EditorMenuItem[];
     annotateRange?: { from: number; to: number };
   } | null>(null);
-  let editorMenuOverlayId: number | null = null;
-  $effect(() => {
-    if (editorMenu && editorMenuOverlayId === null) {
-      editorMenuOverlayId = focus.pushOverlay(() => (editorMenu = null));
-    } else if (!editorMenu && editorMenuOverlayId !== null) {
-      focus.removeOverlay(editorMenuOverlayId);
-      editorMenuOverlayId = null;
-    }
-  });
+  useOverlay(
+    () => editorMenu !== null,
+    () => (editorMenu = null),
+  );
 
   type AnnotationPopupState = {
     x: number;
@@ -298,15 +294,10 @@
     anchor?: number;
   };
   let annotationPopup = $state<AnnotationPopupState | null>(null);
-  let annotationPopupOverlayId: number | null = null;
-  $effect(() => {
-    if (annotationPopup && annotationPopupOverlayId === null) {
-      annotationPopupOverlayId = focus.pushOverlay(() => (annotationPopup = null));
-    } else if (!annotationPopup && annotationPopupOverlayId !== null) {
-      focus.removeOverlay(annotationPopupOverlayId);
-      annotationPopupOverlayId = null;
-    }
-  });
+  useOverlay(
+    () => annotationPopup !== null,
+    () => (annotationPopup = null),
+  );
 
   function openCommentPopup(req: CommentEditRequest): void {
     annotationPopup = { x: req.x, y: req.y, mode: 'edit', text: req.text, anchor: req.anchor };
@@ -596,8 +587,6 @@
 
   onDestroy(() => {
     tile.scrollProbe = null;
-    if (editorMenuOverlayId !== null) focus.removeOverlay(editorMenuOverlayId);
-    if (annotationPopupOverlayId !== null) focus.removeOverlay(annotationPopupOverlayId);
     view?.destroy();
     view = null;
     viewReady = false;

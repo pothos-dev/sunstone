@@ -26,7 +26,7 @@
   } from '$lib/treeCrud';
   import { bundle } from '$lib/state/bundle.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
-  import { focus } from '$lib/state/focus.svelte';
+  import { useOverlay } from '$lib/state/overlay.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
 
   interface Props {
@@ -74,26 +74,16 @@
   // ALSO route focus through `oncancel`/`oncommit` to the Explorer's affected row
   // (slice: explorer-crud-keybindings) — both target the Explorer, so the
   // opener-restore is consistent, never fighting the slice-3 routing.
-  let menuOverlayId: number | null = null;
-  $effect(() => {
-    if (menu && menuOverlayId === null) {
-      menuOverlayId = focus.pushOverlay(() => (menu = null));
-    } else if (!menu && menuOverlayId !== null) {
-      focus.removeOverlay(menuOverlayId);
-      menuOverlayId = null;
-    }
-  });
-  let dialogOverlayId: number | null = null;
-  $effect(() => {
-    if (dialog && dialogOverlayId === null) {
-      // Cancel closes the dialog via the SAME path as the Cancel button so the
-      // keyboard-CRUD focus restore (oncancel) still fires.
-      dialogOverlayId = focus.pushOverlay(closeDialog);
-    } else if (!dialog && dialogOverlayId !== null) {
-      focus.removeOverlay(dialogOverlayId);
-      dialogOverlayId = null;
-    }
-  });
+  useOverlay(
+    () => menu !== null,
+    () => (menu = null),
+  );
+  // Cancel closes the dialog via the SAME path as the Cancel button so the
+  // keyboard-CRUD focus restore (oncancel) still fires.
+  useOverlay(
+    () => dialog !== null,
+    () => closeDialog(),
+  );
 
   // Move-picker targets: all folder paths in the live tree ('' = Bundle root).
   // Falls back to a root-only tree while the Bundle is still loading.

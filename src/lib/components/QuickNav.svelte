@@ -20,6 +20,7 @@
   import { clampIndex, listKeyIntent, stepIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
   import { focus } from '$lib/state/focus.svelte';
+  import { useOverlay } from '$lib/state/overlay.svelte';
 
   interface Props {
     /** Whether the palette is open. */
@@ -111,8 +112,11 @@
   // later CANCEL (Escape/backdrop) restores focus exactly where it came from. The
   // token is dropped on close via ANY path (cancel or commit) so the stack stays
   // clean — commit moves focus to the Concept→Editor, cancel restores the opener.
+  useOverlay(
+    () => open,
+    () => onclose(),
+  );
   let wasOpen = false;
-  let overlayId: number | null = null;
   $effect(() => {
     if (open && !wasOpen) {
       wasOpen = true;
@@ -120,14 +124,9 @@
       selected = 0;
       tagMode = null;
       tagConcepts = [];
-      overlayId = focus.pushOverlay(onclose);
       queueMicrotask(() => input?.focus());
     } else if (!open) {
       wasOpen = false;
-      if (overlayId !== null) {
-        focus.removeOverlay(overlayId);
-        overlayId = null;
-      }
     }
   });
 

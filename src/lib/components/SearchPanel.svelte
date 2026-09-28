@@ -18,6 +18,7 @@
   import { clampIndex, listKeyIntent, stepIndex } from '$lib/listNav';
   import { splitPath, stripMd } from '$lib/path';
   import { focus } from '$lib/state/focus.svelte';
+  import { useOverlay } from '$lib/state/overlay.svelte';
   import type { SearchHit } from '$lib/types';
 
   interface Props {
@@ -64,8 +65,11 @@
   // so a CANCEL (Escape/backdrop) restores focus to where it came from. The token
   // is dropped on close via ANY path (commit opens a Concept→Editor; cancel
   // restores the opener).
+  useOverlay(
+    () => open,
+    () => onclose(),
+  );
   let wasOpen = false;
-  let overlayId: number | null = null;
   $effect(() => {
     if (open && !wasOpen) {
       wasOpen = true;
@@ -73,14 +77,9 @@
       results = [];
       selected = 0;
       searching = false;
-      overlayId = focus.pushOverlay(onclose);
       queueMicrotask(() => input?.focus());
     } else if (!open) {
       wasOpen = false;
-      if (overlayId !== null) {
-        focus.removeOverlay(overlayId);
-        overlayId = null;
-      }
       if (debounceTimer !== null) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
