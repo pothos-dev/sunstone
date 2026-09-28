@@ -10,7 +10,8 @@
 //!
 //! It is a **pure ATX string scan** (never a comrak parse — ADR 0006 §8, render
 //! stays out of wasm): a line is a heading iff it is `#`…`######` + whitespace +
-//! text, outside the leading YAML frontmatter block and outside fenced code
+//! text (an optional closing `#` sequence dropped, as CommonMark/GitHub do),
+//! outside the leading YAML frontmatter block and outside fenced code
 //! blocks. **Setext headings (`Foo\n===`) are NOT recognised** — the outline is
 //! ATX-only on both sides (OKF/Obsidian-aligned; a deliberate ADR 0006 change).
 //! Line numbers are 1-based against the FULL document (the frontmatter offset is
@@ -33,7 +34,8 @@ use crate::slug;
 pub struct OutlineHeading {
     /// Heading level, 1 (`#`) … 6 (`######`). Drives indentation.
     pub level: u8,
-    /// The heading text (the `#` markers and surrounding whitespace stripped).
+    /// The heading text (the `#` markers, any closing `#` sequence and the
+    /// surrounding whitespace stripped).
     pub text: String,
     /// 1-based line number in the FULL document (frontmatter included).
     pub line: usize,
@@ -41,9 +43,10 @@ pub struct OutlineHeading {
     pub slug: String,
 }
 
-/// The ATX heading `(level, text)` for `line`, or `None`. Mirrors the TS
-/// `/^(#{1,6})\s+(.*)$/`: 1–6 leading `#`, then at least one whitespace char,
-/// then the text (trimmed). Kept regex-free (ADR 0006 §2 — no `regex` crate).
+/// The ATX heading `(level, text)` for `line`, or `None`: 1–6 leading `#`, then
+/// at least one whitespace char, then the text (trimmed, with any CommonMark
+/// closing sequence dropped — see [`strip_closing_sequence`]). Kept regex-free
+/// (ADR 0006 §2 — no `regex` crate).
 fn atx_heading(line: &str) -> Option<(u8, String)> {
     let hashes = line.bytes().take_while(|&b| b == b'#').count();
     if hashes == 0 || hashes > 6 {
@@ -54,7 +57,22 @@ fn atx_heading(line: &str) -> Option<(u8, String)> {
     if !rest.chars().next().is_some_and(|c| c.is_whitespace()) {
         return None;
     }
-    Some((hashes as u8, rest.trim().to_string()))
+    Some((hashes as u8, strip_closing_sequence(rest.trim()).to_string()))
+}
+
+/// Drop an ATX heading's optional closing sequence (CommonMark §4.2): a
+/// trailing run of `#` that is either the whole (trimmed) content or preceded
+/// by a space/tab. `Foo ##` → `Foo`, `###` → `` (an empty heading), but `Foo#`
+/// and the escaped `Foo \#` keep their `#` (not preceded by a space/tab).
+fn strip_closing_sequence(text: &str) -> &str {
+    let before = text.trim_end_matches('#');
+    if before.is_empty() {
+        ""
+    } else if before.ends_with([' ', '\t']) {
+        before.trim_end()
+    } else {
+        text
+    }
 }
 
 /// The fence marker char (`` ` `` or `~`) opening/closing a fenced code block on
@@ -190,6 +208,36 @@ mod tests {
     #[test]
     fn hash_without_space_is_not_a_heading() {
         assert!(scan_headings("#nospace\n").is_empty());
+    }
+
+    #[test]
+    fn atx_closing_sequence_is_dropped_from_text_and_slug() {
+        // CommonMark: a trailing `#` run preceded by a space/tab is an optional
+        // closing sequence, not heading text (GitHub slugs `## Foo ##` as `foo`).
+        let hs = scan_headings("## Foo ##\n# Bar #####   \n### Baz\t#\n");
+        assert_eq!(
+            levels_texts_slugs(&hs),
+            vec![(2, "Foo", "foo"), (1, "Bar", "bar"), (3, "Baz", "baz")]
+        );
+    }
+
+    #[test]
+    fn hashes_not_preceded_by_a_space_or_escaped_are_kept() {
+        let hs = scan_headings("## Foo#\n## Foo \\#\n## C# and F#\n");
+        assert_eq!(
+            hs.iter().map(|h| h.text.as_str()).collect::<Vec<_>>(),
+            vec!["Foo#", "Foo \\#", "C# and F#"]
+        );
+    }
+
+    #[test]
+    fn heading_of_only_a_closing_sequence_is_an_empty_heading() {
+        // An empty heading is still a heading (as `# ` alone always was).
+        let hs = scan_headings("# ###\n## #\n# \n");
+        assert_eq!(
+            hs.iter().map(|h| (h.level, h.text.as_str())).collect::<Vec<_>>(),
+            vec![(1, ""), (2, ""), (1, "")]
+        );
     }
 
     #[test]
