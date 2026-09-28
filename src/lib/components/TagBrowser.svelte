@@ -31,7 +31,7 @@
   import type { TagCount } from '$lib/types';
   import { focus } from '$lib/state/focus.svelte';
   import { tagsNav } from '$lib/state/tagsNav.svelte';
-  import { rowKey } from '$lib/tagsNav';
+  import { pruneToLiveTags, rowKey } from '$lib/tagsNav';
 
   interface Props {
     /** Index version signal; re-query when it bumps (file-changed). */
@@ -68,22 +68,9 @@
       if (guard.isCancelled()) return;
       tags = result;
       const live = new Set(result.map((t) => t.tag));
-      // Prune expanded tags that vanished.
-      let prunedExpanded = false;
-      const nextExpanded = new Set<string>();
-      for (const t of expanded) {
-        if (live.has(t)) nextExpanded.add(t);
-        else prunedExpanded = true;
-      }
-      if (prunedExpanded) expanded = nextExpanded;
-      // Prune cache entries that vanished.
-      let prunedCache = false;
-      const nextCache = new Map<string, string[]>();
-      for (const [t, c] of conceptCache) {
-        if (live.has(t)) nextCache.set(t, c);
-        else prunedCache = true;
-      }
-      if (prunedCache) conceptCache = nextCache;
+      const pruned = pruneToLiveTags(live, expanded, conceptCache);
+      if (pruned.expanded) expanded = pruned.expanded;
+      if (pruned.cache) conceptCache = pruned.cache;
     });
     return () => guard.cancel();
   });

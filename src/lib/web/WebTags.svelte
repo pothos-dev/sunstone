@@ -16,6 +16,7 @@
    */
   import { backend } from '$lib/ipc';
   import { basename, stripMd } from '$lib/path';
+  import { pruneToLiveTags } from '$lib/tagsNav';
   import type { TagCount } from '$lib/types';
 
   interface Props {
@@ -38,12 +39,9 @@
   // Concept was untagged on disk), keyed on the `tags` prop.
   $effect(() => {
     const live = new Set(tags.map((t) => t.tag));
-    const nextExpanded = new Set<string>();
-    for (const t of expanded) if (live.has(t)) nextExpanded.add(t);
-    if (nextExpanded.size !== expanded.size) expanded = nextExpanded;
-    const nextCache = new Map<string, string[]>();
-    for (const [t, c] of conceptCache) if (live.has(t)) nextCache.set(t, c);
-    if (nextCache.size !== conceptCache.size) conceptCache = nextCache;
+    const pruned = pruneToLiveTags(live, expanded, conceptCache);
+    if (pruned.expanded) expanded = pruned.expanded;
+    if (pruned.cache) conceptCache = pruned.cache;
   });
 
   // Re-query the Concept list for every expanded tag (also on version changes so

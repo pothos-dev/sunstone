@@ -1,6 +1,39 @@
 import { describe, expect, test } from 'bun:test';
 import type { TagCount } from './types';
-import { flattenTagRows, indexOfKey, rowKey } from './tagsNav';
+import { flattenTagRows, indexOfKey, pruneToLiveTags, rowKey } from './tagsNav';
+
+describe('pruneToLiveTags', () => {
+  const cache = new Map([
+    ['okf', ['a.md']],
+    ['gone', ['b.md']],
+  ]);
+
+  test('drops vanished tags from both the expanded set and the cache', () => {
+    const r = pruneToLiveTags(new Set(['okf', 'editor']), new Set(['okf', 'gone']), cache);
+    expect(r.expanded).toEqual(new Set(['okf']));
+    expect(r.cache).toEqual(new Map([['okf', ['a.md']]]));
+  });
+
+  test('returns null for a field with nothing to prune', () => {
+    const r = pruneToLiveTags(new Set(['okf', 'gone']), new Set(['okf']), cache);
+    expect(r).toEqual({ expanded: null, cache: null });
+  });
+
+  test('prunes each field independently', () => {
+    const r = pruneToLiveTags(new Set(['okf']), new Set(['okf']), cache);
+    expect(r.expanded).toBeNull();
+    expect(r.cache).toEqual(new Map([['okf', ['a.md']]]));
+  });
+
+  test('empty live set empties both; inputs are not mutated', () => {
+    const expanded = new Set(['okf']);
+    const r = pruneToLiveTags(new Set(), expanded, cache);
+    expect(r.expanded).toEqual(new Set());
+    expect(r.cache).toEqual(new Map());
+    expect(expanded).toEqual(new Set(['okf']));
+    expect(cache.size).toBe(2);
+  });
+});
 
 const tags: TagCount[] = [
   { tag: 'okf', count: 3 },

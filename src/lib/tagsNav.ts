@@ -80,3 +80,25 @@ export function indexOfKey(rows: TagRow[], key: string | null): number {
   if (key === null) return -1;
   return rows.findIndex((r) => r.key === key);
 }
+
+/**
+ * Drop the expanded tags and cached per-tag Concept lists whose tag is no
+ * longer `live` (e.g. its last Concept was untagged on disk). Each field is the
+ * pruned copy, or `null` when nothing was dropped — so a caller holding them in
+ * reactive state reassigns only on a real change. Shared by the desktop
+ * `TagBrowser` and the web `WebTags`.
+ */
+export function pruneToLiveTags<V>(
+  live: ReadonlySet<string>,
+  expanded: ReadonlySet<string>,
+  cache: ReadonlyMap<string, V>,
+): { expanded: Set<string> | null; cache: Map<string, V> | null } {
+  const nextExpanded = new Set<string>();
+  for (const t of expanded) if (live.has(t)) nextExpanded.add(t);
+  const nextCache = new Map<string, V>();
+  for (const [t, v] of cache) if (live.has(t)) nextCache.set(t, v);
+  return {
+    expanded: nextExpanded.size !== expanded.size ? nextExpanded : null,
+    cache: nextCache.size !== cache.size ? nextCache : null,
+  };
+}
