@@ -172,7 +172,8 @@ pub fn create_folder(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
 /// Both are bundle-relative; `from` must exist, `to` must not. This is a PLAIN
 /// filesystem rename — inbound link rewriting is layered on top by the
 /// `rewrite::rename_and_rewrite`, not by this function. Works for both
-/// Concepts and folders. Returns the resolved `to` absolute path.
+/// Concepts and folders. A symlink `from` is renamed as the link itself; its
+/// target stays put. Returns the resolved `to` absolute path.
 pub fn rename_path(root: &Path, from: &str, to: &str) -> Result<PathBuf, String> {
     let src = resolve_entry(root, from)?;
     let dst = resolve_new(root, to)?;
@@ -189,10 +190,13 @@ pub fn rename_path(root: &Path, from: &str, to: &str) -> Result<PathBuf, String>
 }
 
 /// Delete `rel_path` (a Concept or a folder, recursively). The path must exist
-/// and stay within the Bundle. The frontend confirms before calling this.
+/// and stay within the Bundle. A symlink is removed as a link (its target is
+/// never followed or deleted), even when it points at a folder. The frontend
+/// confirms before calling this.
 pub fn delete_path(root: &Path, rel_path: &str) -> Result<(), String> {
     let resolved = resolve_entry(root, rel_path)?;
-    if resolved.is_dir() {
+    let meta = resolved.symlink_metadata().map_err(|e| e.to_string())?;
+    if meta.is_dir() {
         std::fs::remove_dir_all(&resolved).map_err(|e| e.to_string())
     } else {
         std::fs::remove_file(&resolved).map_err(|e| e.to_string())
@@ -212,7 +216,9 @@ fn reject_escaping_components(rel: &Path, rel_path: &str) -> Result<(), String> 
 }
 
 /// Resolve a bundle-relative path against the root, rejecting escapes
-/// (`..`, absolute paths, or anything outside the Bundle).
+/// (`..`, absolute paths, or anything outside the Bundle). Follows symlinks
+/// (the result is the canonical target), so it suits reading/writing content;
+/// an entry being deleted or renamed goes through `resolve_entry` instead.
 pub fn resolve(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     let rel = Path::new(rel_path);
     if rel.is_absolute() {
@@ -230,15 +236,43 @@ pub fn resolve(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
-/// [`resolve`] for an entry *inside* the Bundle: refuses a path that names the
-/// root itself (`""`, `.`), so a delete or rename can never act on the whole
-/// Bundle.
+/// Resolve an existing entry *inside* the Bundle that is about to be acted ON
+/// (the source of a delete or rename/move). Unlike [`resolve`] it does NOT
+/// follow the final component: the parent folder is canonicalized and checked
+/// for containment, and the entry is returned as `canonical_parent/<name>`. So
+/// an in-Bundle symlink resolves to the link itself — deleting or renaming it
+/// touches only the link, never its target (which may be elsewhere in the
+/// Bundle or outside it). Refuses a path that names the root itself (`""`,
+/// `.`), so a delete or rename can never act on the whole Bundle, and a path
+/// that does not exist (checked with `symlink_metadata`, so a dangling link
+/// still counts as existing).
 fn resolve_entry(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
-    let resolved = resolve(root, rel_path)?;
-    if resolved == root {
-        return Err(format!("path names the bundle root: {rel_path:?}"));
+    let rel = Path::new(rel_path);
+    if rel.is_absolute() {
+        return Err(format!("path must be bundle-relative: {rel_path}"));
     }
-    Ok(resolved)
+    reject_escaping_components(rel, rel_path)?;
+    // Only `Normal` segments remain meaningful (`.` is dropped); none left
+    // means the path names the root.
+    let normal: PathBuf = rel
+        .components()
+        .filter(|c| matches!(c, Component::Normal(_)))
+        .collect();
+    let (Some(name), Some(parent_rel)) = (normal.file_name(), normal.parent()) else {
+        return Err(format!("path names the bundle root: {rel_path:?}"));
+    };
+    let canonical_parent = root
+        .join(parent_rel)
+        .canonicalize()
+        .map_err(|e| format!("{rel_path}: {e}"))?;
+    if !canonical_parent.starts_with(root) {
+        return Err(format!("path escapes the bundle: {rel_path}"));
+    }
+    let entry = canonical_parent.join(name);
+    entry
+        .symlink_metadata()
+        .map_err(|e| format!("{rel_path}: {e}"))?;
+    Ok(entry)
 }
 
 /// Resolve a bundle-relative path for a target that may NOT yet exist (create,
@@ -419,6 +453,80 @@ mod tests {
         std::os::unix::fs::symlink(&outside, root.join("escape_link")).unwrap();
 
         assert!(resolve(&root, "escape_link/secret.md").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_a_symlink_to_a_folder_removes_only_the_link() {
+        let root = temp_root();
+        create_folder(&root, "sub").unwrap();
+        create_concept(&root, "sub/a.md").unwrap();
+        std::os::unix::fs::symlink(root.join("sub"), root.join("shortcut")).unwrap();
+
+        delete_path(&root, "shortcut").unwrap();
+        assert!(root.join("shortcut").symlink_metadata().is_err());
+        assert!(root.join("sub/a.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_a_symlink_to_a_file_removes_only_the_link() {
+        let root = temp_root();
+        create_folder(&root, "sub").unwrap();
+        create_concept(&root, "sub/a.md").unwrap();
+        std::os::unix::fs::symlink(root.join("sub/a.md"), root.join("alias.md")).unwrap();
+
+        delete_path(&root, "alias.md").unwrap();
+        assert!(root.join("alias.md").symlink_metadata().is_err());
+        assert!(root.join("sub/a.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rename_a_symlink_renames_the_link_not_its_target() {
+        let root = temp_root();
+        create_folder(&root, "sub").unwrap();
+        create_concept(&root, "sub/a.md").unwrap();
+        std::os::unix::fs::symlink(root.join("sub"), root.join("shortcut")).unwrap();
+
+        let dst = rename_path(&root, "shortcut", "renamed").unwrap();
+        assert_eq!(dst, root.join("renamed"));
+        assert!(root.join("shortcut").symlink_metadata().is_err());
+        assert!(root.join("renamed").symlink_metadata().unwrap().file_type().is_symlink());
+        assert!(root.join("sub/a.md").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delete_a_symlink_pointing_outside_removes_the_link_and_nothing_outside() {
+        // The link itself lives in the Bundle, so deleting it is allowed; what
+        // it points at is outside and must never be touched.
+        let root = temp_root();
+        let outside = std::env::temp_dir().join(format!(
+            "sunstone-outside-delete-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("secret.md"), "x").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("escape_link")).unwrap();
+
+        // Nothing THROUGH the link may be deleted or moved.
+        assert!(delete_path(&root, "escape_link/secret.md").is_err());
+        assert!(rename_path(&root, "escape_link/secret.md", "stolen.md").is_err());
+        assert!(outside.join("secret.md").exists());
+
+        delete_path(&root, "escape_link").unwrap();
+        assert!(root.join("escape_link").symlink_metadata().is_err());
+        assert!(outside.join("secret.md").exists());
+    }
+
+    #[test]
+    fn delete_and_rename_reject_a_missing_entry() {
+        let root = temp_root();
+        assert!(delete_path(&root, "missing.md").is_err());
+        assert!(rename_path(&root, "missing.md", "b.md").is_err());
+        assert!(delete_path(&root, "no/such/dir.md").is_err());
     }
 
     #[test]
