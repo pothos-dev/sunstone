@@ -76,6 +76,17 @@ describe('outboundLinks — inline code spans (CommonMark, as the Rust scanner)'
     expect(links('Use ``a`b`` here. [[codemirror]]')).toContain('concepts/codemirror.md');
   });
 
+  test('only spaces/tabs make a line blank (a NBSP line does not end a span)', () => {
+    // As Rust/CommonMark: `\u00a0` is not blank, so the span runs on and hides it.
+    expect(links('`a\n\u00a0\n[[codemirror]]`')).not.toContain('concepts/codemirror.md');
+    expect(links('`a\n \t\n[[codemirror]]`')).toContain('concepts/codemirror.md');
+  });
+
+  test('a fence may be indented by spaces/tabs only', () => {
+    // A `\r`-led line is not a fence, so the wikilink after it stays visible.
+    expect(links('\r```\n[[codemirror]]')).toContain('concepts/codemirror.md');
+  });
+
   test('a span may cross a single line break', () => {
     const out = links('`code\n[[codemirror]]` [[bundle]]');
     expect(out).not.toContain('concepts/codemirror.md');

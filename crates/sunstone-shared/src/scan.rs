@@ -255,7 +255,7 @@ fn fence_marker(bytes: &[u8], i: usize) -> Option<u8> {
         && (bytes[j] == b'`' || bytes[j] == b'~')
         && bytes[j + 1] == bytes[j]
         && bytes[j + 2] == bytes[j])
-        .then_some(bytes[j])
+        .then(|| bytes[j])
 }
 
 /// Length of the backtick run starting at `i`.
@@ -381,6 +381,17 @@ mod tests {
     #[test]
     fn a_span_may_cross_a_single_line_break() {
         assert_eq!(raws("`code\n[[X]]` [[Y]]"), vec!["Y"]);
+    }
+
+    /// A body ending in a whitespace-only line (common: trailing indentation
+    /// at EOF) must not index past the end while probing for a fence.
+    #[test]
+    fn a_trailing_whitespace_only_line_does_not_panic() {
+        for body in [" ", "\t", "text\n  ", "[[A]]\n\t", "a\r\n \r\n"] {
+            assert_eq!(scan_replace(body, |r| format!("[[{r}]]")), body, "{body:?}");
+        }
+        assert_eq!(raws("[[A]]\n  "), vec!["A"]);
+        assert_eq!(crate::embed::scan_embeds("![[a.png]]\n\t").len(), 1);
     }
 
     #[test]

@@ -41,7 +41,10 @@ const isExternalLink = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(hr
  */
 function maskCode(body: string): string {
   const lines = body.split('\n');
-  const fenceRe = /^\s*(`{3,}|~{3,})/;
+  // Only spaces/tabs may indent a fence, and only spaces/tabs (plus a CRLF's
+  // `\r`) make a line blank — exactly the Rust walker's rules.
+  const fenceRe = /^[ \t]*(`{3,}|~{3,})/;
+  const blankRe = /^[ \t\r]*$/;
   let inFence = false;
   let fenceMarker = '';
   const out: string[] = [];
@@ -69,7 +72,7 @@ function maskCode(body: string): string {
       out.push(' '.repeat(line.length));
       continue;
     }
-    if (line.trim() === '') {
+    if (blankRe.test(line)) {
       flush();
       out.push(line);
       continue;
