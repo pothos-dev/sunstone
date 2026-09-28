@@ -6,7 +6,8 @@
 // native `render.rs` resolved-link href), and `urlToConcept` is the wasm
 // `BundleIndex.urlToConcept` handle method (resolving against the concept set the
 // handle owns, retiring `collectFilePaths`). What stays TS is the title
-// derivation, which reads the `RenderPayload` — no Rust twin (ADR 0006 §3).
+// derivation, which reads the `RenderPayload` — no Rust twin (ADR 0006 §3) —
+// and `urlToConceptInline`, the SSR-only mirror of `urlToConcept` (see below).
 
 import type { RenderPayload } from './render';
 import { stripMd } from '$lib/path';
@@ -30,4 +31,24 @@ function nameFromPath(path: string): string {
   let last = parts.pop() ?? '';
   if (last === 'index') last = parts.pop() ?? ''; // a folder index → the folder name
   return last || 'Sunstone Web';
+}
+
+/**
+ * Resolve a decoded pretty URL path to a Concept path against `paths` (a folder
+ * `index.md` wins over a same-named leaf; empty segments are ignored, so `/`
+ * and `''` address the root `index.md`). The TS mirror of Rust
+ * `sunstone_shared::url::url_to_concept` (the wasm `BundleIndex.urlToConcept`),
+ * used only by the SSR `load`, where wasm is browser-only (ADR 0006 §1/§5) —
+ * the ONLY place this rule is duplicated. `conceptUrl.test.ts` pins parity
+ * against the shipped wasm.
+ */
+export function urlToConceptInline(urlPath: string, paths: readonly string[]): string | null {
+  const set = new Set(paths);
+  const segs = urlPath.split('/').filter(Boolean);
+  if (segs.length === 0) return set.has('index.md') ? 'index.md' : null;
+  const p = segs.join('/');
+  for (const candidate of [`${p}/index.md`, `${p}.md`]) {
+    if (set.has(candidate)) return candidate;
+  }
+  return null;
 }

@@ -1,6 +1,7 @@
 import type { TreeNode } from '$lib/types';
 import type { RenderPayload } from './render';
 import { ensureWasm } from '$lib/wasm';
+import { urlToConceptInline } from './conceptUrl';
 
 /** Every FILE path (bundle-relative) in the tree — the URL-resolution set. */
 function filePaths(tree: TreeNode, into: string[] = []): string[] {
@@ -10,33 +11,15 @@ function filePaths(tree: TreeNode, into: string[] = []): string[] {
 }
 
 /**
- * Resolve a decoded pretty URL path to a Concept path against `paths` (a folder
- * index wins over a same-named leaf). Mirrors the wasm `BundleIndex.urlToConcept`
- * for the SSR path, where wasm is browser-only (ADR 0006 §1/§5) yet this
- * universal `load` still runs on the server — the ONLY place this rule is
- * duplicated, and only when the handle is unavailable.
- */
-function resolveUrlPathInline(urlPath: string, paths: string[]): string | null {
-  const set = new Set(paths);
-  const segs = urlPath.split('/').filter(Boolean);
-  if (segs.length === 0) return set.has('index.md') ? 'index.md' : null;
-  const p = segs.join('/');
-  for (const candidate of [`${p}/index.md`, `${p}.md`]) {
-    if (set.has(candidate)) return candidate;
-  }
-  return null;
-}
-
-/**
  * Resolve a decoded pretty URL path to a Concept path. On the client this goes
  * through the wasm `BundleIndex.urlToConcept` handle (single source, retiring
  * `collectFilePaths`); on SSR (wasm browser-only) it falls back to the inline
- * mirror over the same file set.
+ * mirror `urlToConceptInline` over the same file set.
  */
 async function resolveUrlPath(urlPath: string, tree: TreeNode): Promise<string | null> {
   const paths = filePaths(tree);
   const wasm = await ensureWasm();
-  if (!wasm) return resolveUrlPathInline(urlPath, paths);
+  if (!wasm) return urlToConceptInline(urlPath, paths);
   const index = new wasm.BundleIndex(paths);
   try {
     return index.urlToConcept(urlPath) ?? null;
