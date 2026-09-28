@@ -1,18 +1,12 @@
 //! Pure path math for the move/rename engine ([`super::moves`]): relative-path
-//! computation and wikilink basename / shortest-resolving-suffix. The URL
+//! computation and the wikilink shortest-resolving-suffix. The URL
 //! `split_suffix` / `LinkInner` helpers live beside it in [`super::text`].
 //!
 //! All bundle-relative, '/'-separated; mirrors `paths::resolve_internal`
 //! EXACTLY (`.`/`..` collapse, leading-`..` escapes dropped). No IO — each
 //! function is a pure transform, exhaustively unit-testable.
 
-use crate::wikilink::{self, basename, drop_md};
-
-/// Basename (after the last `/`) of a bundle path, with `.md` dropped — the
-/// literal filename to write into a rewritten wikilink (preserves new casing).
-pub fn basename_of(path: &str) -> &str {
-    drop_md(basename(path))
-}
+use crate::wikilink::{self, drop_md};
 
 /// The shortest path SUFFIX of `target` (a bundle path, `.md` dropped) that,
 /// resolved as a wikilink against `paths`, lands back on `target`. Starts at the
@@ -91,14 +85,6 @@ mod tests {
         assert_eq!(relative_path("a/b", "a/c.md"), "../c.md");
         assert_eq!(relative_path("a", "a/c.md"), "./c.md");
         assert_eq!(relative_path("a/b/c", "x.md"), "../../../x.md");
-    }
-
-    #[test]
-    fn basename_of_drops_dir_and_extension() {
-        assert_eq!(basename_of("a/b/c.md"), "c");
-        assert_eq!(basename_of("c.md"), "c");
-        assert_eq!(basename_of("a/b/c.MD"), "c"); // case-insensitive `.md`
-        assert_eq!(basename_of("a/b/file"), "file"); // no extension
     }
 
     #[test]

@@ -32,7 +32,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `links` | Markdown link resolution — `resolve_link` (→ `ResolvedLink`, `internal` carries `exists`), `find_bundle_root`, `RewriteBody`, `WikilinkTarget`. |
 | `wikilink` | `[[name]]` parsing (`parse_target`, `parse_target_parts`) and **name-based** resolution (`resolve_wikilink`) — case-insensitive, basename or path-suffix, shortest-path tie-break. |
 | `slug` | GitHub-style heading `slugify` for anchor links (no de-duplication). |
-| `rewrite` | Same-file and corpus-wide anchor rewriting (`anchors`: `rewrite_anchors_in`, `AnchorRename`, `AnchorRewrite`) and the move/rename engine (`moves`: `plan_rewrites`, `build_move_map`, `RewriteSummary`, `MovePlan`) with its path math (`relpath`: `relative_path`, `shortest_resolving_suffix`, `basename_of`). |
+| `rewrite` | Same-file and corpus-wide anchor rewriting (`anchors`: `rewrite_anchors_in`, `AnchorRename`, `AnchorRewrite`) and the move/rename engine (`moves`: `plan_rewrites`, `build_move_map`, `RewriteSummary`, `MovePlan`) with its path math (`relpath`: `relative_path`, `shortest_resolving_suffix`). |
 | `paths` | Pure path helpers — `to_rel_string`, `resolve_internal`, `is_external`, `find_byte` — shared so native tree/index/search and the browser cannot drift. |
 | `frontmatter` | Verbatim `split` / `split_concept` (byte-preserving), `frontmatter_line_count`, and the index-parse kernels (`parse_frontmatter`, `frontmatter_fields`). |
 | `outline` | ATX-only heading scan (`scan_headings` → `OutlineHeading`) and `find_heading_line`. |

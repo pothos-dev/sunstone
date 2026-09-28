@@ -167,6 +167,24 @@ describe('planRewrites — wikilinks', () => {
     // the rewrite must keep the disambiguating folder + preserve anchor + alias.
     expect(rewritten).toContain('[[zzz/target#sec|label]]');
   });
+
+  test('a bare rename never lands on another Concept of the new name', () => {
+    setFiles({
+      'a/x.md': concept('# X'),
+      'y.md': concept('# Y'),
+      's.md': concept('See [[x]].'),
+    });
+    const { writes } = planRewrites('a/x.md', 'a/y.md');
+    // `[[y]]` would resolve to the root y.md; keep enough path to stay on a/y.md.
+    expect(writes.get('s.md')).toContain('See [[a/y]].');
+  });
+
+  test('a bare name that still resolves is left byte-for-byte on a folder move', () => {
+    setFiles({ 'old.md': concept('# Old'), 's.md': concept('[[Old]] [[old.md]]') });
+    const { summary, writes } = planRewrites('old.md', 'f/old.md');
+    expect(writes.has('s.md')).toBe(false);
+    expect(summary.linksChanged).toBe(0);
+  });
 });
 
 describe('planRewrites — Embeds (the af-1 `!`-asymmetry)', () => {

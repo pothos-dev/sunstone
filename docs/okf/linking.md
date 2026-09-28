@@ -156,8 +156,7 @@ When a Concept or folder is renamed/moved, Sunstone **automatically rewrites the
 
 - **Inbound absolute** links (`/old.md`) → the new absolute path.
 - **Inbound & outbound relative** links → recomputed from the source's own directory, preserving relative style (`./`, `../`).
-- **Bare wikilinks** (`[[old]]`) rewrite **only when the basename changes** — a pure folder move leaves them untouched, since bare names resolve bundle-wide anywhere.
-- **Partial-path wikilinks** (`[[a/old]]`) rewrite to the **shortest suffix that still resolves** to the new path in the new Bundle.
+- **Wikilinks** (`[[old]]`, `[[a/old]]`) whose target moved are left **byte-for-byte** when the written name still resolves (by `resolve_wikilink`, over the post-move path set) to the moved Concept — so a pure folder move keeps `[[Old]]` or `[[old.md]]` as written. Otherwise the name becomes the **shortest suffix that resolves** to the new path: the new basename on a plain rename, or more segments when the basename alone would land on another Concept (`[[x]]` → `[[a/y]]` when renaming `a/x.md` to `a/y.md` next to a root `y.md`; `[[x]]` → `[[c/x]]` when a move makes `a/b/c/x.md` lose the fewest-`/` tie-break).
 - `|alias`, `#anchor`, `?query`, link titles, link text and external links are all preserved verbatim; only links whose resolved target actually moved change.
 
 Separately, `rewrite_anchors_in` (`sunstone-shared/src/rewrite/anchors.rs`, exposed as `rewriteAnchors`) rewrites the `#anchor` of every link pointing at a heading whose slug changed — both cross-file inbound links (via the backend) and same-file `[[#slug]]` links in the open editor buffer (`source === target`). Both sides are slugged before comparison, so an older literal anchor is migrated to the canonical slug on the first heading rename.

@@ -7,7 +7,7 @@
 //!   filesystem; the wasm `planMoveRewrites` export drives it for the fake
 //!   backend.
 //! * `relpath` — the engine's path math (`relative_path`,
-//!   `shortest_resolving_suffix`, `basename_of`).
+//!   `shortest_resolving_suffix`).
 //! * `text` — the URL / link-inner helpers both rewriters share.
 
 pub mod anchors;

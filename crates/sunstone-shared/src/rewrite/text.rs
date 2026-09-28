@@ -1,6 +1,6 @@
 //! Pure URL / UTF-8 helpers for link rewriting, shared by the anchor rewriter
 //! (`anchors`) and the move/rename engine (`moves`). The engine's path math
-//! (`basename_of`, `relative_path`, `shortest_resolving_suffix`) lives in
+//! (`relative_path`, `shortest_resolving_suffix`) lives in
 //! `relpath`.
 
 /// Split a URL into its path part and the `#anchor`/`?query` suffix (preserved

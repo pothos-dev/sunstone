@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::paths::{dir_of, is_external, resolve_internal};
 use crate::wikilink::{self, parse_target};
 
-use super::relpath::{basename_of, relative_path, shortest_resolving_suffix};
+use super::relpath::{relative_path, shortest_resolving_suffix};
 use super::text::{split_suffix, LinkInner};
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
@@ -283,10 +283,12 @@ fn rewrite_target(
 ///
 /// Resolution uses the OLD bundle state, from the source's OLD location. The
 /// `|alias` and `#anchor` are preserved VERBATIM (they never participate in
-/// resolution). A BARE name only changes when the target's BASENAME changed —
-/// a pure folder move leaves bare wikilinks untouched (they resolve by basename
-/// bundle-wide). A PARTIAL PATH is recomputed to the shortest suffix that still
-/// resolves to the moved file in the NEW bundle state.
+/// resolution). A wikilink whose ORIGINAL text still resolves to the moved
+/// file in the NEW bundle state is left byte-for-byte (casing, a `.md` suffix
+/// and any partial path survive). Otherwise the name is recomputed to the
+/// shortest suffix that resolves to the moved file in the NEW bundle state —
+/// the basename when that is unambiguous, so a plain rename writes the new
+/// basename, but never a name that would land on a different Concept.
 fn rewrite_wikilink(
     old_source: &str,
     raw: &str,
@@ -303,18 +305,11 @@ fn rewrite_wikilink(
     let resolved = wikilink::resolve_wikilink(all_paths, old_source, raw)?;
     // Only rewrite if the resolved target actually moved.
     let new_target = moves.get(&resolved)?;
-
-    let is_partial = target.name.contains('/');
-    let new_name = if is_partial {
-        // Shortest suffix of the NEW path that resolves (per §1, against the new
-        // path set) back to `new_target`. Try basename, then progressively add
-        // leading segments; fall back to the full new path.
-        shortest_resolving_suffix(new_paths, old_source, new_target)
-    } else {
-        // Bare name: rewrite to the new BASENAME. If the basename did not change
-        // (folder-only move), this yields no textual change and we leave it.
-        basename_of(new_target).to_string()
-    };
+    // Still resolves to the moved file by the resolver's own rules: keep it.
+    if wikilink::resolve_wikilink(new_paths, old_source, raw).as_deref() == Some(new_target) {
+        return None;
+    }
+    let new_name = shortest_resolving_suffix(new_paths, old_source, new_target);
 
     // Rebuild the inner text from the boundaries of the original `raw`, so the
     // alias/anchor (and their ORIGINAL delimiters/whitespace) survive verbatim.
@@ -694,6 +689,60 @@ mod tests {
             "real [[new]]\n```\ncode [[old]]\n```\ninline `[[old]]`"
         );
         assert_eq!(summary.links_changed, 1);
+    }
+
+    #[test]
+    fn bare_wikilink_rename_never_lands_on_another_concept_of_the_new_name() {
+        // `[[x]]` -> a/x.md; renaming it to a/y.md must not write `[[y]]`,
+        // which would resolve to the root y.md (fewer slashes).
+        let files = &[("a/x.md", "# X"), ("y.md", "# Y"), ("s.md", "see [[x]]")];
+        let m = moves(&[("a/x.md", "a/y.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["s.md"], "see [[a/y]]");
+        assert_eq!(summary.links_changed, 1);
+    }
+
+    #[test]
+    fn bare_wikilink_gains_a_segment_when_a_move_loses_the_tie_break() {
+        // Before: a/x.md (1 slash) beats z/q/x.md. After the move a/b/c/x.md
+        // has 3 slashes and `[[x]]` would silently resolve to z/q/x.md.
+        let files = &[
+            ("a/x.md", "# X"),
+            ("z/q/x.md", "# Other X"),
+            ("s.md", "see [[x|X]] and [[x#sec]]"),
+        ];
+        let m = moves(&[("a/x.md", "a/b/c/x.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["s.md"], "see [[c/x|X]] and [[c/x#sec]]");
+        assert_eq!(summary.links_changed, 2);
+        let new_paths: Vec<String> = result.keys().cloned().collect();
+        assert_eq!(
+            wikilink::resolve_wikilink(&new_paths, "s.md", "c/x").as_deref(),
+            Some("a/b/c/x.md")
+        );
+    }
+
+    #[test]
+    fn bare_wikilink_that_still_resolves_is_left_byte_for_byte() {
+        // A folder-only move keeps the author's casing and `.md` suffix.
+        let files = &[
+            ("a.md", "[[Old]] and [[old.md]] and [[OLD|o]]"),
+            ("old.md", "# Old"),
+        ];
+        let m = moves(&[("old.md", "folder/old.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["a.md"], "[[Old]] and [[old.md]] and [[OLD|o]]");
+        assert_eq!(summary.links_changed, 0);
+    }
+
+    #[test]
+    fn partial_path_wikilink_that_still_resolves_is_left_alone() {
+        // `[[b/x]]` still names the moved file after `a/b` -> `z/b`.
+        let files = &[("s.md", "[[b/x]]"), ("a/b/x.md", "# X")];
+        let m = moves(&[("a/b/x.md", "z/b/x.md")]);
+        let (result, summary) = run(files, &m);
+        assert_eq!(result["s.md"], "[[b/x]]");
+        assert_eq!(summary.links_changed, 0);
     }
 
     #[test]
