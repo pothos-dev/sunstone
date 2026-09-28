@@ -379,12 +379,8 @@
       onConflictKeep={conflictKeep}
       onDeletedRecreate={deletedRecreate}
       onDeletedDiscard={deletedDiscard}
-      onLeaveSave={() => void resolveGate('leave', 'save')}
-      onLeaveDiscard={() => void resolveGate('leave', 'discard')}
-      onLeaveCancel={() => void resolveGate('leave', 'cancel')}
-      onStructuralSave={() => void resolveGate('structural', 'save')}
-      onStructuralDiscard={() => void resolveGate('structural', 'discard')}
-      onStructuralCancel={() => void resolveGate('structural', 'cancel')}
+      onLeave={(choice) => void resolveGate('leave', choice)}
+      onStructural={(choice) => void resolveGate('structural', choice)}
     />
   </div>
 {:else}

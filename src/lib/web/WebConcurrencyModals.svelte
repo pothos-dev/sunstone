@@ -21,7 +21,7 @@
   // get the full App shell instead); rendered today by `WebAppShellIsland`.
   // All decision logic + state machines stay in the island; this is a thin
   // switch over the pure `concurrency.ts` copy helpers.
-  import type { GatedStructuralOp } from './concurrency';
+  import type { GateChoice, GatedStructuralOp } from './concurrency';
   import {
     conflictTitle,
     updatedNoticeText,
@@ -45,8 +45,11 @@
     deleted: { author: string | null } | null;
     /** Blocking conflict dialog: dirty buffer, active Concept changed remotely. */
     conflict: { author: string | null } | null;
-    /** Three-way leave modal: unsaved edits on an implicit exit (presence only). */
-    leave: unknown | null;
+    /**
+     * Three-way leave modal: unsaved edits on an implicit exit. Only its
+     * presence matters here (the copy names `conceptName`).
+     */
+    leave: { doc: { path: string } } | null;
     /** Three-way structural-op modal: rename/move/delete while dirty. */
     structural: { op: GatedStructuralOp; target: string } | null;
 
@@ -57,12 +60,10 @@
     onConflictKeep: () => void;
     onDeletedRecreate: () => void;
     onDeletedDiscard: () => void;
-    onLeaveSave: () => void;
-    onLeaveDiscard: () => void;
-    onLeaveCancel: () => void;
-    onStructuralSave: () => void;
-    onStructuralDiscard: () => void;
-    onStructuralCancel: () => void;
+    /** The leave modal's Save / Discard / Cancel choice. */
+    onLeave: (choice: GateChoice) => void;
+    /** The structural-op modal's Save / Discard / Cancel choice. */
+    onStructural: (choice: GateChoice) => void;
   }
 
   let {
@@ -78,12 +79,8 @@
     onConflictKeep,
     onDeletedRecreate,
     onDeletedDiscard,
-    onLeaveSave,
-    onLeaveDiscard,
-    onLeaveCancel,
-    onStructuralSave,
-    onStructuralDiscard,
-    onStructuralCancel,
+    onLeave,
+    onStructural,
   }: Props = $props();
 </script>
 
@@ -154,11 +151,15 @@
     <div class="modal">
       <h2>{leavePromptText(conceptName)}</h2>
       <div class="modal-actions">
-        <button type="button" class="primary" data-testid="web-leave-save" onclick={onLeaveSave}
+        <button type="button" class="primary" data-testid="web-leave-save" onclick={() => onLeave('save')}
           >Save</button
         >
-        <button type="button" data-testid="web-leave-discard" onclick={onLeaveDiscard}>Discard</button>
-        <button type="button" data-testid="web-leave-cancel" onclick={onLeaveCancel}>Cancel</button>
+        <button type="button" data-testid="web-leave-discard" onclick={() => onLeave('discard')}
+          >Discard</button
+        >
+        <button type="button" data-testid="web-leave-cancel" onclick={() => onLeave('cancel')}
+          >Cancel</button
+        >
       </div>
     </div>
   </div>
@@ -171,13 +172,13 @@
       <h2>{structuralPromptText(structural.op, structural.target, conceptName)}</h2>
       <p>This action also updates links across the Bundle and can't run with unsaved changes open.</p>
       <div class="modal-actions">
-        <button type="button" class="primary" data-testid="web-structural-save" onclick={onStructuralSave}
+        <button type="button" class="primary" data-testid="web-structural-save" onclick={() => onStructural('save')}
           >Save &amp; continue</button
         >
-        <button type="button" data-testid="web-structural-discard" onclick={onStructuralDiscard}
+        <button type="button" data-testid="web-structural-discard" onclick={() => onStructural('discard')}
           >Discard &amp; continue</button
         >
-        <button type="button" data-testid="web-structural-cancel" onclick={onStructuralCancel}
+        <button type="button" data-testid="web-structural-cancel" onclick={() => onStructural('cancel')}
           >Cancel</button
         >
       </div>
