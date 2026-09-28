@@ -14,10 +14,12 @@
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-/// Whether a `sunstone-native` error message is a path the client should never
-/// have sent: absolute, or escaping the Bundle.
+/// Whether an error message is a path the client should never have sent:
+/// absolute, escaping the Bundle, or naming a hidden entry ([`check_rel_path`]).
 fn is_bad_path(msg: &str) -> bool {
-    msg.contains("escapes the bundle") || msg.contains("must be bundle-relative")
+    msg.contains("escapes the bundle")
+        || msg.contains("must be bundle-relative")
+        || msg.contains("names a hidden entry")
 }
 
 // --- Read side --------------------------------------------------------------
@@ -52,18 +54,33 @@ pub(crate) fn classify(msg: &str) -> StatusCode {
     }
 }
 
-/// Reject a `path` that escapes the Bundle (absolute, or containing a `..`
-/// segment) with a 400. The index routes never touch the filesystem, but the
-/// path is still a client-supplied bundle-relative key, so we guard the network
-/// boundary the same way the fs routes do.
-pub(crate) fn guard_rel_path(path: &str) -> Result<(), ApiError> {
+/// The network-boundary check every client-supplied bundle-relative path goes
+/// through, read and write alike. Refuses:
+///
+/// - an escape — absolute, or containing a `..` segment;
+/// - a **hidden** component — any dot-prefixed segment other than `.` itself.
+///   The Bundle walker and the watcher hide these, so no Concept or Attachment
+///   path ever has one; what they *do* name is `.git/` (the origin URL in
+///   `.git/config`, the auth-gated history in `.git/objects`, and — writable —
+///   a `core.fsmonitor` command the next `git add` would run).
+///
+/// `bundle::resolve` stays the filesystem-side confinement (it catches the
+/// symlinked escape no string check can see); this is the syntactic half.
+pub(crate) fn check_rel_path(path: &str) -> Result<(), String> {
     if path.starts_with('/') || path.split('/').any(|c| c == "..") {
-        return Err(ApiError(
-            StatusCode::BAD_REQUEST,
-            format!("path escapes the bundle: {path}"),
-        ));
+        return Err(format!("path escapes the bundle: {path}"));
+    }
+    if path.split('/').any(|c| c.starts_with('.') && c != ".") {
+        return Err(format!("path names a hidden entry: {path}"));
     }
     Ok(())
+}
+
+/// [`check_rel_path`] as a read-side `400`. The index routes never touch the
+/// filesystem, but the path is still a client-supplied bundle-relative key, so
+/// they guard the network boundary the same way the fs routes do.
+pub(crate) fn guard_rel_path(path: &str) -> Result<(), ApiError> {
+    check_rel_path(path).map_err(|msg| ApiError(StatusCode::BAD_REQUEST, msg))
 }
 
 // --- Write side -------------------------------------------------------------
@@ -119,6 +136,18 @@ mod tests {
         assert_eq!(escape.0, StatusCode::BAD_REQUEST);
         assert_eq!(guard_rel_path("/etc/passwd").unwrap_err().0, StatusCode::BAD_REQUEST);
         assert_eq!(guard_rel_path("a/../../x.md").unwrap_err().0, StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn check_rel_path_rejects_hidden_components_but_not_dot() {
+        for bad in [".git/config", "a/.git/config", ".env", "sub/.hidden.md", "..."] {
+            let msg = check_rel_path(bad).unwrap_err();
+            assert_eq!(classify(&msg), StatusCode::BAD_REQUEST, "{bad}");
+            assert_eq!(classify_write(&msg), StatusCode::BAD_REQUEST, "{bad}");
+        }
+        for ok in ["", ".", "./a.md", "a/./b.md", "notes/v1.2.md", "a.b/c.md"] {
+            assert!(check_rel_path(ok).is_ok(), "{ok}");
+        }
     }
 
     #[test]

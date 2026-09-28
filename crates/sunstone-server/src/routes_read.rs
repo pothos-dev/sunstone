@@ -47,6 +47,7 @@ pub(crate) async fn concept_handler(
     State(state): State<Arc<ServerState>>,
     Query(q): Query<ConceptQuery>,
 ) -> Result<Json<String>, ApiError> {
+    guard_rel_path(&q.path)?;
     bundle::read_concept(&state.app.bundle_root, &q.path)
         .map(Json)
         .map_err(ApiError::from_core)
@@ -56,6 +57,7 @@ pub(crate) async fn render_handler(
     State(state): State<Arc<ServerState>>,
     Query(q): Query<ConceptQuery>,
 ) -> Result<Json<RenderPayload>, ApiError> {
+    guard_rel_path(&q.path)?;
     // Resolve links against the in-memory index. The read lock is held only for
     // the render call; a poisoned lock is a 500.
     let index = read_index(&state)?;
@@ -332,6 +334,24 @@ mod tests {
         let index = sunstone_native::index::Index::build(&root);
         let err = render::render_concept(&root, &index, "../secret.md", &asset_url).unwrap_err();
         assert_eq!(classify(&err), StatusCode::BAD_REQUEST);
+    }
+
+    /// The read routes refuse a hidden (dot-prefixed) component, so `.git/` and
+    /// other entries the walker hides are unreachable over HTTP.
+    #[tokio::test]
+    async fn concept_and_render_routes_reject_a_hidden_path_with_400() {
+        use crate::config::Config;
+        let root = temp_bundle();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git/notes.md"), "secret").unwrap();
+        let state = server_state(Config::plain(root));
+        for path in [".git/notes.md", "sub/../.git/notes.md"] {
+            let q = || Query(ConceptQuery { path: path.to_string() });
+            let err = concept_handler(State(state.clone()), q()).await.unwrap_err();
+            assert_eq!(err.0, StatusCode::BAD_REQUEST, "{path}");
+            let err = render_handler(State(state.clone()), q()).await.unwrap_err();
+            assert_eq!(err.0, StatusCode::BAD_REQUEST, "{path}");
+        }
     }
 
     #[test]

@@ -36,8 +36,8 @@
 //!
 //! # Boundary details (§11.2)
 //!
-//! - Reuse the existing path guard ([`crate::guard_rel_path`]): absolute or `..`
-//!   ⇒ **400**. The one case the seam permits rejecting.
+//! - Reuse the existing path guard ([`crate::guard_rel_path`]): absolute, `..`
+//!   or a hidden segment ⇒ **400**. The one case the seam permits rejecting.
 //! - `rev` passes through **opaquely**; git is invoked via `Command::args` (no
 //!   shell), so there is no quoting concern. An unresolvable rev falls out as
 //!   `notFound`.

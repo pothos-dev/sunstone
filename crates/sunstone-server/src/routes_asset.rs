@@ -13,8 +13,9 @@
 //! ## Confinement, twice
 //!
 //! - [`guard_rel_path`] at the **network** boundary — the cheap syntactic check
-//!   every other path-taking route runs, rejecting a leading `/` or any `..`
-//!   segment with a `400` before the filesystem is touched at all.
+//!   every other path-taking route runs, rejecting a leading `/`, any `..`
+//!   segment, or a hidden (dot-prefixed) segment such as `.git` with a `400`
+//!   before the filesystem is touched at all.
 //! - [`bundle::resolve`] at the **filesystem** — the shared primitive
 //!   (absolute-reject, component-reject, `canonicalize`, `starts_with(root)`),
 //!   which is what catches the escape the syntactic check *cannot* see: an
@@ -187,6 +188,25 @@ mod tests {
             StatusCode::BAD_REQUEST
         );
         assert_eq!(get(&root, "a/../../b").await.0, StatusCode::BAD_REQUEST);
+    }
+
+    /// A dot-prefixed component names something the Bundle never lists (the
+    /// walker hides it) — above all `.git/`, whose `config` carries the origin
+    /// URL and whose objects hold the whole (auth-gated) history. This route is
+    /// unauthenticated, so it must refuse them outright.
+    #[tokio::test]
+    async fn a_hidden_path_is_rejected() {
+        let root = temp_bundle();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git/config"), b"[remote]").unwrap();
+        std::fs::write(root.join(".env.png"), b"secret").unwrap();
+        for path in [".git/config", ".env.png", "assets/../.git/config", "./.git/config"] {
+            let (status, _, body) = get(&root, path).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
+            assert_ne!(body, b"[remote]", "{path}");
+        }
+        // A plain `.` segment is still the current directory, not a hidden entry.
+        assert_eq!(get(&root, "./assets/sub/logo.png").await.0, StatusCode::OK);
     }
 
     #[tokio::test]

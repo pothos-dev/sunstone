@@ -1,7 +1,8 @@
 //! Write routes (ticket 07): `/api/concept` (PUT/POST/DELETE), `/api/folder`,
 //! `/api/rename`, `/api/move`, `/api/rewrite-anchors`.
 //!
-//! Every handler takes `AuthedUser` (proof it is gated; reads omit it) and runs
+//! Every handler takes `AuthedUser` (proof it is gated; reads omit it), checks
+//! each path it names at the network boundary ([`guard_write_paths`]), and runs
 //! its orchestration on a blocking thread under the global write lock. The
 //! identity flows into the git commit author/committer; a stamped `FileChange`
 //! is broadcast so other browsers live-refresh while the writer drops its echo.
@@ -26,7 +27,7 @@ use sunstone_native::git::CommitIdentity;
 use sunstone_native::rewrite::{AnchorRename, RewriteSummary};
 use sunstone_native::watcher::{FileAuthor, FileChange, FileOrigin};
 
-use crate::api_error::WriteError;
+use crate::api_error::{check_rel_path, WriteError};
 use crate::auth::AuthedUser;
 use crate::routes_read::ConceptQuery;
 use crate::{ServerEvent, ServerState};
@@ -70,6 +71,7 @@ pub(crate) async fn write_concept_handler(
     headers: HeaderMap,
     Json(body): Json<WriteConceptBody>,
 ) -> Result<StatusCode, WriteError> {
+    guard_write_paths(&[&body.path])?;
     write_and_broadcast(
         &state,
         &user,
@@ -86,6 +88,7 @@ pub(crate) async fn create_concept_handler(
     headers: HeaderMap,
     Json(body): Json<PathBody>,
 ) -> Result<StatusCode, WriteError> {
+    guard_write_paths(&[&body.path])?;
     write_and_broadcast(
         &state,
         &user,
@@ -102,6 +105,7 @@ pub(crate) async fn create_folder_handler(
     headers: HeaderMap,
     Json(body): Json<PathBody>,
 ) -> Result<StatusCode, WriteError> {
+    guard_write_paths(&[&body.path])?;
     write_and_broadcast(
         &state,
         &user,
@@ -118,6 +122,7 @@ pub(crate) async fn delete_concept_handler(
     headers: HeaderMap,
     Query(q): Query<ConceptQuery>,
 ) -> Result<StatusCode, WriteError> {
+    guard_write_paths(&[&q.path])?;
     write_and_broadcast(
         &state,
         &user,
@@ -134,6 +139,7 @@ pub(crate) async fn rename_handler(
     headers: HeaderMap,
     Json(body): Json<RenameBody>,
 ) -> Result<Json<RewriteSummary>, WriteError> {
+    guard_write_paths(&[&body.from, &body.to])?;
     write_and_broadcast(
         &state,
         &user,
@@ -150,6 +156,7 @@ pub(crate) async fn move_handler(
     headers: HeaderMap,
     Json(body): Json<MoveBody>,
 ) -> Result<Json<RewriteSummary>, WriteError> {
+    guard_write_paths(&[&body.from, &body.to_dir])?;
     write_and_broadcast(
         &state,
         &user,
@@ -166,6 +173,7 @@ pub(crate) async fn rewrite_anchors_handler(
     headers: HeaderMap,
     Json(body): Json<RewriteAnchorsBody>,
 ) -> Result<Json<RewriteSummary>, WriteError> {
+    guard_write_paths(&[&body.target])?;
     write_and_broadcast(
         &state,
         &user,
@@ -174,6 +182,15 @@ pub(crate) async fn rewrite_anchors_handler(
         |result| Json(result.summary.unwrap_or_default()),
     )
     .await
+}
+
+/// [`check_rel_path`] over every path a write names, before the write lock is
+/// taken — an invalid or hidden path is a `400` and never reaches the disk.
+fn guard_write_paths(paths: &[&str]) -> Result<(), WriteError> {
+    paths
+        .iter()
+        .try_for_each(|p| check_rel_path(p))
+        .map_err(WriteError)
 }
 
 /// The shared write-handler skeleton (identity → shape → run_write →
@@ -400,5 +417,54 @@ mod tests {
     #[test]
     fn a_missing_client_header_yields_an_empty_client_id() {
         assert_eq!(client_id(&HeaderMap::new()), "");
+    }
+
+    /// Every write route refuses a hidden (dot-prefixed) component before any
+    /// IO: a write into `.git/` (e.g. `core.fsmonitor` in `.git/config`) would
+    /// run a command on the next `git add`.
+    #[tokio::test]
+    async fn write_routes_reject_a_hidden_path_with_400() {
+        use crate::api_error::classify_write;
+        let root = temp_bundle();
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::write(root.join(".git/config"), "[core]").unwrap();
+        let state = server_state(Config::plain(root.clone()));
+        let user = || AuthedUser {
+            name: "Ada Lovelace".to_string(),
+            email: "ada@example.com".to_string(),
+        };
+        let h = HeaderMap::new;
+        let s = || State(state.clone());
+        let status = |e: WriteError| classify_write(&e.0);
+
+        let body = WriteConceptBody { path: ".git/config".into(), content: "[core]\n x".into() };
+        let err = write_concept_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = PathBody { path: ".hidden/new.md".into() };
+        let err = create_concept_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = PathBody { path: ".hidden".into() };
+        let err = create_folder_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let q = Query(ConceptQuery { path: ".git".into() });
+        let err = delete_concept_handler(s(), user(), h(), q).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = RenameBody { from: "note.md".into(), to: ".git/hooks/note.md".into() };
+        let err = rename_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = RenameBody { from: ".git/config".into(), to: "config.md".into() };
+        let err = rename_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = MoveBody { from: "note.md".into(), to_dir: ".git".into() };
+        let err = move_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        let body = RewriteAnchorsBody { target: ".git/x.md".into(), renames: vec![] };
+        let err = rewrite_anchors_handler(s(), user(), h(), Json(body)).await.unwrap_err();
+        assert_eq!(status(err), StatusCode::BAD_REQUEST);
+
+        // Nothing under `.git/` was touched, and nothing landed in the Bundle.
+        assert_eq!(std::fs::read_to_string(root.join(".git/config")).unwrap(), "[core]");
+        assert!(root.join("note.md").exists());
+        assert!(!root.join(".hidden").exists());
     }
 }
