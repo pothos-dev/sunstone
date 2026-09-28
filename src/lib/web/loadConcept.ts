@@ -1,3 +1,4 @@
+import { error } from '@sveltejs/kit';
 import type { TreeNode } from '$lib/types';
 import type { RenderPayload } from './render';
 import { ensureWasm } from '$lib/wasm';
@@ -71,6 +72,21 @@ async function loadUser(fetchFn: typeof fetch): Promise<WebUser | null> {
 }
 
 /**
+ * Fetch one of the JSON payloads the shell cannot render without (Bundle root,
+ * tree). A failed upstream — `sunstone-server` down or erroring — becomes a 502
+ * SvelteKit error naming the endpoint and the upstream `status: body` (the same
+ * shape as `renderError`), rather than an opaque JSON-parse 500.
+ */
+async function fetchShellJson<T>(fetchFn: typeof fetch, path: string): Promise<T> {
+  const res = await fetchFn(path);
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')) || 'no response body';
+    error(502, `Cannot load ${path}: ${res.status}: ${detail}`);
+  }
+  return (await res.json()) as T;
+}
+
+/**
  * Load the Bundle root + Explorer tree and, for the Concept addressed by
  * `urlPath` (a pretty, already-decoded path like `research/providers/mistral-ai`
  * or `''` for the root), the server-rendered payload — so first paint shows the
@@ -83,8 +99,8 @@ async function loadUser(fetchFn: typeof fetch): Promise<WebUser | null> {
  */
 export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promise<WebPageData> {
   const [bundleRoot, tree, user] = await Promise.all([
-    fetchFn('/api/bundle-root').then((r) => r.json() as Promise<string>),
-    fetchFn('/api/tree').then((r) => r.json() as Promise<TreeNode>),
+    fetchShellJson<string>(fetchFn, '/api/bundle-root'),
+    fetchShellJson<TreeNode>(fetchFn, '/api/tree'),
     loadUser(fetchFn),
   ]);
 
