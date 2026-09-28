@@ -281,9 +281,10 @@ export interface Backend {
    * and offers reader controls (font size, margins) plus Print / Save-as-PDF.
    *
    * On the desktop this opens a SEPARATE native window (WebKitGTK has no rich
-   * PDF chrome of its own); the fake/HTTP impls open a new browser tab. The web
-   * viewer opens a bare tab directly (no toolbar) and relies on the browser's
-   * native print → Save-as-PDF UI, so it does not use this seam.
+   * PDF chrome of its own); the fake/HTTP impls open a new browser tab (the
+   * signed-in web shell goes through here). Only the anonymous web read surface
+   * bypasses this seam: it opens a bare tab directly (no toolbar) and relies on
+   * the browser's native print → Save-as-PDF UI.
    */
   openPrintWindow(path: string): Promise<void>;
 
@@ -293,7 +294,7 @@ export interface Backend {
    * chooser (default file name `defaultName`) and writes the PDF, resolving to
    * the saved absolute path — or `null` if the chooser was cancelled. Rejects on
    * platforms without direct export so the caller can fall back to
-   * `window.print()`. Desktop-only; the fake/HTTP impls resolve to `null`.
+   * `window.print()`. Desktop-only; the fake/HTTP impls always reject.
    */
   savePdf(defaultName: string): Promise<string | null>;
 

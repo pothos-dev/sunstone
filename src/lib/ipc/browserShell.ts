@@ -6,8 +6,9 @@
  *
  *  - print preview opens as a new tab WITH the desktop reader toolbar, so the
  *    desktop print flow stays exercisable without the Tauri shell;
- *  - direct PDF save has no filesystem — a no-op `null` (the browser's native
- *    print → Save-as-PDF UI is the export path);
+ *  - direct PDF save has no filesystem — it rejects, so the print view falls
+ *    back to `window.print()` (the browser's native print → Save-as-PDF UI is
+ *    the export path);
  *  - "open in default app" is a plain new tab: in a browser, a new tab IS the
  *    default application.
  */
@@ -17,7 +18,9 @@ export async function openPrintTab(path: string): Promise<void> {
 }
 
 export async function noSavePdf(_defaultName: string): Promise<string | null> {
-  return null;
+  // Rejecting (not resolving `null`, which means "chooser cancelled") is what
+  // makes the caller fall back to the print dialog — see `Backend.savePdf`.
+  throw new Error('direct PDF export unavailable');
 }
 
 export async function setDocumentTitle(title: string): Promise<void> {

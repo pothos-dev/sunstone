@@ -137,6 +137,24 @@ test('preview (toolbar) renders the Concept and Print calls window.print', async
   await page.screenshot({ path: 'tests/screenshots/export-pdf.png', fullPage: true });
 });
 
+// The browser shells (fake + web) have no direct PDF export: `savePdf` rejects,
+// so Save as PDF falls back to the browser's print dialog (its own Save-as-PDF).
+test('Save as PDF falls back to window.print where there is no direct export', async ({
+  page,
+}) => {
+  await stubPrint(page);
+  await page.goto(`/?print=${encodeURIComponent(FIXTURE)}&toolbar=1`);
+  await expect(page.getByTestId('print-body').locator('h1')).toContainText('Annotated');
+
+  const savePdf = page.getByTestId('save-pdf');
+  await expect(savePdf).toBeEnabled();
+  expect(await printCalls(page)).toBe(0);
+  await savePdf.click();
+  await expect.poll(() => printCalls(page)).toBe(1);
+  // Nothing was written, so no "Saved to …" confirmation.
+  await expect(page.getByText(/Saved to/)).toHaveCount(0);
+});
+
 test('preview (web, no toolbar) renders and auto-invokes the browser print', async ({ page }) => {
   await stubPrint(page);
   await page.goto(`/?print=${encodeURIComponent(FIXTURE)}`);

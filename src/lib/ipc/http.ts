@@ -449,8 +449,9 @@ export const httpBackend: Backend = {
   },
 
   // The web app already runs in a browser: the browser-shell fallbacks shared
-  // with the fake backend (see `./browserShell`). (The web viewer opens its own
-  // chrome-free print tab directly, so `openPrintWindow` is interface parity.)
+  // with the fake backend (see `./browserShell`). The signed-in shell (the full
+  // `App` island) prints through `openPrintWindow`; only the anonymous read
+  // surface opens its own chrome-free print tab directly.
   openPrintWindow: openPrintTab,
   savePdf: noSavePdf,
   setWindowTitle: setDocumentTitle,
