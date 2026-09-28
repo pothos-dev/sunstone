@@ -64,6 +64,7 @@
   import Frontmatter from '$lib/components/Frontmatter.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import AnnotationPopup from '$lib/components/AnnotationPopup.svelte';
+  import ReviewStepper from '$lib/components/ReviewStepper.svelte';
 
   interface Props {
     /** The Tile state object (active Concept, history, shared Document). */
@@ -739,34 +740,7 @@
   ></div>
 
   {#if review.active}
-    <div class="review-stepper" data-testid="review-stepper">
-      <button
-        type="button"
-        class="nav-btn"
-        data-testid="review-older"
-        title="Compare the previous (older) commit pair"
-        aria-label="Older change"
-        disabled={!review.stepInfo.canOlder}
-        onclick={() => review.step(1)}>← older</button
-      >
-      <div class="review-stepper-meta">
-        <span class="review-comparison" data-testid="review-stepper-label">{review.stepInfo.label}</span>
-        {#if review.stepInfo.newer}
-          <span class="review-hash" data-testid="review-stepper-hash">{review.stepInfo.newer.hash}</span>
-          <span class="review-subject" data-testid="review-stepper-subject">{review.stepInfo.newer.subject}</span>
-          <span class="review-date" data-testid="review-stepper-date">{review.stepInfo.newer.relativeDate}</span>
-        {/if}
-      </div>
-      <button
-        type="button"
-        class="nav-btn"
-        data-testid="review-newer"
-        title="Compare the next (newer) commit pair"
-        aria-label="Newer change"
-        disabled={!review.stepInfo.canNewer}
-        onclick={() => review.step(-1)}>newer →</button
-      >
-    </div>
+    <ReviewStepper stepInfo={review.stepInfo} onStep={review.step} />
     <div class="editor-host review-host" data-testid="review-editor" bind:this={review.parent}></div>
   {/if}
 </div>
@@ -857,75 +831,5 @@
 
   .status.error {
     color: var(--danger);
-  }
-
-  .review-stepper {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: none;
-    padding: 0.35rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-elevated);
-    font-size: 0.8rem;
-  }
-
-  .review-stepper-meta {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    justify-content: center;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-
-  .review-comparison {
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .review-hash {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    color: var(--accent);
-  }
-
-  .review-subject {
-    color: var(--text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .review-date {
-    color: var(--text-muted);
-    flex: none;
-  }
-
-  .review-stepper .nav-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    height: 1.7rem;
-    padding: 0 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-size: 0.78rem;
-    line-height: 1;
-    cursor: pointer;
-    transition: background 0.12s ease;
-  }
-
-  .review-stepper .nav-btn:hover:not(:disabled) {
-    background: var(--hover);
-  }
-
-  .review-stepper .nav-btn:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
 </style>
