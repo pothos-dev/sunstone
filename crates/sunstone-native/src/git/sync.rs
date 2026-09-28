@@ -144,6 +144,32 @@ pub fn rev_list_count(root: &Path, range: &str) -> Result<usize, String> {
         .map_err(|e| format!("git rev-list --count returned {:?}: {e}", raw.trim()))
 }
 
+/// Whether `rev` is already contained in `upstream` (e.g. `origin/main`), i.e.
+/// the sync loop has pushed it — `git merge-base --is-ancestor <rev> <upstream>`.
+/// An `upstream` ref that does not exist yet is `Ok(false)`: nothing has been
+/// pushed. The write path asks this before amending HEAD (ticket 07 §5), since
+/// amending a pushed commit forks history against origin.
+///
+/// `Err` on any other failure (not a repo, `rev` unresolvable, git missing), so
+/// the caller can choose the safe fallback rather than guess.
+pub fn is_pushed(root: &Path, rev: &str, upstream: &str) -> Result<bool, String> {
+    let commit = format!("{upstream}^{{commit}}");
+    let exists = git_out(root, &["rev-parse", "--verify", "--quiet", &commit])?;
+    match exists.status.code() {
+        Some(0) => {}
+        // `--verify --quiet`: exit 1, silently, when the ref is absent.
+        Some(1) => return Ok(false),
+        _ => return Err(git_err("rev-parse --verify", &exists)),
+    }
+    let output = git_out(root, &["merge-base", "--is-ancestor", rev, upstream])?;
+    // 0 = ancestor, 1 = not; anything else (bad rev, not a repo) is a failure.
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(git_err("merge-base --is-ancestor", &output)),
+    }
+}
+
 /// The unmerged (conflicted) paths of a stopped rebase, de-duplicated across the
 /// three stages — `git ls-files --unmerged`. The resolver's work list (§9).
 ///
@@ -578,6 +604,38 @@ mod tests {
             changed,
             vec![('A', "notes/new.md".to_string()), ('M', "notes/f.md".to_string())]
         );
+    }
+
+    #[test]
+    fn is_pushed_tracks_whether_the_upstream_contains_the_rev() {
+        if !git_available() {
+            return;
+        }
+        let root = repo_on_main("is-pushed");
+        put(&root, "a.md", b"a\n");
+        commit_all(&root, "a");
+
+        // No `origin/main` yet: nothing pushed, not an error.
+        assert_eq!(is_pushed(&root, "HEAD", "origin/main"), Ok(false));
+
+        plant_origin(&root);
+        assert_eq!(is_pushed(&root, "HEAD", "origin/main"), Ok(true));
+
+        // A new local commit on top is not on origin; its parent still is.
+        put(&root, "b.md", b"b\n");
+        commit_all(&root, "b");
+        assert_eq!(is_pushed(&root, "HEAD", "origin/main"), Ok(false));
+        assert_eq!(is_pushed(&root, "HEAD^", "origin/main"), Ok(true));
+
+        // An amend of the pushed tip is a different commit — also not on origin.
+        git(&root, &["reset", "-q", "--hard", "origin/main"]);
+        git(&root, &["commit", "-q", "--amend", "-m", "a amended"]);
+        assert_eq!(is_pushed(&root, "HEAD", "origin/main"), Ok(false));
+
+        // An unresolvable rev is a real failure, not a guess.
+        assert!(is_pushed(&root, "nope", "origin/main").is_err());
+        let plain = temp_dir("is-pushed-plain");
+        assert!(is_pushed(&plain, "HEAD", "origin/main").is_err());
     }
 
     #[test]

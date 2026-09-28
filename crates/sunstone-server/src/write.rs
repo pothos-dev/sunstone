@@ -30,7 +30,10 @@
 //!   all" rule, whose read-side half is `history.rs`'s short-circuit (§11.1).
 //!   Without it a non-repo bundle **500s on Save**, so the plain shape is a real
 //!   feature, not the absence of one.
-//! - **git-local / git-synced** ([`WriteShape::Git`]) — unchanged behaviour.
+//! - **git-local** ([`WriteShape::GitLocal`]) — write, then commit (or amend
+//!   our own unpushed HEAD, ticket 07 §5).
+//! - **git-synced** ([`WriteShape::GitSynced`]) — as git-local, except HEAD is
+//!   never amended once the sync loop has pushed it (it pushes between writes).
 //!
 //! The one part of §5 that cannot live here is the **sync-loop kick**: it must
 //! happen *after* the write lock is released, so that the loop's first act is to
@@ -39,7 +42,7 @@
 //! caller, once, after `run_write` returns: `state.sync.kick()`
 //! ([`crate::sync::SyncState::kick`], a no-op in a shape with no loop).
 
-use crate::config::Config;
+use crate::config::{Config, Shape};
 use sunstone_native::app_state::AppState;
 use sunstone_native::bundle;
 use sunstone_native::git::{self, CommitIdentity};
@@ -102,36 +105,70 @@ mod subject {
     }
 }
 
-/// Whether this deployment's write path commits — the whole of §5's gate.
+/// Whether this deployment's write path commits — the whole of §5's gate — and,
+/// when it does, whether a commit may later be *amended*.
 ///
-/// Only two values, because the *write* path cannot tell git-local from
-/// git-synced: the one behavioural difference between them (the sync-loop kick)
-/// happens after the write lock is released, outside every op below.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The two git shapes differ on the write path in exactly one way: git-synced
+/// has a loop that **pushes between writes** (a write's `broadcast_write` kicks
+/// it as soon as the write lock is free), so a commit the previous write landed
+/// may already be on origin by the time the next write wants to fold into it.
+/// Amending a pushed commit forks history (next tick: ahead 1 / behind 1, an
+/// add/add rebase conflict, a spurious fork file), so the amend-else-fresh rule
+/// ([`WriteShape::may_amend_head`]) consults `upstream` in the synced shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WriteShape {
     /// **plain** — write the file, run **no git at all**.
     Plain,
-    /// **git-local / git-synced** — write, then commit (or amend) as the
-    /// authenticated user.
-    Git,
+    /// **git-local** — write, then commit (or amend) as the authenticated user.
+    /// Nothing is ever pushed, so amending our own HEAD is always safe.
+    GitLocal,
+    /// **git-synced** — as git-local, but the sync loop pushes to `upstream`
+    /// (`origin/<branch>`), so HEAD is only amended while it is not yet on it.
+    GitSynced { upstream: String },
 }
 
 impl WriteShape {
     /// Derive the gate from the one parse of the environment (§2) held in
     /// `ServerState`.
+    ///
+    /// A git-synced [`Shape`] without a [`GitConfig`]
+    /// (unreachable from `parse_env`, which always fills it in a git shape) maps
+    /// to [`WriteShape::GitLocal`]: the sync loop cannot run without the git
+    /// family either, so nothing would ever be pushed.
+    ///
+    /// [`GitConfig`]: crate::config::GitConfig
     pub fn for_config(cfg: &Config) -> WriteShape {
-        if cfg.is_git() {
-            WriteShape::Git
-        } else {
-            WriteShape::Plain
+        match (cfg.shape, cfg.git()) {
+            (Shape::Plain, _) => WriteShape::Plain,
+            (Shape::GitSynced, Some(git_cfg)) => WriteShape::GitSynced {
+                upstream: git_cfg.upstream_ref(),
+            },
+            (Shape::GitLocal | Shape::GitSynced, _) => WriteShape::GitLocal,
         }
     }
 
     /// Whether an op commits after writing. In [`WriteShape::Plain`] this is not
     /// "commit false" but "git is never invoked": callers short-circuit on it
     /// *before* probing HEAD, so the plain shape spawns no git process at all.
-    fn commits(self) -> bool {
-        matches!(self, WriteShape::Git)
+    fn commits(&self) -> bool {
+        !matches!(self, WriteShape::Plain)
+    }
+
+    /// The amend-else-fresh guard (ticket 07 §5): fold a write into HEAD only
+    /// when HEAD is our own commit with exactly `subject` ([`head_is_ours`]) AND
+    /// it has not been pushed yet. In git-synced, "pushed" means HEAD is
+    /// reachable from `upstream`; an upstream ref that does not exist yet means
+    /// nothing was ever pushed. A git failure while asking counts as pushed, so
+    /// an unanswerable probe falls back to a fresh commit rather than rewriting
+    /// shared history on a guess. Only ever reached when [`Self::commits`].
+    fn may_amend_head(&self, app: &AppState, ident: &CommitIdentity, subject: &str) -> bool {
+        head_is_ours(app, ident, subject)
+            && match self {
+                WriteShape::Plain | WriteShape::GitLocal => true,
+                WriteShape::GitSynced { upstream } => {
+                    !git::is_pushed(&app.bundle_root, "HEAD", upstream).unwrap_or(true)
+                }
+            }
     }
 
     /// `PUT /api/concept` — overwrite an existing Concept's body.
@@ -155,7 +192,7 @@ impl WriteShape {
     /// amend rule is a git concept, so it is not merely false there, it is never
     /// asked (no `head_commit` probe).
     pub fn write_concept(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         path: &str,
@@ -164,7 +201,7 @@ impl WriteShape {
         // Decide BEFORE writing — the write is about to overwrite the empty file.
         // `self.commits()` first, so the plain shape never probes HEAD.
         let fold_into_create = self.commits()
-            && head_is_ours(app, ident, &subject::create(path))
+            && self.may_amend_head(app, ident, &subject::create(path))
             && file_is_empty(&app.bundle_root.join(path));
         let resolved = bundle::write_concept(&app.bundle_root, path, content)?;
         app.note_self_write(resolved);
@@ -180,7 +217,7 @@ impl WriteShape {
 
     /// `POST /api/concept` — create a new empty Concept, commit `create`.
     pub fn create_concept(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         path: &str,
@@ -197,7 +234,7 @@ impl WriteShape {
     /// committed (git tracks no empty dirs), so there is nothing to commit here
     /// in **any** shape; the folder enters history when its first Concept lands.
     /// We still broadcast a `created` so every client refreshes its tree.
-    pub fn create_folder(self, app: &AppState, path: &str) -> Result<WriteResult, String> {
+    pub fn create_folder(&self, app: &AppState, path: &str) -> Result<WriteResult, String> {
         let resolved = bundle::create_folder(&app.bundle_root, path)?;
         app.note_self_write(resolved);
         Ok(WriteResult::change("created", path.to_string()))
@@ -205,7 +242,7 @@ impl WriteShape {
 
     /// `POST /api/rename` — rename/move + auto link rewrite, commit `rename`.
     pub fn rename_path(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         from: &str,
@@ -226,7 +263,7 @@ impl WriteShape {
 
     /// `POST /api/move` — move into a folder + auto link rewrite, commit `move`.
     pub fn move_path(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         from: &str,
@@ -253,7 +290,7 @@ impl WriteShape {
 
     /// `DELETE /api/concept?path=` — delete a Concept/folder, commit `delete`.
     pub fn delete_path(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         path: &str,
@@ -271,7 +308,7 @@ impl WriteShape {
     /// (ticket 07 §5: amend-else-fresh). The plain shape writes the fixups and
     /// stops there — again with no `head_commit` probe.
     pub fn rewrite_anchors(
-        self,
+        &self,
         app: &AppState,
         ident: &CommitIdentity,
         target: &str,
@@ -291,7 +328,7 @@ impl WriteShape {
         // the whole tree (the rewrite touched inbound sources we don't enumerate
         // here).
         if self.commits() {
-            if head_is_ours(app, ident, &subject::edit(target)) {
+            if self.may_amend_head(app, ident, &subject::edit(target)) {
                 git::amend(&app.bundle_root, &[], ident)?;
             } else {
                 git::commit(&app.bundle_root, &[], &subject::relink(target), ident)?;
@@ -310,7 +347,8 @@ impl WriteShape {
 /// Whether HEAD is a commit with exactly `subject`, authored by `ident`. The
 /// amend-else-fresh guard (ticket 07 §5): only ever fold a write into the tip
 /// when it is our own, matching commit; never touch someone else's history.
-/// Only ever reached in [`WriteShape::Git`].
+/// One half of [`WriteShape::may_amend_head`] (the other: not yet pushed); only
+/// ever reached in a git shape.
 fn head_is_ours(app: &AppState, ident: &CommitIdentity, subject: &str) -> bool {
     git::head_commit(&app.bundle_root).is_some_and(|h| {
         h.subject == subject && h.author_name == ident.name && h.author_email == ident.email
@@ -350,11 +388,11 @@ mod tests {
     use std::process::Command;
     use sunstone_native::git::{self, FileHistory};
 
-    use crate::config::Shape;
+    use crate::config::GitConfig;
 
     // The pre-§5 call shape, kept **only** here: every test below that predates
     // the shape gate exercises the git shape, so these read as `write_concept(…)`
-    // rather than repeating `WriteShape::Git.` on every line. Production callers
+    // rather than repeating `WriteShape::GitLocal.` on every line. Production callers
     // name the shape (`routes_write.rs` takes `WriteShape::for_config(&state.cfg)`);
     // there is no ungated free function left for one to reach for by mistake.
     fn write_concept(
@@ -363,7 +401,7 @@ mod tests {
         path: &str,
         content: &str,
     ) -> Result<WriteResult, String> {
-        WriteShape::Git.write_concept(app, ident, path, content)
+        WriteShape::GitLocal.write_concept(app, ident, path, content)
     }
 
     fn create_concept(
@@ -371,11 +409,11 @@ mod tests {
         ident: &CommitIdentity,
         path: &str,
     ) -> Result<WriteResult, String> {
-        WriteShape::Git.create_concept(app, ident, path)
+        WriteShape::GitLocal.create_concept(app, ident, path)
     }
 
     fn create_folder(app: &AppState, path: &str) -> Result<WriteResult, String> {
-        WriteShape::Git.create_folder(app, path)
+        WriteShape::GitLocal.create_folder(app, path)
     }
 
     fn rename_path(
@@ -384,7 +422,7 @@ mod tests {
         from: &str,
         to: &str,
     ) -> Result<WriteResult, String> {
-        WriteShape::Git.rename_path(app, ident, from, to)
+        WriteShape::GitLocal.rename_path(app, ident, from, to)
     }
 
     fn delete_path(
@@ -392,7 +430,7 @@ mod tests {
         ident: &CommitIdentity,
         path: &str,
     ) -> Result<WriteResult, String> {
-        WriteShape::Git.delete_path(app, ident, path)
+        WriteShape::GitLocal.delete_path(app, ident, path)
     }
 
     fn rewrite_anchors(
@@ -401,10 +439,10 @@ mod tests {
         target: &str,
         renames: &[AnchorRename],
     ) -> Result<WriteResult, String> {
-        WriteShape::Git.rewrite_anchors(app, ident, target, renames)
+        WriteShape::GitLocal.rewrite_anchors(app, ident, target, renames)
     }
 
-    use crate::testutil::{git as run, git_available, temp_dir};
+    use crate::testutil::{git as run, git_available, git_stdout, head, temp_dir};
 
     /// A temp bundle that IS a git repo, with an initial commit so HEAD exists.
     fn temp_repo() -> PathBuf {
@@ -601,6 +639,133 @@ mod tests {
         assert_eq!(commit_count(&root), before2 + 1, "fresh commit added");
     }
 
+    // --- amend-else-fresh vs the sync loop's push --------------------------
+
+    /// The git-synced deployment in miniature: [`temp_repo`] on `main`, pushed
+    /// to a fresh bare `origin` so `refs/remotes/origin/main` exists at HEAD —
+    /// the state right after a completed sync tick. Returns `(clone, bare)`.
+    fn synced_repo() -> (PathBuf, PathBuf) {
+        let root = temp_repo();
+        run(&root, &["branch", "-M", "main"]);
+        let bare = temp_dir("write-origin");
+        run(&bare, &["init", "--bare", "-q", "--initial-branch=main"]);
+        run(&root, &["remote", "add", "origin", &bare.to_string_lossy()]);
+        run(&root, &["push", "-q", "-u", "origin", "main"]);
+        (root, bare)
+    }
+
+    fn synced() -> WriteShape {
+        WriteShape::GitSynced {
+            upstream: "origin/main".into(),
+        }
+    }
+
+    /// What the sync loop does between two writes once `broadcast_write` kicks
+    /// it: push HEAD (the loop's own primitive, which also advances
+    /// `origin/main`). Returns the pushed commit.
+    fn loop_pushes(root: &Path) -> String {
+        git::push(root, "main").unwrap();
+        head(root)
+    }
+
+    /// The reported race: `createConcept` → the loop pushes → the scaffold
+    /// `writeConcept`. Amending the pushed `create` would fork history (next
+    /// tick ahead 1 / behind 1, add/add conflict, the scaffold forked to
+    /// `n-<ts>.md`); instead the scaffold lands as a FRESH commit on top.
+    #[test]
+    fn synced_scaffold_write_after_a_push_does_not_amend_the_pushed_create() {
+        if !git_available() {
+            return;
+        }
+        let (root, bare) = synced_repo();
+        let app = AppState::new(root.clone());
+        let shape = synced();
+
+        shape.create_concept(&app, &ident(), "n.md").unwrap();
+        let pushed = loop_pushes(&root);
+
+        shape.write_concept(&app, &ident(), "n.md", "---\ntitle: N\n---\n\n").unwrap();
+        assert_eq!(head_subject(&root), "edit n.md via web", "fresh, not amended");
+        assert_eq!(git_stdout(&root, &["rev-parse", "HEAD^"]), pushed);
+        // origin is untouched and still an ancestor: the next tick is a plain
+        // fast-forward push (ahead 1, behind 0).
+        assert_eq!(git_stdout(&bare, &["rev-parse", "main"]), pushed);
+        assert_eq!(git_stdout(&root, &["rev-list", "--count", "HEAD..origin/main"]), "0");
+        assert_eq!(git_stdout(&root, &["rev-list", "--count", "origin/main..HEAD"]), "1");
+    }
+
+    /// Same race for the anchor relink: the loop pushed the `edit`, so the
+    /// relink is its own `relink` commit rather than an amend of the pushed edit.
+    #[test]
+    fn synced_relink_after_a_push_does_not_amend_the_pushed_edit() {
+        if !git_available() {
+            return;
+        }
+        let (root, bare) = synced_repo();
+        std::fs::write(root.join("target.md"), "# Intro\n\nbody\n").unwrap();
+        std::fs::write(root.join("src.md"), "see [x](/target.md#intro)\n").unwrap();
+        git::commit(&root, &[], "seed files", &ident()).unwrap();
+        let app = AppState::new(root.clone());
+        let shape = synced();
+
+        shape.write_concept(&app, &ident(), "target.md", "# Introduction\n\nbody\n").unwrap();
+        let pushed = loop_pushes(&root);
+
+        let renames = vec![anchor("intro", "introduction")];
+        shape.rewrite_anchors(&app, &ident(), "target.md", &renames).unwrap();
+        assert_eq!(head_subject(&root), "relink target.md via web", "fresh, not amended");
+        assert_eq!(git_stdout(&root, &["rev-parse", "HEAD^"]), pushed);
+        assert_eq!(git_stdout(&bare, &["rev-parse", "main"]), pushed);
+        assert!(std::fs::read_to_string(root.join("src.md")).unwrap().contains("#introduction"));
+    }
+
+    /// Before the loop has pushed, git-synced folds exactly like git-local: the
+    /// scaffold amends the unpushed `create`, and the relink amends the
+    /// unpushed `edit`.
+    #[test]
+    fn synced_still_amends_our_unpushed_head() {
+        if !git_available() {
+            return;
+        }
+        let (root, _bare) = synced_repo();
+        std::fs::write(root.join("src.md"), "see [x](/n.md#intro)\n").unwrap();
+        git::commit(&root, &[], "seed files", &ident()).unwrap();
+        loop_pushes(&root);
+        let app = AppState::new(root.clone());
+        let shape = synced();
+
+        shape.create_concept(&app, &ident(), "n.md").unwrap();
+        let after_create = commit_count(&root);
+        shape.write_concept(&app, &ident(), "n.md", "# Intro\n").unwrap();
+        assert_eq!(head_subject(&root), "create n.md via web", "amended");
+        assert_eq!(commit_count(&root), after_create);
+
+        shape.write_concept(&app, &ident(), "n.md", "# Introduction\n").unwrap();
+        let after_edit = commit_count(&root);
+        let renames = vec![anchor("intro", "introduction")];
+        shape.rewrite_anchors(&app, &ident(), "n.md", &renames).unwrap();
+        assert_eq!(head_subject(&root), "edit n.md via web", "amended");
+        assert_eq!(commit_count(&root), after_edit);
+    }
+
+    /// No `origin/<branch>` ref yet (e.g. a first boot against an empty origin,
+    /// before the first push) means nothing has been pushed: amending is safe.
+    #[test]
+    fn synced_amends_when_the_upstream_ref_does_not_exist_yet() {
+        if !git_available() {
+            return;
+        }
+        let root = temp_repo();
+        let app = AppState::new(root.clone());
+        let shape = synced();
+
+        shape.create_concept(&app, &ident(), "n.md").unwrap();
+        let after_create = commit_count(&root);
+        shape.write_concept(&app, &ident(), "n.md", "# N\n").unwrap();
+        assert_eq!(head_subject(&root), "create n.md via web", "amended");
+        assert_eq!(commit_count(&root), after_create);
+    }
+
     fn commit_count(root: &Path) -> usize {
         match git::file_history(root, ".") {
             FileHistory::Ok { commits } => commits.len(),
@@ -639,9 +804,25 @@ mod tests {
         let mut cfg = Config::plain(std::env::temp_dir());
         assert_eq!(WriteShape::for_config(&cfg), WriteShape::Plain);
         cfg.shape = Shape::GitLocal;
-        assert_eq!(WriteShape::for_config(&cfg), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&cfg), WriteShape::GitLocal);
         cfg.shape = Shape::GitSynced;
-        assert_eq!(WriteShape::for_config(&cfg), WriteShape::Git);
+        cfg.git = Some(GitConfig {
+            branch: "trunk".into(),
+            origin: Some("/srv/origin.git".into()),
+            bundle_subdir: String::new(),
+            sync_interval: std::time::Duration::from_secs(10),
+            sync_identity: ident(),
+            ssh_key_pem: None,
+            known_hosts: None,
+        });
+        // The synced shape carries the ref the loop pushes to, so the write path
+        // can tell a pushed HEAD from an unpushed one.
+        assert_eq!(
+            WriteShape::for_config(&cfg),
+            WriteShape::GitSynced {
+                upstream: "origin/trunk".into()
+            }
+        );
     }
 
     /// The bundle IS a real repo, so git would happily commit — the plain shape
@@ -671,7 +852,7 @@ mod tests {
         assert_eq!(result.changes[0].kind, "modified");
 
         // Only the shape differs: the git shapes still commit.
-        WriteShape::Git
+        WriteShape::GitLocal
             .write_concept(&app, &ident(), "a.md", "newer\n")
             .unwrap();
         assert_eq!(head_subject(&root), "edit a.md via web");
@@ -695,7 +876,7 @@ mod tests {
         // Contrast (the pre-gate behaviour, still correct for a git shape): the
         // commit fails and classifies as a 500.
         if git_available() {
-            let Err(err) = WriteShape::Git.write_concept(&app, &ident(), "a.md", "newer\n") else {
+            let Err(err) = WriteShape::GitLocal.write_concept(&app, &ident(), "a.md", "newer\n") else {
                 panic!("a git shape cannot commit in a non-repo bundle");
             };
             assert_eq!(classify_write(&err), StatusCode::INTERNAL_SERVER_ERROR);

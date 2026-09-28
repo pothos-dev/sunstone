@@ -222,8 +222,8 @@ where
     // §5's write-path gate, read off the one parse of the environment — never
     // off the environment itself and never by sniffing the filesystem for a
     // `.git`. Taken BEFORE `run_write`, because the closure it hands to the
-    // blocking task sees only an `&AppState`; `WriteShape` is `Copy`, so the
-    // closure captures the decision rather than the whole `ServerState`.
+    // blocking task sees only an `&AppState`; the closure takes the owned
+    // `WriteShape`, so it captures the decision rather than the whole `ServerState`.
     let shape = WriteShape::for_config(&state.cfg);
     let result = run_write(state, move |app| op(app, shape, &ident)).await?;
     let response = to_response(&result);
@@ -316,10 +316,12 @@ mod tests {
         );
         let mut git_cfg = Config::plain(root.clone());
         git_cfg.shape = config::Shape::GitLocal;
-        assert_eq!(WriteShape::for_config(&server_state(git_cfg).cfg), WriteShape::Git);
+        assert_eq!(WriteShape::for_config(&server_state(git_cfg).cfg), WriteShape::GitLocal);
         let mut synced = Config::plain(root);
         synced.shape = config::Shape::GitSynced;
-        assert_eq!(WriteShape::for_config(&server_state(synced).cfg), WriteShape::Git);
+        // (No `GitConfig` here, so no loop could ever push: treated as git-local.
+        // `write.rs`'s shape test covers the synced shape with its upstream.)
+        assert_eq!(WriteShape::for_config(&server_state(synced).cfg), WriteShape::GitLocal);
     }
 
     /// §5's kick: the write path signals the loop once the write lock is free

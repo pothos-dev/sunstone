@@ -49,8 +49,14 @@ pub fn commit(
 /// Stage `paths` and amend HEAD (`git commit --amend --no-edit`), preserving the
 /// original author + author-date; only the tree and committer-date move. Used
 /// to fold anchor-relink writes into the preceding `edit … via web` commit
-/// (ticket 07 §5). Safe because push is out of scope — amend only rewrites the
-/// tip of local, unshared history.
+/// (ticket 07 §5). Amend rewrites HEAD, so it is only safe while HEAD is
+/// **unpushed**: the git-synced server pushes between writes, and amending a
+/// commit already on origin forks history (the next sync tick sees ahead 1 /
+/// behind 1). This primitive does not check that — the caller must, e.g. with
+/// [`super::is_pushed`] against the upstream ref.
+///
+/// Empty `paths` stages the **whole tree** (see `stage`), which is what the
+/// anchor-relink fold relies on.
 pub fn amend(root: &Path, paths: &[&str], identity: &CommitIdentity) -> Result<(), String> {
     stage(root, paths)?;
     let env = identity_env(identity);
@@ -83,7 +89,9 @@ pub fn head_commit(root: &Path) -> Option<HeadCommit> {
 }
 
 /// Stage `paths` with `git add -A --` (so deletions stage too). Empty `paths`
-/// stages nothing (a no-op add succeeds).
+/// stages the **whole working tree**: `git add -A` with no pathspec means "all"
+/// (git ≥ 2), which the structural ops (rename/move) and the anchor-relink amend
+/// rely on to pick up every rewritten file they do not enumerate.
 fn stage(root: &Path, paths: &[&str]) -> Result<(), String> {
     let mut args: Vec<&str> = vec!["add", "-A", "--"];
     args.extend(paths.iter().copied());
