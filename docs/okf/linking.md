@@ -28,7 +28,7 @@ All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-test
 | Wikilink parse + resolve | `wikilink.rs` (`resolve_wikilink`, `parse_target`, `parse_target_parts`) | `resolveWikilinkIn`, `splitWikilinkTarget` |
 | Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
 | Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
-| Citation refs | `citations.rs` (`find_citation_refs`, `citation_def_pos`) | `findCitationRefs`, `citationDefPos` |
+| Citation refs | `citations.rs` (`find_citation_refs`, `find_citation_defs`, `citation_def_pos`) | `findCitationRefs`, `citationDefPos` |
 | Rename/move rewrite | — (host-side path math: `sunstone-native/src/rewrite/{engine,paths}.rs`) | `planRewrites` in `src/lib/ipc/fake/links.ts` |
 
 Rename/move rewrite is the **one remaining twin**: the fake backend's `planRewrites` ports the Rust `rewrite` path math into TS so the exact same behaviour runs under Chromium/Playwright. Everything else has a single implementation. The CodeMirror extensions (`src/lib/editor/*.ts`) are the thin **view/authoring** layer over those wasm exports, never a second copy of the logic.
@@ -136,8 +136,9 @@ Sunstone recognises two related but distinct things under the citation banner:
 
 `sunstone-shared/src/citations.rs` is the pure detector, exposed to the frontend through the wasm seam:
 
-- `find_citation_refs(text)` (`findCitationRefs`) finds every inline `[n]` that is immediately preceded by a non-whitespace character (a word, punctuation, or the `]` of an adjacent `[6][7]`) and not followed by `]` (a `[[wikilink]]` close), `(` (a real markdown link `[6](url)`), or `:` (a reference-link definition `[6]:`). Line-start `[n]` — the table rows — fail the "preceded by non-space" test and are skipped, so they stay literal and act as jump targets.
-- `citation_def_pos(text, num)` (`citationDefPos`) returns the offset of the definition row (first line whose first non-blank content is `[num]`), or `null` for a dangling reference.
+- `find_citation_refs(text)` (`findCitationRefs`) finds every inline `[n]` that is immediately preceded by a non-whitespace character other than `[` (a word, punctuation, the `]` of an adjacent citation as in `[6][7]`, or a `]]` wikilink close) and not followed by `]` (a `[[wikilink]]` close), `(` (a real markdown link `[6](url)`), or `:` (a reference-link definition `[6]:`). A `[n]` after any other bracketed label (`[text][1]`) is a reference-link label, not a citation. Line-start `[n]` (the table rows) fail the "preceded by non-space" test and are skipped, so they stay literal and act as jump targets.
+- `find_citation_defs(text)` finds the definition rows: a `[n]` that is the first content of its line (after spaces/tabs only), passes the same trailer guard (so `[1](url)` and `[1]: url` stay markdown), and lies outside fenced code and inline code spans. The native render anchors exactly these rows (`id="cite-n"`).
+- `citation_def_pos(text, num)` (`citationDefPos`) returns the offset of the first `find_citation_defs` row numbered `num`, or `null` for a dangling reference.
 
 `src/lib/editor/citations.ts` is the thin CodeMirror layer: a `CitationWidget` superscript, a click handler that scrolls to the definition and briefly flashes it, active in hybrid + reading modes (in hybrid the raw token is revealed under the cursor for editing; absent in source `edit` mode).
 

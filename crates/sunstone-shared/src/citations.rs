@@ -17,6 +17,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::paths::find_byte;
+use crate::scan::{walk_code, CodeClass};
+
 /// A citation reference found in text: its `[n]` span (UTF-16 offsets) and the
 /// number `n` as written (digits only).
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
@@ -36,9 +39,6 @@ const B_LBRACKET: u16 = b'[' as u16;
 const B_RBRACKET: u16 = b']' as u16;
 const B_LPAREN: u16 = b'(' as u16;
 const B_COLON: u16 = b':' as u16;
-const B_NEWLINE: u16 = b'\n' as u16;
-const B_SPACE: u16 = b' ' as u16;
-const B_TAB: u16 = b'\t' as u16;
 
 fn is_ascii_digit(u: u16) -> bool {
     (b'0' as u16..=b'9' as u16).contains(&u)
@@ -51,10 +51,14 @@ fn is_whitespace_unit(u: u16) -> bool {
 }
 
 /// Find every inline citation reference in `text`. A `[n]` qualifies when it
-/// FOLLOWS a word (the preceding unit exists and is neither whitespace nor `[`)
-/// and is NOT immediately followed by `]` / `(` / `:` (a `]]` wikilink close, a
-/// markdown link, or a reference-link definition). Line-start `[n]` (table rows)
-/// fail the "follows a word" test and are skipped. Mirrors `findCitationRefs`.
+/// FOLLOWS a word and is NOT immediately followed by `]` / `(` / `:` (a `]]`
+/// wikilink close, a markdown link, or a reference-link definition — the
+/// [`trailer_ok`] guard). "Follows a word" means the preceding unit exists and
+/// is neither whitespace nor `[`; a preceding `]` counts only when it closes a
+/// citation reference (the `[6][7]` chain) or a `]]` wikilink, since after any
+/// other bracketed label (`[text][1]`) the `[n]` is a reference-link label.
+/// Line-start `[n]` (table rows) fail the "follows a word" test and are
+/// skipped. Mirrors `findCitationRefs`.
 pub fn find_citation_refs(text: &str) -> Vec<CitationRef> {
     let u: Vec<u16> = text.encode_utf16().collect();
     let n = u.len();
@@ -62,30 +66,22 @@ pub fn find_citation_refs(text: &str) -> Vec<CitationRef> {
 
     let mut i = 0;
     while i < n {
-        if u[i] == B_LBRACKET {
-            let mut j = i + 1;
-            while j < n && is_ascii_digit(u[j]) {
-                j += 1;
-            }
-            // A bare `[` <digits> `]` (at least one digit).
-            if j > i + 1 && j < n && u[j] == B_RBRACKET {
-                let from = i;
-                let to = j + 1;
-                let before = if i > 0 { Some(u[i - 1]) } else { None };
-                let after = if to < n { Some(u[to]) } else { None };
-                let follows_word =
-                    matches!(before, Some(b) if !is_whitespace_unit(b) && b != B_LBRACKET);
-                let trailer_ok =
-                    !matches!(after, Some(a) if a == B_RBRACKET || a == B_LPAREN || a == B_COLON);
-                if follows_word && trailer_ok {
-                    refs.push(CitationRef {
-                        from,
-                        to,
-                        num: String::from_utf16_lossy(&u[i + 1..j]),
-                    });
-                    i = to;
-                    continue;
+        if let Some(to) = bracketed_number_end(&u, i) {
+            let follows_word = match i.checked_sub(1).map(|p| u[p]) {
+                None => false,
+                Some(B_RBRACKET) => {
+                    refs.last().is_some_and(|r| r.to == i) || (i >= 2 && u[i - 2] == B_RBRACKET)
                 }
+                Some(b) => !is_whitespace_unit(b) && b != B_LBRACKET,
+            };
+            if follows_word && trailer_ok(&u, to) {
+                refs.push(CitationRef {
+                    from: i,
+                    to,
+                    num: String::from_utf16_lossy(&u[i + 1..to - 1]),
+                });
+                i = to;
+                continue;
             }
         }
         i += 1;
@@ -93,31 +89,82 @@ pub fn find_citation_refs(text: &str) -> Vec<CitationRef> {
     refs
 }
 
-/// UTF-16 offset of the citation-table DEFINITION for `num` — the first line
-/// whose first non-blank content is `[num]` (allowing leading spaces/tabs). The
-/// offset of the `[`, or `None`. Mirrors `citationDefPos`.
-pub fn citation_def_pos(text: &str, num: &str) -> Option<usize> {
-    let u: Vec<u16> = text.encode_utf16().collect();
-    let n = u.len();
-    let target: Vec<u16> = format!("[{num}]").encode_utf16().collect();
+/// When a bare `[` <digits> `]` (at least one digit) starts at `i`, the offset
+/// just past its `]`.
+fn bracketed_number_end(u: &[u16], i: usize) -> Option<usize> {
+    if u.get(i) != Some(&B_LBRACKET) {
+        return None;
+    }
+    let digits = u[i + 1..].iter().take_while(|&&c| is_ascii_digit(c)).count();
+    let close = i + 1 + digits;
+    (digits > 0 && u.get(close) == Some(&B_RBRACKET)).then_some(close + 1)
+}
 
-    // Every line start: offset 0, and every index just after a `\n`.
-    let mut starts = vec![0usize];
-    for (idx, &c) in u.iter().enumerate() {
-        if c == B_NEWLINE {
-            starts.push(idx + 1);
+/// Whether the unit at `to` (just past a `[n]`) leaves it a citation: not a
+/// `]` (wikilink close), `(` (markdown link) or `:` (reference definition).
+fn trailer_ok(u: &[u16], to: usize) -> bool {
+    !matches!(u.get(to), Some(&(B_RBRACKET | B_LPAREN | B_COLON)))
+}
+
+/// A citation DEFINITION (citation-table row): the line-start `[n]` span
+/// (UTF-16 offsets) and its number.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CitationDef {
+    /// Offset of the `[` (inclusive), UTF-16 units into the scanned text.
+    pub from: usize,
+    /// Offset just past the `]` (exclusive).
+    pub to: usize,
+    /// The citation number as written (digits only).
+    pub num: String,
+}
+
+/// Every citation-table DEFINITION in `text`, in order: a `[n]` that is the
+/// first content of its line (after optional spaces/tabs only), passes the
+/// same [`trailer_ok`] guard as a reference (so `[1](url)` and `[1]: url` stay
+/// markdown), and lies outside fenced code blocks and inline code spans (the
+/// shared [`crate::scan`] code contract). The editor's jump target
+/// ([`citation_def_pos`]) and the native render's row anchors both use this.
+pub fn find_citation_defs(text: &str) -> Vec<CitationDef> {
+    let bytes = text.as_bytes();
+    let mut in_code = vec![false; bytes.len()];
+    walk_code(bytes, |i, class| {
+        match class {
+            CodeClass::FenceLine { end } => in_code[i..end].fill(true),
+            CodeClass::Fenced | CodeClass::Tick => in_code[i] = true,
+            CodeClass::Text { in_inline_code } => in_code[i] = in_inline_code,
         }
+        None
+    });
+
+    let u: Vec<u16> = text.encode_utf16().collect();
+    let mut defs = Vec::new();
+    // Walk line starts in bytes, carrying the matching UTF-16 offset along.
+    let (mut byte, mut unit) = (0usize, 0usize);
+    let mut line_start = Some(0usize);
+    while let Some(s) = line_start {
+        unit += text[byte..s].encode_utf16().count();
+        byte = s;
+        let indent = bytes[s..].iter().take_while(|&&b| b == b' ' || b == b'\t').count();
+        let (b, from) = (s + indent, unit + indent);
+        if b < bytes.len() && !in_code[b] {
+            if let Some(to) = bracketed_number_end(&u, from).filter(|&to| trailer_ok(&u, to)) {
+                defs.push(CitationDef {
+                    from,
+                    to,
+                    num: String::from_utf16_lossy(&u[from + 1..to - 1]),
+                });
+            }
+        }
+        line_start = find_byte(bytes, s, b'\n').map(|p| p + 1);
     }
-    for &s in &starts {
-        let mut i = s;
-        while i < n && (u[i] == B_SPACE || u[i] == B_TAB) {
-            i += 1;
-        }
-        if i + target.len() <= n && u[i..i + target.len()] == *target {
-            return Some(i);
-        }
-    }
-    None
+    defs
+}
+
+/// UTF-16 offset of the citation-table DEFINITION for `num` — the first
+/// [`find_citation_defs`] row numbered `num`. The offset of the `[`, or `None`.
+/// Mirrors `citationDefPos`.
+pub fn citation_def_pos(text: &str, num: &str) -> Option<usize> {
+    find_citation_defs(text).into_iter().find(|d| d.num == num).map(|d| d.from)
 }
 
 #[cfg(test)]
@@ -191,5 +238,68 @@ mod tests {
     #[test]
     fn def_pos_none_when_missing() {
         assert_eq!(citation_def_pos("body.[6]\n", "6"), None);
+    }
+
+    fn def_nums(text: &str) -> Vec<String> {
+        find_citation_defs(text).into_iter().map(|d| d.num).collect()
+    }
+
+    #[test]
+    fn defs_are_line_start_rows() {
+        let defs = find_citation_defs("body.[6]\n\n[6] Kokumi.\n  [7] Indented.\n\t[8] Tabbed.\n");
+        assert_eq!(
+            defs.iter().map(|d| d.num.as_str()).collect::<Vec<_>>(),
+            vec!["6", "7", "8"]
+        );
+        assert_eq!((defs[0].from, defs[0].to), (10, 13));
+    }
+
+    #[test]
+    fn defs_reject_the_reference_trailers() {
+        assert!(def_nums("[1](https://x)").is_empty()); // markdown link
+        assert!(def_nums("[1]: https://x").is_empty()); // reference definition
+        assert!(def_nums("[1]] stray").is_empty());
+        // A def at the very end of the text has no trailer: still a def.
+        assert_eq!(def_nums("[1]"), vec!["1"]);
+    }
+
+    #[test]
+    fn defs_indent_only_by_space_or_tab() {
+        assert!(def_nums("\u{a0}[1] nbsp").is_empty());
+        assert!(def_nums("\u{3000}[1] ideographic space").is_empty());
+        assert!(def_nums("text [1] mid-line").is_empty());
+    }
+
+    #[test]
+    fn defs_skip_code() {
+        assert!(def_nums("```\n[1] fenced\n```\n").is_empty());
+        assert!(def_nums("~~~\n  [1] fenced\n~~~\n").is_empty());
+        // A line-start `[1]` inside an inline code span that wraps a line.
+        assert!(def_nums("`a\n[1] b`\n").is_empty());
+        // After the fence closes, rows count again.
+        assert_eq!(def_nums("```\n[1] x\n```\n[2] row\n"), vec!["2"]);
+    }
+
+    #[test]
+    fn defs_offsets_are_utf16_units() {
+        let defs = find_citation_defs("😀\n[4] row");
+        // 😀 = 2 units + `\n` → `[` at 3.
+        assert_eq!((defs[0].from, defs[0].to), (3, 6));
+    }
+
+    #[test]
+    fn def_pos_skips_non_definitions() {
+        let text = "[6](https://x)\n```\n[6] code\n```\n[6] the row\n";
+        let pos = citation_def_pos(text, "6").unwrap();
+        assert_eq!(&text[pos..pos + 7], "[6] the");
+    }
+
+    #[test]
+    fn bracketed_label_before_a_number_is_a_reference_link_not_a_citation() {
+        // `[text][1]` is a markdown reference link; only a `]` that closes a
+        // citation (or a `]]` wikilink) chains into the next reference.
+        assert!(nums("See [the source][1].").is_empty());
+        assert_eq!(nums("x[6][7][8]"), vec!["6", "7", "8"]);
+        assert_eq!(nums("see [[Note]][3]"), vec!["3"]);
     }
 }

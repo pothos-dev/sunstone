@@ -37,7 +37,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `frontmatter` | Verbatim `split` / `split_concept` (byte-preserving), `frontmatter_line_count`, and the index-parse kernels (`parse_frontmatter`, `frontmatter_fields`). |
 | `outline` | ATX-only heading scan (`scan_headings` → `OutlineHeading`) and `find_heading_line`. |
 | `critic` | CriticMarkup parse/group — `parse_critic_marks`, `pair_annotations`, `annotation_at` (offset-span structs). |
-| `citations` | Inline citation scanning — `find_citation_refs`, `citation_def_pos`. |
+| `citations` | Inline citation scanning — `find_citation_refs`, `find_citation_defs`, `citation_def_pos`. |
 | `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
 | `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, and sunstone-native's rename rewriter all walk — extraction and rewriting can never disagree on what counts as a link. |
 

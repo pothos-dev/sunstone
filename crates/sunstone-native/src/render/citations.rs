@@ -6,18 +6,17 @@
 //!   - an inline `[n]` that FOLLOWS a word (preceded by a non-whitespace char
 //!     that is not `[`, and not trailed by `]`/`(`/`:`) → a superscript link to
 //!     the citation-table row;
-//!   - a line-start `[n]` (the table rows) → the literal `[n]` jump TARGET
-//!     carrying `id="cite-n"` (NOT superscript — a superscript row head reads
-//!     wrong);
+//!   - a line-start `[n]` (the table rows, `find_citation_defs`: after only
+//!     spaces/tabs, same trailer guard, outside code) → the literal `[n]` jump
+//!     TARGET carrying `id="cite-n"` (NOT superscript — a superscript row head
+//!     reads wrong);
 //!   - anything else → left untouched.
 //!
 //! A distinct PUA sentinel pair (shared plumbing with `critic.rs`, via
 //! `sentinel::Sentinels`, but a DIFFERENT delimiter pair) keeps the two
 //! substitution passes independent.
 
-use std::collections::HashMap;
-
-use sunstone_shared::citations::find_citation_refs;
+use sunstone_shared::citations::{find_citation_defs, find_citation_refs};
 
 use super::sentinel::Sentinels;
 
@@ -37,75 +36,32 @@ fn citation_def_html(num: &str) -> String {
 /// Rewrite citation markers in `body` to sentinel tokens, returning the prepared
 /// body plus the sentinel replacements.
 ///
-/// Inline REFERENCES come from the SHARED `find_citation_refs` (ADR 0006 family
-/// 13 — one recognition of what a reference is, for the editor and SSR). The
-/// line-start DEFINITIONS (table rows) are not references (the shared scan
-/// excludes them), so they are detected here; the two are disjoint. Offsets from
-/// the shared scan are UTF-16 units, so the body is walked over its UTF-16 units.
+/// Both kinds come from the SHARED scanner (ADR 0006 family 13 — one
+/// recognition, for the editor and SSR): inline REFERENCES from
+/// `find_citation_refs`, line-start DEFINITIONS (table rows) from
+/// `find_citation_defs` (trailer-guarded and code-aware). The two are disjoint
+/// (a reference must follow a word). Offsets are UTF-16 units, so the body is
+/// sliced over its UTF-16 units.
 pub(super) fn citations_to_sentinels(body: &str) -> (String, Sentinels) {
     let units: Vec<u16> = body.encode_utf16().collect();
-    let n = units.len();
-    // Inline references keyed by their `[` offset (UTF-16 units).
-    let refs: HashMap<usize, (usize, String)> = find_citation_refs(body)
+    let refs = find_citation_refs(body)
         .into_iter()
-        .map(|r| (r.from, (r.to, r.num)))
-        .collect();
+        .map(|r| (r.from, r.to, citation_ref_html(&r.num)));
+    let defs = find_citation_defs(body)
+        .into_iter()
+        .map(|d| (d.from, d.to, citation_def_html(&d.num)));
+    let mut spans: Vec<(usize, usize, String)> = refs.chain(defs).collect();
+    spans.sort_unstable_by_key(|&(from, _, _)| from);
 
     let mut sentinels = Sentinels::new(CITE_OPEN, CITE_CLOSE);
     let mut out = String::with_capacity(body.len());
-
-    let decode = |a: usize, b: usize| String::from_utf16_lossy(&units[a..b]);
-    const L_BRACKET: u16 = b'[' as u16;
-    const R_BRACKET: u16 = b']' as u16;
-    const NEWLINE: u16 = b'\n' as u16;
-    let is_digit = |u: u16| (b'0' as u16..=b'9' as u16).contains(&u);
-    let is_ws = |u: u16| char::from_u32(u as u32).is_some_and(|c| c.is_whitespace());
-
     let mut pos = 0usize;
-    let mut i = 0usize;
-    while i < n {
-        // Inline reference (shared recognition): superscript link.
-        if let Some((to, num)) = refs.get(&i) {
-            out.push_str(&decode(pos, i));
-            sentinels.push(&mut out, citation_ref_html(num));
-            i = *to;
-            pos = i;
-            continue;
-        }
-        // Line-start `[n]` definition (table row): literal anchored jump target.
-        if units[i] == L_BRACKET {
-            let mut j = i + 1;
-            while j < n && is_digit(units[j]) {
-                j += 1;
-            }
-            if j > i + 1 && j < n && units[j] == R_BRACKET {
-                // At line start iff only whitespace back to the newline / start.
-                let mut k = i;
-                let mut at_line_start = true;
-                while k > 0 {
-                    let c = units[k - 1];
-                    if c == NEWLINE {
-                        break;
-                    }
-                    if !is_ws(c) {
-                        at_line_start = false;
-                        break;
-                    }
-                    k -= 1;
-                }
-                if at_line_start {
-                    let num = decode(i + 1, j);
-                    out.push_str(&decode(pos, i));
-                    sentinels.push(&mut out, citation_def_html(&num));
-                    i = j + 1;
-                    pos = i;
-                    continue;
-                }
-            }
-        }
-        i += 1;
+    for (from, to, html) in spans {
+        out.push_str(&String::from_utf16_lossy(&units[pos..from]));
+        sentinels.push(&mut out, html);
+        pos = to;
     }
-    out.push_str(&decode(pos, n));
+    out.push_str(&String::from_utf16_lossy(&units[pos..]));
     (out, sentinels)
 }
 
@@ -170,5 +126,38 @@ mod tests {
         assert!(p.html.contains("[6]"));
         assert!(!p.html.contains("citation-ref"));
         assert!(!p.html.contains("citation-def"));
+    }
+
+    #[test]
+    fn line_start_numbered_link_stays_a_link() {
+        // `[1](url)` is a markdown link, not a citation-table row.
+        let p = render("[1](https://x.example)\n", "a.md", &["a.md"]);
+        assert!(p.html.contains(r#"href="https://x.example""#), "{}", p.html);
+        assert!(!p.html.contains("citation-def"), "{}", p.html);
+        assert!(!p.html.contains("(https://x.example)"), "{}", p.html);
+    }
+
+    #[test]
+    fn line_start_reference_definition_is_not_consumed() {
+        // `[1]: url` is a reference definition; `[text][1]` must still resolve.
+        let p = render("See [the source][1].\n\n[1]: https://x.example\n", "a.md", &["a.md"]);
+        assert!(p.html.contains(r#"href="https://x.example""#), "{}", p.html);
+        assert!(!p.html.contains("citation-def"), "{}", p.html);
+    }
+
+    #[test]
+    fn line_start_bracket_number_in_fenced_code_is_left_alone() {
+        let p = render("```\n[1] not a row\n```\n", "a.md", &["a.md"]);
+        assert!(!p.html.contains("citation-def"), "{}", p.html);
+        assert!(p.html.contains("[1] not a row"), "{}", p.html);
+    }
+
+    #[test]
+    fn only_space_or_tab_indents_a_definition() {
+        // A no-break space is not row indentation (the shared rule: spaces/tabs).
+        let p = render("\u{a0}[1] not a row\n", "a.md", &["a.md"]);
+        assert!(!p.html.contains("citation-def"), "{}", p.html);
+        let p = render("\t[1] tab-indented row\n", "a.md", &["a.md"]);
+        assert!(p.html.contains(r#"id="cite-1""#), "{}", p.html);
     }
 }
