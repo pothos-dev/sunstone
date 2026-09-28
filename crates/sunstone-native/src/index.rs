@@ -262,6 +262,62 @@ impl Index {
         self.attachments.contains(path)
     }
 
+    // --- Folders -------------------------------------------------------------
+
+    /// Whether any indexed Concept or Attachment lies under the folder `dir`
+    /// (bundle-relative, whole components: `notes` does not cover `notesy/`).
+    /// Lets the watcher recognise a folder that is already gone from disk.
+    pub fn has_entries_under(&self, dir: &str) -> bool {
+        let prefix = format!("{dir}/");
+        self.concepts.keys().any(|k| k.starts_with(&prefix))
+            || self.attachments.iter().any(|k| k.starts_with(&prefix))
+    }
+
+    /// Bring everything under the folder `dir` back in line with disk: drop
+    /// every Concept and Attachment indexed under it, then, if the folder
+    /// still exists, re-walk it and index what it holds. A folder rename or
+    /// move-in fires events for the folder only, never for its files, so this
+    /// is the one way the index learns about them without a restart.
+    ///
+    /// The re-walk is [`bundle_walker`] over the whole Bundle root, pruned to
+    /// `dir` and its ancestors, so the hidden and `.gitignore` rules (the root
+    /// `.gitignore` included) are exactly those of [`Index::build`].
+    pub fn resync_folder(&mut self, root: &Path, dir: &str) {
+        let prefix = format!("{dir}/");
+        self.concepts.retain(|k, _| !k.starts_with(&prefix));
+        self.attachments.retain(|k| !k.starts_with(&prefix));
+
+        if root.join(dir).is_dir() {
+            let mut walker = bundle_walker(root);
+            let (walk_root, keep) = (root.to_path_buf(), prefix.clone());
+            walker.filter_entry(move |entry| {
+                let Ok(rel) = entry.path().strip_prefix(&walk_root) else {
+                    return false;
+                };
+                let rel = to_rel_string(rel);
+                // The folder's ancestors (to descend) and the folder's subtree.
+                rel.is_empty() || keep.starts_with(&format!("{rel}/")) || rel.starts_with(&keep)
+            });
+            for entry in walker.build().filter_map(Result::ok) {
+                if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                    continue;
+                }
+                let path = entry.path();
+                let Ok(rel) = path.strip_prefix(root) else {
+                    continue;
+                };
+                let rel = to_rel_string(rel);
+                if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                    let content = std::fs::read_to_string(path).unwrap_or_default();
+                    self.insert_concept(&rel, &content);
+                } else {
+                    self.insert_attachment(&rel);
+                }
+            }
+        }
+        self.rebuild_reverse();
+    }
+
     /// Sources linking TO `path` (backlinks), sorted. Empty when none.
     pub fn backlinks(&self, path: &str) -> Vec<String> {
         self.reverse

@@ -136,14 +136,23 @@ where
         // autosave writes — the index must reflect on-disk truth regardless of
         // who wrote it. (Only the *frontend event* is suppressed for self
         // writes, below, to avoid reload loops / cursor jumps.)
-        if rel.ends_with(".md") {
+        if is_or_was_folder(state, &rel, abs) {
+            // A folder rename / move-in / removal fires events for the folder
+            // alone, never for the files under it, so the index would keep
+            // `notes/*.md` and never learn `archive/*.md` until a restart.
+            // The folder path itself still reaches the sink below; every host
+            // reloads the tree and the index on any change.
+            if let Ok(mut index) = state.index.write() {
+                index.resync_folder(root, &rel);
+            }
+        } else if rel.ends_with(".md") {
             update_index(state, &rel, abs, kind);
         } else if Index::is_attachment_path(&rel) {
             // Attachments are kept live exactly as Concepts are, in their own
             // index (af-1): the Embed widget resolves `![[name.png]]` against
             // that list synchronously, so a dropped-in image must appear without
             // a restart. Nothing is read from disk — the index holds paths only.
-            update_attachment_index(state, &rel, kind);
+            update_attachment_index(state, &rel, abs, kind);
         }
 
         // Suppress Sunstone's own writes for the frontend echo.
@@ -188,16 +197,29 @@ fn update_index(state: &AppState, rel: &str, abs: &Path, kind: &str) {
 }
 
 /// Apply a single Attachment change to the in-memory index (af-1). The
-/// Attachment index holds PATHS only, so there is nothing to re-read: a
-/// create/modify records the path, a removal drops it.
-fn update_attachment_index(state: &AppState, rel: &str, kind: &str) {
+/// Attachment index holds PATHS only, so there is nothing to re-read: the path
+/// is recorded when it exists on disk and dropped otherwise. The existence
+/// check (the counterpart of [`update_index`]'s failed read) is what handles a
+/// rename: inotify reports the OLD name as `Modify(Name(From))`, not a removal.
+fn update_attachment_index(state: &AppState, rel: &str, abs: &Path, kind: &str) {
     let Ok(mut index) = state.index.write() else {
         return;
     };
-    match kind {
-        "removed" => index.remove_attachment(rel),
-        _ => index.insert_attachment(rel),
+    if kind != "removed" && abs.exists() {
+        index.insert_attachment(rel);
+    } else {
+        index.remove_attachment(rel);
     }
+}
+
+/// Whether `rel` names a folder now, or named one the index still holds
+/// entries under (a folder renamed away or removed, now gone from disk).
+fn is_or_was_folder(state: &AppState, rel: &str, abs: &Path) -> bool {
+    abs.is_dir()
+        || state
+            .read_index()
+            .map(|index| index.has_entries_under(rel))
+            .unwrap_or(false)
 }
 
 /// Map a notify `EventKind` to our coarse "created"/"modified"/"removed"
@@ -239,7 +261,7 @@ pub struct WatcherHandle(#[allow(dead_code)] RecommendedWatcher);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind};
+    use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind, RenameMode};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
@@ -388,5 +410,113 @@ mod tests {
             notify::Event::new(EventKind::Remove(RemoveKind::File)).add_path(abs),
         );
         assert!(state.read_index().unwrap().attachment_paths().is_empty());
+    }
+
+    /// Feed one event of `kind` over `rels` (under `root`) to `handle_event`,
+    /// returning the `FileChange`s that reached the sink as `(kind, paths)`.
+    fn feed(root: &Path, state: &AppState, kind: EventKind, rels: &[&str]) -> Vec<(String, Vec<String>)> {
+        let seen = Mutex::new(Vec::new());
+        let sink = |change: FileChange| {
+            seen.lock().unwrap().push((change.kind, change.paths));
+        };
+        let mut event = notify::Event::new(kind);
+        for rel in rels {
+            event = event.add_path(root.join(rel));
+        }
+        handle_event(state, root, &sink, event);
+        seen.into_inner().unwrap()
+    }
+
+    fn name(mode: RenameMode) -> EventKind {
+        EventKind::Modify(ModifyKind::Name(mode))
+    }
+
+    #[test]
+    fn a_renamed_attachment_leaves_no_stale_entry() {
+        // `mv x.png y.png` under inotify: `Name(From)` for x.png, `Name(To)`
+        // for y.png. A `Modify` of a path that is gone is a removal.
+        let (root, state) = temp_state();
+        created(&root, &state, "x.png");
+        std::fs::rename(root.join("x.png"), root.join("y.png")).unwrap();
+        feed(&root, &state, name(RenameMode::From), &["x.png"]);
+        feed(&root, &state, name(RenameMode::To), &["y.png"]);
+        assert_eq!(
+            state.read_index().unwrap().attachment_paths(),
+            vec!["y.png".to_string()]
+        );
+
+        // The paired form some backends send instead: one event, both paths.
+        std::fs::rename(root.join("y.png"), root.join("z.png")).unwrap();
+        feed(&root, &state, name(RenameMode::Both), &["y.png", "z.png"]);
+        assert_eq!(
+            state.read_index().unwrap().attachment_paths(),
+            vec!["z.png".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_renamed_folder_moves_its_concepts_and_attachments() {
+        let (root, state) = temp_state();
+        created(&root, &state, "notes/a.md");
+        created(&root, &state, "notes/sub/b.md");
+        created(&root, &state, "notes/pic.png");
+        created(&root, &state, "other.md");
+
+        // `mv notes archive` fires directory Name events only.
+        std::fs::rename(root.join("notes"), root.join("archive")).unwrap();
+        let from = feed(&root, &state, name(RenameMode::From), &["notes"]);
+        let to = feed(&root, &state, name(RenameMode::To), &["archive"]);
+
+        let index = state.read_index().unwrap();
+        assert_eq!(
+            index.concept_paths(),
+            vec![
+                "archive/a.md".to_string(),
+                "archive/sub/b.md".to_string(),
+                "other.md".to_string()
+            ]
+        );
+        assert_eq!(index.attachment_paths(), vec!["archive/pic.png".to_string()]);
+        // The clients still hear about the folder itself, as before.
+        assert_eq!(from, vec![("modified".to_string(), vec!["notes".to_string()])]);
+        assert_eq!(to, vec![("modified".to_string(), vec!["archive".to_string()])]);
+    }
+
+    #[test]
+    fn a_folder_rewalk_keeps_the_bundle_walker_rules() {
+        // Moved in from outside the Bundle: only a `Name(To)` for the folder.
+        // The re-walk must honour the Bundle's own `.gitignore` and skip
+        // hidden paths, exactly as the startup build does.
+        let (root, state) = temp_state();
+        // `ignore` honours a `.gitignore` only inside a git repo.
+        std::fs::create_dir(root.join(".git")).unwrap();
+        std::fs::write(root.join(".gitignore"), "archive/build/\n").unwrap();
+        for rel in ["archive/a.md", "archive/build/gen.md", "archive/.drafts/d.md", "archive/i.png"] {
+            let abs = root.join(rel);
+            std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
+            std::fs::write(abs, "# x\n").unwrap();
+        }
+        feed(&root, &state, name(RenameMode::To), &["archive"]);
+        let index = state.read_index().unwrap();
+        assert_eq!(index.concept_paths(), vec!["archive/a.md".to_string()]);
+        assert_eq!(index.attachment_paths(), vec!["archive/i.png".to_string()]);
+        // And it agrees with a from-scratch build.
+        let fresh = Index::build(&root);
+        assert_eq!(index.concept_paths(), fresh.concept_paths());
+        assert_eq!(index.attachment_paths(), fresh.attachment_paths());
+    }
+
+    #[test]
+    fn a_removed_folder_drops_everything_under_it_only() {
+        let (root, state) = temp_state();
+        created(&root, &state, "notes/a.md");
+        created(&root, &state, "notes/pic.png");
+        // A sibling sharing the prefix string but not the component.
+        created(&root, &state, "notesy/c.md");
+        std::fs::remove_dir_all(root.join("notes")).unwrap();
+        feed(&root, &state, EventKind::Remove(RemoveKind::Folder), &["notes"]);
+        let index = state.read_index().unwrap();
+        assert_eq!(index.concept_paths(), vec!["notesy/c.md".to_string()]);
+        assert!(index.attachment_paths().is_empty());
     }
 }
