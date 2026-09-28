@@ -126,8 +126,11 @@ function tokenize(text: string): string[] {
   return text.match(/[\p{L}\p{N}]+|\s+|[^\p{L}\p{N}\s]/gu) ?? [];
 }
 
-const wrapDel = (s: string): string => `{--${s}--}`;
-const wrapIns = (s: string): string => `{++${s}++}`;
+// An empty string is never wrapped: `{----}` / `{++++}` (e.g. a deleted or
+// inserted BLANK line) is a mark with nothing to review. The blank line itself
+// stays in the output unmarked, like any other whole-line mark's own line.
+const wrapDel = (s: string): string => (s === '' ? '' : `{--${s}--}`);
+const wrapIns = (s: string): string => (s === '' ? '' : `{++${s}++}`);
 
 /**
  * How many inline word-level marks a single changed line may carry before we

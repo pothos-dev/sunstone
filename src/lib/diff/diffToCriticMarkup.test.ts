@@ -165,3 +165,25 @@ describe('diffToCriticMarkup', () => {
     expect(accept(review)).toBe('I like big dogs');
   });
 });
+
+describe('blank lines', () => {
+  test('a deleted blank line emits no empty mark', () => {
+    const review = diffToCriticMarkup('a\n\nb', 'a\nb');
+    expect(review).not.toContain('{----}');
+    expect(review).toBe('a\n\nb');
+    assertClean(review);
+  });
+
+  test('an inserted blank line emits no empty mark', () => {
+    const review = diffToCriticMarkup('a\nb', 'a\n\nb');
+    expect(review).not.toContain('{++++}');
+    expect(review).toBe('a\n\nb');
+    assertClean(review);
+  });
+
+  test('a blank line replaced by a heading marks only the heading', () => {
+    const review = diffToCriticMarkup('a\n\nb', 'a\n# x\nb');
+    expect(review).toBe('a\n\n{++# x++}\nb');
+    assertClean(review);
+  });
+});
