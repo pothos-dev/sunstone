@@ -13,6 +13,8 @@
 
 use std::collections::HashSet;
 
+use crate::wikilink::drop_md;
+
 /// Percent-encode a value for one URL path segment or query value (like
 /// `encodeURIComponent`: the RFC 3986 unreserved set passes through, `%XX`
 /// everything else, including `/`).
@@ -55,11 +57,7 @@ pub fn percent_decode(s: &str) -> String {
 /// `/index`; the root `index.md` becomes `/`. Each segment is URL-encoded.
 /// (The former TS `conceptToUrl` + native `render.rs::concept_url`.)
 pub fn concept_url(path: &str) -> String {
-    let p = if path.len() >= 3 && path[path.len() - 3..].eq_ignore_ascii_case(".md") {
-        &path[..path.len() - 3]
-    } else {
-        path
-    };
+    let p = drop_md(path);
     if p == "index" {
         return "/".to_string();
     }

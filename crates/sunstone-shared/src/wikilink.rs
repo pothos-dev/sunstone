@@ -68,29 +68,25 @@ pub struct WikiTarget {
 /// present. Shared by [`parse_target`] and the rename rewriter so the two agree
 /// on exactly where the name ends.
 pub fn name_end(raw: &str) -> usize {
-    match (raw.find('|'), raw.find('#')) {
-        (Some(p), Some(h)) => p.min(h),
-        (Some(p), None) => p,
-        (None, Some(h)) => h,
-        (None, None) => raw.len(),
-    }
+    raw.find(['|', '#']).unwrap_or(raw.len())
+}
+
+/// The text after the FIRST `|`, up to (not including) a `#` that follows it —
+/// a Wikilink's alias, an Embed's size suffix. Untrimmed; `None` without a `|`.
+pub fn pipe_suffix(raw: &str) -> Option<&str> {
+    let after = &raw[raw.find('|')? + 1..];
+    Some(&after[..after.find('#').unwrap_or(after.len())])
 }
 
 pub fn parse_target(raw: &str) -> WikiTarget {
-    // Locate the first `|` and the first `#`; the name ends at the earliest.
-    let pipe = raw.find('|');
-    let hash = raw.find('#');
-    // Drop a trailing `.md` (case-insensitive) — `[[name.md]]` is accepted.
+    // The name ends at the earliest `|` / `#`. Drop a trailing `.md`
+    // (case-insensitive) — `[[name.md]]` is accepted.
     let name = drop_md(raw[..name_end(raw)].trim()).trim().to_string();
 
     // Alias = text after the FIRST `|`, up to (but not including) a `#` that
     // follows it. Anchor = text after the FIRST `#`.
-    let alias = pipe.map(|p| {
-        let after = &raw[p + 1..];
-        let end = after.find('#').unwrap_or(after.len());
-        after[..end].to_string()
-    });
-    let anchor = hash.map(|h| {
+    let alias = pipe_suffix(raw).map(str::to_string);
+    let anchor = raw.find('#').map(|h| {
         let after = &raw[h + 1..];
         // If a `|` follows the `#`, the anchor stops there.
         let end = after.find('|').unwrap_or(after.len());
@@ -245,6 +241,17 @@ mod tests {
 
     fn paths(ps: &[&str]) -> Vec<String> {
         ps.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn name_end_and_pipe_suffix_split_at_the_first_delimiters() {
+        assert_eq!(name_end("a"), 1);
+        assert_eq!(name_end("a|b#c"), 1);
+        assert_eq!(name_end("ab#c|d"), 2);
+        assert_eq!(pipe_suffix("a"), None);
+        assert_eq!(pipe_suffix("a| b #c"), Some(" b "));
+        assert_eq!(pipe_suffix("a#c|d"), Some("d"));
+        assert_eq!(pipe_suffix("a|"), Some(""));
     }
 
     #[test]

@@ -23,7 +23,8 @@ use crate::paths::{is_external, resolve_internal};
 use crate::slug::slugify;
 use crate::wikilink::{self, parse_target};
 
-use super::text::{split_suffix, LinkInner};
+use super::text::LinkInner;
+use crate::paths::split_suffix;
 
 /// One heading-slug rename: the old slug (`from`) and the new slug (`to`). Sent
 /// from the editor, which tracks each heading's identity across edits and emits a

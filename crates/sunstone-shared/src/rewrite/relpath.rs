@@ -1,6 +1,6 @@
 //! Pure path math for the move/rename engine ([`super::moves`]): relative-path
-//! computation and the wikilink shortest-resolving-suffix. The URL
-//! `split_suffix` / `LinkInner` helpers live beside it in [`super::text`].
+//! computation and the wikilink shortest-resolving-suffix. The `LinkInner`
+//! helper lives beside it in [`super::text`], `split_suffix` in `crate::paths`.
 //!
 //! All bundle-relative, '/'-separated; mirrors `paths::resolve_internal`
 //! EXACTLY (`.`/`..` collapse, leading-`..` escapes dropped). No IO — each

@@ -72,6 +72,13 @@ pub fn normalize_segments<'a>(segments: impl Iterator<Item = &'a str>) -> String
     out.join("/")
 }
 
+/// Split a URL into its path part and the `#anchor`/`?query` suffix (preserved
+/// verbatim, including the leading `#` or `?`). The suffix begins at the first
+/// `#` or `?`, whichever comes first.
+pub fn split_suffix(url: &str) -> (&str, &str) {
+    url.split_at(url.find(['#', '?']).unwrap_or(url.len()))
+}
+
 /// Resolve an `href` to a bundle-relative internal target, or `None` for
 /// external / anchor / empty links. A trailing `#anchor` or `?query` is dropped
 /// (so a path part already split of its suffix passes through unchanged).
@@ -88,9 +95,8 @@ pub fn resolve_location(current_path: &str, href: &str) -> Option<String> {
     if raw.is_empty() || is_external(raw) || raw.starts_with('#') {
         return None;
     }
-    // Drop a trailing `#anchor` and `?query`.
-    let path_part = raw.split('#').next().unwrap_or("");
-    let path_part = path_part.split('?').next().unwrap_or("");
+    // Drop a trailing `#anchor` / `?query`.
+    let (path_part, _) = split_suffix(raw);
     if path_part.is_empty() {
         return None;
     }
@@ -139,6 +145,17 @@ pub fn folder_index_fallback(path: String, exists: &impl Fn(&str) -> bool) -> St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn split_suffix_splits_at_first_anchor_or_query() {
+        assert_eq!(split_suffix("a.md"), ("a.md", ""));
+        assert_eq!(split_suffix("a.md#h"), ("a.md", "#h"));
+        assert_eq!(split_suffix("a.md?q=1"), ("a.md", "?q=1"));
+        // Whichever indicator comes first wins; the rest is kept verbatim.
+        assert_eq!(split_suffix("a.md#h?q"), ("a.md", "#h?q"));
+        assert_eq!(split_suffix("a.md?q=1#h"), ("a.md", "?q=1#h"));
+        assert_eq!(split_suffix(""), ("", ""));
+    }
 
     #[test]
     fn is_external_detects_scheme_urls() {

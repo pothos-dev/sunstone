@@ -1,25 +1,7 @@
-//! Pure URL / UTF-8 helpers for link rewriting, shared by the anchor rewriter
-//! (`anchors`) and the move/rename engine (`moves`). The engine's path math
-//! (`relative_path`, `shortest_resolving_suffix`) lives in
-//! `relpath`.
-
-/// Split a URL into its path part and the `#anchor`/`?query` suffix (preserved
-/// verbatim, including the leading `#` or `?`). The suffix begins at the first
-/// `#` or `?`, whichever comes first.
-pub fn split_suffix(url: &str) -> (&str, &str) {
-    let hash = url.find('#');
-    let query = url.find('?');
-    let cut = match (hash, query) {
-        (Some(h), Some(q)) => Some(h.min(q)),
-        (Some(h), None) => Some(h),
-        (None, Some(q)) => Some(q),
-        (None, None) => None,
-    };
-    match cut {
-        Some(c) => (&url[..c], &url[c..]),
-        None => (url, ""),
-    }
-}
+//! Pure link-inner / UTF-8 helpers for link rewriting, shared by the anchor
+//! rewriter (`anchors`) and the move/rename engine (`moves`). The engine's path
+//! math (`relative_path`, `shortest_resolving_suffix`) lives in `relpath`; the
+//! URL `split_suffix` in `crate::paths`.
 
 /// The inside of a Markdown link's parens (`[text](inner)`), split so a
 /// rewriter touches only the URL: `{leading ws}{<}{url}{>}{title}`. The URL
@@ -114,16 +96,6 @@ mod tests {
     }
 
     use super::*;
-
-    #[test]
-    fn split_suffix_splits_at_first_anchor_or_query() {
-        assert_eq!(split_suffix("a.md"), ("a.md", ""));
-        assert_eq!(split_suffix("a.md#h"), ("a.md", "#h"));
-        assert_eq!(split_suffix("a.md?q=1"), ("a.md", "?q=1"));
-        // Whichever indicator comes first wins; the rest is kept verbatim.
-        assert_eq!(split_suffix("a.md#h?q"), ("a.md", "#h?q"));
-        assert_eq!(split_suffix("a.md?q=1#h"), ("a.md", "?q=1#h"));
-    }
 
     #[test]
     fn utf8_len_reads_the_leading_byte() {

@@ -22,7 +22,8 @@ use crate::paths::resolve_internal;
 use crate::wikilink::{self, parse_target};
 
 use super::relpath::{relative_path, shortest_resolving_suffix};
-use super::text::{split_suffix, LinkInner};
+use super::text::LinkInner;
+use crate::paths::split_suffix;
 
 /// Summary of an auto-rewrite pass: how many links across how many files were
 /// changed. Matches the TS `{ linksChanged, filesChanged }`.

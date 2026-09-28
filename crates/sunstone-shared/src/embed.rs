@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths::{find_byte, resolve_internal};
 use crate::scan::{link_target, walk_code, CodeClass};
-use crate::wikilink::{basename, best_name_match, find_double_close};
+use crate::wikilink::{basename, best_name_match, find_double_close, name_end, pipe_suffix};
 
 /// The Attachment extensions Sunstone renders as an image, matched
 /// case-insensitively (af-1). Non-image Attachments keep their literal
@@ -178,26 +178,13 @@ pub fn accessible_name(target: &str, alt: Option<&str>) -> String {
 
 /// Split a raw `![[ … ]]` inner text into `(name, size suffix)`.
 ///
-/// The name ends at the earliest `|` or `#`, mirroring
-/// [`crate::wikilink::name_end`]; the suffix is the text after the FIRST `|`, up
-/// to a following `#`. Unlike a Wikilink the name keeps its extension (an
+/// The name ends at the earliest `|` or `#` ([`name_end`]); the suffix is the
+/// text after the FIRST `|`, up to a following `#` ([`pipe_suffix`]). Unlike a Wikilink the name keeps its extension (an
 /// Attachment corpus has no implied `.md`) and the `|` suffix is a SIZE, never
 /// an alias. A `#anchor` is meaningless for an Embed and is dropped.
 fn split_name_target(raw: &str) -> (&str, Option<&str>) {
-    let pipe = raw.find('|');
-    let hash = raw.find('#');
-    let name_end = match (pipe, hash) {
-        (Some(p), Some(h)) => p.min(h),
-        (Some(p), None) => p,
-        (None, Some(h)) => h,
-        (None, None) => raw.len(),
-    };
-    let size = pipe.map(|p| {
-        let after = &raw[p + 1..];
-        let end = after.find('#').unwrap_or(after.len());
-        after[..end].trim()
-    });
-    (raw[..name_end].trim(), size)
+    let size = pipe_suffix(raw).map(str::trim);
+    (raw[..name_end(raw)].trim(), size)
 }
 
 /// Blank `out[from..to]`, preserving newlines (so line-start state and every
