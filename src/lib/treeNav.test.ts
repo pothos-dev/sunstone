@@ -10,6 +10,9 @@ import {
   reservedChildren,
   folderIndexPath,
   indexChild,
+  linearMove,
+  explorerKeyIntent,
+  type VisibleRow,
 } from './treeNav';
 
 // A small Bundle tree: a `concepts/` folder with a nested `editor/` folder,
@@ -253,5 +256,86 @@ describe('ordinaryChildren markdown filter', () => {
       ],
     };
     expect(ordinaryChildren(node).map((c) => c.path)).toEqual(['A.MD']);
+  });
+});
+
+describe('linearMove', () => {
+  test('ArrowDown/j and ArrowUp/k step one row, clamped at the ends', () => {
+    expect(linearMove('ArrowDown', 0, 3)).toBe(1);
+    expect(linearMove('j', 2, 3)).toBe(2);
+    expect(linearMove('ArrowUp', 2, 3)).toBe(1);
+    expect(linearMove('k', 0, 3)).toBe(0);
+  });
+
+  test('nothing focused (-1) lands on the first row either way', () => {
+    expect(linearMove('j', -1, 3)).toBe(0);
+    expect(linearMove('k', -1, 3)).toBe(0);
+  });
+
+  test('Home / End jump to the first / last row', () => {
+    expect(linearMove('Home', 1, 3)).toBe(0);
+    expect(linearMove('End', -1, 3)).toBe(2);
+  });
+
+  test('other keys and an empty list are not movement', () => {
+    expect(linearMove('Enter', 0, 3)).toBeNull();
+    expect(linearMove('l', 0, 3)).toBeNull();
+    expect(linearMove('j', -1, 0)).toBeNull();
+  });
+});
+
+describe('explorerKeyIntent', () => {
+  const row = (path: string, parentPath: string, isDir = false, expanded = false): VisibleRow => ({
+    path,
+    isDir,
+    depth: parentPath === '' ? 0 : parentPath.split('/').length,
+    parentPath,
+    expanded,
+  });
+  // open/ (expanded, one child), shut/ (collapsed), top.md
+  const rows = [
+    row('open', '', true, true),
+    row('open/a.md', 'open'),
+    row('shut', '', true, false),
+    row('top.md', ''),
+  ];
+
+  test('linear movement focuses the target row', () => {
+    expect(explorerKeyIntent('j', rows, 0)).toEqual({ focus: 'open/a.md' });
+    expect(explorerKeyIntent('End', rows, 0)).toEqual({ focus: 'top.md' });
+  });
+
+  test('Right: collapsed folder expands, expanded folder enters, file is a no-op', () => {
+    expect(explorerKeyIntent('ArrowRight', rows, 2)).toEqual({ expand: true });
+    expect(explorerKeyIntent('l', rows, 0)).toEqual({ focus: 'open/a.md' });
+    expect(explorerKeyIntent('l', rows, 3)).toEqual({});
+  });
+
+  test('Right on an expanded but empty folder is a no-op', () => {
+    const empty = [row('e', '', true, true), row('z.md', '')];
+    expect(explorerKeyIntent('l', empty, 0)).toEqual({});
+  });
+
+  test('Left: expanded folder collapses, a child goes to its parent, root rows stay', () => {
+    expect(explorerKeyIntent('ArrowLeft', rows, 0)).toEqual({ expand: false });
+    expect(explorerKeyIntent('h', rows, 1)).toEqual({ focus: 'open' });
+    expect(explorerKeyIntent('h', rows, 2)).toEqual({});
+    expect(explorerKeyIntent('h', rows, 3)).toEqual({});
+  });
+
+  test('Right/Left with nothing focused land on the first row', () => {
+    expect(explorerKeyIntent('l', rows, -1)).toEqual({ focus: 'open' });
+    expect(explorerKeyIntent('h', rows, -1)).toEqual({ focus: 'open' });
+  });
+
+  test('Enter / Space toggle a folder and open a file; unhandled with nothing focused', () => {
+    expect(explorerKeyIntent('Enter', rows, 0)).toEqual({ expand: false });
+    expect(explorerKeyIntent(' ', rows, 2)).toEqual({ expand: true });
+    expect(explorerKeyIntent('Enter', rows, 3)).toEqual({ open: true });
+    expect(explorerKeyIntent('Enter', rows, -1)).toBeNull();
+  });
+
+  test('unrelated keys are not handled', () => {
+    expect(explorerKeyIntent('x', rows, 0)).toBeNull();
   });
 });

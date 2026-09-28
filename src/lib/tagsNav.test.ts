@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { TagCount } from './types';
-import { flattenTagRows, indexOfKey, pruneToLiveTags, rowKey } from './tagsNav';
+import { flattenTagRows, indexOfKey, pruneToLiveTags, rowKey, tagKeyIntent } from './tagsNav';
 
 describe('pruneToLiveTags', () => {
   const cache = new Map([
@@ -115,5 +115,47 @@ describe('indexOfKey', () => {
   test('returns -1 for a missing or null key', () => {
     expect(indexOfKey(rows, 'nope')).toBe(-1);
     expect(indexOfKey(rows, null)).toBe(-1);
+  });
+});
+
+describe('tagKeyIntent', () => {
+  // okf (expanded, leaves a.md + b.md), editor (collapsed)
+  const rows = flattenTagRows(
+    [
+      { tag: 'okf', count: 2 },
+      { tag: 'editor', count: 1 },
+    ],
+    (t) => t === 'okf',
+    () => ['a.md', 'b.md'],
+  );
+  const okf = rowKey('okf', null);
+
+  test('linear movement focuses the target row key', () => {
+    expect(tagKeyIntent('j', rows, 0)).toEqual({ focus: rowKey('okf', 'a.md') });
+    expect(tagKeyIntent('Home', rows, 2)).toEqual({ focus: okf });
+  });
+
+  test('Right: collapsed tag expands, expanded tag enters its first leaf, leaf no-op', () => {
+    expect(tagKeyIntent('ArrowRight', rows, 3)).toEqual({ expand: true });
+    expect(tagKeyIntent('l', rows, 0)).toEqual({ focus: rowKey('okf', 'a.md') });
+    expect(tagKeyIntent('l', rows, 1)).toEqual({});
+  });
+
+  test('Left: expanded tag collapses, collapsed tag stays, leaf goes to its tag', () => {
+    expect(tagKeyIntent('ArrowLeft', rows, 0)).toEqual({ expand: false });
+    expect(tagKeyIntent('h', rows, 3)).toEqual({});
+    expect(tagKeyIntent('h', rows, 2)).toEqual({ focus: okf });
+  });
+
+  test('Right/Left with nothing focused land on the first row', () => {
+    expect(tagKeyIntent('l', rows, -1)).toEqual({ focus: okf });
+    expect(tagKeyIntent('h', rows, -1)).toEqual({ focus: okf });
+  });
+
+  test('Enter toggles a tag and opens a leaf; Space is not handled', () => {
+    expect(tagKeyIntent('Enter', rows, 0)).toEqual({ expand: false });
+    expect(tagKeyIntent('Enter', rows, 1)).toEqual({ open: true });
+    expect(tagKeyIntent('Enter', rows, -1)).toBeNull();
+    expect(tagKeyIntent(' ', rows, 0)).toBeNull();
   });
 });

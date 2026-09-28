@@ -149,6 +149,90 @@ export function prevIndexClamped(from: number, length: number): number {
 }
 
 /**
+ * The row index a linear-movement key moves the Focused item to over a list of
+ * `length` rows, or `null` when `key` is not one: ArrowDown / `j` and ArrowUp /
+ * `k` step one row CLAMPED at the ends (see `nextIndexClamped` /
+ * `prevIndexClamped`; `current` -1 = nothing focused lands on the first row),
+ * Home / End jump to the first / last row. Also `null` for an empty list. The
+ * one key table the Explorer, Tags, Outline and Backlinks Regions share (the
+ * palettes WRAP instead and never claim `j`/`k` — see `listNav.listKeyIntent`).
+ */
+export function linearMove(key: string, current: number, length: number): number | null {
+  if (length === 0) return null;
+  switch (key) {
+    case 'ArrowDown':
+    case 'j':
+      return nextIndexClamped(current, length);
+    case 'ArrowUp':
+    case 'k':
+      return prevIndexClamped(current, length);
+    case 'Home':
+      return 0;
+    case 'End':
+      return length - 1;
+    default:
+      return null;
+  }
+}
+
+/**
+ * What a handled keypress in a tree Region (Explorer, Tags) asks for, applied by
+ * the nav store: move the Focused item to the row with id `focus`, set the
+ * Focused row's expanded state to `expand`, and/or `open` the Focused Concept.
+ * An empty intent is a handled no-op (the key is still consumed).
+ */
+export interface RowKeyIntent<Id> {
+  focus?: Id;
+  expand?: boolean;
+  open?: boolean;
+}
+
+/**
+ * The Explorer's key decision over its visible `rows` with the Focused item at
+ * index `current` (-1 = none), or `null` when the key is not handled:
+ *
+ * * linear movement — see `linearMove`;
+ * * Right / `l`: collapsed folder → expand; expanded folder → into its first
+ *   child; file → no-op;
+ * * Left / `h`: expanded folder → collapse; otherwise → its parent folder
+ *   (root-level rows have none: no-op);
+ * * Right/Left with nothing focused → the first row;
+ * * Enter / Space: folder → toggle; file → open. Unhandled with nothing focused.
+ */
+export function explorerKeyIntent(
+  key: string,
+  rows: VisibleRow[],
+  current: number,
+): RowKeyIntent<string> | null {
+  const move = linearMove(key, current, rows.length);
+  if (move !== null) return { focus: rows[move].path };
+  const row: VisibleRow | undefined = current >= 0 ? rows[current] : undefined;
+  switch (key) {
+    case 'ArrowRight':
+    case 'l': {
+      if (!row) return rows.length ? { focus: rows[0].path } : null;
+      if (!row.isDir) return {};
+      if (!row.expanded) return { expand: true };
+      // The next row is this folder's first descendant when there is one.
+      const next = rows[current + 1];
+      return next && next.parentPath === row.path ? { focus: next.path } : {};
+    }
+    case 'ArrowLeft':
+    case 'h': {
+      if (!row) return rows.length ? { focus: rows[0].path } : null;
+      if (row.isDir && row.expanded) return { expand: false };
+      return row.parentPath !== '' ? { focus: row.parentPath } : {};
+    }
+    case 'Enter':
+    case ' ':
+      if (!row) return null;
+      return row.isDir ? { expand: !row.expanded } : { open: true };
+    default:
+      return null;
+  }
+}
+
+/**
  * The `index.md` directly inside `folder` (bundle-relative, `''` for the root),
  * or null when the folder has none or is not in the tree. Used by the Tile
  * header breadcrumbs, which open a folder's index when it has one.

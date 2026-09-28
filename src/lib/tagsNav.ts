@@ -9,14 +9,12 @@
 //
 // `$lib/treeNav.flattenVisible` is `TreeNode`-specific (the Bundle tree), so it
 // doesn't fit the tag model; this is the small tags-specific flatten. The index
-// math itself (clamp, no wrap — a tree is spatial) is shared: re-export
-// `nextIndexClamped`/`prevIndexClamped` from `treeNav` so callers have one
-// import and the behaviour stays identical to the Explorer.
+// math itself (clamp, no wrap — a tree is spatial) is shared: `tagKeyIntent`
+// moves with `treeNav.linearMove`, so the behaviour stays identical to the
+// Explorer.
 
 import type { TagCount } from '$lib/types';
-import { nextIndexClamped, prevIndexClamped } from '$lib/treeNav';
-
-export { nextIndexClamped, prevIndexClamped };
+import { linearMove, type RowKeyIntent } from '$lib/treeNav';
 
 /**
  * One row in the flattened Tags visible-rows list. A row is identified by its
@@ -101,4 +99,49 @@ export function pruneToLiveTags<V>(
     expanded: nextExpanded.size !== expanded.size ? nextExpanded : null,
     cache: nextCache.size !== cache.size ? nextCache : null,
   };
+}
+
+/**
+ * The Tags Section's key decision over its visible `rows` with the Focused item
+ * at index `current` (-1 = none), or `null` when the key is not handled. Row ids
+ * are `rowKey`s. Like `treeNav.explorerKeyIntent`, but a tag root has no parent
+ * and there is no Space:
+ *
+ * * linear movement — see `treeNav.linearMove`;
+ * * Right / `l`: collapsed tag → expand; expanded tag → into its first Concept
+ *   leaf; leaf → no-op;
+ * * Left / `h`: expanded tag → collapse; collapsed tag → no-op; leaf → its tag;
+ * * Right/Left with nothing focused → the first row;
+ * * Enter: tag → toggle; leaf → open. Unhandled with nothing focused.
+ */
+export function tagKeyIntent(
+  key: string,
+  rows: TagRow[],
+  current: number,
+): RowKeyIntent<string> | null {
+  const move = linearMove(key, current, rows.length);
+  if (move !== null) return { focus: rows[move].key };
+  const row: TagRow | undefined = current >= 0 ? rows[current] : undefined;
+  switch (key) {
+    case 'ArrowRight':
+    case 'l': {
+      if (!row) return rows.length ? { focus: rows[0].key } : null;
+      if (!row.isTag) return {};
+      if (!row.expanded) return { expand: true };
+      // The next row is this tag's first leaf when there is one.
+      const next = rows[current + 1];
+      return next && !next.isTag && next.tag === row.tag ? { focus: next.key } : {};
+    }
+    case 'ArrowLeft':
+    case 'h': {
+      if (!row) return rows.length ? { focus: rows[0].key } : null;
+      if (!row.isTag) return { focus: rowKey(row.tag, null) };
+      return row.expanded ? { expand: false } : {};
+    }
+    case 'Enter':
+      if (!row) return null;
+      return row.isTag ? { expand: !row.expanded } : { open: true };
+    default:
+      return null;
+  }
 }

@@ -7,8 +7,8 @@
 // Unlike the Explorer the Focused item here is a plain list index over the
 // rendered entries; there is no tree to flatten.
 //
-// This store holds ONLY the Focused index as a rune plus the pure key-handling
-// logic (delegating clamp index math to `$lib/treeNav`, which is generic — NOT
+// This store holds ONLY the Focused index as a rune plus the key-handling
+// glue (movement is `$lib/treeNav.linearMove`, which CLAMPS — NOT
 // `$lib/listNav`, which WRAPS for modal palettes). It is DOM-free: `listRegionNav`
 // (wired from App.svelte) drives DOM focus from `focusedIndex` via roving
 // tabindex + an effect, and App supplies the side-effecting `activate` callback
@@ -18,7 +18,7 @@
 // Two instances are exported (`outlineNav`, `backlinksNav`) so the Outline and
 // Backlinks Regions navigate independently, each remembering its own position.
 
-import { nextIndexClamped, prevIndexClamped } from '$lib/treeNav';
+import { linearMove } from '$lib/treeNav';
 import { isPlainKey } from '$lib/keynav';
 
 class ListFocusNavStore {
@@ -66,34 +66,14 @@ class ListFocusNavStore {
     if (length === 0) return false;
 
     const current = this.focusedIndex ?? -1;
-
-    switch (e.key) {
-      case 'ArrowDown':
-      case 'j': {
-        this.focusedIndex = nextIndexClamped(current, length);
-        return true;
-      }
-      case 'ArrowUp':
-      case 'k': {
-        this.focusedIndex = prevIndexClamped(current, length);
-        return true;
-      }
-      case 'Home': {
-        this.focusedIndex = 0;
-        return true;
-      }
-      case 'End': {
-        this.focusedIndex = length - 1;
-        return true;
-      }
-      case 'Enter': {
-        if (current < 0) return false;
-        activate(current);
-        return true;
-      }
-      default:
-        return false;
+    const move = linearMove(e.key, current, length);
+    if (move !== null) {
+      this.focusedIndex = move;
+      return true;
     }
+    if (e.key !== 'Enter' || current < 0) return false;
+    activate(current);
+    return true;
   }
 }
 

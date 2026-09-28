@@ -7,20 +7,12 @@
 // Editor). Tags has NO CRUD verbs — tags derive from frontmatter, so there is
 // nothing to create/rename/delete here.
 //
-// This store holds ONLY the Focused-item key as a rune and the pure key-handling
-// logic (delegating index math to `$lib/tagsNav`, which re-exports the generic
-// clamp helpers from `$lib/treeNav`). It is DOM-free: TagBrowser.svelte drives
-// DOM focus from `focusedKey` via roving tabindex + an effect, and supplies the
-// side-effecting callbacks. Keeping it here mirrors `explorerNav`/`listFocusNav`.
+// This store holds ONLY the Focused-item key as a rune and the key-handling glue
+// (the key decision is the pure `tagKeyIntent` in `$lib/tagsNav`). It is
+// DOM-free: TagBrowser.svelte drives DOM focus from `focusedKey` via roving
+// tabindex + an effect, and supplies the side-effecting callbacks. Keeping it here mirrors `explorerNav`/`listFocusNav`.
 
-import {
-  flattenTagRows,
-  indexOfKey,
-  nextIndexClamped,
-  prevIndexClamped,
-  rowKey,
-  type TagRow,
-} from '$lib/tagsNav';
+import { flattenTagRows, indexOfKey, tagKeyIntent } from '$lib/tagsNav';
 import type { TagCount } from '$lib/types';
 import { isPlainKey } from '$lib/keynav';
 
@@ -51,8 +43,9 @@ class TagsNavStore {
   /**
    * Handle a within-Tags keydown. Returns true when the key was handled (the
    * caller should then `preventDefault`). `tags` is the current tag list and
-   * `actions` supplies expand + open side-effects. Movement uses the flattened
-   * VISIBLE rows and CLAMPS at the ends (see `$lib/tagsNav`).
+   * `actions` supplies expand + open side-effects. The key decision is the pure
+   * `tagKeyIntent` over the flattened VISIBLE rows (see `$lib/tagsNav`); this
+   * applies it.
    *
    * `h/j/k/l` are unmodified here — unambiguous because cross-Region movement is
    * `Alt`+`hjkl` (handled by App's global capture handler, which runs first).
@@ -72,75 +65,13 @@ class TagsNavStore {
     if (rows.length === 0) return false;
 
     const current = indexOfKey(rows, this.focusedKey);
-    const row: TagRow | undefined = current >= 0 ? rows[current] : undefined;
-
-    switch (e.key) {
-      case 'ArrowDown':
-      case 'j': {
-        this.focusedKey = rows[nextIndexClamped(current, rows.length)].key;
-        return true;
-      }
-      case 'ArrowUp':
-      case 'k': {
-        this.focusedKey = rows[prevIndexClamped(current, rows.length)].key;
-        return true;
-      }
-      case 'Home': {
-        this.focusedKey = rows[0].key;
-        return true;
-      }
-      case 'End': {
-        this.focusedKey = rows[rows.length - 1].key;
-        return true;
-      }
-      case 'ArrowRight':
-      case 'l': {
-        if (!row) {
-          this.focusedKey = rows[0].key;
-          return true;
-        }
-        if (row.isTag) {
-          if (!row.expanded) {
-            // collapsed tag → expand in place
-            actions.setExpanded(row.tag, true);
-          } else {
-            // expanded tag → move into its first concept leaf (the next row,
-            // which is this tag's first leaf when there is one)
-            const next = rows[current + 1];
-            if (next && !next.isTag && next.tag === row.tag) this.focusedKey = next.key;
-          }
-        }
-        // concept leaf → no-op
-        return true;
-      }
-      case 'ArrowLeft':
-      case 'h': {
-        if (!row) {
-          this.focusedKey = rows[0].key;
-          return true;
-        }
-        if (row.isTag) {
-          // expanded tag → collapse; collapsed tag → no parent, stay put
-          if (row.expanded) actions.setExpanded(row.tag, false);
-        } else {
-          // concept leaf → jump to its parent tag root
-          this.focusedKey = rowKey(row.tag, null);
-        }
-        return true;
-      }
-      case 'Enter': {
-        if (!row) return false;
-        if (row.isTag) {
-          actions.setExpanded(row.tag, !row.expanded);
-        } else {
-          // concept leaf → open the Concept AND move focus to the Editor
-          actions.openConcept(row.path);
-        }
-        return true;
-      }
-      default:
-        return false;
-    }
+    const intent = tagKeyIntent(e.key, rows, current);
+    if (!intent) return false;
+    if (intent.focus !== undefined) this.focusedKey = intent.focus;
+    if (intent.expand !== undefined) actions.setExpanded(rows[current].tag, intent.expand);
+    // concept leaf → open the Concept AND move focus to the Editor
+    if (intent.open) actions.openConcept(rows[current].path);
+    return true;
   }
 }
 
