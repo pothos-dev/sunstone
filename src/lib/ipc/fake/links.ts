@@ -32,10 +32,12 @@ import { FILES, conceptPaths } from './store';
 const isExternalLink = (href: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(href);
 
 /**
- * Blank out fenced code blocks (``` / ~~~) and inline code spans (`` ` ``) in a
- * markdown body, preserving length + newlines so offsets stay aligned. Used so
- * the wikilink scanner never picks up `[[ … ]]` written inside code, matching
- * Obsidian / the outline scanner's fence handling.
+ * Blank out fenced code blocks (``` / ~~~) and inline code spans in a markdown
+ * body, preserving length + newlines so offsets stay aligned. Used so the
+ * wikilink scanner never picks up `[[ … ]]` written inside code — the same
+ * contract as the Rust `sunstone-shared::scan::walk_code`: a run of N backticks
+ * opens a span only if a later run of EXACTLY N closes it within the same
+ * paragraph (blank lines and fence lines end one); an unmatched run is literal.
  */
 function maskCode(body: string): string {
   const lines = body.split('\n');
@@ -43,9 +45,15 @@ function maskCode(body: string): string {
   let inFence = false;
   let fenceMarker = '';
   const out: string[] = [];
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length) out.push(...maskInlineCode(para.join('\n')).split('\n'));
+    para = [];
+  };
   for (const line of lines) {
     const fence = fenceRe.exec(line);
     if (fence) {
+      flush();
       const marker = fence[1][0];
       if (!inFence) {
         inFence = true;
@@ -61,10 +69,46 @@ function maskCode(body: string): string {
       out.push(' '.repeat(line.length));
       continue;
     }
-    // Inline code spans: blank the content between matched backtick runs.
-    out.push(line.replace(/`+[^`]*`+/g, (s) => ' '.repeat(s.length)));
+    if (line.trim() === '') {
+      flush();
+      out.push(line);
+      continue;
+    }
+    para.push(line);
   }
+  flush();
   return out.join('\n');
+}
+
+/** Blank CommonMark code spans (delimiters included) in one paragraph, keeping newlines. */
+function maskInlineCode(text: string): string {
+  const runs: { at: number; len: number }[] = [];
+  for (const m of text.matchAll(/`+/g)) runs.push({ at: m.index, len: m[0].length });
+  // Per run length, the next not-yet-passed run index (closers are searched
+  // forward only, so each list is walked once).
+  const byLen = new Map<number, number[]>();
+  runs.forEach((r, k) => {
+    const list = byLen.get(r.len);
+    if (list) list.push(k);
+    else byLen.set(r.len, [k]);
+  });
+  const cursor = new Map<number, number>();
+  let res = '';
+  let last = 0;
+  for (let k = 0; k < runs.length; k++) {
+    const { at, len } = runs[k];
+    const same = byLen.get(len)!;
+    let c = cursor.get(len) ?? 0;
+    while (c < same.length && same[c] <= k) c++;
+    cursor.set(len, c);
+    if (c >= same.length) continue; // unmatched: literal text
+    const close = same[c];
+    const end = runs[close].at + len;
+    res += text.slice(last, at) + text.slice(at, end).replace(/[^\n]/g, ' ');
+    last = end;
+    k = close;
+  }
+  return res + text.slice(last);
 }
 
 /** Matches a wikilink `[[ inner ]]` but NOT an embed `![[ … ]]` (leading `!`). */

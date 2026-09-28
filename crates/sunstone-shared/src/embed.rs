@@ -228,8 +228,10 @@ fn blank(out: &mut [u8], from: usize, to: usize) {
 ///
 /// The contract is the one [`crate::scan`] documents: line-start ```` ``` ````
 /// / `~~~` fences (optionally indented, marker char tracked so a `~~~` inside a
-/// backtick fence does not close it) and `` ` `` toggles for inline spans, which
-/// — as in the shared scanner — are not reset at a line break.
+/// backtick fence does not close it) and CommonMark inline code spans (a run of
+/// N backticks closed by the next run of exactly N in the same paragraph; an
+/// unmatched run is literal and masks nothing). The span delimiters are blanked
+/// along with their content.
 ///
 /// Length-preserving by construction: only whole bytes are overwritten with
 /// ASCII spaces, so a multi-byte char inside code becomes N spaces and the

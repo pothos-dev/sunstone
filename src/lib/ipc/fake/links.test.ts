@@ -63,6 +63,39 @@ describe('outboundLinks — wikilinks', () => {
   });
 });
 
+describe('outboundLinks — inline code spans (CommonMark, as the Rust scanner)', () => {
+  const links = (body: string) => outboundLinks('index.md', concept(body));
+
+  test('an unmatched backtick is literal and hides nothing after it', () => {
+    const out = links('Press the ` key.\n\nSee [[codemirror]] and [[bundle]]');
+    expect(out).toContain('concepts/codemirror.md');
+    expect(out).toContain('concepts/bundle.md');
+  });
+
+  test('a double-backtick span may contain a single backtick', () => {
+    expect(links('Use ``a`b`` here. [[codemirror]]')).toContain('concepts/codemirror.md');
+  });
+
+  test('a span may cross a single line break', () => {
+    const out = links('`code\n[[codemirror]]` [[bundle]]');
+    expect(out).not.toContain('concepts/codemirror.md');
+    expect(out).toContain('concepts/bundle.md');
+  });
+
+  test('a closer must have exactly the opener length', () => {
+    const hidden = links('`a``[[codemirror]]` [[bundle]]');
+    expect(hidden).not.toContain('concepts/codemirror.md');
+    expect(hidden).toContain('concepts/bundle.md');
+    // No later single-backtick run: the opener is literal.
+    expect(links('` [[codemirror]] `` x')).toContain('concepts/codemirror.md');
+  });
+
+  test('a span never crosses a blank line or a fence', () => {
+    expect(links('a ` b\n\n[[codemirror]] ` c')).toContain('concepts/codemirror.md');
+    expect(links('a ` b\n```\n`\n```\n[[codemirror]]')).toContain('concepts/codemirror.md');
+  });
+});
+
 describe('planRewrites — wikilinks', () => {
   // Snapshot/restore the live FILES so each test is isolated.
   let snapshot: Record<string, string>;
