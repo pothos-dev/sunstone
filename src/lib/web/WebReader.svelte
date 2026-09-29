@@ -26,6 +26,7 @@
   import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
+  import { escapeTarget, toggleDrawer, type Drawer } from './mobileLayout';
 
   /**
    * The anonymous, read-only "Sunstone Web" reader — the surface `WebViewer`
@@ -58,8 +59,17 @@
   // A Concept is addressed by its path in the URL (`/research/providers/mistral-ai`),
   // not a `?path=` query — `conceptToUrl` drops `.md` and a trailing `/index`.
   function open(path: string) {
+    drawer = null;
     void goto(conceptToUrl(path), { keepFocus: true });
   }
+
+  // --- Narrow-screen (phone) layout: below the breakpoint both Sidebars are
+  // slide-over drawers and the rails' controls move into the concept strip + an
+  // overflow menu. The switch is CSS-only; this is just the transient drawer /
+  // menu state (never persisted — see `mobileLayout.ts`). Opening a Concept or
+  // jumping to a heading closes the drawer so the Concept is what you see. ---
+  let drawer = $state<Drawer>(null);
+  let menuOpen = $state(false);
 
   // The concept strip's title (the same name `WebViewer` puts in `<title>`).
   const pageTitle = $derived(conceptTitle(data.selected, data.rendered));
@@ -150,6 +160,7 @@
 
   // --- Outline scroll-to-heading ---
   function scrollToHeading(slug: string) {
+    drawer = null;
     document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -212,7 +223,12 @@
     // Ctrl/Cmd+Shift+F toggles Search; Ctrl/Cmd+K toggles the quick-nav palette
     // (both capture phase, converging on the same flags the rail buttons flip).
     const onKeydown = (e: KeyboardEvent) => {
-      if (matchesHotkey(e, { key: 'f', shift: true })) {
+      if (e.key === 'Escape') {
+        const target = escapeTarget({ dialogOpen: searchOpen || quickNavOpen, menuOpen, drawer });
+        if (target === 'menu') menuOpen = false;
+        else if (target === 'drawer') drawer = null;
+        if (target !== null) e.preventDefault();
+      } else if (matchesHotkey(e, { key: 'f', shift: true })) {
         e.preventDefault();
         searchOpen = !searchOpen;
       } else if (matchesHotkey(e, { key: 'k' })) {
@@ -286,9 +302,10 @@
     class="side-bar left"
     class:collapsed={!ui.leftSidebarOpen}
     class:resizing={leftResizing}
+    class:drawer-open={drawer === 'left'}
     aria-label="Sidebar"
     data-testid="left-side-bar"
-    style="width: {ui.leftSidebarOpen ? ui.leftSidebarWidth : 0}px; --side-w: {ui.leftSidebarWidth}px; --expanded-count: {leftCount}"
+    style="--open-w: {ui.leftSidebarOpen ? ui.leftSidebarWidth : 0}px; --side-w: {ui.leftSidebarWidth}px; --expanded-count: {leftCount}"
   >
     <div class="side-bar-inner">
       <SidebarSection
@@ -359,6 +376,24 @@
          collapse/resize moved to the edge borders. -->
     <div class="concept-strip" data-testid="concept-strip">
       <div class="cs-title-group">
+        <!-- Narrow screens only: the Explorer drawer (the left rail is hidden). -->
+        <button
+          type="button"
+          class="icon-btn narrow-only"
+          class:active={drawer === 'left'}
+          data-testid="drawer-toggle-left"
+          title="Explorer"
+          aria-label="Explorer"
+          aria-expanded={drawer === 'left'}
+          onclick={() => {
+            menuOpen = false;
+            drawer = toggleDrawer(drawer, 'left');
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </button>
         <div class="btn-group">
           <button
             type="button"
@@ -370,7 +405,7 @@
           >
           <button
             type="button"
-            class="icon-btn"
+            class="icon-btn wide-only"
             data-testid="nav-forward"
             title="Forward"
             aria-label="Forward"
@@ -386,7 +421,7 @@
         <!-- Properties show/hide: flips the read-only Properties panel in the centre. -->
         <button
           type="button"
-          class="icon-btn"
+          class="icon-btn wide-only"
           class:active={ui.propertiesOpen}
           data-testid="properties-panel-toggle"
           title={ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}
@@ -408,7 +443,7 @@
              straight to the browser's native print → Save-as-PDF preview. -->
         <button
           type="button"
-          class="icon-btn"
+          class="icon-btn wide-only"
           data-testid="export-pdf"
           title="Export as PDF"
           aria-label="Export as PDF"
@@ -427,6 +462,107 @@
             <path d="M8 7.5v4m0 0 1.6-1.6M8 11.5 6.4 9.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
+
+        <!-- Narrow screens only: quick nav, the Outline & Backlinks drawer and an
+             overflow menu stand in for the hidden rails + the controls above. -->
+        <button
+          type="button"
+          class="icon-btn narrow-only"
+          data-testid="strip-quicknav"
+          title="Quick nav"
+          aria-label="Quick nav"
+          onclick={() => {
+            drawer = null;
+            menuOpen = false;
+            quickNavOpen = true;
+          }}
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.25" fill="none" stroke="currentColor" stroke-width="1.3" />
+            <path d="m10.2 10.2 3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+          </svg>
+        </button>
+        {#if data.rendered}
+          <button
+            type="button"
+            class="icon-btn narrow-only"
+            class:active={drawer === 'right'}
+            data-testid="drawer-toggle-right"
+            title="Outline & Backlinks"
+            aria-label="Outline & Backlinks"
+            aria-expanded={drawer === 'right'}
+            onclick={() => {
+              menuOpen = false;
+              drawer = toggleDrawer(drawer, 'right');
+            }}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path d="M2.5 4h11M5 8h8.5M7.5 12h6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
+          </button>
+        {/if}
+        <div class="menu-anchor narrow-only">
+          <button
+            type="button"
+            class="icon-btn"
+            class:active={menuOpen}
+            data-testid="strip-menu"
+            title="More"
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onclick={() => {
+              drawer = null;
+              menuOpen = !menuOpen;
+            }}
+          >⋯</button>
+          {#if menuOpen}
+            <div class="strip-menu" role="menu" data-testid="strip-menu-list">
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="menu-search"
+                onclick={() => {
+                  menuOpen = false;
+                  searchOpen = true;
+                }}>Search in Bundle</button
+              >
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={ui.propertiesOpen}
+                data-testid="menu-properties"
+                disabled={!data.rendered}
+                onclick={() => {
+                  menuOpen = false;
+                  ui.propertiesOpen = !ui.propertiesOpen;
+                }}>{ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}</button
+              >
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="menu-export-pdf"
+                disabled={!data.rendered}
+                onclick={() => {
+                  menuOpen = false;
+                  if (data.selected) window.open(printUrl(data.selected), '_blank');
+                }}>Export as PDF</button
+              >
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="menu-theme"
+                onclick={() => {
+                  menuOpen = false;
+                  toggleTheme();
+                }}>{theme.resolved === 'dark' ? 'Light theme' : 'Dark theme'}</button
+              >
+              {#if __SUNSTONE_WEB__ && data.user === null}
+                <a role="menuitem" href="/auth/signin" data-sveltekit-reload data-testid="menu-sign-in">Sign in</a>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -488,9 +624,10 @@
       class="side-bar right"
       class:collapsed={!ui.rightSidebarOpen}
       class:resizing={rightResizing}
+      class:drawer-open={drawer === 'right'}
       aria-label="Sidebar"
       data-testid="right-side-bar"
-      style="width: {ui.rightSidebarOpen ? ui.rightSidebarWidth : 0}px; --side-w: {ui.rightSidebarWidth}px; --expanded-count: {rightCount}"
+      style="--open-w: {ui.rightSidebarOpen ? ui.rightSidebarWidth : 0}px; --side-w: {ui.rightSidebarWidth}px; --expanded-count: {rightCount}"
     >
       <div class="side-bar-inner">
         <SidebarSection
@@ -520,6 +657,20 @@
       onToggleSidebar={() => (ui.rightSidebarOpen = !ui.rightSidebarOpen)}
     />
   {/if}
+  <!-- Tap-to-close scrim behind an open drawer / the overflow menu (only ever
+       shown on narrow screens; the CSS hides it otherwise). -->
+  {#if drawer !== null || menuOpen}
+    <div
+      class="drawer-scrim"
+      class:clear={drawer === null}
+      role="presentation"
+      data-testid="drawer-scrim"
+      onclick={() => {
+        drawer = null;
+        menuOpen = false;
+      }}
+    ></div>
+  {/if}
 </div>
 
 <WebSearch open={searchOpen} onopen={openSearchHit} onclose={() => (searchOpen = false)} />
@@ -540,7 +691,10 @@
        grid. Each edge slot is empty while its Sidebar is collapsed. */
     display: grid;
     grid-template-columns: auto auto auto minmax(0, 1fr) auto auto auto;
+    /* `dvh` tracks a mobile browser's collapsing toolbars (plain `vh` is the
+       LARGEST viewport, so the bottom of the rail sat under the toolbar). */
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     font-family: var(--font-ui, system-ui, sans-serif);
     color: var(--text, #222);
@@ -571,12 +725,14 @@
     background-clip: padding-box;
   }
 
-  /* A Sidebar's OUTER: its width (0 when collapsed) is driven inline from the
-     persisted width; overflow-hidden clips the fixed-width inner so collapsing
+  /* A Sidebar's OUTER: its width (0 when collapsed) is driven inline (`--open-w`)
+     from the persisted width; overflow-hidden clips the fixed-width inner so collapsing
      slides content out under the clip rather than reflowing it (desktop parity).
      The width transitions unless an edge drag is in progress. */
   .side-bar {
+    width: var(--open-w);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     background: var(--bg-elevated, #f9fafc);
@@ -617,6 +773,7 @@
   .edge-slot {
     display: flex;
     height: 100vh;
+    height: 100dvh;
   }
 
   .left-edge-slot {
@@ -635,6 +792,7 @@
     flex: none;
     width: var(--side-w, 280px);
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -832,6 +990,177 @@
 
   .status.error {
     color: var(--danger, #c0392b);
+  }
+
+  /* --- Narrow-screen controls (see `mobileLayout.ts`). Hidden on wide screens;
+     the `@media` block below swaps them in for the rails + wide-only buttons. --- */
+  .narrow-only,
+  .drawer-scrim {
+    display: none;
+  }
+
+  .menu-anchor {
+    position: relative;
+  }
+
+  .strip-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    min-width: 12rem;
+    padding: 0.3rem;
+    border: 1px solid var(--border, #ccc);
+    border-radius: var(--radius-lg, 10px);
+    background: var(--bg-elevated, #fff);
+    box-shadow: var(--shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.2));
+  }
+
+  .strip-menu > button,
+  .strip-menu > a {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.95rem;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .strip-menu > button:hover:not(:disabled),
+  .strip-menu > a:hover {
+    background: var(--hover, rgba(127, 127, 127, 0.15));
+  }
+
+  .strip-menu > button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* Phones / narrow windows: one column for the Concept. The Sidebars leave the
+     grid and become slide-over drawers, the rails and resize edges go, and the
+     rails' controls live in the concept strip (☰ / quick nav / ≡ / ⋯). Keep the
+     breakpoint in step with `NARROW_MAX_WIDTH` (`mobileLayout.ts`). */
+  @media (max-width: 768px) {
+    .app {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app > :global(.activity-rail),
+    .edge-slot,
+    .wide-only {
+      display: none;
+    }
+
+    .narrow-only {
+      display: inline-flex;
+    }
+
+    .center {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .side-bar,
+    .side-bar.resizing {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      z-index: 1000;
+      width: min(85vw, 320px);
+      box-shadow: var(--shadow-lg, 0 10px 40px rgba(0, 0, 0, 0.2));
+      visibility: hidden;
+      transition:
+        transform 0.22s ease,
+        visibility 0s linear 0.22s;
+    }
+
+    .side-bar.left {
+      left: 0;
+      transform: translateX(-100%);
+      border-right: 1px solid var(--border, #e2e2e2);
+    }
+
+    .side-bar.right {
+      right: 0;
+      transform: translateX(100%);
+      border-left: 1px solid var(--border, #e2e2e2);
+    }
+
+    .side-bar.drawer-open {
+      transform: none;
+      visibility: visible;
+      transition: transform 0.22s ease;
+    }
+
+    .side-bar-inner {
+      width: 100%;
+    }
+
+    .drawer-scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(16, 22, 18, 0.4);
+    }
+
+    /* The overflow menu's scrim only catches the outside tap; no dimming. */
+    .drawer-scrim.clear {
+      background: transparent;
+    }
+
+    .concept-strip {
+      padding: 0.35rem 0.5rem;
+      padding-top: max(0.35rem, env(safe-area-inset-top));
+    }
+
+    .cs-controls {
+      gap: 0.3rem;
+    }
+
+    .reader {
+      padding: 0.75rem 1rem 3rem;
+      padding-bottom: max(3rem, env(safe-area-inset-bottom));
+    }
+
+    /* Long URLs / ids wrap instead of widening the page; a wide table scrolls
+       inside its own box instead of scrolling the whole reader sideways. */
+    .reader :global(.rendered) {
+      overflow-wrap: break-word;
+    }
+
+    .reader :global(.rendered table) {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+  }
+
+  /* Touch: finger-sized targets (~40px) for the strip buttons and the Sidebar
+     lists. */
+  @media (pointer: coarse) {
+    .icon-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+
+    .app :global(.tree .row),
+    .app :global(.side-bar .entry) {
+      min-height: 2.25rem;
+    }
+
+    .app :global(.tree .caret-col) {
+      width: 2rem;
+    }
   }
 
   /* Rendered-body content styles (prose typography, links, broken-link,

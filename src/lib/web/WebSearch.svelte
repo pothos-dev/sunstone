@@ -316,4 +316,14 @@
     font-family: var(--font-ui, system-ui, sans-serif);
     font-size: 0.85rem;
   }
+
+  /* Phones: pin the panel near the top, full width, so the on-screen keyboard
+     covers as little of the result list as possible. */
+  @media (max-width: 768px) {
+    .fts-panel {
+      top: max(0.5rem, env(safe-area-inset-top));
+      width: calc(100vw - 1rem);
+      max-height: 60dvh;
+    }
+  }
 </style>
