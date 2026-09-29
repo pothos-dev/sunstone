@@ -5,7 +5,7 @@ use std::fmt;
 
 use super::{
     BRANCH_ENV, BUNDLE_ENV, DEFAULT_SYNC_INTERVAL_SECS, GIT_VAR_PREFIX, INTERVAL_ENV,
-    KNOWN_GIT_VARS, ORIGIN_ENV, REPO_DIR, SEED_FROM_ENV, SSH_KEY_ENV, SUBDIR_ENV,
+    E2E_REPO_DIR_ENV, KNOWN_GIT_VARS, ORIGIN_ENV, REPO_DIR, SEED_FROM_ENV, SSH_KEY_ENV, SUBDIR_ENV,
 };
 
 /// A non-fatal configuration observation, printed at boot. Deliberately a
@@ -18,6 +18,10 @@ pub enum ConfigWarning {
     /// `SUNSTONE_BUNDLE=/bundle` into the image ENV, so an operator's override
     /// is indistinguishable from the image's default.
     BundleIgnoredInGitShape { value: String },
+    /// `SUNSTONE_E2E_REPO_DIR` set on a binary built without the `e2e` feature:
+    /// the repo stays at `/srv/repo` (§2.3). Loud, so a test harness that forgot
+    /// `--features e2e` is not silently served from the wrong place.
+    E2eRepoDirIgnored { value: String },
 }
 
 /// Renders the message **body only** — no `sunstone-server: ` prefix, so the
@@ -31,6 +35,11 @@ impl fmt::Display for ConfigWarning {
                 "{BUNDLE_ENV}={value} is ignored in a git shape — the bundle root is \
                  {REPO_DIR} joined with {SUBDIR_ENV}. Nothing to do if you did not set it: \
                  the image bakes {BUNDLE_ENV}=/bundle into its ENV."
+            ),
+            ConfigWarning::E2eRepoDirIgnored { value } => write!(
+                f,
+                "{E2E_REPO_DIR_ENV}={value} is ignored — only a sunstone-server built with \
+                 `--features e2e` honours it; the repository stays at {REPO_DIR}."
             ),
         }
     }

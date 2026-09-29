@@ -33,6 +33,13 @@ export const FIXTURE_SRC = resolve('tests/fixtures/web-bundle');
 export const WEB_BUNDLE_DIR = join(tmpdir(), 'sunstone-web-bundle');
 
 /**
+ * The branch the seeded repo is created on. The server runs the **git-local**
+ * shape over it (`SUNSTONE_GIT_BRANCH`), whose boot refuses a repo on any other
+ * branch — so both sides read it from here.
+ */
+export const WEB_BUNDLE_BRANCH = 'main';
+
+/**
  * Shared HS256 secret for the write JWT: the SvelteKit hook mints with it
  * (`SUNSTONE_JWT_SECRET`), axum verifies with it. Must be identical on both
  * servers or every authed write 401s.
@@ -79,7 +86,7 @@ export function setupWebBundleRepo(): string {
   }
   cpSync(FIXTURE_SRC, WEB_BUNDLE_DIR, { recursive: true });
 
-  git(WEB_BUNDLE_DIR, ['init', '-q']);
+  git(WEB_BUNDLE_DIR, ['init', '-q', '-b', WEB_BUNDLE_BRANCH]);
   git(WEB_BUNDLE_DIR, ['config', 'user.name', 'Fixture Seed']);
   git(WEB_BUNDLE_DIR, ['config', 'user.email', 'seed@example.com']);
   git(WEB_BUNDLE_DIR, ['config', 'commit.gpgsign', 'false']);

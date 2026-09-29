@@ -25,3 +25,8 @@ serde_json.workspace = true
 hmac = "0.13.0"
 sha2 = "0.11.0"
 base64 = "0.22.1"
+
+[features]
+# Test-harness knobs compiled out of every shipped binary. `e2e` lets the web e2e
+# suite point a git shape at a temp repo (`SUNSTONE_E2E_REPO_DIR`, see config).
+e2e = []
