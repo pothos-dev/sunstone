@@ -4,6 +4,49 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-09-29
+
+### Added
+
+- Sunstone Web works on phones: below 768px the Explorer and the Outline &
+  Backlinks sidebars become slide-over drawers (☰ and ≡ in the top strip), the
+  Concept takes the full width, and quick nav, search, Properties, PDF export,
+  theme and sign-in sit in the strip and its ⋯ menu. Wide tables scroll on
+  their own, long links wrap, and touch targets are finger-sized.
+- Embedded images: `![[image.png]]` and `![](image.png)` Embeds render inline
+  in the editor and the web reader, served from the Bundle's Attachments.
+- Frontmatter is edited as YAML in place of the Properties panel.
+- Clickable breadcrumbs and the Concept's Bundle-relative path in the Tile
+  header.
+- The desktop window title shows the active Concept's name.
+- The Bundle launcher has a fuzzy filter box.
+- The activity rails on both edges hold the Sidebar collapse toggles.
+- Closing the desktop app flushes a pending autosave first.
+
+### Fixed
+
+- Links to a folder (or the Bundle root) open that folder's `index.md`;
+  moving a folder rewrites links into it, and folder links count as Backlinks
+  of its index.
+- A link inside a fenced code block is no longer counted as a Backlink.
+- An unmatched backtick no longer hides every link after it.
+- Rename/move keeps a bare wikilink only when its name still resolves to the
+  same target; a rejected rename/move leaves the open Concept on its own path.
+- Heading anchors after a `?query` are rewritten; ATX closing `#`s no longer
+  end up in Outline headings.
+- Opening a Concept another Tile is editing keeps its unsaved edits.
+- A search hit scrolls to the right line even with frontmatter above it.
+- Table cells are locked and code block text is selectable in reading mode.
+- Autolinked email addresses keep their visible label; a wikilink's anchor
+  survives an alias.
+- Save as PDF falls back to the print dialog where no direct export exists.
+- Web: Quick nav picks up new Concepts after a live reload; sync notices
+  reach clients for Bundles in a repo subfolder; a pushed commit is never
+  amended; a failed write no longer breaks every later write.
+- Web server: hidden (dot) paths are refused on every route, Attachments are
+  served with a sandboxing CSP, and deleting or renaming a symlink acts on the
+  link, never its target.
+
 ## [0.19.7] - 2026-09-01
 
 ### Fixed
