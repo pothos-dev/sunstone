@@ -306,6 +306,20 @@ export interface Backend {
    */
   setWindowTitle(title: string): Promise<void>;
 
+  /**
+   * Register `flush` to run before the app goes away, so debounced work (the
+   * Document autosave, session persistence) is written instead of dropped.
+   * Returns an unsubscribe.
+   *
+   * Desktop: on the main window's close request — the close WAITS for `flush`
+   * (bounded by {@link CLOSE_FLUSH_TIMEOUT_MS}, so a hung write can never keep the
+   * window open). HTTP (web): on `pagehide` (reload, navigation, tab close),
+   * best-effort — the browser does not wait for an async handler, so only work
+   * that starts synchronously is guaranteed to land. Fake: only on its
+   * `simulateCloseRequest` test hook, which models the desktop close.
+   */
+  onBeforeClose(flush: () => Promise<void>): () => void;
+
   // --- Attachments (slice: attachment-files) ---
 
   /**
@@ -369,3 +383,10 @@ export interface Backend {
    */
   openExternal(url: string): Promise<void>;
 }
+
+/**
+ * Upper bound a desktop close waits for {@link Backend.onBeforeClose}'s flush.
+ * Autosave writes are local file writes (milliseconds); this only matters if a
+ * write hangs, in which case closing wins over waiting.
+ */
+export const CLOSE_FLUSH_TIMEOUT_MS = 2000;

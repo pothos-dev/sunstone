@@ -112,6 +112,18 @@ export class Document {
   }
 
   /**
+   * Write NOW only if an autosave is already scheduled (the app is closing):
+   * the pending debounced write lands instead of being dropped with the page.
+   * Nothing is scheduled on web (it persists only on explicit Save) or for a
+   * held write, so neither is forced through here.
+   */
+  async flushPending(): Promise<void> {
+    if (!this.#autosave.pending) return;
+    this.#autosave.cancel();
+    await this.#save();
+  }
+
+  /**
    * EXPLICIT save (the Save affordance / the web Save-on-leave choice): writes
    * through the save gate, unparseable frontmatter and all. The author asked for
    * their text to be on disk; refusing would lose it.
@@ -199,6 +211,11 @@ export class DocumentRegistry {
   setOnSaved(cb: ((path: string) => void) | null): void {
     this.#onSaved = cb;
     for (const doc of this.#docs.values()) doc.onSaved = cb;
+  }
+
+  /** {@link Document.flushPending} across every Document in the pool. */
+  async flushPending(): Promise<void> {
+    await Promise.all([...this.#docs.values()].map((doc) => doc.flushPending()));
   }
 
   /** Forget the Document at `path` (e.g. after its file was removed on disk). */

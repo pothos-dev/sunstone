@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { Backend } from './backend';
+import { CLOSE_FLUSH_TIMEOUT_MS, type Backend } from './backend';
 import { setDocumentTitle } from './browserShell';
 import type {
   TreeNode,
@@ -199,6 +199,29 @@ export const tauriBackend: Backend = {
   async setWindowTitle(title: string): Promise<void> {
     await setDocumentTitle(title);
     await getCurrentWindow().setTitle(title);
+  },
+
+  // Registering a close-requested listener makes Tauri hold the close until the
+  // listener returns (it then calls `destroy()`, hence `core:window:allow-destroy`
+  // in the capability). Rust's own CloseRequested hook still saves the window
+  // geometry; the session flush cannot clobber it (`merge_frontend_state` keeps
+  // the stored geometry).
+  onBeforeClose(flush: () => Promise<void>): () => void {
+    let unlisten: UnlistenFn | null = null;
+    let disposed = false;
+    void getCurrentWindow()
+      .onCloseRequested(async () => {
+        const timeout = new Promise<void>((r) => setTimeout(r, CLOSE_FLUSH_TIMEOUT_MS));
+        await Promise.race([flush().catch(() => {}), timeout]);
+      })
+      .then((u) => {
+        if (disposed) u();
+        else unlisten = u;
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   },
 
   // Attachment bytes reach the webview over Sunstone's OWN URI scheme (ADR-0011),

@@ -452,6 +452,17 @@ class SessionStore {
     });
   }
 
+  /**
+   * Write NOW if a debounced save is pending (the app is closing), so the last
+   * UI change within the debounce window is not lost. The write starts
+   * synchronously, which is what lets a browser `pagehide` flush land.
+   */
+  async flushPending(): Promise<void> {
+    if (!this.#persist.pending) return;
+    this.#persist.cancel();
+    await backend.saveBundleState(this.#snapshot()).catch(() => {});
+  }
+
   #scheduleSave(): void {
     // Never persist before the FULL restore sequence finishes (a transient
     // default observed mid-restore must not overwrite the just-loaded state).

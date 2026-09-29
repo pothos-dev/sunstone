@@ -10,7 +10,9 @@
  *    back to `window.print()` (the browser's native print → Save-as-PDF UI is
  *    the export path);
  *  - "open in default app" is a plain new tab: in a browser, a new tab IS the
- *    default application.
+ *    default application;
+ *  - "before close" is `pagehide` (fires on reload, navigation and tab close);
+ *    the browser does not await it, so the flush is best-effort.
  */
 
 import { printUrl } from '$lib/print/printData';
@@ -31,4 +33,10 @@ export async function setDocumentTitle(title: string): Promise<void> {
 
 export async function openExternalTab(url: string): Promise<void> {
   window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+export function onPageHide(flush: () => Promise<void>): () => void {
+  const handler = () => void flush().catch(() => {});
+  window.addEventListener('pagehide', handler);
+  return () => window.removeEventListener('pagehide', handler);
 }

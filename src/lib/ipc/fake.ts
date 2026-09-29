@@ -27,7 +27,12 @@ import {
 import { attachmentPaths, fakeAttachmentUrl } from './fake/attachments';
 import { dirname, moveDestination } from '$lib/path';
 import { buildTree, applyRename, applyDelete } from './fake/tree';
-import { openPrintTab, noSavePdf, setDocumentTitle, openExternalTab } from './browserShell';
+import {
+  openPrintTab,
+  noSavePdf,
+  setDocumentTitle,
+  openExternalTab,
+} from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
 import { outboundLinks, planRewrites } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
@@ -193,10 +198,24 @@ function simulateSyncNotice(notice: SyncNotice): void {
   }
 }
 
+/** Flushes registered through `onBeforeClose`, for {@link simulateCloseRequest}. */
+const closeFlushes = new Set<() => Promise<void>>();
+
+/**
+ * Test hook: behave like the desktop window's close request — run every
+ * `onBeforeClose` flush and resolve once they settle (the Tauri impl makes the
+ * close wait for exactly this), WITHOUT unloading the page, so Playwright can
+ * assert what landed in `files`. Exposed on `window.__sunstoneFake`.
+ */
+async function simulateCloseRequest(): Promise<void> {
+  await Promise.all([...closeFlushes].map((f) => f().catch(() => {})));
+}
+
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).__sunstoneFake = {
     simulateExternalChange,
     simulateSyncNotice,
+    simulateCloseRequest,
     clearAllTags,
     files: FILES,
   };
@@ -492,6 +511,14 @@ export const fakeBackend: Backend = {
   openPrintWindow: openPrintTab,
   savePdf: noSavePdf,
   setWindowTitle: setDocumentTitle,
+
+  // Only the close-request test hook above — the awaited desktop path. NOT
+  // `pagehide`: specs seed `localStorage` and reload, and a flush on that reload
+  // would write the in-memory session over the seed.
+  onBeforeClose(flush: () => Promise<void>): () => void {
+    closeFlushes.add(flush);
+    return () => closeFlushes.delete(flush);
+  },
   openExternal: openExternalTab,
 };
 

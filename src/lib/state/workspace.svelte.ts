@@ -444,6 +444,15 @@ export class Workspace {
     await Promise.all([...this.#tiles.values()].map((p) => p.onExternalChange(kind, paths)));
   }
 
+  /**
+   * Land every Document's scheduled autosave now (the app is closing) — across
+   * the whole pool, not just the active Tile's, since any Tile may have typed
+   * within the debounce window.
+   */
+  flushPendingWrites(): Promise<void> {
+    return this.#registry.flushPending();
+  }
+
   /** Set the post-save hook on every Document in the pool. */
   setOnSaved(cb: ((path: string) => void) | null): void {
     this.#registry.setOnSaved(cb);

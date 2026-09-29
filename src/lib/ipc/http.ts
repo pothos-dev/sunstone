@@ -1,7 +1,13 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
-import { openPrintTab, noSavePdf, setDocumentTitle, openExternalTab } from './browserShell';
+import {
+  openPrintTab,
+  noSavePdf,
+  setDocumentTitle,
+  openExternalTab,
+  onPageHide,
+} from './browserShell';
 import type {
   TreeNode,
   FileChange,
@@ -460,5 +466,6 @@ export const httpBackend: Backend = {
   openPrintWindow: openPrintTab,
   savePdf: noSavePdf,
   setWindowTitle: setDocumentTitle,
+  onBeforeClose: onPageHide,
   openExternal: openExternalTab,
 };

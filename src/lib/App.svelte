@@ -184,6 +184,13 @@
           void indexStore.refresh();
         });
 
+    // Before the window/page goes away, land the debounced work the timers would
+    // otherwise drop: a scheduled autosave (desktop; web never schedules one)
+    // and a scheduled session-state write.
+    const offBeforeClose = backend.onBeforeClose(() =>
+      Promise.all([workspace.flushPendingWrites(), session.flushPending()]).then(() => {}),
+    );
+
     const onKeydown = (e: KeyboardEvent) => {
       // Pure routing lives in `appHotkeys.ts`; this switch only performs the
       // side effects (and the matching preventDefault) for the routed intent.
@@ -295,6 +302,7 @@
 
     return () => {
       unsubscribe?.();
+      offBeforeClose();
       window.removeEventListener('keydown', onKeydown, true);
       window.removeEventListener('wheel', onWheel, true);
       window.removeEventListener('mousedown', onMouseDown);
