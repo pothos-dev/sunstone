@@ -1,6 +1,6 @@
 // The pure half of the per-Bundle session store (`session.svelte.ts`): the
 // mapping between the persisted `BundleState` and the store's fields, so the
-// per-field defaults and legacy migrations are unit-testable (CLAUDE.md: pure
+// per-field defaults and legacy migrations are unit-testable (AGENTS.md: pure
 // logic lives in plain `.ts`; the rune module stays thin over it).
 
 import type { EditorMode } from '$lib/editor/cm';

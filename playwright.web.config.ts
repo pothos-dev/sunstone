@@ -10,7 +10,7 @@
 // read-only subset": no write path). The fixture has deterministic content
 // (resolvable + broken links, frontmatter, headings) so render assertions hold.
 //
-// Sandbox note (see CLAUDE.md / `/casket`): inside an ax agent sandbox, launching
+// Sandbox note (see AGENTS.md / `/casket`): inside an ax agent sandbox, launching
 // a second Chromium alongside the two servers is unreliable (OOM, or missing
 // shared libs depending on the image), so the `tests/fixtures.ts` browser
 // fixture auto-detects the sandbox (`CASKET_NAME` is set) and connects over CDP
@@ -21,6 +21,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import {
   WEB_BUNDLE_DIR,
+  WEB_BUNDLE_BRANCH,
   TEST_JWT_SECRET,
   TEST_AUTH_SECRET,
   TEST_AUTH_NAME,
@@ -80,7 +81,11 @@ export default defineConfig({
       // binary left over from before that setting — the suite then fails on
       // routes that demonstrably exist in the source. `cargo run` always
       // launches what it just built, wherever that lives.
-      command: `SUNSTONE_BUNDLE=${WEB_BUNDLE_DIR} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} cargo run -q -p sunstone-server`,
+      // The git-local shape over the seeded temp repo, so a web write lands a
+      // real commit (and history is served). A git shape's repo is the constant
+      // `/srv/repo` in every shipped binary; the `e2e` feature compiles in the
+      // `SUNSTONE_E2E_REPO_DIR` override that points it here instead.
+      command: `SUNSTONE_E2E_REPO_DIR=${WEB_BUNDLE_DIR} SUNSTONE_GIT_BRANCH=${WEB_BUNDLE_BRANCH} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} cargo run -q -p sunstone-server --features e2e`,
       url: `http://localhost:${RUST_PORT}/api/bundle-root`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

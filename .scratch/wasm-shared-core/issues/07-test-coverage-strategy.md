@@ -17,7 +17,7 @@ Rust (covered by `cargo test`). Decide:
 - How the Playwright fake backend consumes wasm (see ticket 12) and whether that
   changes the desktop-suite fake vs the real backend contract.
 - Whether a thin "wasm parity" harness is worth it, or `cargo test` + Playwright
-  suffice. Reconcile with root `CLAUDE.md`'s four gates.
+  suffice. Reconcile with root `AGENTS.md`'s four gates.
 
 ## Answer
 

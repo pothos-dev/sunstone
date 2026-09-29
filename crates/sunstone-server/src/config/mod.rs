@@ -8,7 +8,7 @@
 //!
 //! 1. **Fail fast, once.** Every problem is reported together as a
 //!    `Vec<ConfigError>` — one crash-loop for N typos rather than N.
-//! 2. **Testability**, per CLAUDE.md's pure-logic convention: every rule,
+//! 2. **Testability**, per AGENTS.md's pure-logic convention: every rule,
 //!    default and the subdir join is unit-testable over a `HashMap`, with no
 //!    `std::env` mutation (`set_var` is `unsafe` in edition 2024 and flaky
 //!    under `cargo test`'s threads).
@@ -88,6 +88,15 @@ use sunstone_native::git::CommitIdentity;
 /// The clone. A named volume in the git-synced stack; plain container
 /// filesystem in the git-local dev stack.
 pub const REPO_DIR: &str = "/srv/repo";
+
+/// **Test-only** override of [`REPO_DIR`]: the web e2e suite serves a
+/// throwaway git repo from a temp dir, so it can land and assert real commits
+/// without touching `/srv`. Honoured only by a binary built with the `e2e`
+/// cargo feature (`cargo run -p sunstone-server --features e2e`) — a shipped
+/// binary cannot be pointed elsewhere, so §2.3's "constant, not env" holds for
+/// every real deployment. A non-`e2e` binary that sees it warns and ignores it.
+/// Outside the `SUNSTONE_GIT_*` namespace on purpose: it is not a git setting.
+pub const E2E_REPO_DIR_ENV: &str = "SUNSTONE_E2E_REPO_DIR";
 
 /// The deploy key + `known_hosts`. **Never** a volume — it dies with the
 /// container and is rewritten from env on every boot.
@@ -386,7 +395,7 @@ fn resolve_roots(
                 value: value.clone(),
             });
         }
-        let repo_root = PathBuf::from(REPO_DIR);
+        let repo_root = repo_dir(get, warnings);
         let bundle_root = join_bundle_subdir(&repo_root, subdir);
         (Some(repo_root), bundle_root)
     } else {
@@ -397,6 +406,20 @@ fn resolve_roots(
                 .unwrap_or_else(default_dev_bundle_root),
         )
     }
+}
+
+/// The repository root of a git shape: [`REPO_DIR`], unless an `e2e` build was
+/// handed [`E2E_REPO_DIR_ENV`].
+fn repo_dir(get: &impl Fn(&str) -> Option<String>, warnings: &mut Vec<ConfigWarning>) -> PathBuf {
+    let override_dir = non_empty(get, E2E_REPO_DIR_ENV);
+    if cfg!(feature = "e2e") {
+        if let Some(dir) = override_dir {
+            return PathBuf::from(dir);
+        }
+    } else if let Some(value) = override_dir {
+        warnings.push(ConfigWarning::E2eRepoDirIgnored { value });
+    }
+    PathBuf::from(REPO_DIR)
 }
 
 /// Whether a `SUNSTONE_GIT_BUNDLE_SUBDIR` value would escape [`REPO_DIR`]:
@@ -522,6 +545,39 @@ mod tests {
         let cfg = ok(&[]);
         assert_eq!(cfg.shape, Shape::Plain);
         assert_eq!(cfg.bundle_root, default_dev_bundle_root());
+    }
+
+    /// §2.3 holds for every shipped binary: without the `e2e` feature the
+    /// override is ignored (with a warning), and the repo stays [`REPO_DIR`].
+    #[cfg(not(feature = "e2e"))]
+    #[test]
+    fn the_e2e_repo_dir_override_is_ignored_outside_an_e2e_build() {
+        let cfg = ok(&[(BRANCH_ENV, "main"), (E2E_REPO_DIR_ENV, "/tmp/elsewhere")]);
+        assert_eq!(cfg.repo_root, Some(PathBuf::from(REPO_DIR)));
+        assert_eq!(cfg.bundle_root, PathBuf::from(REPO_DIR));
+        assert_eq!(
+            cfg.warnings,
+            vec![ConfigWarning::E2eRepoDirIgnored { value: "/tmp/elsewhere".into() }]
+        );
+    }
+
+    /// An `e2e` build serves the web e2e suite's throwaway repo instead, subdir
+    /// and all; the plain shape never reads the override.
+    #[cfg(feature = "e2e")]
+    #[test]
+    fn an_e2e_build_points_the_git_shape_at_the_override() {
+        let cfg = ok(&[
+            (BRANCH_ENV, "main"),
+            (SUBDIR_ENV, "./docs"),
+            (E2E_REPO_DIR_ENV, "/tmp/e2e-repo"),
+        ]);
+        assert_eq!(cfg.repo_root, Some(PathBuf::from("/tmp/e2e-repo")));
+        assert_eq!(cfg.bundle_root, PathBuf::from("/tmp/e2e-repo/docs"));
+        assert!(cfg.warnings.is_empty());
+
+        let plain = ok(&[(BUNDLE_ENV, "/b"), (E2E_REPO_DIR_ENV, "/tmp/e2e-repo")]);
+        assert_eq!(plain.repo_root, None);
+        assert_eq!(plain.bundle_root, PathBuf::from("/b"));
     }
 
     #[test]

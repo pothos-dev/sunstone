@@ -123,4 +123,4 @@ guard.
 Ticket 09 was the last open decision ticket. With it resolved, **every locked-scope decision
 is pinned**; what remains is implementation (the "build/handoff" fog items) + genuinely
 operator-dependent deployment fog. A `docs/testing.md` capturing how to run each gate is
-written as part of this resolution and referenced from `CLAUDE.md`.
+written as part of this resolution and referenced from `AGENTS.md`.

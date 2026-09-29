@@ -37,7 +37,7 @@ can implement web writing without further design choices.
   already exists (`fileHistory` / `fileAtRev` via the system `git` binary).
 - **Skills:** use `/grilling` + `/domain-modeling` for decision tickets, `/prototype`
   for the editor-shell ticket, `/research` (subagent) for research tickets.
-- Every change must keep the four green gates (see `CLAUDE.md`): `bun test src/lib`,
+- Every change must keep the four green gates (see `AGENTS.md`): `bun test src/lib`,
   `bun run check`, `cargo test`, `cargo check`.
 
 ## Decisions so far
@@ -163,7 +163,7 @@ implementation work spec'd by tickets 07 + 04 + 05):
   concurrency-UX decision logic + `clientId` echo filter + http write shaping; extend
   `playwright.web.config.ts` (fixture Bundle → real git repo; `testMatch` → `web-*.spec.ts`)
   with `web-write` / `web-concurrency` specs gated by the env-only Auth.js Credentials provider.
-  Docs: `docs/testing.md` (how to run each gate), referenced from `CLAUDE.md`.
+  Docs: `docs/testing.md` (how to run each gate), referenced from `AGENTS.md`.
 
 ## Out of scope
 

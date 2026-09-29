@@ -18,14 +18,14 @@ the ADR captures them.
 ## Notes
 
 - **Domain**: CLI-launched Tauri 2 + SvelteKit (Svelte 5 runes) + Rust markdown
-  editor with OKF support. See root `CLAUDE.md`, `docs/GLOSSARY.md`, `docs/linking.md`.
+  editor with OKF support. See root `AGENTS.md`, `docs/GLOSSARY.md`, `docs/linking.md`.
 - **Deliverable is plan-only** (wayfinder default). Tickets resolve *decisions*, not
   code. The one build artifact allowed is the ADR + this map.
 - **Hard constraints** every ticket must respect:
   - Must NOT regress the native builds: the Tauri desktop backend (`src-tauri`) and
     the SSR web renderer (`sunstone-server`, `render.rs`) keep using native Rust.
     Wasm is additive, for the *frontend process only*.
-  - Keep `cargo test` as the behavioural coverage gate (root `CLAUDE.md`).
+  - Keep `cargo test` as the behavioural coverage gate (root `AGENTS.md`).
   - Honour the IPC seam rule: frontend backend access stays behind `src/lib/ipc/`.
   - The binding constraint that motivates all of this: CodeMirror decorations run
     synchronously and cannot `await` IPC (`src/lib/editor/broken-links.ts:19`), and
