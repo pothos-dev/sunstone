@@ -2,7 +2,15 @@ import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures';
 import { WEB_BUNDLE_DIR, TEST_AUTH_NAME } from './web-bundle';
-import { mountShell, openFromTree, cmContent, headCommit, commitCount, typeAtEnd } from './web-shell';
+import {
+  mountShell,
+  openFromTree,
+  enterEdit,
+  cmContent,
+  headCommit,
+  commitCount,
+  typeAtEnd,
+} from './web-shell';
 
 /**
  * Web WRITE UX nuances over the REAL full-App shell (branch
@@ -45,8 +53,10 @@ test('a Frontmatter edit stays in-memory (shows Save, NO commit) until Save fold
     // Turn the global Frontmatter Region on, then edit the `title` line in the
     // YAML. (The toggle lives in the per-Tile header — `frontmatter-toggle` —
     // after the layout rework moved it out of the old concept strip.)
+    // `openFromTree` already entered edit mode; `enterEdit` is idempotent, where
+    // a raw `edit-toggle` click would toggle it back OFF.
     await page.getByTestId('frontmatter-toggle').click();
-    await page.getByTestId('edit-toggle').click();
+    await enterEdit(page);
     const yaml = page.getByTestId('frontmatter').locator('.cm-content');
     await expect(yaml).toContainText('title: Prop Target');
 
