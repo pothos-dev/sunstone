@@ -17,7 +17,7 @@ The SvelteKit app (Svelte 5 runes) at the repo root under `src/` is the "web" pa
 
 | File | Role |
 | --- | --- |
-| `backend.ts` | The `Backend` interface — ~40 async methods (`listTree`, `readConcept`, `writeConcept`, `onFileChanged`, CRUD, index queries, `search`, git seam, `renderConcept`, print/PDF, state). Paths crossing it are always bundle-relative, forward-slash. |
+| `backend.ts` | The `Backend` interface — ~40 async methods (`listTree`, `readConcept`, `writeConcept`, `onFileChanged`, CRUD, index queries, `search`, git seam, `renderConcept`, print/PDF, state, `onBeforeClose`). Paths crossing it are always bundle-relative, forward-slash. `onBeforeClose` is how App lands a pending autosave and session write on close: Tauri holds the window close for it; the web backend runs it on `pagehide`. |
 | `tauri.ts` | Real desktop backend — a thin `invoke(...)` / `listen(...)` per method; command names match the [desktop shell](/architecture/desktop-shell.md)'s `#[tauri::command]`s. |
 | `http.ts` | Web backend — `fetch` to relative `/api/...` against [sunstone-server](/architecture/sunstone-server.md); open GET reads, JWT-gated `PUT/POST/DELETE` writes carrying a per-tab `x-sunstone-client` id, live updates via `EventSource('/api/events')`. |
 | `fake.ts` (+ `fake/*`) | In-memory backend over a seeded fixture Bundle — behaviourally faithful (same path conventions, path-escape rejection, simulated watcher, canned git history). Powers plain-Chromium dev and the desktop Playwright suite. |

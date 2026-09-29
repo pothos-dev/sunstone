@@ -3,7 +3,7 @@ type: Reference
 title: Testing Sunstone
 description: The four green gates plus the two Playwright suites, and which package owns which test.
 tags: [testing, playwright, cargo, gates, ci]
-timestamp: 2026-07-23T00:00:00Z
+timestamp: 2026-09-29T00:00:00Z
 ---
 
 # Testing Sunstone
@@ -88,7 +88,7 @@ still overrides that binary if needed.
 
 ### 2. Web e2e suite — `playwright.web.config.ts`
 
-The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over the committed fixture Bundle `tests/fixtures/web-bundle`, plus the real adapter-node SSR build (`SUNSTONE_TARGET=web`) proxying `/api` to it. This is the only place the web chrome (`web-viewer`, the editor island, concurrency modals) renders, so all **web** behaviour is proven here.
+The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over a throwaway git repo seeded from the committed fixture Bundle `tests/fixtures/web-bundle` (`tests/web-bundle.ts`, on branch `main`), plus the real adapter-node SSR build (`SUNSTONE_TARGET=web`) proxying `/api` to it. The server runs the **git-local** shape, so every web write lands a real commit and history is served. A git shape's repo is the constant `/srv/repo` in every shipped binary; the suite builds the server with `--features e2e`, which compiles in the `SUNSTONE_E2E_REPO_DIR` override pointing it at the temp repo (a non-`e2e` binary warns and ignores it). This is the only place the web chrome (`web-viewer`, the editor island, concurrency modals) renders, so all **web** behaviour is proven here.
 
 ```bash
 mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start
@@ -112,6 +112,7 @@ The web write path is tested **by the seam**: the frontend never observes a comm
 - **The `fake` backend models no commit creation.** Web writes just mutate the in-memory Bundle and fire a `FileChange`; committing is a server-only concern the fake ignores.
 - **`cargo test` owns the substance below the seam:** the `git::commit` primitive + amend-else-fresh (temp repo, assert real `git log`), server write-route orchestration + the global write lock, the write error classifier (400/404/409/500), and the `AuthedUser` JWT extractor.
 - **`bun test src/lib` owns client decision logic** extracted to plain `.ts`: the file-change path-match routing, the clean→reload vs dirty→modal branching, the three-way leave/structural-op decision, the per-tab `clientId` echo filter, and `http.ts` write request shaping / error mapping.
+- **Closing the app** (`Backend.onBeforeClose`): the desktop flush path is proven against the fake's `simulateCloseRequest` hook, which runs the registered flush as a Tauri close request would (`tests/close-flush.spec.ts`); the fake deliberately does not flush on `pagehide`, since specs seed `localStorage` and reload.
 - **The web e2e suite owns the rendered end-to-end path:** a test-authed user Saves → a real commit lands in the fixture repo; a second client's edit drives the concurrency modals over real SSE. New specs live in their own `web-*.spec.ts` files.
 
 ### Auth in tests
