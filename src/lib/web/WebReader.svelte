@@ -52,8 +52,8 @@
   // activity rail (quick-nav + search + a bottom theme toggle + a user slot wired
   // to real Auth.js), click/drag SidebarEdge borders around a left Sidebar Accordion
   // (Explorer + Tags) and a right one (Outline + Backlinks) reusing the desktop
-  // `SidebarSection`, a slim concept strip over the centre (history + Properties +
-  // export-PDF), and the rendered Concept in the centre. No write path /
+  // `SidebarSection`, a slim concept strip over the centre (title + Properties +
+  // export-PDF; Back/Forward is the browser's own), and the rendered Concept in the centre. No write path /
   // editor / CodeMirror on the anon surface. UI state persists (uiState).
 
   // A Concept is addressed by its path in the URL (`/research/providers/mistral-ai`),
@@ -73,15 +73,6 @@
 
   // The concept strip's title (the same name `WebViewer` puts in `<title>`).
   const pageTitle = $derived(conceptTitle(data.selected, data.rendered));
-
-  // Back / forward: navigation is URL-driven (`goto` pushes history), so
-  // drive the browser history — SvelteKit's router handles popstate + re-runs load.
-  function goBack() {
-    if (typeof history !== 'undefined') history.back();
-  }
-  function goForward() {
-    if (typeof history !== 'undefined') history.forward();
-  }
 
   // --- Theme: applied to the app root; mode persisted via uiState. The anon web
   // surface offers a manual light/dark toggle in the activity rail (the desktop
@@ -371,7 +362,7 @@
   <div class="center">
     <!-- Slim "concept strip": the web analogue of the desktop concept header
          (web has no tiles/CodeMirror, so it is light). The left group holds the
-         per-Concept history + title; the right group the per-Concept controls
+         title; the right group the per-Concept controls
          (Properties, export-PDF; theme lives in the activity rail). Sidebar
          collapse/resize moved to the edge borders. -->
     <div class="concept-strip" data-testid="concept-strip">
@@ -394,24 +385,6 @@
             <path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
           </svg>
         </button>
-        <div class="btn-group">
-          <button
-            type="button"
-            class="icon-btn"
-            data-testid="nav-back"
-            title="Back"
-            aria-label="Back"
-            onclick={goBack}>←</button
-          >
-          <button
-            type="button"
-            class="icon-btn wide-only"
-            data-testid="nav-forward"
-            title="Forward"
-            aria-label="Forward"
-            onclick={goForward}>→</button
-          >
-        </div>
         {#if data.selected}
           <span class="tile-title" data-testid="tile-title" title={data.selected}>{pageTitle}</span>
         {/if}
@@ -810,7 +783,7 @@
     overflow: hidden;
   }
 
-  /* Slim concept strip: the per-Concept history + title at the start, the
+  /* Slim concept strip: the title at the start, the
      per-Concept controls at the end. */
   .concept-strip {
     flex: none;
@@ -845,11 +818,6 @@
     align-items: center;
     gap: 0.5rem;
     flex: none;
-  }
-
-  .btn-group {
-    display: inline-flex;
-    gap: 0.2rem;
   }
 
   .icon-btn {

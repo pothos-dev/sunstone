@@ -40,7 +40,7 @@ Either Sidebar collapses entirely — to a literal 0 width, via the toggle at th
 The web build reuses this shell in two modes, keyed on whether a user is signed in:
 
 - **Authenticated** — mounts the full desktop `App.svelte` shell (via `WebAppShellIsland`), inheriting both Activity Rails, the rail-toggled Sidebars and the per-Tile Concept header unchanged, with the web write path (explicit Save, concurrency gate).
-- **Anonymous** — a read-only, server-rendered surface (`WebViewer`) that still carries the same two-rail Sidebar layout and interactive client islands (**Quick nav** and **Search**), plus a rail **Sign in** affordance. In place of the full Concept header it shows a **slim concept strip** (back/forward, a read-only properties view of the frontmatter, export-PDF, theme toggle).
+- **Anonymous** — a read-only, server-rendered surface (`WebViewer`) that still carries the same two-rail Sidebar layout and interactive client islands (**Quick nav** and **Search**), plus a rail **Sign in** affordance. In place of the full Concept header it shows a **slim concept strip** (a read-only properties view of the frontmatter, export-PDF, theme toggle).
 
 Both are described from the control side in [Activity Rail and Concept header](/interface/activity-rail.md).
 

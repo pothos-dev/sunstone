@@ -112,7 +112,10 @@
 
 <header class="tile-header" data-testid="tile-header" aria-label="Concept header">
   <div class="tile-title-group">
-    <!-- Per-Tile navigation history (the Tile owns its own Back/Forward stack). -->
+    <!-- Per-Tile navigation history (the Tile owns its own Back/Forward stack).
+         Desktop only: on web the URL tracks the Tile (`urlSync.ts`), so the
+         browser's own Back/Forward drives it — through the same dirty-leave gate. -->
+    {#if !__SUNSTONE_WEB__}
     <div class="btn-group">
       <button
         type="button"
@@ -133,6 +136,7 @@
         onclick={onForward}>→</button
       >
     </div>
+    {/if}
     <!-- Folder prefix + name. The prefix is dimmed so the Concept still reads as
          the label's subject, and the tooltip carries the exact path. -->
     <span class="tile-title" data-testid="tile-title" title={titlePath ?? title}

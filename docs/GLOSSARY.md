@@ -146,7 +146,8 @@ _Avoid_: "toolbar", "nav bar" (there is no global nav/tool bar; the Rail and the
 
 **Concept header**:
 The per-**Tile** control bar above each open Concept, carrying the controls scoped to that
-Concept/Tile: back/forward, the **Edit** toggle, the **Frontmatter** toggle, undo/redo (shown
+Concept/Tile: back/forward (desktop only — on web the browser's own Back/Forward
+navigates), the **Edit** toggle, the **Frontmatter** toggle, undo/redo (shown
 only while editing), review, export-PDF, split, and close. A single open Concept therefore
 shows just its Concept header — there is no second global bar above it. See
 [Activity Rail and Concept header](/interface/activity-rail.md).

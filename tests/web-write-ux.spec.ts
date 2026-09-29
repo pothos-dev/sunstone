@@ -168,14 +168,15 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
     const content = await openFromTree(page, bRel);
     await expect(content).toContainText('Concept B body');
 
-    // Dirty B, then press Back — the leave modal must block the history nav.
+    // No Tile Back/Forward buttons on web: the browser's own history drives it.
+    await expect(page.getByTestId('nav-back')).toHaveCount(0);
+
+    // Dirty B, then press browser Back — the leave modal must block the history nav.
     await typeAtEnd(page, content, `\n\n${marker}`);
     await expect(page.getByTestId('save-concept')).toBeVisible();
 
     const before = commitCount();
-    const back = page.getByTestId('nav-back');
-    await expect(back).toBeEnabled();
-    await back.click();
+    await page.goBack();
 
     await expect(page.getByTestId('web-leave-modal')).toBeVisible();
     await page.getByTestId('web-leave-cancel').click();
@@ -187,7 +188,7 @@ test('a dirty Back navigation gates on the leave modal: Cancel stays on the dirt
     expect(diskContent(bRel)).not.toContain(marker);
 
     // Save & Back: commit lands, then A opens.
-    await back.click();
+    await page.goBack();
     await expect(page.getByTestId('web-leave-modal')).toBeVisible();
     await page.getByTestId('web-leave-save').click();
     await expect(page.getByTestId('web-leave-modal')).toHaveCount(0);

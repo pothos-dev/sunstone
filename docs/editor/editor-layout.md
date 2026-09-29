@@ -24,7 +24,8 @@ Concept; that is now just the one-Tile case.
 - Columns and the Tiles within them are **independently resizable** via
   draggable dividers, and rows need not align across Columns.
 
-The **Concept header** carries every concept-scoped control — back/forward, the
+The **Concept header** carries every concept-scoped control — back/forward (desktop only; on web the
+browser's Back/Forward navigates, see `web/urlSync.ts`), the
 **Edit** toggle (which flips the Tile between `read` and `editing`), the
 Frontmatter toggle, undo/redo (only while editing), review, export-PDF, split and
 close. There is no global nav bar; app-global controls live on the

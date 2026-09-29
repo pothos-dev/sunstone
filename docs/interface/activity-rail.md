@@ -76,8 +76,8 @@ surfaces](/interface/app-shell.md)):
 - The **anonymous** read-only SSR surface renders the same Activity Rails — with
   a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
   but replaces the full Concept header with a **slim concept strip** over the
-  centre: back/forward, a read-only properties view of the frontmatter,
-  export-PDF and a light/dark theme toggle. There is no Edit toggle until you sign in.
+  centre: a read-only properties view of the frontmatter, export-PDF and a
+  light/dark theme toggle. It has no back/forward — the browser's own does that. There is no Edit toggle until you sign in.
 
 ## Relationships
 

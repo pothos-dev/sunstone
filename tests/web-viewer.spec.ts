@@ -384,12 +384,13 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('search-panel')).toHaveCount(0);
 
-  // The slim concept strip carries history + Properties + export (theme moved to
-  // the rail); the old header collapse toggles are gone (collapse moved to the
-  // edges), and the anon reader has no Edit affordance.
+  // The slim concept strip carries Properties + export (theme moved to the
+  // rail; Back/Forward is the browser's own); the old header collapse toggles
+  // are gone (collapse moved to the edges), and the anon reader has no Edit
+  // affordance.
   await expect(page.getByTestId('concept-strip')).toBeVisible();
-  await expect(page.getByTestId('nav-back')).toBeVisible();
-  await expect(page.getByTestId('nav-forward')).toBeVisible();
+  await expect(page.getByTestId('nav-back')).toHaveCount(0);
+  await expect(page.getByTestId('nav-forward')).toHaveCount(0);
   await expect(page.getByTestId('properties-panel-toggle')).toBeVisible();
   await expect(page.getByTestId('export-pdf')).toBeVisible();
   await expect(page.getByTestId('sidebar-toggle')).toHaveCount(0);
@@ -470,13 +471,15 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.screenshot({ path: 'tests/screenshots/web-parity-dark.png', fullPage: true });
 
-  // Back / forward: navigate to a sibling Concept, then step back + forward.
+  // Browser Back / Forward: navigate to a sibling Concept, then step back + forward.
   await page.locator('[data-testid="tree-concept"][data-path="diagram.md"]').click();
   await expect(page).toHaveURL(/\/diagram$/);
-  await page.getByTestId('nav-back').click();
+  await page.goBack();
   await expect(page).toHaveURL(/\/good$/);
-  await page.getByTestId('nav-forward').click();
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
+  await page.goForward();
   await expect(page).toHaveURL(/\/diagram$/);
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Diagram Concept');
 
   // --- Persistence across reload ---
   await page.goto('/good');
