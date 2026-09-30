@@ -10,8 +10,25 @@ import type { Extension } from '@codemirror/state';
 // mode the document was still typeable through any table. This plugin clears
 // the cells' `contenteditable` after every DOM write and swallows the cell
 // context menu; leaving reading mode destroys it and hands editability back.
+//
+// The widget also reveals a mark's delimiters (`**`, `_`, backticks) around the
+// caret by flagging its wrap `.active` on focus / mouseup / keyup. A click in a
+// locked cell still leaves a selection there, so reading mode showed the raw
+// markers. The plugin clears those flags again once the widget's own handlers
+// have run.
 
 const CELL_SOURCE = '.cm-atomic-table-cell-source';
+
+/** The events on which atomic-editor reveals the mark wraps around the caret. */
+const REVEAL_EVENTS = ['focusin', 'mouseup', 'keyup'] as const;
+
+/** Collapse every revealed mark wrap in the table cell `target` sits in. */
+export function hideCellMarks(target: EventTarget | null): void {
+  if (!(target instanceof Element)) return;
+  const source = target.closest(CELL_SOURCE);
+  if (!source) return;
+  for (const el of source.querySelectorAll('.active')) el.classList.remove('active');
+}
 
 /**
  * Flip every rendered table cell in `root` between locked (reading) and
@@ -43,8 +60,13 @@ export function readOnlyTables(reading: boolean): Extension {
         }
       };
 
+      // Bubble phase on the editor root: runs AFTER the cell's own listener
+      // (focus fires before focusin), so its `.active` flags are undone.
+      private readonly hideMarks = (event: Event) => hideCellMarks(event.target);
+
       constructor(readonly view: EditorView) {
         view.dom.addEventListener('contextmenu', this.blockCellMenu, true);
+        for (const type of REVEAL_EVENTS) view.dom.addEventListener(type, this.hideMarks);
         this.lock();
       }
 
@@ -58,6 +80,7 @@ export function readOnlyTables(reading: boolean): Extension {
 
       destroy() {
         this.view.dom.removeEventListener('contextmenu', this.blockCellMenu, true);
+        for (const type of REVEAL_EVENTS) this.view.dom.removeEventListener(type, this.hideMarks);
         setTableCellsEditable(this.view.dom, true);
       }
 

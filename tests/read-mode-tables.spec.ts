@@ -37,3 +37,34 @@ test('read mode: table cells are not editable', async ({ page }) => {
   await page.keyboard.type('ZZZ');
   await expect(editable).toContainText('ZZZ');
 });
+
+test('read mode: clicking formatted text in a table cell keeps its markers hidden', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByTestId('tree').locator('[data-path="concepts/editor/live-preview.md"]').click();
+
+  const editor = page.getByTestId('editor');
+  await expect(editor).toContainText('Obsidian-style hybrid editing');
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+  const bold = editor.locator('.cm-atomic-table td .cm-atomic-strong-wrap', { hasText: 'Tables' });
+  await expect(bold).toBeVisible();
+  const marks = bold.locator('.cm-atomic-mark');
+  await expect(marks.first()).toBeHidden();
+
+  // Clicking (and pressing a key in) the bold run must not reveal the `**`.
+  await bold.click();
+  await page.keyboard.press('ArrowLeft');
+  await expect(bold).not.toHaveClass(/\bactive\b/);
+  await expect(marks.first()).toBeHidden();
+
+  // Editing mode still reveals them around the caret.
+  await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'true');
+  const editableBold = editor.locator('.cm-atomic-table td .cm-atomic-strong-wrap', {
+    hasText: 'Tables',
+  });
+  await editableBold.click();
+  await expect(editableBold).toHaveClass(/\bactive\b/);
+});

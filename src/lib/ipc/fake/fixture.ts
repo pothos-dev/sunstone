@@ -359,7 +359,7 @@ A GFM table renders as an interactive widget:
 | ------------ | ------ |
 | Headings     | done   |
 | Code blocks  | done   |
-| Tables       | done   |
+| **Tables**   | done   |
 
 A \`data:\` URI Embed, which deliberately renders NOTHING (af-1: it is an
 injection vector once af-2 inlines SVG, and carries no benefit a Bundle file
