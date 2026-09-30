@@ -1,7 +1,7 @@
 //! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
 //! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
 //! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! `/api/attachment-paths`, and `/api/events` (SSE), plus the shared
+//! `/api/attachment-paths`, `/api/events` (SSE) and `/api/version`, plus the shared
 //! [`read_index`] helper. Errors map through [`crate::api_error`].
 
 use std::convert::Infallible;
@@ -13,7 +13,7 @@ use axum::{
     response::sse::{Event, KeepAlive, Sse},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
 
@@ -25,6 +25,22 @@ use sunstone_shared::url::query_encode;
 
 use crate::api_error::{guard_rel_path, ApiError};
 use crate::{ServerEvent, ServerState};
+
+/// Which build is running: the release version, and the git commit when the
+/// image build passed one (`SUNSTONE_COMMIT` build arg, see the Dockerfile).
+#[derive(Debug, Serialize, PartialEq)]
+pub(crate) struct VersionInfo {
+    version: &'static str,
+    commit: Option<&'static str>,
+}
+
+/// `GET /api/version`. Unauthenticated and content-free, like `/api/sync-status`.
+pub(crate) async fn version_handler() -> Json<VersionInfo> {
+    Json(VersionInfo {
+        version: env!("CARGO_PKG_VERSION"),
+        commit: option_env!("SUNSTONE_COMMIT").filter(|c| !c.is_empty()),
+    })
+}
 
 pub(crate) async fn bundle_root_handler(State(state): State<Arc<ServerState>>) -> Json<String> {
     Json(state.app.bundle_root.to_string_lossy().into_owned())
@@ -352,6 +368,15 @@ mod tests {
             let err = render_handler(State(state.clone()), q()).await.unwrap_err();
             assert_eq!(err.0, StatusCode::BAD_REQUEST, "{path}");
         }
+    }
+
+    #[tokio::test]
+    async fn version_route_reports_the_crate_version() {
+        let Json(info) = version_handler().await;
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
+        // Local builds pass no commit; the key is still present, as null.
+        assert!(json.as_object().unwrap().contains_key("commit"));
     }
 
     #[test]

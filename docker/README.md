@@ -89,6 +89,16 @@ volume classed as a disposable cache.
 > because offline tolerance is by design and a restart fixes nothing.
 > `pendingCommits` is the number to alert on — it is literally how much web work
 > exists only inside this container.
+>
+> To confirm which build is running, `GET /api/version` (also unauthenticated)
+> reports the release version and, for an image built with
+> `--build-arg SUNSTONE_COMMIT=<sha>` (the publish workflow passes
+> `github.sha`), the commit; otherwise `commit` is `null`:
+>
+> ```bash
+> curl -s localhost:3000/api/version
+> # {"version":"0.20.0","commit":"47820fa…"}
+> ```
 
 ## Quick start (docker compose)
 

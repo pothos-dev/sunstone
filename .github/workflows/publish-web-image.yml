@@ -65,6 +65,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # Compiled into the server and reported by `GET /api/version`.
+          build-args: |
+            SUNSTONE_COMMIT=${{ github.sha }}
           cache-from: type=gha
           # ignore-error: the cache export runs AFTER the image has been pushed, so
           # without it a cache-side hiccup fails the job on work that already

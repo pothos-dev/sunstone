@@ -275,6 +275,8 @@ fn router(state: Arc<ServerState>) -> Router {
         // Operator status (§10.5) — deliberately UNAUTHENTICATED and
         // content-free, so a monitoring probe needs no token.
         .route("/api/sync-status", get(sync::sync_status_handler))
+        // Build identification, unauthenticated for the same reason.
+        .route("/api/version", get(routes_read::version_handler))
         .with_state(state)
 }
 

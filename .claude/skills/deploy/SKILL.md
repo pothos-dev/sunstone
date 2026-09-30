@@ -59,18 +59,20 @@ Show the user the drafted section and ask for confirmation/edits before committi
 
 ## Phase 3 — Bump, commit, tag
 
-After the CHANGELOG is approved, set the new version in **all four** places (use `Edit`, not version-bump tooling, so the diff stays predictable):
+After the CHANGELOG is approved, set the new version in **all six** places (use `Edit`, not version-bump tooling, so the diff stays predictable):
 
 1. `package.json` — `.version`
 2. `src-tauri/tauri.conf.json` — `.version`
 3. `src-tauri/Cargo.toml` — `[package] version`
-4. `src-tauri/Cargo.lock` — the `version` under `[[package]] name = "sunstone"`
+4. `crates/sunstone-server/Cargo.toml` — `[package] version` (reported by the web server's `GET /api/version`)
+5. `Cargo.lock` — the `version` under `[[package]] name = "sunstone"`
+6. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-server"`
 
-Keep all four in lockstep — a mismatch makes `tauri-action` produce wrongly-named artifacts. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
+Keep all six in lockstep — a mismatch makes `tauri-action` produce wrongly-named artifacts. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
 
 Then:
 
-5. Stage the four manifests and `CHANGELOG.md`.
+5. Stage the five manifest files (`Cargo.lock` holds two of the six entries) and `CHANGELOG.md`.
 6. Commit: `Release vX.Y.Z`.
 7. Tag: `git tag vX.Y.Z` (note the `v` prefix — the workflow triggers on `v*`).
 

@@ -18,7 +18,7 @@ The server exposes only a JSON/SSE API — it serves **no** static assets. The p
 | File | Role |
 | --- | --- |
 | `src/main.rs` | Entrypoint, `ServerState`, the axum route table (`router`), the watcher → broadcast wiring. |
-| `src/routes_read.rs` | The open read handlers — tree, concept, render, search, the `Index` queries, `concept-paths`/`attachment-paths` — plus the `/api/events` SSE stream. |
+| `src/routes_read.rs` | The open read handlers — tree, concept, render, search, the `Index` queries, `concept-paths`/`attachment-paths` — plus the `/api/events` SSE stream and the unauthenticated `GET /api/version` (`{version, commit}`: the crate version, and the `SUNSTONE_COMMIT` build arg when the image build passed one). |
 | `src/routes_write.rs` | The JWT-gated write handlers: take the write lock on a blocking thread, pick the `WriteShape`, call `write.rs`, broadcast the `origin`-stamped change and kick the sync loop. |
 | `src/routes_asset.rs` | `GET /api/asset` — an Attachment's raw bytes ([ADR 0011](/adr/0011-attachment-bytes-cross-a-custom-uri-scheme.md)), the one route that does not answer JSON/SSE. |
 | `src/history.rs` | The two gated history reads, `GET /api/history` and `GET /api/file-at-rev`, with the plain-shape short-circuit. |

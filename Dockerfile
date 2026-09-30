@@ -38,6 +38,10 @@ RUN mkdir -p src-tauri/src \
 
 # Build only the server package. Cache the cargo registry and target dir across
 # builds; copy the finished binary OUT of the (non-persisted) cache mount.
+# SUNSTONE_COMMIT (optional) is compiled in and reported by `/api/version`;
+# declared here, after the dependency-heavy steps, so a new commit only
+# rebuilds the server crate itself.
+ARG SUNSTONE_COMMIT=
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release -p sunstone-server \
