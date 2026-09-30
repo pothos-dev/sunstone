@@ -22,6 +22,11 @@ import { destinationUrlNode } from './linkTarget';
 // Links remain fully clickable and navigable — this is styling only, never a
 // block (broken links are tolerated per the OKF spec, docs/GLOSSARY.md).
 //
+// Every internal link (broken or not) also carries `cm-internal-link`, so the
+// reading view can drop atomic-editor's external-link icon on it: there the
+// link text itself follows the link, and the "opens elsewhere" arrow would
+// misdescribe an in-app jump. External links keep the icon.
+//
 // Freshness: the decoration re-runs on doc changes AND when the host dispatches
 // `refreshBrokenLinks` (fired on the `file-changed` watcher event and on
 // Concept switch, so created/removed targets restyle without a reload).
@@ -37,7 +42,8 @@ export interface BrokenLinkContext {
 /** Dispatch this effect to force the broken-link decoration to recompute. */
 export const refreshBrokenLinks = StateEffect.define<null>();
 
-const brokenLinkMark = Decoration.mark({ class: 'cm-broken-link' });
+const internalLinkMark = Decoration.mark({ class: 'cm-internal-link' });
+const brokenLinkMark = Decoration.mark({ class: 'cm-internal-link cm-broken-link' });
 
 /** Distinct styling for broken internal links: dashed, red. Clickable still.
  *  The label text lives in a nested highlight span inside `.cm-broken-link`, so
@@ -52,13 +58,20 @@ export const brokenLinkTheme = EditorView.theme({
   '.cm-broken-link': {
     textDecoration: 'underline dashed var(--danger)',
   },
+  // Reading view (non-editable content): no external-link icon on internal
+  // links. The icon is `.cm-atomic-link::after`; which of the two marks nests
+  // outside is up to CodeMirror, so cover both orders. Table cells render
+  // their own real icon element and keep it (there the icon is the only way
+  // to follow a link).
+  '.cm-content[contenteditable="false"] .cm-internal-link .cm-atomic-link::after, .cm-content[contenteditable="false"] .cm-atomic-link:has(.cm-internal-link)::after':
+    { content: 'none' },
 });
 
 /**
- * Build the broken-link decoration set for the current viewport: walk the
- * syntax tree, find `Link` nodes, extract their URL, resolve it the same way
- * the navigation seam does (`resolveLink`), and mark the link's text range
- * broken when it resolves to an internal target absent from the index.
+ * Build the link decoration set for the current viewport: walk the syntax
+ * tree, find `Link` nodes, extract their URL, resolve it the same way the
+ * navigation seam does (`resolveLink`), and mark every internal link — broken
+ * too when its target is absent from the index.
  */
 function computeBrokenLinks(view: EditorView, ctx: BrokenLinkContext): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
@@ -80,8 +93,8 @@ function computeBrokenLinks(view: EditorView, ctx: BrokenLinkContext): Decoratio
         // Resolve synchronously through the wasm handle; the `internal` variant
         // carries `exists`, so a broken internal link is `!resolved.exists`.
         const resolved = indexStore.resolveLink(currentPath, href);
-        if (resolved.kind === 'internal' && !resolved.exists) {
-          builder.add(node.from, node.to, brokenLinkMark);
+        if (resolved.kind === 'internal') {
+          builder.add(node.from, node.to, resolved.exists ? internalLinkMark : brokenLinkMark);
         }
       },
     });

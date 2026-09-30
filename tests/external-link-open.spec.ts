@@ -88,3 +88,35 @@ test('a link labelled with an email address stays visible and opens its mailto:'
     .poll(() => page.evaluate(() => (window as unknown as { __opened: string[] }).__opened))
     .toContain('mailto:hello@example.com');
 });
+
+/**
+ * Verification: in read mode the link text itself follows the link, so an
+ * internal link (to another Concept, broken or not) drops the external-link
+ * icon; an external URL keeps it. In editing mode every link keeps the icon.
+ */
+test('read mode shows the link icon only on external links', async ({ page }) => {
+  await page.goto('/');
+
+  const tree = page.getByTestId('tree');
+  await expect(tree).toBeVisible();
+  await tree.locator('[data-path="concepts/links-demo.md"]').click();
+
+  const editor = page.getByTestId('editor');
+  await expect(editor).toContainText('An external link is never treated as broken');
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+  const iconContent = (label: string) =>
+    editor
+      .locator('.cm-atomic-link', { hasText: label })
+      .first()
+      .evaluate((el) => getComputedStyle(el, '::after').content);
+
+  await expect.poll(() => iconContent('CodeMirror')).toBe('none');
+  await expect.poll(() => iconContent('Knowledge Base')).toBe('none');
+  await expect.poll(() => iconContent('Ghost Concept')).toBe('none');
+  await expect.poll(() => iconContent('Example')).not.toBe('none');
+
+  await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => iconContent('CodeMirror')).not.toBe('none');
+});
