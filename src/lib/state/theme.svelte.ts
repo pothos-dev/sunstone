@@ -6,14 +6,13 @@
  * so BOTH the app UI (CSS) and the atomic-editor inside CodeMirror (`cm.ts`
  * reads the inherited `data-theme`) are themed consistently.
  *
- * SHIPS NOW: only the OS-driven default — `mode: 'system'` follows
- * `prefers-color-scheme` and tracks live changes. The structure is deliberately
- * left open so a later slice can add custom themes/fonts read from the OS config
- * folder: set `mode` to an explicit `'light'`/`'dark'` (or extend with named
- * themes) and have `resolved` honour it instead of the OS query. The config
- * folder already carries an app-level `theme` field (`config.rs::AppConfig`) for
- * exactly this.
+ * `mode: 'system'` follows `prefers-color-scheme` and tracks live changes; an
+ * explicit `'light'`/`'dark'` forces a scheme. The user's colour overrides from
+ * the config store are applied separately by `loadThemeColors` below.
  */
+
+import type { Backend } from '$lib/ipc/backend';
+import { parseThemeColors, themeColorsCss } from './themeColors';
 
 /** Theme mode. `'system'` follows the OS; explicit values force a scheme. */
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -79,4 +78,35 @@ export function applyTheme(root: HTMLElement | null, resolved: ResolvedTheme): v
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', resolved);
   }
+}
+
+/** Id of the `<style>` element carrying the user's colour overrides. */
+const THEME_COLORS_STYLE_ID = 'sunstone-theme-colors';
+
+/**
+ * Fetch the user's colour overrides and install them as a `<style>` appended to
+ * `<head>` — after `app.css`, so its same-specificity rules win, and the tokens
+ * derived from the base colours follow. Called once from each desktop shell's
+ * `onMount`; a failed load keeps the default palette.
+ */
+export async function loadThemeColors(backend: Backend): Promise<void> {
+  if (typeof document === 'undefined') return;
+  let raw: unknown = null;
+  try {
+    raw = await backend.loadThemeColors();
+  } catch {
+    return;
+  }
+  const css = themeColorsCss(parseThemeColors(raw, (v) => CSS.supports('color', v)));
+  let style = document.getElementById(THEME_COLORS_STYLE_ID);
+  if (css === '') {
+    style?.remove();
+    return;
+  }
+  if (!style) {
+    style = document.createElement('style');
+    style.id = THEME_COLORS_STYLE_ID;
+    document.head.append(style);
+  }
+  style.textContent = css;
 }

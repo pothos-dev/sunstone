@@ -91,6 +91,7 @@ pub fn run() {
             commands::current_bundle,
             commands::list_known_bundles,
             commands::forget_bundle,
+            commands::load_theme_colors,
             commands::open_bundle,
             commands::pick_folder,
             commands::list_tree,

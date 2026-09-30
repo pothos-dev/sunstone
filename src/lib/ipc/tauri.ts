@@ -44,6 +44,10 @@ export const tauriBackend: Backend = {
     return invoke<KnownBundle[]>('list_known_bundles');
   },
 
+  loadThemeColors(): Promise<unknown> {
+    return invoke<unknown>('load_theme_colors');
+  },
+
   forgetBundle(path: string): Promise<void> {
     return invoke<void>('forget_bundle', { path });
   },

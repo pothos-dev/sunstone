@@ -247,6 +247,16 @@ export const fakeBackend: Backend = {
     return loadKnownBundles();
   },
 
+  // Colour overrides: whatever a spec seeded under THEME_COLORS_KEY, standing in
+  // for `config.colors` in the OS config store. Corrupt JSON -> none.
+  async loadThemeColors(): Promise<unknown> {
+    try {
+      return JSON.parse(localStorage.getItem(THEME_COLORS_KEY) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+
   async forgetBundle(path: string): Promise<void> {
     saveKnownBundles(loadKnownBundles().filter((b) => b.path !== path));
   },
@@ -521,6 +531,9 @@ export const fakeBackend: Backend = {
   },
   openExternal: openExternalTab,
 };
+
+/** localStorage key a spec seeds with `config.colors`-shaped overrides. */
+const THEME_COLORS_KEY = 'sunstone:fakeThemeColors';
 
 /** localStorage key for the fake Bundle's session state. */
 const BUNDLE_STATE_KEY = `sunstone:bundleState:${FAKE_BUNDLE_ROOT}`;

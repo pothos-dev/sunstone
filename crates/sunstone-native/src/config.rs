@@ -5,8 +5,8 @@
 //! the OS config directory — `dirs::config_dir()/sunstone/state.json` (e.g.
 //! `~/.config/sunstone/state.json` on Linux) — holding:
 //!
-//!   - app-level config (theme; only the OS-driven default ships now, but the
-//!     field exists so custom themes/fonts can be read from here later), and
+//!   - app-level config: the theme preference and the user's optional colour
+//!     overrides (`config.colors`, hand-edited — see [`AppConfig::colors`]), and
 //!   - PER-BUNDLE session state keyed by the Bundle's ABSOLUTE path: the
 //!     last-open Concept, the expanded tree folders, and the window geometry.
 //!
@@ -126,9 +126,7 @@ struct Store {
     pub bundles: HashMap<String, BundleState>,
 }
 
-/// App-level configuration (not per-Bundle). Only the OS-driven theme default
-/// ships now; the field exists so future custom theme/font config can live here
-/// and be read from the config folder without a schema migration.
+/// App-level configuration (not per-Bundle), shared across Bundles.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
@@ -136,12 +134,20 @@ pub struct AppConfig {
     /// setting; future values (`"light"`, `"dark"`, custom theme ids) can be
     /// honoured by the frontend theme store later.
     pub theme: String,
+    /// The user's colour overrides, written by hand and never by Sunstone:
+    /// `{ "light": { "accent": "#d9622b", ... }, "dark": { ... } }`, one optional
+    /// entry per base colour. Round-tripped as OPAQUE JSON — the frontend owns the
+    /// key list and validates the values (`src/lib/state/themeColors.ts`), and a
+    /// typo'd key or odd value must survive the next save rather than vanish.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub colors: Option<serde_json::Value>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
+            colors: None,
         }
     }
 }
@@ -164,13 +170,27 @@ fn store_path() -> Option<PathBuf> {
 /// Load the whole store from disk. Missing or corrupt file -> defaults (never
 /// an error: losing session state must not break startup).
 fn load_store() -> Store {
-    let Some(path) = store_path() else {
-        return Store::default();
+    store_path().map(|path| read_store(&path).0).unwrap_or_default()
+}
+
+/// Read the store at `path`, also reporting whether the file exists but does
+/// not parse (a hand edit gone wrong, most likely in `config.colors`).
+fn read_store(path: &Path) -> (Store, bool) {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return (Store::default(), false);
     };
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        return Store::default();
-    };
-    serde_json::from_str(&text).unwrap_or_default()
+    match serde_json::from_str(&text) {
+        Ok(store) => (store, false),
+        Err(_) => (Store::default(), true),
+    }
+}
+
+/// Copy an unparsable store aside to `state.json.corrupt` before it is
+/// overwritten with defaults, so the user's hand edits are not lost for good.
+fn keep_corrupt_copy(path: &Path) {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".corrupt");
+    let _ = std::fs::copy(path, path.with_file_name(name));
 }
 
 /// Persist the whole store to disk (pretty JSON for human inspection).
@@ -211,11 +231,21 @@ static STORE_LOCK: Mutex<()> = Mutex::new(());
 fn with_store(update: impl FnOnce(&mut Store) -> bool) -> Result<(), String> {
     // A panic in another update cannot leave the `()` guard inconsistent.
     let _guard = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let mut store = load_store();
+    let path = store_path();
+    let (mut store, corrupt) = path.as_deref().map(read_store).unwrap_or_default();
     if update(&mut store) {
+        if let (true, Some(path)) = (corrupt, path.as_deref()) {
+            keep_corrupt_copy(path);
+        }
         save_store(&store)?;
     }
     Ok(())
+}
+
+/// The user's colour overrides (`config.colors`), verbatim, or `None` when the
+/// store sets none. See [`AppConfig::colors`].
+pub fn load_theme_colors() -> Option<serde_json::Value> {
+    load_store().config.colors
 }
 
 /// Normalise a Bundle root path to the string key used in the store. We use the
@@ -448,6 +478,40 @@ mod tests {
         let store: Store = serde_json::from_str("{ not valid json").unwrap_or_default();
         assert!(store.bundles.is_empty());
         assert_eq!(store.config.theme, "system");
+    }
+
+    #[test]
+    fn colors_round_trip_verbatim_and_are_omitted_when_unset() {
+        // Hand-written, so everything — including keys the frontend ignores —
+        // must survive a load/save cycle.
+        let json = r##"{ "config": { "theme": "system", "colors": {
+            "light": { "accent": "#123456", "typo": 1 }, "dark": {} } } }"##;
+        let store: Store = serde_json::from_str(json).unwrap();
+        let back = serde_json::to_value(&store).unwrap();
+        assert_eq!(back["config"]["colors"]["light"]["accent"], "#123456");
+        assert_eq!(back["config"]["colors"]["light"]["typo"], 1);
+        let unset = serde_json::to_value(Store::default()).unwrap();
+        assert!(unset["config"].get("colors").is_none());
+    }
+
+    #[test]
+    fn an_unparsable_store_is_reported_and_kept_aside() {
+        let dir = std::env::temp_dir().join(format!(
+            "sunstone-config-corrupt-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+        std::fs::write(&path, "{ \"config\": { \"colors\": ").unwrap();
+        let (store, corrupt) = read_store(&path);
+        assert!(corrupt);
+        assert!(store.bundles.is_empty());
+        keep_corrupt_copy(&path);
+        let kept = std::fs::read_to_string(dir.join("state.json.corrupt")).unwrap();
+        assert_eq!(kept, "{ \"config\": { \"colors\": ");
+        assert!(!read_store(&dir.join("missing.json")).1);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

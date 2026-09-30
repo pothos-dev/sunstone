@@ -281,6 +281,10 @@ export const httpBackend: Backend = {
   listKnownBundles(): Promise<KnownBundle[]> {
     return Promise.resolve([]);
   },
+  // No config store on the web: the default palette only.
+  loadThemeColors(): Promise<unknown> {
+    return Promise.resolve(null);
+  },
   forgetBundle(_path: string): Promise<void> {
     return Promise.reject(new Error(NO_LAUNCHER));
   },

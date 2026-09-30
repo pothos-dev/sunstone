@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { backend } from '$lib/ipc';
-  import { applyTheme, theme } from '$lib/state/theme.svelte';
+  import { applyTheme, loadThemeColors, theme } from '$lib/state/theme.svelte';
   import { errMessage } from '$lib/errors';
   import type { KnownBundle } from '$lib/types';
   import { relativeTime } from '$lib/relativeTime';
@@ -31,6 +31,7 @@
 
   onMount(() => {
     const stopTheme = theme.start();
+    void loadThemeColors(backend);
     void refresh();
     return stopTheme;
   });

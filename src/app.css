@@ -5,7 +5,13 @@
  *
  * Themes are selected by `data-theme="light"|"dark"` on the app root (owned by
  * the theme store, state/theme.svelte.ts). `:root` carries the light values as
- * the default; the dark block overrides them. The atomic-editor inside
+ * the default; the dark block overrides them.
+ *
+ * Each scheme sets TWELVE base colours (bg, bg-elevated, bg-sunken, text,
+ * text-muted, text-faint, border, border-strong, accent, accent-contrast,
+ * danger, tag-text); every other colour token is derived from those with
+ * `color-mix()`. The user can override any base colour per scheme in the config
+ * store (`config.colors`, see state/themeColors.ts), and the derived tokens follow. The atomic-editor inside
  * CodeMirror reads `--atomic-editor-font*` from here too, so the note prose
  * shares the app's typeface.
  *
@@ -23,8 +29,13 @@
   --bg-sunken: #f6e4d5; /* subtle wells — warm sand */
 
   /* Soft sunlit gradient washed across the document background (see `body`).
-     A shallow diagonal from amber morning light into a peach-red glow. */
-  --bg-gradient: linear-gradient(150deg, #fff3e0 0%, #fde5cf 45%, #f9d8c6 78%, #f6cdbd 100%);
+     A shallow diagonal from the elevated paper into an accent-tinted glow. */
+  --bg-gradient: linear-gradient(
+    150deg,
+    var(--bg-elevated) 0%,
+    color-mix(in srgb, var(--accent) 8%, var(--bg)) 45%,
+    color-mix(in srgb, var(--accent) 20%, var(--bg)) 100%
+  );
 
   /* Text */
   --text: #3a2a20; /* warm espresso brown, not pure black */
@@ -38,11 +49,11 @@
   /* Accent — warm amber orange */
   --accent: #d9622b;
   --accent-contrast: #fffaf4; /* text/icon sitting on a solid accent fill */
-  --accent-soft: rgba(217, 98, 43, 0.16); /* selection / active wash */
-  --accent-ring: rgba(217, 98, 43, 0.45); /* focus ring */
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent); /* selection / active wash */
+  --accent-ring: color-mix(in srgb, var(--accent) 45%, transparent); /* focus ring */
 
   /* Neutral interaction wash */
-  --hover: rgba(120, 68, 38, 0.07);
+  --hover: color-mix(in srgb, var(--text) 5%, transparent);
 
   /* Active-Region lift: the Region holding keyboard focus is BRIGHTENED (never
      darkened) by a subtle translucent-white wash, so the Focused item's ring
@@ -51,10 +62,10 @@
 
   /* Danger — a true red, distinct from the warm-orange accent */
   --danger: #c62f2f;
-  --danger-contrast: #fffaf4;
+  --danger-contrast: var(--accent-contrast);
 
   /* Tag chips — derived from the accent */
-  --tag-bg: rgba(217, 98, 43, 0.14);
+  --tag-bg: color-mix(in srgb, var(--accent) 14%, transparent);
   --tag-text: #b0491c;
 
   /* Radius scale — smooth edges */
@@ -133,7 +144,12 @@ body:has([data-theme='dark']) {
   --bg-sunken: #150f0b;
 
   /* Embers-at-dusk gradient — a darker, quieter counterpart to the light wash. */
-  --bg-gradient: linear-gradient(150deg, #241811 0%, #1d1511 55%, #17100c 100%);
+  --bg-gradient: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--bg-elevated) 60%, var(--bg)) 0%,
+    var(--bg) 55%,
+    color-mix(in srgb, var(--bg-sunken) 70%, var(--bg)) 100%
+  );
 
   --text: #ecdcd0;
   --text-muted: #b39685;
@@ -144,18 +160,18 @@ body:has([data-theme='dark']) {
 
   --accent: #f0864a;
   --accent-contrast: #1a1109;
-  --accent-soft: rgba(240, 134, 74, 0.2);
-  --accent-ring: rgba(240, 134, 74, 0.5);
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 50%, transparent);
 
-  --hover: rgba(222, 200, 180, 0.07);
+  --hover: color-mix(in srgb, var(--text) 7%, transparent);
 
   /* Same brightening lift over the dark "paper" — a faint white wash. */
   --region-active: rgba(255, 255, 255, 0.05);
 
   --danger: #e06a4a;
-  --danger-contrast: #1a1109;
+  --danger-contrast: var(--accent-contrast);
 
-  --tag-bg: rgba(240, 134, 74, 0.16);
+  --tag-bg: color-mix(in srgb, var(--accent) 16%, transparent);
   --tag-text: #f3b48a;
 
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);

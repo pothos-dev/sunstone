@@ -9,6 +9,7 @@ How the Sunstone window is laid out, how keyboard focus moves across it, and whi
 - [Sidebars and Sections](sidebars.md) - The left/right Sidebars, edge-driven collapse/resize, their collapsible Sections and Accordion height-sharing, and transient focus-driven reveal.
 - [Focus model](focus-model.md) - The six-Region 3×2 grid, directional movement, and the Focused item within a Region.
 - [View state](view-state.md) - The per-user UI state restored on relaunch (last-open Concept, expanded folders, sidebar flags, tiling layout, window geometry) — never written into the Bundle.
+- [Theme colours](theme-colors.md) - The twelve base colours per scheme, the tokens derived from them, and the per-scheme overrides in the desktop config store.
 
 ## Related
 

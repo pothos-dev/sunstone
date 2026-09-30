@@ -58,6 +58,14 @@ export interface Backend {
   forgetBundle(path: string): Promise<void>;
 
   /**
+   * The user's colour overrides (`config.colors` in the desktop config store),
+   * as the raw JSON the user wrote — `parseThemeColors` validates it. `null`
+   * when none are set, and always on the web, which has no config store.
+   * Never rejects for a missing/corrupt store.
+   */
+  loadThemeColors(): Promise<unknown>;
+
+  /**
    * Open `path` as the current Bundle in-process (build index, start watcher,
    * record it, restore its window geometry). Rejects if the folder is missing.
    * The caller reloads the webview afterwards so the app re-initializes.
