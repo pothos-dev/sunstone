@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  blockForHost,
   DEFAULT_FENCES,
   formatYaml,
   isParseable,
@@ -7,6 +8,7 @@ import {
   scaffoldConcept,
   titleFromFilename,
   titleFromYaml,
+  trimBlock,
   yamlError,
 } from './frontmatter';
 // `splitFrontmatter` is a wasm FREE export (ADR 0006 §11-B); the round-trip
@@ -119,5 +121,23 @@ describe('titleFromFilename / scaffoldConcept', () => {
 
   test('scaffold emits an empty type and a derived title', () => {
     expect(scaffoldConcept('my-note.md')).toBe('---\ntype:\ntitle: My note\n---\n\n');
+  });
+});
+
+describe('trimBlock / blockForHost', () => {
+  test('drops leading blank lines and trailing whitespace, keeps inner layout', () => {
+    expect(trimBlock('\n  \ntype: a\ntags:\n  - x\n\n')).toBe('type: a\ntags:\n  - x');
+    expect(trimBlock('  indented: 1\n')).toBe('  indented: 1');
+  });
+
+  test('the host form is newline-terminated, or empty', () => {
+    expect(blockForHost('type: a\n\n')).toBe('type: a\n');
+    expect(blockForHost('type: a')).toBe('type: a\n');
+    expect(blockForHost(' \n\n')).toBe('');
+  });
+
+  test('the host form is what splitFrontmatter reads back from the written file', () => {
+    const yaml = blockForHost('\ntype: a\ntitle: T\n\n');
+    expect(splitFrontmatter(joinConcept(yaml, '# Body\n')).yaml).toBe(yaml);
   });
 });

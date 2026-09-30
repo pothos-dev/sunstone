@@ -2,7 +2,7 @@ import { EditorView, keymap, type KeyBinding } from '@codemirror/view';
 import { EditorState, Annotation, Compartment, type Extension } from '@codemirror/state';
 import { defaultKeymap, indentWithTab, redo, undo } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { formatYaml } from '$lib/frontmatter';
+import { blockForHost, formatYaml, trimBlock } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
 
 import {
@@ -15,7 +15,9 @@ import {
 // The Frontmatter Region's YAML editor (ADR 0008)
 //
 // A SECOND CodeMirror, separate from the body editor, holding the inner YAML of
-// the open Concept (no `---` fences — the Region draws those). It deliberately
+// the open Concept: no `---` fences, and trimmed (`trimBlock`). Edits reach the
+// host as `blockForHost` of this doc; a host value mirrors in only when it
+// differs in that normalised form, so a keystroke never bounces back. It deliberately
 // runs WITHOUT a history of its own: the body editor owns the single undo stack
 // for the whole Concept, this editor mirrors `frontmatterField` out of it, and
 // its undo/redo keys forward there. See `frontmatter-field.ts` for the field,
@@ -99,7 +101,9 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
     commitFrontmatterGroup(host, start);
   }
 
-  function noteEdit(yaml: string): void {
+  function noteEdit(text: string): void {
+    const yaml = blockForHost(text);
+    if (yaml === host.state.field(frontmatterField)) return;
     if (groupStart === null) groupStart = host.state.field(frontmatterField);
     dispatchFrontmatter(host, yaml);
     if (timer !== null) clearTimeout(timer);
@@ -126,7 +130,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
   ];
 
   const state = EditorState.create({
-    doc,
+    doc: trimBlock(doc),
     extensions: [
       languageSlice.of([]),
       readOnlySlice.of(readOnlyExtension(options.readOnly)),
@@ -165,8 +169,8 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
     view,
     syncFromHost(yaml: string): void {
       const current = view.state.doc.toString();
-      if (current === yaml) return;
-      const change = minimalChange(current, yaml);
+      if (blockForHost(current) === blockForHost(yaml)) return;
+      const change = minimalChange(current, trimBlock(yaml));
       if (change === null) return;
       // A host-driven value supersedes whatever run was open here.
       if (timer !== null) {

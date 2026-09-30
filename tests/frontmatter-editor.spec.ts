@@ -6,8 +6,8 @@ import { type Page } from '@playwright/test';
  * Properties panel).
  *
  * Drives the Frontmatter Region against the fake backend:
- *  - collapsed by default; the toggle shows the block with `---` fences as
- *    Region chrome and the inner YAML in its own editor,
+ *  - collapsed by default; the toggle shows the inner YAML (no `---` fences,
+ *    trimmed) in its own editor,
  *  - read mode shows the SAME text, verbatim and not editable,
  *  - a NESTED value (what the old panel rendered read-only) is authorable,
  *  - a body-only edit leaves the block byte-for-byte,
@@ -54,7 +54,7 @@ async function openForEditing(page: Page, path: string) {
   return yaml;
 }
 
-test('frontmatter: collapsed by default; the toggle shows the fences + inner YAML', async ({
+test('frontmatter: collapsed by default; the toggle shows the inner YAML, no fences', async ({
   page,
 }) => {
   // Track script loads, to pin the "nothing extra loads while collapsed" half of
@@ -80,9 +80,8 @@ test('frontmatter: collapsed by default; the toggle shows the fences + inner YAM
 
   const region = page.getByTestId('frontmatter');
   await expect(region).toBeVisible();
-  // The `---` delimiters are Region CHROME; the editor holds the inner block.
-  await expect(page.getByTestId('frontmatter-fence-open')).toHaveText('---');
-  await expect(page.getByTestId('frontmatter-fence-close')).toHaveText('---');
+  // No `---` fences: the editor holds the inner block only, trimmed.
+  await expect(region).not.toContainText('---');
   const yaml = region.locator('.cm-content');
   await expect(yaml).toContainText('type: concept');
   await expect(yaml).toContainText('tags: [editor, dependency]');
@@ -98,8 +97,6 @@ test('frontmatter: a Concept with no block shows an empty editor; it materialise
 }) => {
   const yaml = await openForEditing(page, 'concepts/no-frontmatter.md');
   await expect(yaml).toHaveText('');
-  // The fences are still drawn as Region chrome — the block is simply empty.
-  await expect(page.getByTestId('frontmatter-fence-open')).toHaveText('---');
 
   await yaml.click();
   await page.keyboard.type('type: concept');

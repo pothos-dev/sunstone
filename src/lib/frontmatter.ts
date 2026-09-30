@@ -48,6 +48,25 @@ export function joinConcept(yaml: string, body: string, fences: Fences = DEFAULT
   return fences.open + block + fences.close + body;
 }
 
+/**
+ * The block as the Frontmatter editor SHOWS it: leading blank lines and
+ * trailing whitespace dropped. That surrounding whitespace is not preserved —
+ * the first frontmatter edit writes the trimmed block back.
+ */
+export function trimBlock(yaml: string): string {
+  return yaml.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd();
+}
+
+/**
+ * The editor's text as the HOST field holds it: trimmed, then newline-terminated
+ * (or empty), which is exactly how `splitFrontmatter` reads the written file
+ * back. Anything else would make the re-read look like an external change.
+ */
+export function blockForHost(text: string): string {
+  const trimmed = trimBlock(text);
+  return trimmed === '' ? '' : `${trimmed}\n`;
+}
+
 /** A YAML parse failure, with the document offsets to mark it at. */
 export interface YamlError {
   message: string;

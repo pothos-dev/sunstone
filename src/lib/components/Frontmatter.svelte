@@ -2,9 +2,9 @@
   // The Frontmatter Region (ADR 0008, superseding ADR 0003's Properties panel).
   //
   // Hosts the open Concept's frontmatter as YAML TEXT in its own small
-  // CodeMirror (`$lib/editor/frontmatterEditor`), with the `---` fences drawn
-  // here as Region chrome — the editor holds the INNER block only, so what the
-  // user edits is exactly what is written back.
+  // CodeMirror (`$lib/editor/frontmatterEditor`). The editor shows the INNER
+  // block only, trimmed: no `---` fences and no surrounding blank lines (the
+  // first edit writes the trimmed block back; see `trimBlock`).
   //
   // The YAML is NOT this component's state: it lives in the body editor's
   // `frontmatterField` (the `host` view), which owns the single undo history for
@@ -134,11 +134,9 @@
 </script>
 
 <section class="frontmatter" data-testid="frontmatter" aria-label="Frontmatter">
-  <div class="fence" data-testid="frontmatter-fence-open" aria-hidden="true">---</div>
   <div class="yaml-host" data-testid="frontmatter-editor" bind:this={editorParent}></div>
-  <div class="footer">
-    <span class="fence" data-testid="frontmatter-fence-close" aria-hidden="true">---</span>
-    {#if !readOnly}
+  {#if !readOnly}
+    <div class="footer">
       <button
         type="button"
         class="format-btn"
@@ -146,8 +144,8 @@
         title="Reflow the YAML block (Shift+Alt+F)"
         onclick={format}>Format</button
       >
-    {/if}
-  </div>
+    </div>
+  {/if}
   {#if parseError}
     <p class="parse-error" data-testid="frontmatter-error" role="status">
       Invalid YAML — this Concept is not being saved. {parseError}
@@ -167,20 +165,9 @@
     background: var(--bg-sunken);
   }
 
-  /* The `---` delimiters are Region CHROME, not content: the editor below holds
-     the inner block only, so they can never be edited away by accident. */
-  .fence {
-    font-family: var(--atomic-editor-font-mono, monospace);
-    color: var(--fg-faint, var(--fg-muted));
-    user-select: none;
-    line-height: 1.4;
-  }
-
   .footer {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
+    justify-content: flex-end;
   }
 
   .format-btn {
@@ -205,9 +192,12 @@
     color: var(--danger);
   }
 
+  /* Smaller than the body: a monospace face at the body's size reads larger
+     than the prose. Tied to the body size so UI zoom scales both together. */
   .yaml-host :global(.cm-editor) {
     background: transparent;
     font-family: var(--atomic-editor-font-mono, monospace);
+    font-size: calc(var(--atomic-editor-body-size, 14px) * 0.85);
   }
 
   .yaml-host :global(.cm-editor.cm-focused) {

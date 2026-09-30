@@ -10,7 +10,7 @@ This ticket is the **editing surface only**. The linting and completion that rep
 
 The unified undo timeline from ADR-0003 survives, but not unchanged: the YAML now has a document of its own, so the body editor's `history()` stays the single stack and the YAML editor runs with no history of its own, forwarding undo/redo to it. `frontmatterField` still holds the frontmatter with the payload changed from `Property[]` to the YAML string. Grouping becomes ours to do — CodeMirror coalesces only events that both carry document changes, so intermediate keystrokes go in with `addToHistory: false` and one history entry opens per idle pause. Because an undo step can now change a surface the user cannot see, focus follows what was undone.
 
-- [x] The Frontmatter Region hosts a YAML editor with syntax highlighting; the `---` fences are drawn by the Region, and the editor holds the inner YAML only
+- [x] The Frontmatter Region hosts a YAML editor with syntax highlighting; the editor holds the inner YAML only, trimmed, with no `---` fences shown
 - [x] A Concept with no Frontmatter shows an empty editor, and the block materialises on first save
 - [x] The Region is collapsed by default in read and edit mode, and the highlighting code is lazy-loaded on expand, so nothing extra loads while it is collapsed
 - [x] Read mode shows the same YAML verbatim and highlighted — never re-formatted, so what is read matches what is on disk
