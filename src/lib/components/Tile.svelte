@@ -387,6 +387,16 @@
   // --- Link / wikilink navigation (navigates THIS Tile, pushes its history) ----
   let pendingScrollLine: number | null = null;
   let pendingScrollAnchor: string | null = null;
+  // The path of an open that carries an anchor. `tile.open` asks for a scroll to
+  // the top AFTER the load (which has already scrolled to the anchor), so that
+  // one offset is skipped for this path.
+  let anchorOpenPath: string | null = null;
+
+  function navigateWithAnchor(path: string, anchor: string | null): void {
+    pendingScrollAnchor = anchor;
+    anchorOpenPath = anchor === null ? null : path;
+    void tile.open(path);
+  }
 
   // --- Active-heading reporting (outline-active-heading) -----------------------
   // The Outline highlights the heading whose section the reader is in. The probe
@@ -455,8 +465,7 @@
       }
       return;
     }
-    pendingScrollAnchor = anchor;
-    void tile.open(path);
+    navigateWithAnchor(path, anchor);
   }
 
   // Slug-anchor rewriting after an autosave of this Tile's Concept.
@@ -541,6 +550,7 @@
     if (pendingScrollAnchor !== null && view) {
       const line = findHeadingLine(tile.content, pendingScrollAnchor);
       if (line !== null) scrollToOutlineLine(line);
+      else anchorOpenPath = null; // no such heading: let the open land at the top
       pendingScrollAnchor = null;
       tile.pendingScrollOffset = null; // the anchor wins over the offset
     }
@@ -550,8 +560,10 @@
     if (tile.pendingScrollOffset !== null && view) {
       const target = tile.pendingScrollOffset;
       tile.pendingScrollOffset = null;
+      const anchored = anchorOpenPath === tile.activePath;
+      anchorOpenPath = null;
       const sc = view.scrollDOM;
-      requestAnimationFrame(() => {
+      if (!anchored) requestAnimationFrame(() => {
         sc.scrollTop = target;
         reportViewportLine();
       });
@@ -617,6 +629,18 @@
       pendingScrollLine = line;
       void tile.open(path);
     }
+  }
+  /**
+   * Open `path` in this Tile and scroll to the heading `anchor` (a slug) once
+   * loaded, or just re-scroll when it is already open (CLI DOCUMENT argument).
+   */
+  export function openAtAnchor(path: string, anchor: string | null): void {
+    if (tile.activePath === path && view) {
+      handleWikiLinkOpen(path, anchor);
+      return;
+    }
+    if (tile.activePath !== path) navigateWithAnchor(path, anchor);
+    else pendingScrollAnchor = anchor;
   }
   export function enterFind(): void {
     if (!view) return;

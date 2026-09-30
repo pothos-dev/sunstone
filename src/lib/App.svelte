@@ -34,6 +34,7 @@
   import { ensureWasm } from '$lib/wasm';
   import { splitFrontmatter } from '$lib/wasm/exports';
   import { windowTitle, foldersToExpand } from '$lib/tileTitle';
+  import { dirname } from '$lib/path';
 
   interface Props {
     /**
@@ -138,7 +139,12 @@
       // doc before the wasm-backed frontmatter/body split is ready — that race
       // used to leave the raw YAML block sitting in the editable body on the
       // very first restored tile.
-      await Promise.all([bundle.load(), session.load(), ensureWasm()]);
+      const [startupDoc] = await Promise.all([
+        backend.takeStartupDocument().catch(() => null),
+        bundle.load(),
+        session.load(),
+        ensureWasm(),
+      ]);
 
       // Reconstruct the tiling workspace from the persisted layout: rebuild every
       // column/tile, open each tile's Concept into its Tile, and restore each
@@ -166,7 +172,30 @@
 
       session.endRestore();
 
-      focusExplorerInitial();
+      // A Document named on the command line (`sunstone ./docs guide/setup.md#x`)
+      // opens into the restored active Tile, scrolled to its anchor. Once it has
+      // loaded (focusing earlier is lost in the swap), focus goes to the editor
+      // in editing mode; a read-mode editor is not focusable, so the Explorer
+      // cursor lands on the Document instead. Retried until the grid has mounted
+      // that Tile.
+      if (startupDoc) {
+        retryFrames(() => {
+          const tileRef = tileGrid?.activeTile();
+          if (!tileRef) return false;
+          focusTypeForPath = null;
+          tileRef.openAtAnchor(startupDoc.path, startupDoc.anchor);
+          retryFrames(() => {
+            const active = workspace.activeTile;
+            if (active.activePath !== startupDoc.path) return false;
+            if (active.mode === 'editing') focusEditorWhenReady();
+            else focusExplorerOn(startupDoc.path);
+            return true;
+          }, 60);
+          return true;
+        }, 20);
+      } else {
+        focusExplorerInitial();
+      }
     })();
 
     void indexStore.refresh();
@@ -403,6 +432,18 @@
       if (target === null || !explorerPane) return true;
       return explorerPane.focusRow(target);
     }, 10);
+  }
+
+  // Move the Explorer cursor (and DOM focus) onto `path`'s row, expanding its
+  // folders first so the row exists.
+  function focusExplorerOn(path: string) {
+    const folder = dirname(path);
+    if (folder !== '') {
+      for (const p of foldersToExpand(folder)) {
+        if (!session.isExpanded(p)) session.setExpanded(p, true);
+      }
+    }
+    refocusExplorerAt(path);
   }
 
   function focusExplorerInitial() {

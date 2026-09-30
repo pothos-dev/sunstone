@@ -35,6 +35,15 @@ pub(crate) fn current_bundle(session: State<'_, Arc<Session>>) -> Option<String>
         .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// The Document named on the command line, handed out ONCE (a webview reload
+/// after the first take gets `None`), so it opens at launch and not again.
+#[tauri::command]
+pub(crate) fn take_startup_document(
+    pending: State<'_, crate::startup::PendingStartupDocument>,
+) -> Option<crate::startup::StartupDocument> {
+    pending.0.lock().ok()?.take()
+}
+
 /// The launcher's known-folder list (previously-opened Bundles), most-recent
 /// first. Purely config-derived — no open Bundle required.
 #[tauri::command]

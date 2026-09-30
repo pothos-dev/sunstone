@@ -10,6 +10,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  StartupDocument,
   SyncNotice,
 } from '$lib/types';
 
@@ -44,6 +45,13 @@ export interface Backend {
    * from this on startup.
    */
   currentBundle(): Promise<string | null>;
+
+  /**
+   * The Document named on the command line after the Bundle, handed out once:
+   * later calls (e.g. after a webview reload) return `null`, as does a launch
+   * that named none. The editor opens it after restoring the layout.
+   */
+  takeStartupDocument(): Promise<StartupDocument | null>;
 
   /**
    * The launcher's known-folder list — previously-opened Bundles derived from

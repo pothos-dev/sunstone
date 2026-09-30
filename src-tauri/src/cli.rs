@@ -1,7 +1,8 @@
 //! Command-line argument parsing.
 //!
 //! Sunstone is CLI-launched (`sunstone ./docs`). The arguments are an optional
-//! positional Bundle path, the conventional `--help`/`--version` flags, and
+//! positional Bundle path, optionally followed by a Document inside it
+//! (`sunstone ./docs guide/setup.md#install`), the conventional `--help`/`--version` flags, and
 //! `--detached`/`-d` (run detached from the spawning console). We hand-roll the
 //! parse (no `clap`) to keep the dependency surface small; the grammar is tiny
 //! and the logic is pure so it can be unit-tested.
@@ -12,6 +13,10 @@ pub struct RunOptions {
     /// The Bundle root from the command line; `None` means "fall back to
     /// `SUNSTONE_BUNDLE` / the per-build default" (see `resolve_bundle_root`).
     pub bundle: Option<String>,
+    /// A Document to open in the Bundle, as typed (bundle-relative or relative
+    /// to the working directory, optionally with a `#heading` anchor); resolved
+    /// by `startup::resolve_startup_document`. Only accepted after `bundle`.
+    pub document: Option<String>,
     /// Detach from the spawning console: re-spawn the UI as an independent
     /// process and return the shell prompt immediately (see `lib.rs`).
     pub detached: bool,
@@ -33,9 +38,10 @@ pub enum CliAction {
 /// Parse the CLI arguments, which MUST already have the program name stripped
 /// (i.e. pass `std::env::args().skip(1)`).
 ///
-/// Grammar: at most one positional Bundle path, plus the flags `-h`/`--help`,
+/// Grammar: up to two positionals — a Bundle path, then a Document in it — plus
+/// the flags `-h`/`--help`,
 /// `-V`/`--version` and `-d`/`--detached`. `--help`/`--version` take precedence
-/// wherever they appear. Any unrecognised flag, or a second positional
+/// wherever they appear. Any unrecognised flag, or a third positional
 /// argument, is rejected.
 pub fn parse_args<I, S>(args: I) -> CliAction
 where
@@ -56,13 +62,12 @@ where
                     "unknown option '{a}'\n\nTry 'sunstone --help' for usage."
                 ));
             }
+            _ if opts.bundle.is_none() => opts.bundle = Some(a.to_string()),
+            _ if opts.document.is_none() => opts.document = Some(a.to_string()),
             _ => {
-                if opts.bundle.is_some() {
-                    return CliAction::Error(format!(
-                        "unexpected extra argument '{a}'\n\nTry 'sunstone --help' for usage."
-                    ));
-                }
-                opts.bundle = Some(a.to_string());
+                return CliAction::Error(format!(
+                    "unexpected extra argument '{a}'\n\nTry 'sunstone --help' for usage."
+                ));
             }
         }
     }
@@ -82,11 +87,14 @@ pub fn help_string() -> String {
 A CLI-launched markdown editor with first-class Open Knowledge Format support.
 
 Usage:
-  {name} [BUNDLE]
+  {name} [BUNDLE [DOCUMENT[#HEADING]]]
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
                 (pick from recently-opened folders, or choose a new one).
+  DOCUMENT      A markdown file in the Bundle to open, relative to the Bundle
+                (e.g. guide/setup.md) or to the current directory. Append
+                #HEADING to scroll to that heading.
 
 Options:
   -d, --detached Run detached from this console (returns the prompt immediately)
@@ -106,6 +114,7 @@ mod tests {
     fn run(bundle: Option<&str>, detached: bool) -> CliAction {
         CliAction::Run(RunOptions {
             bundle: bundle.map(str::to_string),
+            document: None,
             detached,
         })
     }
@@ -166,9 +175,20 @@ mod tests {
     }
 
     #[test]
-    fn second_positional_is_rejected() {
-        match parse_args(["./a", "./b"]) {
-            CliAction::Error(msg) => assert!(msg.contains("unexpected extra argument './b'")),
+    fn second_positional_is_the_document() {
+        let expected = CliAction::Run(RunOptions {
+            bundle: Some("./docs".into()),
+            document: Some("guide/setup.md#install".into()),
+            detached: true,
+        });
+        assert_eq!(parse_args(["./docs", "guide/setup.md#install", "-d"]), expected);
+        assert_eq!(parse_args(["-d", "./docs", "guide/setup.md#install"]), expected);
+    }
+
+    #[test]
+    fn third_positional_is_rejected() {
+        match parse_args(["./a", "b.md", "c.md"]) {
+            CliAction::Error(msg) => assert!(msg.contains("unexpected extra argument 'c.md'")),
             other => panic!("expected Error, got {other:?}"),
         }
     }

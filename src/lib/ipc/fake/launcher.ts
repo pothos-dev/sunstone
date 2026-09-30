@@ -2,7 +2,7 @@
 // the "which Bundle is open" marker uses sessionStorage so it survives the reload
 // the launcher triggers but resets per fresh test context.
 
-import type { KnownBundle } from '$lib/types';
+import type { KnownBundle, StartupDocument } from '$lib/types';
 
 /** localStorage key for the fake launcher's known-folder list. */
 export const KNOWN_BUNDLES_KEY = 'sunstone:knownBundles';
@@ -13,6 +13,14 @@ const FAKE_OPEN_KEY = 'sunstone:fakeOpenBundle';
 export function isLauncherForced(): boolean {
   if (typeof location === 'undefined') return false;
   return new URLSearchParams(location.search).has('launcher');
+}
+
+/** The fake's CLI DOCUMENT argument, from `?open=<path>[&anchor=<slug>]`. */
+export function fakeStartupDocument(): StartupDocument | null {
+  if (typeof location === 'undefined') return null;
+  const params = new URLSearchParams(location.search);
+  const path = params.get('open');
+  return path ? { path, anchor: params.get('anchor') || null } : null;
 }
 
 export function getFakeOpenBundle(): string | null {

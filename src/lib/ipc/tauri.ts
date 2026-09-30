@@ -16,6 +16,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  StartupDocument,
 } from '$lib/types';
 
 /** Tauri event name emitted by the Rust watcher (matches watcher.rs). */
@@ -38,6 +39,10 @@ export const tauriBackend: Backend = {
 
   currentBundle(): Promise<string | null> {
     return invoke<string | null>('current_bundle');
+  },
+
+  takeStartupDocument(): Promise<StartupDocument | null> {
+    return invoke<StartupDocument | null>('take_startup_document');
   },
 
   listKnownBundles(): Promise<KnownBundle[]> {

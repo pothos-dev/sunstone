@@ -93,6 +93,15 @@ export type TagCount = {
  * (`serde rename_all = "camelCase"`). Returned by `Backend.listKnownBundles()`,
  * ordered most-recently-opened first.
  */
+/**
+ * A Document named on the desktop command line (`sunstone ./docs guide/setup.md#x`):
+ * a bundle-relative path plus an optional heading anchor (the slug after `#`).
+ */
+export type StartupDocument = {
+  path: string;
+  anchor: string | null;
+};
+
 export type KnownBundle = {
   /** absolute path of the Bundle root; also the store key used by forgetBundle/openBundle */
   path: string;

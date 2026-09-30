@@ -40,7 +40,7 @@ timestamp: 2026-07-23T00:00:00Z
 
 The frontend's real backend (`tauri.ts`) is a thin `invoke(...)` over these; command names match one-to-one. All Bundle-scoped commands read the open Bundle through `session.current()?`, so they error with "no Bundle is open" in launcher mode.
 
-- **Launcher / session** — `bundle_root`, `current_bundle` (drives launcher-vs-editor), `list_known_bundles`, `forget_bundle`, `open_bundle` (canonicalize + `Session::open`), `pick_folder` (native chooser).
+- **Launcher / session** — `bundle_root`, `current_bundle` (drives launcher-vs-editor), `take_startup_document` (the CLI DOCUMENT, handed out once), `list_known_bundles`, `forget_bundle`, `open_bundle` (canonicalize + `Session::open`), `pick_folder` (native chooser).
 - **Tree / Concept CRUD** — `list_tree`, `read_concept`, `write_concept` (autosave; records a self-write so the watcher suppresses its echo), `create_concept`, `create_folder`, `rename_path` / `move_path` (+ auto link-rewrite → `RewriteSummary`), `delete_path`, `rewrite_anchors`.
 - **Index queries** — `list_concept_paths`, `concept_exists`, `backlinks`, `all_tags`, `concepts_by_tag`, `all_types`, `all_keys`.
 - **Search / git / render** — `search`, `file_history`, `file_at_rev`, `render_concept` (feeds the print/PDF path).
@@ -52,6 +52,8 @@ Each command is glue: it delegates straight to the matching sunstone-native func
 ## Launch model
 
 `run()` calls `cli::parse_args(...)` **before** starting Tauri, so `--version` / `--help` print and exit without a window and bad flags are rejected. The startup Bundle is resolved by `resolve_startup_bundle`: the `SUNSTONE_BUNDLE` env var if set, else the positional CLI path, canonicalized; with neither, the frontend shows the [Launcher](/interface/app-shell.md). `--detached` re-spawns the executable as a console-independent child (a `SUNSTONE_DETACHED_CHILD` marker stops it detaching twice) so the shell prompt returns immediately.
+
+An optional second positional names a Document to open (`sunstone ./docs guide/setup.md#install`). `resolve_startup_document` turns it into a bundle-relative path plus an optional heading anchor. The path is tried relative to the Bundle first (a leading `/` is allowed, as in a bundle-absolute link), then relative to the working directory, so a shell-completed `docs/guide/setup.md` works too. Anything outside the Bundle is ignored with a warning; a path that doesn't exist yet stays bundle-relative and the Tile shows it as missing. The result waits in `PendingStartupDocument` until the frontend calls `takeStartupDocument` after restoring the layout. It then opens into the active Tile scrolled to the anchor, with focus in the editor (editing mode) or on its Explorer row (read mode). A webview reload doesn't reopen it. The fake backend stands the argument in as `?open=<path>&anchor=<slug>`.
 
 ## Print / PDF export
 

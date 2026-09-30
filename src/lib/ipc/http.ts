@@ -20,6 +20,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  StartupDocument,
   SyncNotice,
 } from '$lib/types';
 
@@ -277,6 +278,10 @@ export const httpBackend: Backend = {
   // inert (never reached by the web viewer).
   currentBundle(): Promise<string | null> {
     return getJson<string>('/api/bundle-root');
+  },
+  // No command line on the web: the URL addresses the open Concept instead.
+  takeStartupDocument(): Promise<StartupDocument | null> {
+    return Promise.resolve(null);
   },
   listKnownBundles(): Promise<KnownBundle[]> {
     return Promise.resolve([]);

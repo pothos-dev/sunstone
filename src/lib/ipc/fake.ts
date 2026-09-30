@@ -11,6 +11,7 @@ import type {
   FileAtRev,
   RenderPayload,
   KnownBundle,
+  StartupDocument,
   SyncNotice,
 } from '$lib/types';
 import {
@@ -40,6 +41,7 @@ import { FAKE_COMMITS, committedContentAt } from './fake/git';
 import { searchFiles } from './fake/search';
 import {
   isLauncherForced,
+  fakeStartupDocument,
   getFakeOpenBundle,
   setFakeOpenBundle,
   loadKnownBundles,
@@ -241,6 +243,11 @@ export const fakeBackend: Backend = {
     if (!isLauncherForced()) return FAKE_BUNDLE_ROOT;
     // Forced launcher mode: open only once a folder has been picked this session.
     return getFakeOpenBundle();
+  },
+
+  // Stand-in for the CLI DOCUMENT argument: `?open=<path>[&anchor=<slug>]`.
+  async takeStartupDocument(): Promise<StartupDocument | null> {
+    return fakeStartupDocument();
   },
 
   async listKnownBundles(): Promise<KnownBundle[]> {

@@ -37,7 +37,7 @@ fn handle_cli() -> Option<cli::RunOptions> {
     // this (parent) process exit, returning the shell prompt. Skip when we ARE
     // the re-spawned child (marker set), so the child runs the UI normally.
     if opts.detached && std::env::var_os(startup::DETACHED_CHILD_ENV).is_none() {
-        match startup::spawn_detached(&opts.bundle) {
+        match startup::spawn_detached(&opts.bundle, &opts.document) {
             Ok(()) => return None,
             Err(e) => {
                 eprintln!("error: failed to launch detached: {e}");
@@ -55,6 +55,7 @@ pub fn run() {
         return;
     };
     let cli_path = opts.bundle;
+    let cli_document = opts.document;
 
     tauri::Builder::default()
         // Attachment bytes reach the webview over `sunstone-asset://localhost/<rel>`
@@ -78,17 +79,31 @@ pub fn run() {
             // the Session empty so the frontend shows the launcher. `open` builds
             // the index, starts the watcher, records the folder, and restores the
             // saved window geometry — the same work a launcher pick triggers.
+            let pending = startup::PendingStartupDocument::default();
             if let Some(root) = startup::resolve_startup_bundle(cli_path) {
-                if let Err(e) = sess.open(root) {
-                    eprintln!("failed to open startup Bundle: {e}");
+                match sess.open(root.clone()) {
+                    Ok(()) => {
+                        // The named Document (if any) waits for the frontend to
+                        // take it once the editor has restored its layout.
+                        if let Some(arg) = cli_document {
+                            let cwd = std::env::current_dir().unwrap_or_default();
+                            match startup::resolve_startup_document(&root, &arg, &cwd) {
+                                Some(doc) => *pending.0.lock().unwrap() = Some(doc),
+                                None => eprintln!("'{arg}' is not inside the Bundle; ignoring it"),
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("failed to open startup Bundle: {e}"),
                 }
             }
+            app.manage(pending);
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::bundle_root,
             commands::current_bundle,
+            commands::take_startup_document,
             commands::list_known_bundles,
             commands::forget_bundle,
             commands::load_theme_colors,
