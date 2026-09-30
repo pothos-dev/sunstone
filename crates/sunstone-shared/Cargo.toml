@@ -2,7 +2,7 @@
 name = "sunstone-shared"
 version = "0.14.0"
 description = "Pure leaf crate of Sunstone algorithms; compiles on both native and wasm32 (ADR 0006)"
-authors = ["you"]
+authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
 
 [dependencies]

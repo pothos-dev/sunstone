@@ -2,7 +2,7 @@
 name = "sunstone-server"
 version = "0.21.0"
 description = "Read-only HTTP server exposing a Sunstone Bundle over sunstone-native (Sunstone Web)"
-authors = ["you"]
+authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
 
 [[bin]]

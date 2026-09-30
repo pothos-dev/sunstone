@@ -2,7 +2,7 @@
 name = "sunstone-wasm"
 version = "0.14.0"
 description = "Sunstone's WebAssembly entry point over sunstone-shared (ADR 0006)"
-authors = ["you"]
+authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
 
 [lib]
