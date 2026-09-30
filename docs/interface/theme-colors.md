@@ -48,7 +48,7 @@ On desktop, set any base colour, per scheme, under `config.colors` in the config
 - Changes are read at startup, so restart Sunstone (or reopen a Bundle) to see them.
 - If a hand edit leaves the file invalid JSON, Sunstone falls back to defaults and copies the broken file to `state.json.corrupt` before its next save overwrites it.
 
-The web build has no config store and always uses the default palette.
+The web build has no config store and always uses the default palette (see the [deployment guide](../../docker/README.md#theme-colours-not-configurable-on-the-web)).
 
 ## How it is applied
 
