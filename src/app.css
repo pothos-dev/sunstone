@@ -16,7 +16,7 @@
  * shares the app's typeface.
  *
  * Palette identity: a warm amber-orange accent over a sunlit peach-cream
- * "paper", washed with a soft orange→amber→red gradient (--bg-gradient). Warm
+ * "paper", washed with a soft paper-toned gradient (--bg-gradient). Warm
  * and radiant throughout — like light through sunstone — while keeping enough
  * restraint that long prose stays comfortable.
  */
@@ -28,15 +28,15 @@
   --bg-elevated: #fffaf4; /* panels, inputs, dialogs */
   --bg-sunken: #f6e4d5; /* subtle wells — warm sand */
 
-  /* Soft sunlit gradient washed across the document background (see `body`).
-     Accent-tinted end to end — a shallow diagonal from a faint glow on the
-     elevated paper into a deeper one — so the whole content area reads warm. */
+  /* Soft gradient washed across the document background (see `body`): a
+     shallow diagonal from the elevated paper into the sunken one. Built from the
+     surface colours only — no accent — so the content area keeps the paper's
+     hue; same shape as the dark scheme's. */
   --bg-gradient: linear-gradient(
     150deg,
-    color-mix(in srgb, var(--accent) 7%, var(--bg-elevated)) 0%,
-    color-mix(in srgb, var(--accent) 12%, var(--bg)) 45%,
-    color-mix(in srgb, var(--accent) 17%, var(--bg)) 78%,
-    color-mix(in srgb, var(--accent) 22%, var(--bg)) 100%
+    color-mix(in srgb, var(--bg-elevated) 60%, var(--bg)) 0%,
+    var(--bg) 55%,
+    color-mix(in srgb, var(--bg-sunken) 70%, var(--bg)) 100%
   );
 
   /* Text */

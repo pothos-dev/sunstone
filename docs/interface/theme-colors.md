@@ -14,13 +14,13 @@ Sunstone's palette lives in `src/app.css` as CSS custom properties, one block fo
 | ---------- | ----- | --------------- |
 | `bg` | `--bg` | `--bg-gradient` |
 | `bgElevated` | `--bg-elevated` | `--bg-gradient` |
-| `bgSunken` | `--bg-sunken` | `--bg-gradient` (dark) |
+| `bgSunken` | `--bg-sunken` | `--bg-gradient` |
 | `text` | `--text` | `--hover` |
 | `textMuted` | `--text-muted` | |
 | `textFaint` | `--text-faint` | |
 | `border` | `--border` | |
 | `borderStrong` | `--border-strong` | |
-| `accent` | `--accent` | `--accent-soft`, `--accent-ring`, `--tag-bg`, `--bg-gradient` (light) |
+| `accent` | `--accent` | `--accent-soft`, `--accent-ring`, `--tag-bg` |
 | `accentContrast` | `--accent-contrast` | `--danger-contrast` |
 | `danger` | `--danger` | |
 | `tagText` | `--tag-text` | |
