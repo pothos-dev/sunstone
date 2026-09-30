@@ -29,12 +29,14 @@
   --bg-sunken: #f6e4d5; /* subtle wells — warm sand */
 
   /* Soft sunlit gradient washed across the document background (see `body`).
-     A shallow diagonal from the elevated paper into an accent-tinted glow. */
+     Accent-tinted end to end — a shallow diagonal from a faint glow on the
+     elevated paper into a deeper one — so the whole content area reads warm. */
   --bg-gradient: linear-gradient(
     150deg,
-    var(--bg-elevated) 0%,
-    color-mix(in srgb, var(--accent) 8%, var(--bg)) 45%,
-    color-mix(in srgb, var(--accent) 20%, var(--bg)) 100%
+    color-mix(in srgb, var(--accent) 7%, var(--bg-elevated)) 0%,
+    color-mix(in srgb, var(--accent) 12%, var(--bg)) 45%,
+    color-mix(in srgb, var(--accent) 17%, var(--bg)) 78%,
+    color-mix(in srgb, var(--accent) 22%, var(--bg)) 100%
   );
 
   /* Text */
