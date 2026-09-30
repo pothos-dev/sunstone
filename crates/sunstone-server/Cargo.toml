@@ -1,6 +1,6 @@
 [package]
 name = "sunstone-server"
-version = "0.20.0"
+version = "0.21.0"
 description = "Read-only HTTP server exposing a Sunstone Bundle over sunstone-native (Sunstone Web)"
 authors = ["you"]
 edition = "2021"

@@ -4,6 +4,27 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-09-30
+
+### Added
+
+- Custom theme colours on desktop: override any of the twelve base colours per
+  light and dark scheme under `colors` in `~/.config/sunstone/config.json`;
+  every other colour follows from them.
+- Sunstone Web reports its version and build commit at `GET /api/version`.
+
+### Changed
+
+- Sunstone Web drops its Back/Forward buttons; the browser's own history
+  navigates.
+- Internal links no longer show the link icon in read mode.
+- The Frontmatter Region shows the YAML without the `---` fences and without
+  surrounding blank lines, in a smaller font than the body.
+
+### Fixed
+
+- The light theme's background no longer has an orange tint.
+
 ## [0.20.0] - 2026-09-29
 
 ### Added
