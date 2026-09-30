@@ -29,27 +29,24 @@ The `--atomic-editor-*` tokens the editor reads are aliases of these. What stays
 
 ## Overriding colours
 
-On desktop, set any base colour, per scheme, under `config.colors` in the config store `~/.config/sunstone/state.json` (the OS config dir; see [View state](view-state.md)):
+On desktop, set any base colour, per scheme, under `colors` in `~/.config/sunstone/config.json` (the OS config dir). This file is yours: Sunstone reads it and never writes it. Its session data lives separately in `state.json` ([View state](view-state.md)).
 
 ```json
 {
-  "config": {
-    "theme": "system",
-    "colors": {
-      "light": { "accent": "#2b7fd9", "bg": "#f4f7fb" },
-      "dark": { "accent": "#5aa2f0" }
-    }
+  "colors": {
+    "light": { "accent": "#2b7fd9", "bg": "#f4f7fb" },
+    "dark": { "accent": "#5aa2f0" }
   }
 }
 ```
 
 - Every key is optional. A key left out keeps the default for that scheme, and an override for one scheme never touches the other.
-- Values are any CSS colour (`#hex`, `rgb()`, `oklch()`, a colour name, …). Unknown keys and invalid values are ignored, but Sunstone keeps them in the file when it rewrites it.
+- Values are any CSS colour (`#hex`, `rgb()`, `oklch()`, a colour name, …). Unknown keys and invalid values are ignored.
 - Changes are read at startup, so restart Sunstone (or reopen a Bundle) to see them.
-- If a hand edit leaves the file invalid JSON, Sunstone falls back to defaults and copies the broken file to `state.json.corrupt` before its next save overwrites it.
+- If the file is not valid JSON, Sunstone logs a warning and uses the default palette.
 
 The web build has no config store and always uses the default palette (see the [deployment guide](../../docker/README.md#theme-colours-not-configurable-on-the-web)).
 
 ## How it is applied
 
-Rust returns `config.colors` as opaque JSON (`load_theme_colors`, `crates/sunstone-native/src/config.rs`). The frontend fetches it through `Backend.loadThemeColors`, validates it (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`), and `loadThemeColors` in `state/theme.svelte.ts` appends a `<style id="sunstone-theme-colors">` after `app.css` that re-declares the overridden tokens for each scheme.
+Rust returns the `colors` value of `config.json` as opaque JSON (`load_theme_colors`, `crates/sunstone-native/src/config.rs`). The frontend fetches it through `Backend.loadThemeColors`, validates it (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`), and `loadThemeColors` in `state/theme.svelte.ts` appends a `<style id="sunstone-theme-colors">` after `app.css` that re-declares the overridden tokens for each scheme.

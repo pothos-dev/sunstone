@@ -248,7 +248,7 @@ export const fakeBackend: Backend = {
   },
 
   // Colour overrides: whatever a spec seeded under THEME_COLORS_KEY, standing in
-  // for `config.colors` in the OS config store. Corrupt JSON -> none.
+  // for the `colors` value of the user's `config.json`. Corrupt JSON -> none.
   async loadThemeColors(): Promise<unknown> {
     try {
       return JSON.parse(localStorage.getItem(THEME_COLORS_KEY) ?? 'null');
@@ -532,7 +532,7 @@ export const fakeBackend: Backend = {
   openExternal: openExternalTab,
 };
 
-/** localStorage key a spec seeds with `config.colors`-shaped overrides. */
+/** localStorage key a spec seeds with `config.json` `colors`-shaped overrides. */
 const THEME_COLORS_KEY = 'sunstone:fakeThemeColors';
 
 /** localStorage key for the fake Bundle's session state. */

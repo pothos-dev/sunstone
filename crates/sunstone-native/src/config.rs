@@ -1,14 +1,16 @@
-//! Global config/state store in the OS app-data directory.
+//! Global config and state files in the OS config directory.
 //!
 //! Sunstone NEVER writes config or session state into the Bundle (docs/GLOSSARY.md:
-//! the "no `.obsidian` equivalent" rule). Instead it keeps a single JSON file in
-//! the OS config directory — `dirs::config_dir()/sunstone/state.json` (e.g.
-//! `~/.config/sunstone/state.json` on Linux) — holding:
+//! the "no `.obsidian` equivalent" rule). Instead it keeps two JSON files in the
+//! OS config directory, `dirs::config_dir()/sunstone/` (e.g. `~/.config/sunstone/`
+//! on Linux):
 //!
-//!   - app-level config: the theme preference and the user's optional colour
-//!     overrides (`config.colors`, hand-edited — see [`AppConfig::colors`]), and
-//!   - PER-BUNDLE session state keyed by the Bundle's ABSOLUTE path: the
-//!     last-open Concept, the expanded tree folders, and the window geometry.
+//!   - `config.json` — the USER's configuration (colour overrides). Written by
+//!     hand; Sunstone only ever reads it (see [`load_theme_colors`]).
+//!   - `state.json` — Sunstone's own state store, rewritten on every change:
+//!     the theme preference (only the OS-driven default ships now) and
+//!     PER-BUNDLE session state keyed by the Bundle's ABSOLUTE path (the
+//!     last-open Concept, the expanded tree folders, the window geometry, …).
 //!
 //! The store is robust: a missing or corrupt file loads as defaults (we never
 //! propagate a parse error up to the UI — losing session state is harmless).
@@ -126,7 +128,9 @@ struct Store {
     pub bundles: HashMap<String, BundleState>,
 }
 
-/// App-level configuration (not per-Bundle), shared across Bundles.
+/// App-level configuration (not per-Bundle). Only the OS-driven theme default
+/// ships now; the field exists so future custom theme/font config can live here
+/// and be read from the config folder without a schema migration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
@@ -134,20 +138,12 @@ pub struct AppConfig {
     /// setting; future values (`"light"`, `"dark"`, custom theme ids) can be
     /// honoured by the frontend theme store later.
     pub theme: String,
-    /// The user's colour overrides, written by hand and never by Sunstone:
-    /// `{ "light": { "accent": "#d9622b", ... }, "dark": { ... } }`, one optional
-    /// entry per base colour. Round-tripped as OPAQUE JSON — the frontend owns the
-    /// key list and validates the values (`src/lib/state/themeColors.ts`), and a
-    /// typo'd key or odd value must survive the next save rather than vanish.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub colors: Option<serde_json::Value>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
-            colors: None,
         }
     }
 }
@@ -162,6 +158,11 @@ fn config_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
+/// Path of the user-owned config file (read-only to Sunstone).
+fn user_config_path() -> Option<PathBuf> {
+    Some(config_dir()?.join("config.json"))
+}
+
 /// Path of the single JSON state file.
 fn store_path() -> Option<PathBuf> {
     Some(config_dir()?.join("state.json"))
@@ -170,27 +171,13 @@ fn store_path() -> Option<PathBuf> {
 /// Load the whole store from disk. Missing or corrupt file -> defaults (never
 /// an error: losing session state must not break startup).
 fn load_store() -> Store {
-    store_path().map(|path| read_store(&path).0).unwrap_or_default()
-}
-
-/// Read the store at `path`, also reporting whether the file exists but does
-/// not parse (a hand edit gone wrong, most likely in `config.colors`).
-fn read_store(path: &Path) -> (Store, bool) {
-    let Ok(text) = std::fs::read_to_string(path) else {
-        return (Store::default(), false);
+    let Some(path) = store_path() else {
+        return Store::default();
     };
-    match serde_json::from_str(&text) {
-        Ok(store) => (store, false),
-        Err(_) => (Store::default(), true),
-    }
-}
-
-/// Copy an unparsable store aside to `state.json.corrupt` before it is
-/// overwritten with defaults, so the user's hand edits are not lost for good.
-fn keep_corrupt_copy(path: &Path) {
-    let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(".corrupt");
-    let _ = std::fs::copy(path, path.with_file_name(name));
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Store::default();
+    };
+    serde_json::from_str(&text).unwrap_or_default()
 }
 
 /// Persist the whole store to disk (pretty JSON for human inspection).
@@ -231,21 +218,32 @@ static STORE_LOCK: Mutex<()> = Mutex::new(());
 fn with_store(update: impl FnOnce(&mut Store) -> bool) -> Result<(), String> {
     // A panic in another update cannot leave the `()` guard inconsistent.
     let _guard = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let path = store_path();
-    let (mut store, corrupt) = path.as_deref().map(read_store).unwrap_or_default();
+    let mut store = load_store();
     if update(&mut store) {
-        if let (true, Some(path)) = (corrupt, path.as_deref()) {
-            keep_corrupt_copy(path);
-        }
         save_store(&store)?;
     }
     Ok(())
 }
 
-/// The user's colour overrides (`config.colors`), verbatim, or `None` when the
-/// store sets none. See [`AppConfig::colors`].
+/// The user's colour overrides — the `colors` value of `config.json`
+/// (`{ "light": { "accent": "#d9622b", ... }, "dark": { ... } }`), verbatim, or
+/// `None` when the file is missing, sets no colours, or is not valid JSON (a
+/// warning is logged; the file is left untouched). The frontend owns the key list
+/// and validates the values (`src/lib/state/themeColors.ts`).
 pub fn load_theme_colors() -> Option<serde_json::Value> {
-    load_store().config.colors
+    let path = user_config_path()?;
+    let text = std::fs::read_to_string(&path).ok()?;
+    let colors = colors_from_config(&text);
+    if colors.is_err() {
+        eprintln!("sunstone: ignoring {}: not valid JSON", path.display());
+    }
+    colors.ok().flatten()
+}
+
+/// The `colors` value of a `config.json` document; `Err` when it does not parse.
+fn colors_from_config(text: &str) -> Result<Option<serde_json::Value>, serde_json::Error> {
+    let mut config: serde_json::Value = serde_json::from_str(text)?;
+    Ok(config.get_mut("colors").map(serde_json::Value::take).filter(|c| !c.is_null()))
 }
 
 /// Normalise a Bundle root path to the string key used in the store. We use the
@@ -481,37 +479,14 @@ mod tests {
     }
 
     #[test]
-    fn colors_round_trip_verbatim_and_are_omitted_when_unset() {
-        // Hand-written, so everything — including keys the frontend ignores —
-        // must survive a load/save cycle.
-        let json = r##"{ "config": { "theme": "system", "colors": {
-            "light": { "accent": "#123456", "typo": 1 }, "dark": {} } } }"##;
-        let store: Store = serde_json::from_str(json).unwrap();
-        let back = serde_json::to_value(&store).unwrap();
-        assert_eq!(back["config"]["colors"]["light"]["accent"], "#123456");
-        assert_eq!(back["config"]["colors"]["light"]["typo"], 1);
-        let unset = serde_json::to_value(Store::default()).unwrap();
-        assert!(unset["config"].get("colors").is_none());
-    }
-
-    #[test]
-    fn an_unparsable_store_is_reported_and_kept_aside() {
-        let dir = std::env::temp_dir().join(format!(
-            "sunstone-config-corrupt-{}-{}",
-            std::process::id(),
-            now_millis()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("state.json");
-        std::fs::write(&path, "{ \"config\": { \"colors\": ").unwrap();
-        let (store, corrupt) = read_store(&path);
-        assert!(corrupt);
-        assert!(store.bundles.is_empty());
-        keep_corrupt_copy(&path);
-        let kept = std::fs::read_to_string(dir.join("state.json.corrupt")).unwrap();
-        assert_eq!(kept, "{ \"config\": { \"colors\": ");
-        assert!(!read_store(&dir.join("missing.json")).1);
-        std::fs::remove_dir_all(&dir).unwrap();
+    fn colors_come_verbatim_from_the_user_config() {
+        let text = r##"{ "colors": { "light": { "accent": "#123456", "typo": 1 }, "dark": {} } }"##;
+        let colors = colors_from_config(text).unwrap().unwrap();
+        assert_eq!(colors["light"]["accent"], "#123456");
+        assert_eq!(colors["light"]["typo"], 1);
+        assert!(colors_from_config("{}").unwrap().is_none());
+        assert!(colors_from_config(r#"{ "colors": null }"#).unwrap().is_none());
+        assert!(colors_from_config("{ \"colors\": ").is_err());
     }
 
     #[test]

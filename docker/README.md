@@ -503,11 +503,11 @@ intentional and a restart fixes nothing.
 ## Theme colours: not configurable on the web
 
 Sunstone Web always serves the **default palette**. The per-scheme colour
-overrides the desktop app reads from `config.colors` in
-`~/.config/sunstone/state.json` ([Theme colours](../docs/interface/theme-colors.md))
+overrides the desktop app reads from `~/.config/sunstone/config.json`
+([Theme colours](../docs/interface/theme-colors.md))
 have no counterpart here: the server has no config store, no environment
 variable carries colours, and the web backend's `loadThemeColors` always
-returns none (`src/lib/ipc/http.ts`). Mounting a `state.json` into the
+returns none (`src/lib/ipc/http.ts`). Mounting a `config.json` into the
 container does nothing. Viewers still get light or dark from their OS
 preference.
 

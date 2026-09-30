@@ -58,7 +58,7 @@ export interface Backend {
   forgetBundle(path: string): Promise<void>;
 
   /**
-   * The user's colour overrides (`config.colors` in the desktop config store),
+   * The user's colour overrides (the `colors` value of the desktop `config.json`),
    * as the raw JSON the user wrote — `parseThemeColors` validates it. `null`
    * when none are set, and always on the web, which has no config store.
    * Never rejects for a missing/corrupt store.

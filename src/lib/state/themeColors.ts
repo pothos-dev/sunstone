@@ -3,14 +3,14 @@
  *
  * The palette in `app.css` rests on twelve BASE colours per scheme; every other
  * colour token is derived from them with `color-mix()`. The user can override
- * any base colour, per scheme, by hand in the desktop config store
- * (`~/.config/sunstone/state.json`):
+ * any base colour, per scheme, by hand in the desktop config file
+ * (`~/.config/sunstone/config.json`, which Sunstone never writes):
  *
- *   { "config": { "colors": {
+ *   { "colors": {
  *       "light": { "accent": "#2b7fd9", "bg": "#f4f7fb" },
- *       "dark":  { "accent": "#5aa2f0" } } } }
+ *       "dark":  { "accent": "#5aa2f0" } } }
  *
- * Rust hands `config.colors` over as opaque JSON; this module keeps only the
+ * Rust hands `colors` over as opaque JSON; this module keeps only the
  * known keys whose values are valid CSS colours and turns them into one
  * stylesheet that re-declares those tokens after `app.css`.
  */
@@ -67,7 +67,7 @@ function parseScheme(raw: unknown, isColor: (value: string) => boolean): ColorOv
 }
 
 /**
- * Parse the opaque `config.colors` value. Unknown keys, non-strings and values
+ * Parse the opaque `colors` value. Unknown keys, non-strings and values
  * `isColor` rejects are dropped (the browser passes `CSS.supports('color', v)`,
  * which also refuses anything that could break out of the declaration).
  */

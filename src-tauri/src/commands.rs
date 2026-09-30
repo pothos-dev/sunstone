@@ -42,7 +42,7 @@ pub(crate) fn list_known_bundles() -> Vec<KnownBundle> {
     config::list_known_bundles()
 }
 
-/// The user's colour overrides from the config store (`config.colors`), as
+/// The user's colour overrides from `config.json` (its `colors` value), as
 /// opaque JSON the frontend validates. No open Bundle required (the launcher
 /// is themed too).
 #[tauri::command]

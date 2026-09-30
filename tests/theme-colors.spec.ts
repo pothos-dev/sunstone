@@ -1,10 +1,10 @@
 import { test, expect, type Page } from './fixtures';
 
 /**
- * User colour overrides (`config.colors`, state/themeColors.ts).
+ * User colour overrides (`config.json` `colors`, state/themeColors.ts).
  *
  * The fake backend reads the overrides from `sunstone:fakeThemeColors`, standing
- * in for the OS config store. Verifies, per scheme, that an overridden base
+ * in for the user's `config.json`. Verifies, per scheme, that an overridden base
  * colour wins over `app.css`, that a token derived from it follows, and that a
  * key overridden for ONE scheme leaves the other scheme's default alone.
  */

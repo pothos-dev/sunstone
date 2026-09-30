@@ -10,8 +10,8 @@
  * Each scheme sets TWELVE base colours (bg, bg-elevated, bg-sunken, text,
  * text-muted, text-faint, border, border-strong, accent, accent-contrast,
  * danger, tag-text); every other colour token is derived from those with
- * `color-mix()`. The user can override any base colour per scheme in the config
- * store (`config.colors`, see state/themeColors.ts), and the derived tokens follow. The atomic-editor inside
+ * `color-mix()`. The user can override any base colour per scheme in
+ * `config.json` (`colors`, see state/themeColors.ts), and the derived tokens follow. The atomic-editor inside
  * CodeMirror reads `--atomic-editor-font*` from here too, so the note prose
  * shares the app's typeface.
  *
