@@ -101,6 +101,13 @@ the Dex dev stack.
 Branch plus `SUNSTONE_GIT_ORIGIN` plus a deploy key. The server clones origin on boot, commits
 every Save, and runs the **Sync loop**. The shape of a collaborative wiki.
 
+**local**:
+Not a Sunstone Web deployment, and never derived from the environment: the shape `sunstone serve`
+runs on, so the desktop editor works in a browser tab on localhost. It trusts every request (no
+sign-in), a Save writes the file **without committing**, and history comes from whatever repo
+holds the Bundle, all exactly as on the desktop. See
+[ADR-0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md).
+
 **Sync loop**:
 The server-owned `fetch → rebase → push` cycle that runs only in the **git-synced** shape. A Save
 kicks it immediately (so outbound latency is not the poll interval); external pushes are

@@ -21,7 +21,7 @@ The SvelteKit app (Svelte 5 runes) at the repo root under `src/` is the "web" pa
 | `tauri.ts` | Real desktop backend — a thin `invoke(...)` / `listen(...)` per method; command names match the [desktop shell](/architecture/desktop-shell.md)'s `#[tauri::command]`s. |
 | `http.ts` | Web backend — `fetch` to relative `/api/...` against [sunstone-server](/architecture/sunstone-server.md); open GET reads, JWT-gated `PUT/POST/DELETE` writes carrying a per-tab `x-sunstone-client` id, live updates via `EventSource('/api/events')`. |
 | `fake.ts` (+ `fake/*`) | In-memory backend over a seeded fixture Bundle — behaviourally faithful (same path conventions, path-escape rejection, simulated watcher, canned git history). Powers plain-Chromium dev and the desktop Playwright suite. |
-| `index.ts` | **Backend selection:** `backend = __SUNSTONE_WEB__ ? httpBackend : isTauri ? tauriBackend : fakeBackend`. `__SUNSTONE_WEB__` is a Vite `define` constant, so the unused branches are dead-code-eliminated. |
+| `index.ts` | **Backend selection:** `backend = __SUNSTONE_WEB__ ? httpBackend : isTauri ? tauriBackend : isServed ? httpBackend : fakeBackend`. `__SUNSTONE_WEB__` is a Vite `define` constant, so the unused branches are dead-code-eliminated. `isServed` is the runtime `window.__SUNSTONE_SERVE__` flag `sunstone serve` stamps into `index.html`: the *desktop* build, in a plain browser, on the HTTP backend ([ADR 0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md)). |
 
 Every method both real backends implement returns one of the [sunstone-native](/architecture/sunstone-native.md) serde shapes, mirrored in `src/lib/types.ts`.
 

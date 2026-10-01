@@ -25,6 +25,11 @@ of markdown files. Point it at your notes, a docs repo, or a cloned knowledge
 base and start editing. Files stay plain `.md` on disk. Nothing gets indexed
 into a database you can't grep.
 
+Prefer a browser tab to a window? `sunstone serve ./notes` serves the same
+editor at `http://localhost:3000/` (`--port` to change it). It listens on
+localhost only and needs no sign-in, and edits save to disk just as they do
+in the app.
+
 ## Built for the Google Open Knowledge Format
 
 Sunstone implements the

@@ -6,6 +6,11 @@
 //! axum **verifies the token itself** — it is self-defending even if reachable
 //! on the network (loopback binding becomes optional defence-in-depth).
 //!
+//! The one exception is the `sunstone serve` local shape
+//! ([`crate::config::Shape::Local`]): no Node hook, no secret — the extractor
+//! admits every request, and the loopback bind plus the `Host` guard in
+//! `local.rs` are the whole defence.
+//!
 //! The JWT is HMAC-SHA256 over `base64url(header).base64url(payload)`, verified
 //! against a shared secret in `SUNSTONE_JWT_SECRET`. We implement the (tiny)
 //! HS256 slice by hand over pure-Rust `hmac`/`sha2` rather than pulling a full
@@ -126,6 +131,9 @@ pub fn verify(token: &str, secret: &[u8]) -> Result<Claims, String> {
 
 /// Reject with a bare 401 (no body detail — an unauthenticated write never
 /// reaches the write error classifier).
+/// The author name a `sunstone serve` write is stamped with.
+const LOCAL_USER: &str = "local";
+
 fn unauthorized() -> (StatusCode, String) {
     (StatusCode::UNAUTHORIZED, "unauthorized".to_string())
 }
@@ -137,6 +145,15 @@ impl FromRequestParts<Arc<ServerState>> for AuthedUser {
         parts: &mut Parts,
         state: &Arc<ServerState>,
     ) -> Result<Self, Self::Rejection> {
+        // `sunstone serve`: the one user is the person at the machine (loopback
+        // bind + `Host` guard, see `local.rs`). The identity reaches no commit
+        // — the local shape never commits — only the SSE `origin` stamp.
+        if state.cfg.shape.trusts_every_request() {
+            return Ok(AuthedUser {
+                name: LOCAL_USER.to_string(),
+                email: String::new(),
+            });
+        }
         // No configured secret → writing is disabled entirely.
         let secret = state.cfg.jwt_secret.as_ref().ok_or_else(unauthorized)?;
         let header = parts
@@ -206,6 +223,40 @@ mod tests {
         assert!(verify(&tampered, secret).is_err());
         // The benign re-encode also fails (signature was over the original bytes).
         let _ = forged;
+    }
+
+    /// Run the extractor over a bodiless request, optionally carrying an
+    /// `Authorization` header.
+    async fn extract(
+        state: &Arc<ServerState>,
+        auth_header: Option<&str>,
+    ) -> Result<AuthedUser, StatusCode> {
+        let mut req = axum::http::Request::builder().uri("/api/concept");
+        if let Some(h) = auth_header {
+            req = req.header(AUTHORIZATION, h);
+        }
+        let (mut parts, ()) = req.body(()).unwrap().into_parts();
+        AuthedUser::from_request_parts(&mut parts, state)
+            .await
+            .map_err(|(status, _)| status)
+    }
+
+    #[tokio::test]
+    async fn the_local_shape_admits_a_request_without_a_token() {
+        let root = crate::testutil::seeded_bundle("main");
+        let local = crate::testutil::server_state(crate::config::Config::local(root.clone(), 0));
+        assert_eq!(extract(&local, None).await.unwrap().name, LOCAL_USER);
+
+        // The same token-less request against the plain shape stays a 401,
+        // even with a secret configured.
+        let mut cfg = crate::config::Config::plain(root);
+        cfg.jwt_secret = Some(b"s".to_vec());
+        let plain = crate::testutil::server_state(cfg);
+        assert_eq!(extract(&plain, None).await.unwrap_err(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            extract(&plain, Some("Bearer junk")).await.unwrap_err(),
+            StatusCode::UNAUTHORIZED
+        );
     }
 
     #[test]

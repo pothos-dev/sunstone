@@ -9,8 +9,10 @@ use sunstone_native::git::CommitIdentity;
 
 // --- Shape ------------------------------------------------------------------
 
-/// The deployment shape (Spec 1 §1), derived from the presence gate. Serialized
-/// as `plain` / `git-local` / `git-synced` for `GET /api/sync-status` (§10.5).
+/// The deployment shape (Spec 1 §1). The three Sunstone Web shapes derive from
+/// the env presence gate; [`Shape::Local`] is never parsed from the environment
+/// — only `sunstone serve` builds it ([`Config::local`]). Serialized as `plain`
+/// / `git-local` / `git-synced` / `local` for `GET /api/sync-status` (§10.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Shape {
@@ -22,6 +24,12 @@ pub enum Shape {
     /// Branch + origin (+ key for an ssh origin). Runs the fetch → rebase →
     /// push loop (§8).
     GitSynced,
+    /// `sunstone serve`: the desktop editor in a browser on loopback. Behaves
+    /// like the desktop shell, not like a shared deployment: every request is
+    /// trusted (no JWT — the one user is the person at the machine), Save
+    /// writes the file and **never commits** (exactly like the desktop), and
+    /// history reads git wherever the Bundle sits, as the desktop's do.
+    Local,
 }
 
 impl Shape {
@@ -36,12 +44,27 @@ impl Shape {
         matches!(self, Shape::GitSynced)
     }
 
+    /// Whether the two history reads may spawn git. Every shape but plain:
+    /// plain's short-circuit guards a Bundle bind-mounted inside a *host* repo
+    /// (§11.1), while [`Shape::Local`] wants the desktop's behaviour — history
+    /// from whatever repo holds the Bundle.
+    pub fn reads_history(self) -> bool {
+        !matches!(self, Shape::Plain)
+    }
+
+    /// Whether every request is treated as authenticated — [`Shape::Local`]
+    /// only, which binds loopback and checks the `Host` header instead.
+    pub fn trusts_every_request(self) -> bool {
+        matches!(self, Shape::Local)
+    }
+
     /// The wire/log spelling, identical to the serde rename.
     pub fn as_str(self) -> &'static str {
         match self {
             Shape::Plain => "plain",
             Shape::GitLocal => "git-local",
             Shape::GitSynced => "git-synced",
+            Shape::Local => "local",
         }
     }
 }
@@ -185,8 +208,24 @@ impl Config {
         }
     }
 
-    /// Whether git runs at all — the read-side (§11.1) and write-side (§5)
-    /// short-circuits both key off this.
+    /// The [`Shape::Local`] config `sunstone serve` runs on: `bundle_root`
+    /// (already canonical) on `port`, no git family, no secret.
+    pub fn local(bundle_root: PathBuf, port: u16) -> Config {
+        Config {
+            shape: Shape::Local,
+            git: None,
+            repo_root: None,
+            bundle_root,
+            seed_from: None,
+            jwt_secret: None,
+            api_port: port,
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Whether this is a git shape — commits on write (§5), a repo at
+    /// [`crate::config::REPO_DIR`]. The history reads key off
+    /// [`Shape::reads_history`] instead, which [`Shape::Local`] also passes.
     pub fn is_git(&self) -> bool {
         self.shape.is_git()
     }
@@ -237,11 +276,24 @@ mod tests {
     // --- Surface bookkeeping ------------------------------------------------
 
     #[test]
+    fn local_is_the_trusted_commitless_shape_that_reads_history() {
+        assert!(!Shape::Local.is_git(), "local never commits");
+        assert!(!Shape::Local.syncs());
+        assert!(Shape::Local.reads_history());
+        assert!(Shape::Local.trusts_every_request());
+        assert!(!Shape::Plain.reads_history());
+        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced] {
+            assert!(!shape.trusts_every_request(), "{shape:?} must keep the JWT gate");
+        }
+    }
+
+    #[test]
     fn shape_serializes_kebab_case() {
         assert_eq!(Shape::Plain.as_str(), "plain");
         assert_eq!(Shape::GitLocal.as_str(), "git-local");
         assert_eq!(Shape::GitSynced.as_str(), "git-synced");
-        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced] {
+        assert_eq!(Shape::Local.as_str(), "local");
+        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced, Shape::Local] {
             assert_eq!(
                 serde_json::to_string(&shape).unwrap(),
                 format!("\"{}\"", shape.as_str())

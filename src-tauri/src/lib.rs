@@ -2,6 +2,7 @@ mod asset;
 mod cli;
 mod commands;
 mod pdf;
+mod serve;
 mod session;
 mod startup;
 
@@ -10,15 +11,24 @@ use std::sync::Arc;
 use session::Session;
 use tauri::Manager;
 
+/// What this process goes on to do once the command line is handled.
+enum Launch {
+    /// Open the window.
+    App(cli::RunOptions),
+    /// Serve the editor to a browser instead (`sunstone serve`).
+    Serve(cli::ServeOptions),
+}
+
 /// Parse the command line and act on the terminal-only modes (`--version`,
-/// `--help`, errors, `--detached` re-spawn). Returns the options the UI run
-/// should use, or `None` when this process is done (printed/re-spawned).
-fn handle_cli() -> Option<cli::RunOptions> {
+/// `--help`, errors, `--detached` re-spawn). Returns what to launch, or `None`
+/// when this process is done (printed/re-spawned).
+fn handle_cli() -> Option<Launch> {
     // Parse the command line BEFORE starting Tauri so `--version`/`--help` print
     // to the terminal and exit without ever opening a window, and unknown options
     // are rejected instead of being treated as a Bundle path.
     let opts = match cli::parse_args(std::env::args().skip(1)) {
         cli::CliAction::Run(opts) => opts,
+        cli::CliAction::Serve(opts) => return Some(Launch::Serve(opts)),
         cli::CliAction::Version => {
             println!("{}", cli::version_string());
             return None;
@@ -46,13 +56,18 @@ fn handle_cli() -> Option<cli::RunOptions> {
         }
     }
 
-    Some(opts)
+    Some(Launch::App(opts))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let Some(opts) = handle_cli() else {
-        return;
+    // Generated once: it carries the embedded SPA build, which `serve` hands to
+    // the HTTP server instead of a window.
+    let context = tauri::generate_context!();
+    let opts = match handle_cli() {
+        Some(Launch::App(opts)) => opts,
+        Some(Launch::Serve(opts)) => return serve::run(opts, context),
+        None => return,
     };
     let cli_path = opts.bundle;
     let cli_document = opts.document;
@@ -134,6 +149,6 @@ pub fn run() {
             commands::load_bundle_state,
             commands::save_bundle_state
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }

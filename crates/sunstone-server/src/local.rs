@@ -1,0 +1,369 @@
+//! `sunstone serve`: the desktop editor, in a browser, over loopback.
+//!
+//! One process serves both halves on one origin — the
+//! [`Shape::Local`](crate::config::Shape::Local) API (the
+//! ordinary [`crate::router`]) and the desktop's static SPA build, handed in by
+//! the caller as [`AppShellAssets`] (the desktop binary passes the copy Tauri
+//! embeds). Every path the API does not route falls through to [`app_shell`]:
+//! a built file is served as-is, anything else gets `index.html` (the SPA
+//! fallback), stamped with [`SERVE_MARKER`] so the frontend picks the `http`
+//! backend instead of the in-memory `fake` it would use in a plain browser.
+//!
+//! The trust model is the desktop's — the one user is the person at the
+//! machine — so the local shape drops the JWT gate. What stands in for it:
+//!
+//! - the listener binds **127.0.0.1 only**, never a routable address;
+//! - [`guard_loopback`] refuses any request whose `Host` (or, when present,
+//!   `Origin`) is not a loopback name. That closes DNS rebinding — a hostile
+//!   page whose domain re-resolves to 127.0.0.1 is same-origin to itself but
+//!   still sends its own `Host` — and cross-site form posts;
+//! - the write routes take JSON bodies, so a cross-origin `fetch` needs a CORS
+//!   preflight this server never answers.
+
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use axum::{
+    extract::Request,
+    http::{
+        header::{CACHE_CONTROL, CONTENT_TYPE, HOST, ORIGIN, X_CONTENT_TYPE_OPTIONS},
+        HeaderMap, StatusCode, Uri,
+    },
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
+    Router,
+};
+
+use crate::config::Config;
+
+/// Resolves a built app-shell file by its forward-slash path relative to the
+/// build root (`index.html`, `_app/immutable/…`), or `None` when there is no
+/// such file. Only ever called with paths free of `..` segments.
+pub type AppShellAssets = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
+
+/// What `sunstone serve` was asked to serve.
+pub struct LocalServeOptions {
+    /// The Bundle root. Canonicalized here; must be a directory.
+    pub bundle_root: PathBuf,
+    /// The loopback port to listen on (`0` picks a free one).
+    pub port: u16,
+    /// The desktop SPA build.
+    pub assets: AppShellAssets,
+}
+
+/// Injected into every `index.html` this mode serves. `src/lib/ipc/index.ts`
+/// selects the `http` backend when it finds the flag on `window`.
+pub const SERVE_MARKER: &str = "<script>window.__SUNSTONE_SERVE__=true</script>";
+
+pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
+    let root = opts
+        .bundle_root
+        .canonicalize()
+        .map_err(|e| format!("cannot open {}: {e}", opts.bundle_root.display()))?;
+    if !root.is_dir() {
+        return Err(format!("{} is not a folder", root.display()));
+    }
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], opts.port));
+    // Bind before building the index, so a taken port fails fast.
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
+        format!("cannot listen on {addr}: {e} (pick another port with --port)")
+    })?;
+    let port = listener.local_addr().map(|a| a.port()).unwrap_or(opts.port);
+
+    let (state, _watcher) = crate::start(Config::local(root.clone(), port), root.clone());
+    let app = app(crate::router(state), opts.assets);
+
+    eprintln!("Serving {} at http://localhost:{port}/", root.display());
+    eprintln!("Press Ctrl+C to stop.");
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| format!("server error: {e}"))
+}
+
+/// The API router plus the app-shell fallback, behind the loopback guard.
+fn app(api: Router, assets: AppShellAssets) -> Router {
+    api.fallback(move |uri: Uri| {
+        let assets = assets.clone();
+        async move { app_shell(&assets, uri.path()) }
+    })
+    .layer(middleware::from_fn(guard_loopback))
+}
+
+/// Serve a built file, or the marked `index.html` for any route the SPA owns.
+fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
+    let rel = path.trim_start_matches('/');
+    // An unrouted `/api/…` is a client bug, not a page: no SPA fallback.
+    if rel == "api" || rel.starts_with("api/") {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    if rel.split('/').any(|seg| seg == "..") || rel.contains('\\') {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    if !rel.is_empty() && rel != "index.html" {
+        if let Some(bytes) = assets(rel) {
+            return (
+                [
+                    (CONTENT_TYPE, shell_content_type(rel)),
+                    (X_CONTENT_TYPE_OPTIONS, "nosniff"),
+                ],
+                bytes,
+            )
+                .into_response();
+        }
+        // A missing *file* (it has an extension) is a 404; anything else is a
+        // route the SPA resolves client-side.
+        let last = rel.rsplit('/').next().unwrap_or(rel);
+        if last.contains('.') {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+    }
+    match assets("index.html") {
+        Some(bytes) => (
+            [
+                (CONTENT_TYPE, "text/html; charset=utf-8"),
+                (CACHE_CONTROL, "no-cache"),
+            ],
+            inject_marker(&String::from_utf8_lossy(&bytes)),
+        )
+            .into_response(),
+        None => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "this build has no app shell: run `bun run build` first",
+        )
+            .into_response(),
+    }
+}
+
+/// `html` with [`SERVE_MARKER`] as the first child of `<head>`, so it runs
+/// before any module script (prepended when there is no `<head>` tag).
+fn inject_marker(html: &str) -> String {
+    let at = html
+        .find("<head>")
+        .map(|i| i + "<head>".len())
+        .or_else(|| html.find("<head ").and_then(|i| html[i..].find('>').map(|j| i + j + 1)))
+        .unwrap_or(0);
+    let mut out = String::with_capacity(html.len() + SERVE_MARKER.len());
+    out.push_str(&html[..at]);
+    out.push_str(SERVE_MARKER);
+    out.push_str(&html[at..]);
+    out
+}
+
+/// The `Content-Type` for an app-shell file. Deliberately separate from
+/// `sunstone_native::mime` — that table serves Attachments and must never
+/// answer `text/html` or JavaScript for Bundle bytes.
+fn shell_content_type(rel: &str) -> &'static str {
+    let ext = rel.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("html") => "text/html; charset=utf-8",
+        Some("js" | "mjs") => "text/javascript; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("json" | "map") => "application/json",
+        Some("webmanifest") => "application/manifest+json",
+        Some("wasm") => "application/wasm",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("ico") => "image/x-icon",
+        Some("webp") => "image/webp",
+        Some("woff2") => "font/woff2",
+        Some("woff") => "font/woff",
+        Some("ttf") => "font/ttf",
+        Some("txt") => "text/plain; charset=utf-8",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Refuse a request whose `Host` is not loopback, or whose `Origin` (sent on
+/// cross-origin and on non-GET same-origin requests) names a non-loopback
+/// host. See the module docs for why this replaces the JWT gate.
+async fn guard_loopback(req: Request, next: Next) -> Response {
+    if !headers_are_loopback(req.headers()) {
+        return (StatusCode::FORBIDDEN, "sunstone serve only answers localhost").into_response();
+    }
+    next.run(req).await
+}
+
+fn headers_are_loopback(headers: &HeaderMap) -> bool {
+    let host_ok = headers
+        .get(HOST)
+        .and_then(|h| h.to_str().ok())
+        .is_some_and(is_loopback_authority);
+    let origin_ok = match headers.get(ORIGIN) {
+        None => true,
+        Some(origin) => origin
+            .to_str()
+            .ok()
+            .and_then(|o| o.strip_prefix("http://"))
+            .is_some_and(is_loopback_authority),
+    };
+    host_ok && origin_ok
+}
+
+/// Whether `authority` (`host[:port]`) names this machine's loopback.
+fn is_loopback_authority(authority: &str) -> bool {
+    let host = if let Some(rest) = authority.strip_prefix('[') {
+        match rest.split_once(']') {
+            Some((h, tail)) if tail.is_empty() || tail.starts_with(':') => h,
+            _ => return false,
+        }
+    } else {
+        authority.split(':').next().unwrap_or("")
+    };
+    matches!(
+        host.to_ascii_lowercase().as_str(),
+        "localhost" | "127.0.0.1" | "::1"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testutil::{seeded_bundle, server_state};
+    use axum::body::Body;
+    use axum::http::{Method, Request as HttpRequest};
+    use tower::ServiceExt;
+
+    fn assets() -> AppShellAssets {
+        Arc::new(|rel: &str| match rel {
+            "index.html" => Some(b"<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>".to_vec()),
+            "_app/immutable/entry.js" => Some(b"export {}".to_vec()),
+            "_app/core.wasm" => Some(b"\0asm".to_vec()),
+            _ => None,
+        })
+    }
+
+    fn test_app() -> Router {
+        let state = server_state(Config::local(seeded_bundle("local"), 0));
+        assert_eq!(state.cfg.shape, crate::config::Shape::Local);
+        app(crate::router(state), assets())
+    }
+
+    async fn send(req: HttpRequest<Body>) -> (StatusCode, HeaderMap, String) {
+        let res = test_app().oneshot(req).await.unwrap();
+        let status = res.status();
+        let headers = res.headers().clone();
+        let body = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
+        (status, headers, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    fn get(path: &str) -> HttpRequest<Body> {
+        HttpRequest::get(path)
+            .header(HOST, "localhost:3000")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[test]
+    fn the_marker_lands_first_in_head() {
+        assert_eq!(
+            inject_marker("<html><head><title>x</title></head></html>"),
+            format!("<html><head>{SERVE_MARKER}<title>x</title></head></html>")
+        );
+        assert_eq!(
+            inject_marker("<html><head lang=\"en\"><title>x</title>"),
+            format!("<html><head lang=\"en\">{SERVE_MARKER}<title>x</title>")
+        );
+        assert_eq!(inject_marker("<p>bare</p>"), format!("{SERVE_MARKER}<p>bare</p>"));
+    }
+
+    #[test]
+    fn only_loopback_authorities_pass() {
+        for ok in ["localhost", "localhost:3000", "LOCALHOST:1", "127.0.0.1:3000", "[::1]:3000", "[::1]"] {
+            assert!(is_loopback_authority(ok), "{ok} should pass");
+        }
+        for bad in [
+            "evil.example:3000",
+            "localhost.evil.example",
+            "127.0.0.2:3000",
+            "[::1]evil",
+            "0.0.0.0:3000",
+            "",
+        ] {
+            assert!(!is_loopback_authority(bad), "{bad} should be refused");
+        }
+    }
+
+    #[test]
+    fn app_shell_files_get_their_own_content_types() {
+        assert_eq!(shell_content_type("_app/x.js"), "text/javascript; charset=utf-8");
+        assert_eq!(shell_content_type("_app/x.wasm"), "application/wasm");
+        assert_eq!(shell_content_type("_app/x.CSS"), "text/css; charset=utf-8");
+        assert_eq!(shell_content_type("blob"), "application/octet-stream");
+    }
+
+    #[tokio::test]
+    async fn the_root_and_spa_routes_serve_the_marked_index() {
+        for path in ["/", "/index.html", "/some/route", "/?print=note.md&toolbar=1"] {
+            let (status, headers, body) = send(get(path)).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert_eq!(headers[CONTENT_TYPE], "text/html; charset=utf-8");
+            assert!(body.contains(SERVE_MARKER), "{path} should carry the marker");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_built_file_is_served_as_is() {
+        let (status, headers, body) = send(get("/_app/immutable/entry.js")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[CONTENT_TYPE], "text/javascript; charset=utf-8");
+        assert_eq!(body, "export {}");
+        let (_, headers, _) = send(get("/_app/core.wasm")).await;
+        assert_eq!(headers[CONTENT_TYPE], "application/wasm");
+    }
+
+    #[tokio::test]
+    async fn missing_files_unknown_api_routes_and_dot_dot_are_404() {
+        for path in ["/_app/missing.js", "/api/nope", "/api", "/_app/../index.html"] {
+            let (status, _, body) = send(get(path)).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+            assert!(!body.contains(SERVE_MARKER), "{path} must not fall back to the SPA");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_api_is_served_on_the_same_origin() {
+        let (status, _, body) = send(get("/api/concept?path=note.md")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Hello"));
+    }
+
+    #[tokio::test]
+    async fn a_write_needs_no_token() {
+        let req = HttpRequest::builder()
+            .method(Method::PUT)
+            .uri("/api/concept")
+            .header(HOST, "127.0.0.1:3000")
+            .header(ORIGIN, "http://127.0.0.1:3000")
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(r##"{"path":"note.md","content":"# Edited\n"}"##))
+            .unwrap();
+        let state = server_state(Config::local(seeded_bundle("local-write"), 0));
+        let root = state.app.bundle_root.clone();
+        let res = app(crate::router(state), assets()).oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+        assert_eq!(std::fs::read_to_string(root.join("note.md")).unwrap(), "# Edited\n");
+    }
+
+    #[tokio::test]
+    async fn a_foreign_host_or_origin_is_refused() {
+        // DNS rebinding: the page's own domain arrives as the Host.
+        let rebound = HttpRequest::get("/api/concept?path=note.md")
+            .header(HOST, "evil.example:3000")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(send(rebound).await.0, StatusCode::FORBIDDEN);
+
+        // A cross-site request names its origin.
+        let cross = HttpRequest::get("/api/tree")
+            .header(HOST, "localhost:3000")
+            .header(ORIGIN, "https://evil.example")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(send(cross).await.0, StatusCode::FORBIDDEN);
+
+        let no_host = HttpRequest::get("/").body(Body::empty()).unwrap();
+        assert_eq!(send(no_host).await.0, StatusCode::FORBIDDEN);
+    }
+}

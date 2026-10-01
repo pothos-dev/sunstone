@@ -16,23 +16,29 @@ export type { Backend } from './backend';
  *    `@tauri-apps/api` never enters the web bundle.
  *  - **desktop**: inside the Tauri webview `__TAURI_INTERNALS__` is present on
  *    `window`, so we use the real IPC-backed impl.
+ *  - **served desktop** (`sunstone serve`): the DESKTOP build in a plain
+ *    browser, from a server that stamps `window.__SUNSTONE_SERVE__` into
+ *    `index.html` (`crates/sunstone-server/src/local.rs`). The HTTP backend
+ *    again, now on the same origin as the API with no auth in between.
  *  - **fake**: plain Chromium (vite dev / Playwright) with no Tauri — the
  *    in-memory fixture Bundle.
  *
- * The desktop/fake selection is UNCHANGED from before; only the web branch is
- * new. `__SUNSTONE_WEB__` is a build-time constant (replaced by Vite's `define`)
+ * `__SUNSTONE_WEB__` is a build-time constant (replaced by Vite's `define`)
  * so the unused branch is eliminated — the desktop build keeps the exact old
  * behaviour and the web build drops the Tauri path entirely.
  *
  * See docs/architecture/web-frontend.md "The IPC seam".
  */
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const isServed = typeof window !== 'undefined' && '__SUNSTONE_SERVE__' in window;
 
 export const backend: Backend = __SUNSTONE_WEB__
   ? httpBackend
   : isTauri
     ? tauriBackend
-    : fakeBackend;
+    : isServed
+      ? httpBackend
+      : fakeBackend;
 
 // Expose the selected backend on `window` as a stable test hook (mirrors
 // `window.__sunstoneFake` in fake.ts). Playwright reads this instead of

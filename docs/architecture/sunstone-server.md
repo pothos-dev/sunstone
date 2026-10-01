@@ -11,13 +11,17 @@ timestamp: 2026-07-26T00:00:00Z
 
 `crates/sunstone-server/` is the backend of **Sunstone Web**: a thin **axum** HTTP binary that exposes a single [Bundle](/okf/bundle.md) over the shared [sunstone-native](/architecture/sunstone-native.md) crate — the exact bundle/index/render/git logic the [desktop shell](/architecture/desktop-shell.md) uses. Reads are open; an authenticated, git-backed **write path** is gated behind a verified JWT. All filesystem access is validated by sunstone-native against the canonical Bundle root, so path-escape attempts are rejected at what is now a genuine network boundary. It is also the owner of the **git sync loop**: in the git-synced [deployment shape](#deployment-shapes) this same process fetches, rebases and pushes, so web edits and external `git push`es reconcile continuously ([ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md)).
 
-The server exposes only a JSON/SSE API — it serves **no** static assets. The public origin and all HTML belong to the SvelteKit SSR process ([web frontend](/architecture/web-frontend.md)), which proxies `/api/*` to this binary. See the [overview](/architecture/overview.md) for the full two-process web topology.
+For Sunstone Web the server exposes only a JSON/SSE API — it serves **no** static assets. The public origin and all HTML belong to the SvelteKit SSR process ([web frontend](/architecture/web-frontend.md)), which proxies `/api/*` to this binary. See the [overview](/architecture/overview.md) for the full two-process web topology.
+
+The crate is also a **library** (`sunstone_server`): the desktop binary links it for [`sunstone serve`](#local-mode-sunstone-serve), the one case where this same router *does* serve HTML — the desktop SPA, on loopback, in the trusted `local` shape ([ADR 0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md)).
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `src/main.rs` | Entrypoint, `ServerState`, the axum route table (`router`), the watcher → broadcast wiring. |
+| `src/lib.rs` | `ServerState`, the axum route table (`router`), the shared `start` (index + watcher → broadcast + sync spawn) and the two entry points: `serve_from_env` (Sunstone Web) and `serve_local` (`sunstone serve`). |
+| `src/main.rs` | The `sunstone-server` binary: `serve_from_env().await`, nothing else. |
+| `src/local.rs` | `sunstone serve`: the loopback bind, the app-shell fallback (built files, else `index.html` stamped with `window.__SUNSTONE_SERVE__`), and the `Host`/`Origin` loopback guard that replaces the JWT gate. |
 | `src/routes_read.rs` | The open read handlers — tree, concept, render, search, the `Index` queries, `concept-paths`/`attachment-paths` — plus the `/api/events` SSE stream and the unauthenticated `GET /api/version` (`{version, commit}`: the crate version, and the `SUNSTONE_COMMIT` build arg when the image build passed one). |
 | `src/routes_write.rs` | The JWT-gated write handlers: take the write lock on a blocking thread, pick the `WriteShape`, call `write.rs`, broadcast the `origin`-stamped change and kick the sync loop. |
 | `src/routes_asset.rs` | `GET /api/asset` — an Attachment's raw bytes ([ADR 0011](/adr/0011-attachment-bytes-cross-a-custom-uri-scheme.md)), the one route that does not answer JSON/SSE. |
@@ -67,6 +71,8 @@ The server derives its **shape** from the *presence* of any `SUNSTONE_GIT_*` var
 | **git-local** | `SUNSTONE_GIT_BRANCH` only | `/srv/repo[/<subdir>]` | commit locally | — |
 | **git-synced** | branch + `SUNSTONE_GIT_ORIGIN` + key | `/srv/repo[/<subdir>]` | commit | fetch → rebase → push |
 
+A fourth shape, **local**, never comes from the environment — only `sunstone serve` builds it (`Config::local`). It writes like plain (the file, no git), but its history reads spawn git like the desktop's, and `AuthedUser` admits every request. See [Local mode](#local-mode-sunstone-serve).
+
 **plain** is a real feature, not the absence of one: without the `WriteShape::Plain` gate in `write.rs` a non-repo Bundle would 500 on Save. Its read-side half is the history short-circuit above.
 
 ## The sync loop (git-synced only)
@@ -84,6 +90,10 @@ The container paths it needs (`/srv/repo` for the clone, `/srv/ssh` for the key 
 Configuration is entirely via env, with **no CLI args**. The `SUNSTONE_GIT_*` namespace is **closed** (an unrecognised member is a boot error, which catches typos and stale sidecar env files) and every git value is strict, while the pre-existing variables keep their historical leniency; the normative list, with the strict/lenient column and the volumes, is the one table in [`docker/README.md`](../../docker/README.md#environment--volume-reference) — deliberately not repeated here, because a second list is a second thing to forget to update.
 
 Locally, `cargo run -p sunstone-server` serves `examples/` out of the box (plain shape, no git). In production the `Dockerfile` runs this binary as uid 1000 on internal `:8787` alongside the SSR Node server; see `docker/README.md` and the internal-network / no-auth-on-reads caveat.
+
+## Local mode (`sunstone serve`)
+
+`serve_local` (in `local.rs`) is the desktop binary's browser mode. It canonicalizes the Bundle, binds **127.0.0.1:<port>** first (so a taken port fails before the index is built), runs the same `start` as `serve_from_env` over `Config::local`, and serves `router(state)` with an app-shell **fallback**: a built file from the caller's `AppShellAssets` closure as-is (its own small content-type table — never `mime`'s Attachment table), `index.html` with the serve marker for any extensionless route (the SPA fallback, incl. `/?print=`), and a 404 for a missing file, `..`, or an unrouted `/api/…`. A middleware refuses any request whose `Host` — or, when sent, `Origin` — is not loopback; with the loopback bind and JSON-only write bodies that is the whole substitute for the JWT gate (DNS rebinding, cross-site posts). No git runs on write, no sync loop, no boot sequence, no env. Why this trust model: [ADR 0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md).
 
 ## Relationships
 

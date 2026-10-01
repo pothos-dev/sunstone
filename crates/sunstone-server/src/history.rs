@@ -85,7 +85,9 @@ pub async fn history_handler(
     crate::guard_rel_path(&q.path)?;
     // §11.1: the plain shape answers WITHOUT spawning git — otherwise git's
     // upward repo discovery would serve a *host* repo containing the bundle.
-    if !state.cfg.is_git() {
+    // (`sunstone serve`'s local shape wants exactly that discovery, as the
+    // desktop does.)
+    if !state.cfg.shape.reads_history() {
         return Ok(Json(FileHistory::NotARepo));
     }
     // Every other status is `git.rs`'s own outcome, verbatim — no mapping.
@@ -102,7 +104,7 @@ pub async fn file_at_rev_handler(
     Query(q): Query<FileAtRevQuery>,
 ) -> Result<Json<FileAtRev>, ApiError> {
     crate::guard_rel_path(&q.path)?;
-    if !state.cfg.is_git() {
+    if !state.cfg.shape.reads_history() {
         return Ok(Json(FileAtRev::NotARepo));
     }
     // `rev` is handed to git unparsed (`Command::args`, no shell): an
@@ -233,6 +235,26 @@ mod tests {
             at_rev(&plain, "b.md", "HEAD").await.unwrap(),
             FileAtRev::NotARepo
         );
+    }
+
+    /// `sunstone serve` reads history like the desktop: git's upward discovery
+    /// finds the repo holding the Bundle, even a host repo one level up — the
+    /// very case the plain shape refuses.
+    #[tokio::test]
+    async fn local_shape_reads_history_from_the_repo_holding_the_bundle() {
+        if !git_available() {
+            return;
+        }
+        let repo = temp_repo();
+        let local = state(Shape::Local, repo.join("sub"));
+        let FileHistory::Ok { commits } = history(&local, "b.md").await.unwrap() else {
+            panic!("expected Ok history in the local shape");
+        };
+        assert_eq!(commits[0].subject, "seed");
+        assert!(matches!(
+            at_rev(&local, "b.md", "HEAD").await.unwrap(),
+            FileAtRev::Ok { .. }
+        ));
     }
 
     /// A git shape passes `git.rs`'s outcomes through untouched: `Ok` for a

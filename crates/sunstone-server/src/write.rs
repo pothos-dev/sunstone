@@ -139,7 +139,8 @@ impl WriteShape {
     /// [`GitConfig`]: crate::config::GitConfig
     pub fn for_config(cfg: &Config) -> WriteShape {
         match (cfg.shape, cfg.git()) {
-            (Shape::Plain, _) => WriteShape::Plain,
+            // `sunstone serve` writes like the desktop: the file, never a commit.
+            (Shape::Plain | Shape::Local, _) => WriteShape::Plain,
             (Shape::GitSynced, Some(git_cfg)) => WriteShape::GitSynced {
                 upstream: git_cfg.upstream_ref(),
             },
@@ -802,6 +803,9 @@ mod tests {
     #[test]
     fn write_shape_comes_from_the_declared_config_shape() {
         let mut cfg = Config::plain(std::env::temp_dir());
+        assert_eq!(WriteShape::for_config(&cfg), WriteShape::Plain);
+        // `sunstone serve` never commits, like the desktop.
+        cfg.shape = Shape::Local;
         assert_eq!(WriteShape::for_config(&cfg), WriteShape::Plain);
         cfg.shape = Shape::GitLocal;
         assert_eq!(WriteShape::for_config(&cfg), WriteShape::GitLocal);

@@ -23,6 +23,9 @@ tauri-build = { version = "2", features = [] }
 sunstone-native = { path = "../crates/sunstone-native" }
 # Host-agnostic helpers shared with the web/wasm builds (URL percent-encoding).
 sunstone-shared = { path = "../crates/sunstone-shared" }
+# `sunstone serve`: the same HTTP API Sunstone Web runs, in its local shape,
+# serving this binary's embedded SPA to a browser on loopback.
+sunstone-server = { path = "../crates/sunstone-server" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Native save-file chooser for the print window's "Save as PDF" button.

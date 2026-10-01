@@ -3940,6 +3940,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sunstone-native",
+ "sunstone-server",
  "sunstone-shared",
  "tauri",
  "tauri-build",
@@ -3982,6 +3983,7 @@ dependencies = [
  "sunstone-shared",
  "tokio",
  "tokio-stream",
+ "tower",
 ]
 
 [[package]]

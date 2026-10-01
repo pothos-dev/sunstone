@@ -1,9 +1,14 @@
 [package]
 name = "sunstone-server"
 version = "0.21.0"
-description = "Read-only HTTP server exposing a Sunstone Bundle over sunstone-native (Sunstone Web)"
+description = "HTTP server exposing a Sunstone Bundle over sunstone-native (Sunstone Web, and the desktop's `sunstone serve`)"
 authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
+
+# A library too: the desktop binary links it for `sunstone serve` (`serve_local`).
+[lib]
+name = "sunstone_server"
+path = "src/lib.rs"
 
 [[bin]]
 name = "sunstone-server"
@@ -30,3 +35,7 @@ base64 = "0.22.1"
 # Test-harness knobs compiled out of every shipped binary. `e2e` lets the web e2e
 # suite point a git shape at a temp repo (`SUNSTONE_E2E_REPO_DIR`, see config).
 e2e = []
+
+[dev-dependencies]
+# `ServiceExt::oneshot` — drive the whole local-mode router in tests (axum's own dep).
+tower = { version = "0.5", features = ["util"] }

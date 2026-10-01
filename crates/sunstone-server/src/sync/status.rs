@@ -143,6 +143,7 @@ mod tests {
             (Shape::Plain, "plain"),
             (Shape::GitLocal, "git-local"),
             (Shape::GitSynced, "git-synced"),
+            (Shape::Local, "local"),
         ] {
             let value = serde_json::to_value(SyncState::new().snapshot(shape)).unwrap();
             assert_eq!(value["shape"], serde_json::json!(wire));

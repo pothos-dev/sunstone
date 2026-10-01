@@ -62,6 +62,8 @@ flowchart TD
   CORE --> FS["Bundle on disk"]
 ```
 
+`sunstone serve ./docs` is the same desktop SPA in an ordinary browser tab. The shell starts no window; it hands its embedded SPA to [sunstone-server](/architecture/sunstone-server.md#local-mode-sunstone-serve)'s `serve_local`, which serves the SPA and the API on one loopback origin. The page then selects `http.ts`. Still one user, no auth, no commits ([ADR 0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md)).
+
 ## Web path
 
 Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/api`. Reads are open; on a write — and on the two gated history reads, `/api/history` and `/api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/api/events`).
