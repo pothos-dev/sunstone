@@ -2,6 +2,7 @@ import type { Backend } from './backend';
 import { tauriBackend } from './tauri';
 import { fakeBackend } from './fake';
 import { httpBackend } from './http';
+import { servedDesktop } from './served';
 
 export type { Backend } from './backend';
 
@@ -30,13 +31,12 @@ export type { Backend } from './backend';
  * See docs/architecture/web-frontend.md "The IPC seam".
  */
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-const isServed = typeof window !== 'undefined' && '__SUNSTONE_SERVE__' in window;
 
 export const backend: Backend = __SUNSTONE_WEB__
   ? httpBackend
   : isTauri
     ? tauriBackend
-    : isServed
+    : servedDesktop
       ? httpBackend
       : fakeBackend;
 

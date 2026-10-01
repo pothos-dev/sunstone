@@ -129,11 +129,11 @@ pub fn verify(token: &str, secret: &[u8]) -> Result<Claims, String> {
     Ok(claims)
 }
 
-/// Reject with a bare 401 (no body detail — an unauthenticated write never
-/// reaches the write error classifier).
 /// The author name a `sunstone serve` write is stamped with.
 const LOCAL_USER: &str = "local";
 
+/// Reject with a bare 401 (no body detail — an unauthenticated write never
+/// reaches the write error classifier).
 fn unauthorized() -> (StatusCode, String) {
     (StatusCode::UNAUTHORIZED, "unauthorized".to_string())
 }

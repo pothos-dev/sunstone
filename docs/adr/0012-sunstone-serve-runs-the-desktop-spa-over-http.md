@@ -27,7 +27,7 @@ into a token so that axum knows who is writing. `sunstone serve` has one user, t
 the machine, which is the desktop's trust model, and the desktop has no gate either. In
 place of the token:
 
-- the listener binds **127.0.0.1 only**;
+- the listeners bind **loopback only**: 127.0.0.1, plus `[::1]` when the machine has IPv6;
 - a middleware refuses any request whose `Host` is not `localhost` / `127.0.0.1` / `[::1]`
   (with any port), or whose `Origin`, when sent, names another host. This is what stops
   **DNS rebinding**: a hostile page whose domain re-resolves to 127.0.0.1 counts as
@@ -58,4 +58,5 @@ local dev server, and it is why this mode stays loopback-only and offers no `--h
 - What the browser cannot do degrades through the existing browser fallbacks
   (`ipc/browserShell.ts`). There is no Launcher, because the Bundle is fixed for the
   process. Print goes to a tab and the browser's own Save-as-PDF. View state lives in
-  `localStorage`, per origin, which means per port. Theme colours use the default palette.
+  `localStorage`, keyed by Bundle root, because one port can serve different Bundles over
+  time. Theme colours use the default palette.

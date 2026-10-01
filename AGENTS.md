@@ -24,11 +24,12 @@ Every change must keep these four gates green:
 | `cargo test` | Rust unit tests across the workspace (`#[cfg(test)]` in each module) |
 | `cargo check` | Rust typecheck |
 
-Playwright is the primary behavioural test for components, split across **two**
-suites: a desktop suite (static SPA + fake backend) and a web e2e suite (real
-`sunstone-server` + SSR build).
+Playwright is the primary behavioural test for components, split across **three**
+suites: a desktop suite (static SPA + fake backend), a web e2e suite (real
+`sunstone-server` + SSR build), and a serve suite (`sunstone serve`: the desktop
+SPA over HTTP from the real desktop binary).
 
-**See [`docs/architecture/testing.md`](docs/architecture/testing.md)** for how to run each gate, both
+**See [`docs/architecture/testing.md`](docs/architecture/testing.md)** for how to run each gate, all three
 Playwright suites (including the `/tmp/chromium` sandbox override and CDP mode),
 and the web write test strategy.
 

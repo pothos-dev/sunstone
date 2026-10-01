@@ -12,7 +12,8 @@
 //! The trust model is the desktop's — the one user is the person at the
 //! machine — so the local shape drops the JWT gate. What stands in for it:
 //!
-//! - the listener binds **127.0.0.1 only**, never a routable address;
+//! - the listeners bind **loopback only** — 127.0.0.1, plus `[::1]` where the
+//!   machine has IPv6 — never a routable address;
 //! - [`guard_loopback`] refuses any request whose `Host` (or, when present,
 //!   `Origin`) is not a loopback name. That closes DNS rebinding — a hostile
 //!   page whose domain re-resolves to 127.0.0.1 is same-origin to itself but
@@ -20,6 +21,7 @@
 //! - the write routes take JSON bodies, so a cross-origin `fetch` needs a CORS
 //!   preflight this server never answers.
 
+use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -35,18 +37,22 @@ use axum::{
     Router,
 };
 
+use crate::api_error::check_rel_path;
 use crate::config::Config;
 
 /// Resolves a built app-shell file by its forward-slash path relative to the
 /// build root (`index.html`, `_app/immutable/…`), or `None` when there is no
-/// such file. Only ever called with paths free of `..` segments.
+/// such file. Only ever called with paths that passed
+/// [`check_rel_path`](crate::api_error::check_rel_path): no `..`, no hidden
+/// segment, not absolute.
 pub type AppShellAssets = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
 
 /// What `sunstone serve` was asked to serve.
 pub struct LocalServeOptions {
     /// The Bundle root. Canonicalized here; must be a directory.
     pub bundle_root: PathBuf,
-    /// The loopback port to listen on (`0` picks a free one).
+    /// The loopback port to listen on. `0` picks a free one — a library-level
+    /// convenience (the tests use it); the CLI insists on a real port.
     pub port: u16,
     /// The desktop SPA build.
     pub assets: AppShellAssets,
@@ -65,21 +71,36 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
         return Err(format!("{} is not a folder", root.display()));
     }
 
+    // Bind before building the index, so a taken port fails fast. IPv4 is
+    // required; `[::1]` on the same port is best-effort (a machine without
+    // IPv6 just serves 127.0.0.1), so a client resolving `localhost` to `::1`
+    // still connects.
     let addr = SocketAddr::from(([127, 0, 0, 1], opts.port));
-    // Bind before building the index, so a taken port fails fast.
-    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
+    let v4 = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
         format!("cannot listen on {addr}: {e} (pick another port with --port)")
     })?;
-    let port = listener.local_addr().map(|a| a.port()).unwrap_or(opts.port);
+    let port = v4.local_addr().map(|a| a.port()).unwrap_or(opts.port);
+    let v6 = tokio::net::TcpListener::bind(SocketAddr::from((
+        [0, 0, 0, 0, 0, 0, 0, 1],
+        port,
+    )))
+    .await
+    .ok();
 
     let (state, _watcher) = crate::start(Config::local(root.clone(), port), root.clone());
     let app = app(crate::router(state), opts.assets);
 
     eprintln!("Serving {} at http://localhost:{port}/", root.display());
     eprintln!("Press Ctrl+C to stop.");
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| format!("server error: {e}"))
+    let served = match v6 {
+        Some(v6) => tokio::try_join!(
+            axum::serve(v4, app.clone()).into_future(),
+            axum::serve(v6, app).into_future(),
+        )
+        .map(|_| ()),
+        None => axum::serve(v4, app).await,
+    };
+    served.map_err(|e| format!("server error: {e}"))
 }
 
 /// The API router plus the app-shell fallback, behind the loopback guard.
@@ -98,8 +119,11 @@ fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
     if rel == "api" || rel.starts_with("api/") {
         return StatusCode::NOT_FOUND.into_response();
     }
-    if rel.split('/').any(|seg| seg == "..") || rel.contains('\\') {
-        return StatusCode::NOT_FOUND.into_response();
+    // The network-boundary guard every path-taking route uses (AGENTS.md):
+    // no `..`, no hidden segment. (A raw backslash cannot reach here — `http`
+    // refuses it in a URI, and `%5C` stays literal through to the assets.)
+    if let Err(msg) = check_rel_path(rel) {
+        return (StatusCode::BAD_REQUEST, msg).into_response();
     }
     if !rel.is_empty() && rel != "index.html" {
         if let Some(bytes) = assets(rel) {
@@ -185,6 +209,8 @@ async fn guard_loopback(req: Request, next: Next) -> Response {
     next.run(req).await
 }
 
+/// Whether `Host` names loopback and `Origin` — absent on a same-origin GET —
+/// does too. A missing `Host` fails: HTTP/1.1 requires one.
 fn headers_are_loopback(headers: &HeaderMap) -> bool {
     let host_ok = headers
         .get(HOST)
@@ -234,14 +260,16 @@ mod tests {
         })
     }
 
-    fn test_app() -> Router {
+    /// The local-mode app over a fresh seeded Bundle, plus that Bundle's root.
+    fn test_app() -> (Router, PathBuf) {
         let state = server_state(Config::local(seeded_bundle("local"), 0));
         assert_eq!(state.cfg.shape, crate::config::Shape::Local);
-        app(crate::router(state), assets())
+        let root = state.app.bundle_root.clone();
+        (app(crate::router(state), assets()), root)
     }
 
     async fn send(req: HttpRequest<Body>) -> (StatusCode, HeaderMap, String) {
-        let res = test_app().oneshot(req).await.unwrap();
+        let res = test_app().0.oneshot(req).await.unwrap();
         let status = res.status();
         let headers = res.headers().clone();
         let body = axum::body::to_bytes(res.into_body(), usize::MAX).await.unwrap();
@@ -314,10 +342,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_files_unknown_api_routes_and_dot_dot_are_404() {
-        for path in ["/_app/missing.js", "/api/nope", "/api", "/_app/../index.html"] {
+    async fn missing_files_and_unknown_api_routes_are_404() {
+        for path in ["/_app/missing.js", "/api/nope", "/api"] {
             let (status, _, body) = send(get(path)).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+            assert!(!body.contains(SERVE_MARKER), "{path} must not fall back to the SPA");
+        }
+    }
+
+    /// The same network-boundary guard as every API route: an escape, a hidden
+    /// segment (`.git/`) is a 400 before the assets are asked.
+    #[tokio::test]
+    async fn escaping_and_hidden_paths_are_400() {
+        for path in ["/_app/../index.html", "/.git/config", "/_app/.env"] {
+            let (status, _, body) = send(get(path)).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{path}");
             assert!(!body.contains(SERVE_MARKER), "{path} must not fall back to the SPA");
         }
     }
@@ -339,9 +378,8 @@ mod tests {
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(r##"{"path":"note.md","content":"# Edited\n"}"##))
             .unwrap();
-        let state = server_state(Config::local(seeded_bundle("local-write"), 0));
-        let root = state.app.bundle_root.clone();
-        let res = app(crate::router(state), assets()).oneshot(req).await.unwrap();
+        let (app, root) = test_app();
+        let res = app.oneshot(req).await.unwrap();
         assert_eq!(res.status(), StatusCode::NO_CONTENT);
         assert_eq!(std::fs::read_to_string(root.join("note.md")).unwrap(), "# Edited\n");
     }

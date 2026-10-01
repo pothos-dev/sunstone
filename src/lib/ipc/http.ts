@@ -1,6 +1,7 @@
 import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
+import { servedDesktop } from './served';
 import {
   openPrintTab,
   noSavePdf,
@@ -49,21 +50,36 @@ import type {
 const NO_LAUNCHER = 'the web serves a single fixed Bundle: no folder switching';
 
 /**
- * `localStorage` key for the web build's per-Bundle View state. The web serves
- * a single fixed Bundle, so one key suffices (mirrors `web/uiState.ts`'s
- * `sunstone:webUI` naming convention). NEVER committed into the Bundle — this
- * is per-user View state (docs/GLOSSARY.md).
+ * `localStorage` key for the per-Bundle View state. A web deployment serves a
+ * single fixed Bundle, so one key suffices there (mirrors `web/uiState.ts`'s
+ * `sunstone:webUI` naming convention). A `sunstone serve` origin
+ * (`localhost:<port>`) serves whichever Bundle it was started on, so there the
+ * key carries the Bundle root — the desktop keys this state by root too —
+ * and the layout restored on reload is never another Bundle's. NEVER committed
+ * into the Bundle — this is per-user View state (docs/GLOSSARY.md).
  */
-const BUNDLE_STATE_KEY = 'sunstone:bundleState';
-
-/** Load/save the web Bundle's View state via the shared localStorage plumbing
- * (`./bundleState`) — SSR-safe, corrupt-JSON-safe, best-effort on write. */
-function loadWebBundleState(): BundleState {
-  return loadBundleState(BUNDLE_STATE_KEY);
+export function bundleStateKey(served: boolean, bundleRoot: string): string {
+  return served ? `sunstone:bundleState:${bundleRoot}` : 'sunstone:bundleState';
 }
 
-function saveWebBundleState(state: BundleState): void {
-  saveBundleState(BUNDLE_STATE_KEY, state);
+/** The key, resolved once: the web build needs no round-trip; a served page
+ * asks the server for its root on first use. Cached so a save on `pagehide`
+ * (which the browser does not await) stays synchronous after the load. */
+let stateKey: string | null = servedDesktop ? null : bundleStateKey(false, '');
+async function resolveStateKey(): Promise<string> {
+  stateKey ??= bundleStateKey(true, await getJson<string>('/api/bundle-root'));
+  return stateKey;
+}
+
+/** Load/save the Bundle's View state via the shared localStorage plumbing
+ * (`./bundleState`) — SSR-safe, corrupt-JSON-safe, best-effort on write. */
+async function loadHttpBundleState(): Promise<BundleState> {
+  return loadBundleState(await resolveStateKey());
+}
+
+function saveHttpBundleState(state: BundleState): void {
+  if (stateKey !== null) saveBundleState(stateKey, state);
+  else void resolveStateKey().then((key) => saveBundleState(key, state)).catch(() => {});
 }
 
 /**
@@ -139,7 +155,8 @@ async function getGatedGit<T>(url: string, unavailable: T): Promise<T> {
 /**
  * Map a write route's HTTP status + server detail to a user-facing message
  * (ticket 07 §8 taxonomy: 400 invalid path / 409 conflict / 404 missing / 401
- * unauthenticated / 500 server). Pure so it is unit-testable; `sendJson` throws
+ * unauthenticated / 403 refused — `sunstone serve`'s localhost-only guard — /
+ * 500 server). Pure so it is unit-testable; `sendJson` throws
  * an `Error` carrying this message on any non-2xx write response.
  */
 export function httpWriteError(status: number, detail: string): string {
@@ -149,6 +166,8 @@ export function httpWriteError(status: number, detail: string): string {
       return `Invalid path${extra}`;
     case 401:
       return 'You are not signed in, or your session expired — sign in to edit.';
+    case 403:
+      return `Refused${extra}`;
     case 404:
       return `Not found${extra}`;
     case 409:
@@ -158,20 +177,31 @@ export function httpWriteError(status: number, detail: string): string {
   }
 }
 
+/** A write's message when the request got no response at all. */
+export const UNREACHABLE =
+  'Cannot reach the Sunstone server — check that it is still running, then try again.';
+
 /**
  * Send a JSON write to `url` with `method`, forwarding the per-tab `clientId`.
  * A `204 No Content` resolves to `undefined`; a `200` parses its JSON body
  * (a `RewriteSummary`). A non-2xx throws with a `httpWriteError` message.
  */
 async function sendJson<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'content-type': 'application/json',
-      'x-sunstone-client': CLIENT_ID,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: {
+        'content-type': 'application/json',
+        'x-sunstone-client': CLIENT_ID,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    // No response at all — the likeliest cause with `sunstone serve` is that
+    // the process was stopped; on the web, a dropped connection.
+    throw new Error(UNREACHABLE);
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new Error(httpWriteError(res.status, detail));
@@ -338,9 +368,9 @@ export const httpBackend: Backend = {
   // `saveBundleState` is off the server write surface (ticket 07 §6): it is
   // per-user *View state*, never committed into the shared Bundle. On the web it
   // is a purely client-side concern, so we round-trip it through `localStorage`
-  // (see `loadBundleState` / `saveWebBundleState`), SSR-safe.
+  // (see `loadHttpBundleState` / `saveHttpBundleState`), SSR-safe.
   saveBundleState(state: BundleState): Promise<void> {
-    saveWebBundleState(state);
+    saveHttpBundleState(state);
     return Promise.resolve();
   },
 
@@ -420,7 +450,7 @@ export const httpBackend: Backend = {
     return getJson<string[]>('/api/keys');
   },
   loadBundleState(): Promise<BundleState> {
-    return Promise.resolve(loadWebBundleState());
+    return loadHttpBundleState();
   },
 
   // Bundle-wide full-text search over the proxied `/api/search` (backed by the

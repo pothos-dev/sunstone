@@ -62,7 +62,7 @@ function git(cwd: string, args: string[]): void {
 }
 
 /**
- * Wipe + rebuild {@link WEB_BUNDLE_DIR} as a fresh git repo seeded from the
+ * Wipe + rebuild `dir` as a fresh git repo on `branch`, seeded from the
  * read-only fixture: copy the fixture, `git init`, pin a deterministic identity,
  * disable commit signing (CI/sandbox has no key), and land one seed commit so
  * `HEAD` exists (the amend-else-fresh write path needs a HEAD to inspect).
@@ -75,23 +75,27 @@ function git(cwd: string, args: string[]): void {
  * delivery (breaking every live-reload / concurrency spec while leaving the
  * write+commit path working). Keeping the root inode keeps the watch live.
  *
- * Idempotent across runs. Returns the served bundle path.
+ * Idempotent across runs. Returns `dir`. Shared with the `sunstone serve`
+ * runner (`tests/serve-bundle.ts`), which seeds its own directory.
  */
-export function setupWebBundleRepo(): string {
-  // Clear contents in place (preserve the root inode — see doc comment) rather
-  // than removing WEB_BUNDLE_DIR itself.
-  mkdirSync(WEB_BUNDLE_DIR, { recursive: true });
-  for (const entry of readdirSync(WEB_BUNDLE_DIR)) {
-    rmSync(join(WEB_BUNDLE_DIR, entry), { recursive: true, force: true });
+export function seedFixtureRepo(dir: string, branch: string): string {
+  mkdirSync(dir, { recursive: true });
+  for (const entry of readdirSync(dir)) {
+    rmSync(join(dir, entry), { recursive: true, force: true });
   }
-  cpSync(FIXTURE_SRC, WEB_BUNDLE_DIR, { recursive: true });
+  cpSync(FIXTURE_SRC, dir, { recursive: true });
 
-  git(WEB_BUNDLE_DIR, ['init', '-q', '-b', WEB_BUNDLE_BRANCH]);
-  git(WEB_BUNDLE_DIR, ['config', 'user.name', 'Fixture Seed']);
-  git(WEB_BUNDLE_DIR, ['config', 'user.email', 'seed@example.com']);
-  git(WEB_BUNDLE_DIR, ['config', 'commit.gpgsign', 'false']);
-  git(WEB_BUNDLE_DIR, ['add', '-A']);
-  git(WEB_BUNDLE_DIR, ['commit', '-q', '-m', 'seed web fixture']);
+  git(dir, ['init', '-q', '-b', branch]);
+  git(dir, ['config', 'user.name', 'Fixture Seed']);
+  git(dir, ['config', 'user.email', 'seed@example.com']);
+  git(dir, ['config', 'commit.gpgsign', 'false']);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'seed web fixture']);
 
-  return WEB_BUNDLE_DIR;
+  return dir;
+}
+
+/** Seed {@link WEB_BUNDLE_DIR}, the repo the web e2e server serves. */
+export function setupWebBundleRepo(): string {
+  return seedFixtureRepo(WEB_BUNDLE_DIR, WEB_BUNDLE_BRANCH);
 }

@@ -55,13 +55,13 @@ cargo check                        # typecheck only — includes the wasm crate'
 
 `cargo test -p sunstone-shared` is the behavioural gate for the pure algorithms the browser runs via wasm; `cargo check` compiles `sunstone-wasm` on the native host (proving the toolchain, since its exports are inert off `wasm32`). Git-touching code (`crates/sunstone-native/src/git.rs`) is tested against a **temporary git repo** created in the test — assert on real `git log` / `git show` output, no fixtures on disk.
 
-## Playwright — two suites
+## Playwright — three suites
 
-Playwright is the primary **behavioural** test for components. There are two runners, and they are **disjoint** (each spec belongs to exactly one):
+Playwright is the primary **behavioural** test for components. There are three runners, and they are **disjoint** (each spec belongs to exactly one):
 
 ### 1. Desktop suite — `playwright.config.ts`
 
-The static SPA (`bun run build && bun run preview`) + the in-memory **`fake` backend** on port 1420. This is the default runner and covers the desktop editor and all shared components. It `testIgnore`s the web specs.
+The static SPA (`bun run build && bun run preview`) + the in-memory **`fake` backend** on port 1420. This is the default runner and covers the desktop editor and all shared components. It `testIgnore`s the web and serve specs.
 
 ```bash
 bunx playwright test -c playwright.config.ts             # all desktop specs
@@ -96,9 +96,17 @@ mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start
 bunx playwright test -c playwright.web.config.ts
 ```
 
-The Rust API binds port `8787` by default; if something else already holds it, set `SUNSTONE_TEST_API_PORT=<free port>` (the suite otherwise fails at "webServer was not able to start"). Both suites build into the same `build/` directory, so never run them concurrently.
+The Rust API binds port `8787` by default; if something else already holds it, set `SUNSTONE_TEST_API_PORT=<free port>` (the suite otherwise fails at "webServer was not able to start"). All three suites build into the same `build/` directory, so never run them concurrently.
 
-`reuseExistingServer` also lets you pre-build/pre-start either server by hand (e.g. build to a temp dir where in-repo build dirs are protected) and have Playwright reuse it.
+### 3. Serve suite — `playwright.serve.config.ts`
+
+`sunstone serve` ([ADR 0012](/adr/0012-sunstone-serve-runs-the-desktop-spa-over-http.md)): the **desktop** static build in a plain browser, on the HTTP backend, served by the real desktop binary (`cargo run -p sunstone -- serve`, a dev build, which reads `build/` from disk). The Bundle is a throwaway git repo seeded from the same `tests/fixtures/web-bundle` (`seedFixtureRepo` in `tests/web-bundle.ts`, at `tests/serve-bundle.ts`'s temp path), so the specs can assert a Save lands **no** commit and history is still read from git. It owns every `serve-*.spec.ts`; port `5299`, overridable with `SUNSTONE_TEST_SERVE_PORT`.
+
+```bash
+bunx playwright test -c playwright.serve.config.ts
+```
+
+`reuseExistingServer` also lets you pre-build/pre-start any server by hand (e.g. build to a temp dir where in-repo build dirs are protected) and have Playwright reuse it.
 
 > **Reuse cuts both ways.** A `vite preview` left running from an earlier run is reused
 > **as-is** — it serves the build from *that* run, so source edits since then are invisible and

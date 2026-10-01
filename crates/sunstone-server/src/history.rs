@@ -373,7 +373,7 @@ mod tests {
     #[tokio::test]
     async fn path_escape_is_400_in_every_shape() {
         let root = temp_dir("escape");
-        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced] {
+        for shape in [Shape::Plain, Shape::GitLocal, Shape::GitSynced, Shape::Local] {
             let st = state(shape, root.clone());
             for bad in ["../secret.md", "/etc/passwd", "a/../../x.md"] {
                 assert_eq!(

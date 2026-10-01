@@ -1,5 +1,13 @@
 import { test, expect, afterEach } from 'bun:test';
-import { parseFileChange, parseSyncNotice, httpWriteError, httpBackend, CLIENT_ID } from './http';
+import {
+  parseFileChange,
+  parseSyncNotice,
+  httpWriteError,
+  httpBackend,
+  bundleStateKey,
+  CLIENT_ID,
+  UNREACHABLE,
+} from './http';
 
 // Pure parsing of an SSE `data:` payload into a `FileChange` (the `EventSource`
 // bridge in `onFileChanged` only forwards a non-null result to the callback).
@@ -61,6 +69,9 @@ test('httpWriteError maps each status to a message', () => {
   expect(httpWriteError(401, '')).toContain('signed in');
   expect(httpWriteError(404, 'target folder does not exist')).toBe(
     'Not found: target folder does not exist',
+  );
+  expect(httpWriteError(403, 'sunstone serve only answers localhost')).toBe(
+    'Refused: sunstone serve only answers localhost',
   );
   expect(httpWriteError(409, 'already exists: a.md')).toBe('Conflict: already exists: a.md');
   expect(httpWriteError(500, '')).toBe('Save failed (500)');
@@ -158,6 +169,21 @@ test('rewriteAnchors POSTs target + renames', async () => {
 test('a non-2xx write rejects with the mapped message', async () => {
   stubFetch(new Response('already exists: a.md', { status: 409 }));
   await expect(httpBackend.createConcept('a.md')).rejects.toThrow('Conflict: already exists: a.md');
+});
+
+test('a write that gets no response rejects with the unreachable message', async () => {
+  globalThis.fetch = (() =>
+    Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch;
+  await expect(httpBackend.writeConcept('a.md', 'x')).rejects.toThrow(UNREACHABLE);
+});
+
+// --- View state key ----------------------------------------------------------
+
+test('the web keeps one View state key; a served origin keys it by Bundle root', () => {
+  expect(bundleStateKey(false, '/srv/a')).toBe('sunstone:bundleState');
+  expect(bundleStateKey(false, '/srv/b')).toBe(bundleStateKey(false, '/srv/a'));
+  expect(bundleStateKey(true, '/home/me/a')).toBe('sunstone:bundleState:/home/me/a');
+  expect(bundleStateKey(true, '/home/me/a')).not.toBe(bundleStateKey(true, '/home/me/b'));
 });
 
 // --- index read shaping: types + keys --------------------------------------

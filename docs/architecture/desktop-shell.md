@@ -33,7 +33,7 @@ timestamp: 2026-07-23T00:00:00Z
 | `src/startup.rs` | Startup-bundle resolution, `--detached` re-spawn, window-geometry capture/persistence. |
 | `src/session.rs` | `Session`: the current `AppState` and its `WatcherHandle` behind mutexes. `open()` builds the index, starts a fresh watcher (dropping the old), records the folder in config, and restores window geometry. |
 | `src/cli.rs` | Hand-rolled arg parser (no clap): `CliAction` (`Run`/`Serve`/`Version`/`Help`/`Error`), `RunOptions { bundle, document, detached }`, `ServeOptions { bundle, port }`. |
-| `src/serve.rs` | `sunstone serve`: resolves the Bundle (`SUNSTONE_BUNDLE`, the argument, else the current dir) and hands [sunstone-server](/architecture/sunstone-server.md#local-mode-sunstone-serve)'s `serve_local` the SPA Tauri embedded (`Context::assets`; a dev build embeds nothing and reads `build/` from disk). No window, no Tauri runtime. |
+| `src/serve.rs` | `sunstone serve`: resolves the Bundle (`SUNSTONE_BUNDLE`, the argument, else the current dir) and hands [sunstone-server](/architecture/sunstone-server.md#local-mode-sunstone-serve)'s `serve_local` the SPA Tauri embedded (`Context::assets`; a dev build embeds nothing and reads `build/` from disk). No window and no Tauri app — only `generate_context!` (for the assets) and `tauri::async_runtime` (to block on the server). |
 | `tauri.conf.json` | Product config: single frameless 1200×800 window, frontend served from `../build` (the SvelteKit static SPA). |
 | `capabilities/default.json` | Tauri capability/permission grants. |
 

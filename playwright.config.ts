@@ -25,7 +25,9 @@ export default defineConfig({
   // own runner (`playwright.web.config.ts`, whose `testMatch` selects the same
   // `web-*.spec.ts` pattern), so exclude them here or the default `playwright
   // test` run fails on them. The two suites stay disjoint by this shared pattern.
-  testIgnore: /web-.*\.spec\.ts$/,
+  // `serve-*.spec.ts` likewise belong to `playwright.serve.config.ts` (the
+  // desktop SPA served over HTTP by `sunstone serve`).
+  testIgnore: /(web|serve)-.*\.spec\.ts$/,
   // Serial execution (single worker). The precompiled-serve fix removes the
   // cold-compile contention that previously forced serial-only; serial is kept
   // because it is simple and fast enough for this suite.
