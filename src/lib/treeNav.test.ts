@@ -12,6 +12,8 @@ import {
   indexChild,
   linearMove,
   explorerKeyIntent,
+  setNodeTitle,
+  treeLabel,
   type VisibleRow,
 } from './treeNav';
 
@@ -337,5 +339,58 @@ describe('explorerKeyIntent', () => {
 
   test('unrelated keys are not handled', () => {
     expect(explorerKeyIntent('x', rows, 0)).toBeNull();
+  });
+});
+
+describe('treeLabel', () => {
+  test('a Concept with a title shows the title', () => {
+    expect(treeLabel({ name: 'cm.md', path: 'cm.md', isDir: false, title: 'CodeMirror' })).toBe(
+      'CodeMirror',
+    );
+  });
+
+  test('a Concept without a title shows its filename stem', () => {
+    expect(treeLabel({ name: 'cm.md', path: 'cm.md', isDir: false })).toBe('cm');
+  });
+
+  test('a folder shows its own name', () => {
+    expect(treeLabel({ name: 'concepts', path: 'concepts', isDir: true, children: [] })).toBe(
+      'concepts',
+    );
+  });
+});
+
+describe('setNodeTitle', () => {
+  const make = (): TreeNode => ({
+    name: 'bundle',
+    path: '',
+    isDir: true,
+    children: [
+      {
+        name: 'a',
+        path: 'a',
+        isDir: true,
+        children: [{ name: 'b.md', path: 'a/b.md', isDir: false, title: 'Old' }],
+      },
+    ],
+  });
+  const leaf = (root: TreeNode) => root.children![0].children![0];
+
+  test('sets a nested Concept title in place', () => {
+    const root = make();
+    expect(setNodeTitle(root, 'a/b.md', 'New')).toBe(true);
+    expect(leaf(root).title).toBe('New');
+  });
+
+  test('null clears the title', () => {
+    const root = make();
+    setNodeTitle(root, 'a/b.md', null);
+    expect('title' in leaf(root)).toBe(false);
+  });
+
+  test('an unknown path changes nothing', () => {
+    const root = make();
+    expect(setNodeTitle(root, 'missing.md', 'X')).toBe(false);
+    expect(leaf(root).title).toBe('Old');
   });
 });

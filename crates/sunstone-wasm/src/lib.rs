@@ -147,13 +147,14 @@ pub fn frontmatter_line_count(content: String) -> usize {
     frontmatter::frontmatter_line_count(&content)
 }
 
-/// The `type` scalar + `tags` flat list from a Concept's frontmatter.
+/// The `type` scalar + `tags` flat list + `title` from a Concept's frontmatter.
 #[wasm_bindgen(js_name = parseFrontmatter)]
 pub fn parse_frontmatter(content: String) -> IndexFrontmatter {
     let p = frontmatter::parse_frontmatter(&content);
     IndexFrontmatter {
         concept_type: p.concept_type,
         tags: p.tags,
+        title: p.title,
     }
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TreeNode } from '$lib/types';
-  import { isMarkdownName, stripMd } from '$lib/path';
-  import { indexChild, ordinaryChildren as ordinaryChildrenOf } from '$lib/treeNav';
+  import { isMarkdownName } from '$lib/path';
+  import { indexChild, ordinaryChildren as ordinaryChildrenOf, treeLabel } from '$lib/treeNav';
   import Self from './WebTree.svelte';
 
   interface Props {
@@ -28,7 +28,7 @@
   const expanded = $derived(node.isDir && isExpanded(node.path));
   const indent = $derived(depth * 16);
   const isMarkdown = $derived(!node.isDir && isMarkdownName(node.name));
-  const displayName = $derived(node.isDir ? node.name : stripMd(node.name));
+  const displayName = $derived(treeLabel(node));
   const children = $derived(ordinaryChildrenOf(node));
 
   // This folder's `index.md`, if any. Clicking the folder name opens it (first

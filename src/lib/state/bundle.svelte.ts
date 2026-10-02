@@ -1,5 +1,6 @@
 import { backend } from '$lib/ipc';
 import { errMessage } from '$lib/errors';
+import { setNodeTitle } from '$lib/treeNav';
 import type { TreeNode } from '$lib/types';
 
 /**
@@ -25,6 +26,11 @@ class BundleStore {
     } finally {
       this.loading = false;
     }
+  }
+
+  /** Update one Concept's Explorer title after a save (no Bundle re-walk). */
+  retitle(path: string, title: string | null): void {
+    if (this.tree) setNodeTitle(this.tree, path, title);
   }
 }
 

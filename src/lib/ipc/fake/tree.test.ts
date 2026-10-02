@@ -31,7 +31,12 @@ describe('buildTree', () => {
     const editor = findChild(concepts!, 'editor');
     expect(editor).toMatchObject({ path: 'concepts/editor', isDir: true });
     expect(editor!.children).toEqual([
-      { name: 'live-preview.md', path: 'concepts/editor/live-preview.md', isDir: false },
+      {
+        name: 'live-preview.md',
+        path: 'concepts/editor/live-preview.md',
+        isDir: false,
+        title: 'Live Preview',
+      },
     ]);
   });
 

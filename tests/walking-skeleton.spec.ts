@@ -11,6 +11,8 @@ test('walking skeleton: tree renders and a Concept opens', async ({ page }) => {
   // are surfaced as folder affordances, not ordinary leaves — see the
   // reserved-files slice — so assert on an ordinary Concept here.)
   await expect(tree.locator('[data-path="concepts/codemirror.md"]')).toBeVisible();
+  // A Concept with a frontmatter `title` is labelled by it, not its filename.
+  await expect(tree.locator('[data-path="concepts/codemirror.md"]')).toHaveText('CodeMirror');
 
   // Open a Concept by clicking its tree entry.
   await tree.locator('[data-path="concepts/codemirror.md"]').click();

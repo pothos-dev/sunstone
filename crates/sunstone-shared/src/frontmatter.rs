@@ -68,8 +68,9 @@ pub struct FrontmatterField {
     pub values: Vec<String>,
 }
 
-/// The `type` + `tags` aggregate the fake index surfaces (the former TS
-/// `parseFrontmatter` return). `type` is a non-empty string scalar or `null`.
+/// The `type` + `tags` + `title` aggregate the fake backend surfaces (the former
+/// TS `parseFrontmatter` return). `type` / `title` are non-empty string scalars
+/// or `null`.
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -78,11 +79,12 @@ pub struct IndexFrontmatter {
     #[serde(rename = "type")]
     pub concept_type: Option<String>,
     pub tags: Vec<String>,
+    pub title: Option<String>,
 }
 
 /// The frontmatter aggregates the native Bundle index needs from a Concept's
 /// leading YAML block. NOT a wasm DTO — native-only (the index builds a
-/// `ConceptEntry` from all three fields).
+/// `ConceptEntry` from `type` / `tags` / `keys`; the Explorer tree reads `title`).
 #[derive(Debug, Default, Clone)]
 pub struct ParsedFrontmatter {
     /// `type` scalar, if present and non-empty.
@@ -91,6 +93,9 @@ pub struct ParsedFrontmatter {
     pub tags: Vec<String>,
     /// Distinct top-level frontmatter keys.
     pub keys: Vec<String>,
+    /// `title` scalar, trimmed, if present and non-empty: the Concept's
+    /// human-authored display name (the frontend's `titleFromYaml` rule).
+    pub title: Option<String>,
 }
 
 /// Strip one trailing `\r?\n` then any trailing whitespace from `line` — the
@@ -207,7 +212,7 @@ fn parse_mapping(content: &str) -> Option<serde_yaml::Mapping> {
 }
 
 /// Parse the leading YAML frontmatter block and extract `type` (scalar), `tags`
-/// (flat list), and the distinct top-level keys. Tolerates missing/invalid
+/// (flat list), `title` (trimmed scalar), and the distinct top-level keys. Tolerates missing/invalid
 /// frontmatter: returns an all-empty [`ParsedFrontmatter`] rather than erroring.
 pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
     let Some(map) = parse_mapping(content) else {
@@ -235,10 +240,17 @@ pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
         .filter_map(|k| k.as_str().map(|s| s.to_string()))
         .collect();
 
+    let title = map
+        .get(serde_yaml::Value::from("title"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
     ParsedFrontmatter {
         concept_type,
         tags,
         keys,
+        title,
     }
 }
 
@@ -294,6 +306,17 @@ mod tests {
         let s = split("just a body\n");
         assert!(!s.has_frontmatter);
         assert_eq!(s.body, "just a body\n");
+    }
+
+    #[test]
+    fn title_is_a_trimmed_non_empty_string_scalar() {
+        let title = |c: &str| parse_frontmatter(c).title;
+        assert_eq!(title("---\ntype: x\ntitle: '  Hello  '\n---\n").as_deref(), Some("Hello"));
+        assert_eq!(title("---\ntitle: ''\n---\n"), None);
+        assert_eq!(title("---\ntitle: [a, b]\n---\n"), None);
+        assert_eq!(title("---\ntitle: 42\n---\n"), None);
+        assert_eq!(title("---\ntype: x\n---\n"), None);
+        assert_eq!(title("title: not frontmatter\n"), None);
     }
 
     #[test]

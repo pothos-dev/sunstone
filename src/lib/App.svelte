@@ -32,7 +32,7 @@
   import { retryFrames } from '$lib/retryFrames';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
-  import { splitFrontmatter } from '$lib/wasm/exports';
+  import { parseFrontmatter, splitFrontmatter } from '$lib/wasm/exports';
   import { windowTitle, foldersToExpand } from '$lib/tileTitle';
   import { dirname } from '$lib/path';
 
@@ -112,7 +112,11 @@
     // Slug-anchor rewriting: after each autosave, reconcile heading-slug changes
     // by rewriting inbound anchors. The edit happened in the focused (active)
     // Tile, so route the save hook to it (its view holds the anchor baseline).
-    editor.onSaved = (path) => activeTileRef?.handleSaved(path);
+    // The save may also have changed the frontmatter `title` the Explorer shows.
+    editor.onSaved = (path, content) => {
+      activeTileRef?.handleSaved(path);
+      bundle.retitle(path, parseFrontmatter(content).title);
+    };
 
     const stopTheme = theme.start();
     void loadThemeColors(backend);

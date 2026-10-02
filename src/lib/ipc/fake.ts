@@ -281,7 +281,9 @@ export const fakeBackend: Backend = {
 
   async listTree(): Promise<TreeNode> {
     // Rebuild each call so created/removed files (via writeConcept or a
-    // simulated external change) are reflected, like the real walker.
+    // simulated external change) are reflected, like the real walker. The
+    // titles parse through wasm, so it must be ready.
+    await ensureIndexReady();
     return buildTree();
   },
 

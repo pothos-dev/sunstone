@@ -454,7 +454,7 @@ export class Workspace {
   }
 
   /** Set the post-save hook on every Document in the pool. */
-  setOnSaved(cb: ((path: string) => void) | null): void {
+  setOnSaved(cb: ((path: string, content: string) => void) | null): void {
     this.#registry.setOnSaved(cb);
   }
 

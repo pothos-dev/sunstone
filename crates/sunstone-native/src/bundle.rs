@@ -9,6 +9,7 @@ use std::path::{Component, Path, PathBuf};
 use serde::Serialize;
 
 use crate::paths::bundle_walker;
+use sunstone_shared::frontmatter::parse_frontmatter;
 use sunstone_shared::paths::to_rel_string;
 
 /// A node in the Bundle's directory tree. Matches the TS `TreeNode`.
@@ -19,6 +20,11 @@ pub struct TreeNode {
     /// bundle-relative, '/'-separated, '' for root
     pub path: String,
     pub is_dir: bool,
+    /// A Concept's frontmatter `title` (trimmed, non-empty), shown in the
+    /// Explorer instead of the filename. Omitted for dirs, non-`.md` files and
+    /// Concepts without one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// dirs only; `None` for files so the JSON omits an empty array
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<TreeNode>>,
@@ -33,6 +39,7 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
         name: String,
         path: String,
         is_dir: bool,
+        title: Option<String>,
         children: Vec<String>, // child relative paths, dirs+files
     }
 
@@ -46,6 +53,7 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 .unwrap_or_else(|| "bundle".to_string()),
             path: String::new(),
             is_dir: true,
+            title: None,
             children: Vec::new(),
         },
     );
@@ -68,6 +76,14 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
             .map(|t| t.is_dir())
             .unwrap_or(false);
         let name = entry.file_name().to_string_lossy().into_owned();
+        // An unreadable Concept just keeps its filename label.
+        let title = if !is_dir && name.ends_with(".md") {
+            std::fs::read_to_string(entry.path())
+                .ok()
+                .and_then(|content| parse_frontmatter(&content).title)
+        } else {
+            None
+        };
 
         let parent = rel
             .parent()
@@ -84,6 +100,7 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 name,
                 path: rel_path,
                 is_dir,
+                title,
                 children: Vec::new(),
             },
         );
@@ -107,6 +124,7 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 name: node.name.clone(),
                 path: node.path.clone(),
                 is_dir: true,
+                title: None,
                 children: Some(children),
             }
         } else {
@@ -114,6 +132,7 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 name: node.name.clone(),
                 path: node.path.clone(),
                 is_dir: false,
+                title: node.title.clone(),
                 children: None,
             }
         }
@@ -552,5 +571,22 @@ mod tests {
         assert_eq!(inner.len(), 1);
         assert_eq!(inner[0].path, "zeta/inner.md");
         assert!(!inner[0].is_dir);
+    }
+
+    #[test]
+    fn list_tree_carries_a_concepts_frontmatter_title() {
+        let root = temp_root();
+        std::fs::write(root.join("titled.md"), "---\ntype: x\ntitle: A Title\n---\nbody\n").unwrap();
+        std::fs::write(root.join("plain.md"), "---\ntype: x\n---\nbody\n").unwrap();
+        std::fs::write(root.join("notes.txt"), "---\ntitle: Not a Concept\n---\n").unwrap();
+
+        let tree = list_tree(&root).unwrap();
+        let children = tree.children.unwrap();
+        let title = |name: &str| {
+            children.iter().find(|c| c.name == name).unwrap().title.clone()
+        };
+        assert_eq!(title("titled.md").as_deref(), Some("A Title"));
+        assert_eq!(title("plain.md"), None);
+        assert_eq!(title("notes.txt"), None);
     }
 }

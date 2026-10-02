@@ -62,7 +62,7 @@ export class Document {
    * anchors. Kept as a plain callback (not a rune) — it drives an imperative
    * side effect over the CodeMirror view, which the Document does not hold.
    */
-  onSaved: ((path: string) => void) | null = null;
+  onSaved: ((path: string, content: string) => void) | null = null;
 
   /** Debounced autosave: writes the current content this long after edits stop. */
   #autosave = createDebouncer(() => void this.#save(), AUTOSAVE_DEBOUNCE_MS);
@@ -147,7 +147,7 @@ export class Document {
       if (this.content === content) this.dirty = false;
       // The content is now on disk: let App reconcile slug-anchor changes (a
       // heading rename rewrites inbound anchors). Best-effort — never fail a save.
-      this.onSaved?.(path);
+      this.onSaved?.(path, content);
     } catch (e) {
       this.error = errMessage(e);
     }
@@ -194,7 +194,7 @@ export class Document {
 export class DocumentRegistry {
   #docs = new Map<string, Document>();
   /** Propagated to every Document so autosaves reach App's slug-anchor rewrite. */
-  #onSaved: ((path: string) => void) | null = null;
+  #onSaved: ((path: string, content: string) => void) | null = null;
 
   /** Get (or lazily create) the Document for `path`. */
   get(path: string): Document {
@@ -208,7 +208,7 @@ export class DocumentRegistry {
   }
 
   /** Set the post-save hook on all present and future Documents. */
-  setOnSaved(cb: ((path: string) => void) | null): void {
+  setOnSaved(cb: ((path: string, content: string) => void) | null): void {
     this.#onSaved = cb;
     for (const doc of this.#docs.values()) doc.onSaved = cb;
   }

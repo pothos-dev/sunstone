@@ -6,13 +6,15 @@
 // mirroring the real backend's directory semantics.
 
 import type { TreeNode } from '$lib/types';
-import { basename, dirname, remapPath } from '$lib/path';
+import { basename, dirname, isMarkdownName, remapPath } from '$lib/path';
+import { parseFrontmatter } from '$lib/wasm/exports';
 import { FILES, FOLDERS, fileExists, folderExists, pathExists } from './store';
 
 /**
  * Build the recursive TreeNode for the fixture from the flat FILES map.
  * Directories are inferred from path segments; every FILES key is listed (the
- * seeded fixture is markdown-only; the frontend filters non-`.md` leaves).
+ * seeded fixture is markdown-only; the frontend filters non-`.md` leaves). A
+ * Concept's frontmatter `title` rides along, as from the real walker.
  */
 export function buildTree(): TreeNode {
   const root: TreeNode = { name: 'bundle', path: '', isDir: true, children: [] };
@@ -37,7 +39,10 @@ export function buildTree(): TreeNode {
   for (const folder of FOLDERS) ensureDir(folder);
 
   for (const path of Object.keys(FILES)) {
-    ensureDir(dirname(path)).children!.push({ name: basename(path), path, isDir: false });
+    const node: TreeNode = { name: basename(path), path, isDir: false };
+    const title = isMarkdownName(path) ? parseFrontmatter(FILES[path]).title : null;
+    if (title) node.title = title;
+    ensureDir(dirname(path)).children!.push(node);
   }
 
   // Sort each directory: dirs first, then files, alphabetically.

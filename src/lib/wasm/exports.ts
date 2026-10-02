@@ -97,9 +97,9 @@ export function frontmatterLineCount(content: string): number {
   return mod ? mod.frontmatterLineCount(content) : 0;
 }
 
-/** The `type` scalar + `tags` flat list from a Concept's frontmatter. */
+/** The `type` scalar + `tags` flat list + `title` from a Concept's frontmatter. */
 export function parseFrontmatter(content: string): IndexFrontmatter {
-  return mod ? mod.parseFrontmatter(content) : { type: null, tags: [] };
+  return mod ? mod.parseFrontmatter(content) : { type: null, tags: [], title: null };
 }
 
 /** The distinct top-level frontmatter keys of a Concept. */

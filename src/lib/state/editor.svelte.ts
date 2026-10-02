@@ -78,7 +78,7 @@ class EditorStore {
    * landed (App wires this to slug-anchor rewriting). Propagated to every
    * Document in the workspace.
    */
-  set onSaved(cb: ((path: string) => void) | null) {
+  set onSaved(cb: ((path: string, content: string) => void) | null) {
     this.#workspace.setOnSaved(cb);
   }
 

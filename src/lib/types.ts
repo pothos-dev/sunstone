@@ -13,6 +13,8 @@ export type TreeNode = {
   name: string;
   path: string; // bundle-relative, '/'-separated, '' for root
   isDir: boolean;
+  /** a Concept's frontmatter `title` (trimmed, non-empty); absent otherwise */
+  title?: string;
   children?: TreeNode[]; // dirs only
 };
 

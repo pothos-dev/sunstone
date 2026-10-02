@@ -99,6 +99,7 @@ impl Index {
             concept_type,
             tags,
             keys,
+            ..
         } = parse_frontmatter(content);
         let links = extract_links(rel, content);
         // Wikilink inner texts are captured raw here and resolved later in

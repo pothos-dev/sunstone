@@ -107,6 +107,20 @@ test('frontmatter: a Concept with no block shows an empty editor; it materialise
   expect(await persisted(page, 'concepts/no-frontmatter.md')).toContain('# No Frontmatter');
 });
 
+test('frontmatter: a saved title edit relabels the Explorer row', async ({ page }) => {
+  const yaml = await openForEditing(page, 'concepts/no-frontmatter.md');
+  const row = page.getByTestId('tree').locator('[data-path="concepts/no-frontmatter.md"]');
+  await expect(row).toHaveText('no-frontmatter');
+
+  await yaml.click();
+  await page.keyboard.type('type: concept\ntitle: Freshly Titled');
+
+  await expect
+    .poll(() => persisted(page, 'concepts/no-frontmatter.md'))
+    .toContain('title: Freshly Titled');
+  await expect(row).toHaveText('Freshly Titled');
+});
+
 test('frontmatter: read mode shows the same YAML verbatim, not editable', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();

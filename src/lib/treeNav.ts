@@ -12,7 +12,7 @@
 // its own pure module with unit tests.
 
 import type { TreeNode } from '$lib/types';
-import { isMarkdownName } from '$lib/path';
+import { isMarkdownName, stripMd } from '$lib/path';
 import { isReservedFile, reservedKind, type ReservedKind } from '$lib/reserved';
 
 /** One row in the flattened visible-rows list. */
@@ -247,4 +247,31 @@ export function folderIndexPath(root: TreeNode | null, folder: string): string |
     }
   }
   return node ? indexChild(node) : null;
+}
+
+/**
+ * The Explorer label for `node`: a Concept's frontmatter `title` when it has
+ * one, else its filename without the `.md` extension; a folder's own name.
+ */
+export function treeLabel(node: TreeNode): string {
+  if (node.isDir) return node.name;
+  return node.title ?? stripMd(node.name);
+}
+
+/**
+ * Set (or clear, with `null`) the `title` of the file node at `path` in place,
+ * so a saved title edit shows in the Explorer without re-walking the Bundle.
+ * Returns whether a node was found.
+ */
+export function setNodeTitle(root: TreeNode, path: string, title: string | null): boolean {
+  const walk = (node: TreeNode): boolean => {
+    if (!node.isDir) {
+      if (node.path !== path) return false;
+      if (title === null) delete node.title;
+      else node.title = title;
+      return true;
+    }
+    return (node.children ?? []).some(walk);
+  };
+  return walk(root);
 }
