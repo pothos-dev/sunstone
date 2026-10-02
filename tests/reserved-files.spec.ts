@@ -38,16 +38,25 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   await expect(tree.locator('[data-path="log.md"]')).toHaveCount(0);
   await expect(tree.locator('[data-path="concepts/index.md"]')).toHaveCount(0);
 
-  // --- Bundle-root affordances open the reserved files directly ---
+  // --- The Bundle root: the Explorer header (named by the root index title)
+  // opens index.md; log.md keeps its header icon ---
   const rootReserved = page.getByTestId('root-reserved');
-  await expect(rootReserved.locator('[data-reserved-path="index.md"]')).toBeVisible();
+  await expect(rootReserved.locator('[data-reserved-path="index.md"]')).toHaveCount(0);
   await expect(rootReserved.locator('[data-reserved-path="log.md"]')).toBeVisible();
 
-  await rootReserved.locator('[data-reserved-path="index.md"]').click();
+  const explorerTitle = page.getByTestId('explorer-section-title');
+  await expect(explorerTitle).toHaveText('Knowledge Base');
+  await explorerTitle.click();
   // It opens body-only — reserved files hide the Frontmatter Region entirely
   // (slice: hide-frontmatter-for-reserved-files). The body still renders.
   await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   await expect(page.getByTestId('editor')).toContainText('Knowledge Base');
+  // A second header click, with the root index already open, collapses the
+  // Explorer; a third (index still open) expands it again.
+  await explorerTitle.click();
+  await expect(tree).toHaveCount(0);
+  await explorerTitle.click();
+  await expect(tree).toBeVisible();
 
   // --- Subfolder index: concepts/ has index.md, reached by CLICKING THE FOLDER
   // NAME (there is no separate index icon on folder rows). The index page opens

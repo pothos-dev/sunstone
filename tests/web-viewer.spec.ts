@@ -35,9 +35,9 @@ test('web viewer renders a Concept read-only with resolved + broken links', asyn
   await expect(page.getByTestId('web-tree')).toBeVisible();
   expect(await page.getByTestId('tree-concept').count()).toBeGreaterThan(0);
 
-  // Open the root index Concept via its header affordance (index.md is a
-  // reserved file, not an ordinary tree row — mirrors desktop).
-  await page.locator('[data-reserved-path="index.md"]').click();
+  // Open the root index Concept by clicking the Explorer header title (index.md
+  // is a reserved file, not an ordinary tree row — mirrors desktop).
+  await page.getByTestId('explorer-section-title').click();
   await expect(page).toHaveURL(/\/$/);
 
   // RENDERED output (not raw markdown): real heading + paragraph elements.

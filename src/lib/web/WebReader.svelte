@@ -5,8 +5,9 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { backend } from '$lib/ipc';
   import { applyTheme, theme } from '$lib/state/theme.svelte';
-  import { ordinaryChildren, reservedChildren } from '$lib/treeNav';
-  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
+  import { explorerTitle, folderNameClick, ordinaryChildren, reservedChildren } from '$lib/treeNav';
+  import { RESERVED_FILES } from '$lib/reserved';
+  import ReservedGlyph from '$lib/components/ReservedGlyph.svelte';
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import SidebarEdge from '$lib/components/SidebarEdge.svelte';
@@ -121,7 +122,17 @@
   }
 
   const rootOrdinary = $derived(data.tree ? ordinaryChildren(data.tree) : []);
-  const rootReserved = $derived(data.tree ? reservedChildren(data.tree) : []);
+  // The root index.md opens from the Explorer header title, so only the other
+  // reserved files keep a header icon (mirrors the desktop App).
+  const rootReserved = $derived(
+    data.tree ? reservedChildren(data.tree).filter((r) => r.kind !== 'index') : [],
+  );
+
+  function onExplorerTitleClick() {
+    const action = data.tree ? folderNameClick(data.tree, data.selected) : 'toggle';
+    if (action === 'toggle') ui.explorerOpen = !ui.explorerOpen;
+    else open(action.open);
+  }
 
   // --- Persisted UI state: Sidebar Accordion, whole-Sidebar collapse,
   // Properties collapse and the Sidebar content widths (px, drag-resized via the
@@ -300,10 +311,11 @@
   >
     <div class="side-bar-inner">
       <SidebarSection
-        title="Explorer"
+        title={explorerTitle(data.tree)}
         testid="explorer-section"
         expanded={ui.explorerOpen}
         ontoggle={() => (ui.explorerOpen = !ui.explorerOpen)}
+        ontitleclick={onExplorerTitleClick}
       >
         {#snippet actions()}
           {#if rootReserved.length > 0}
@@ -318,7 +330,7 @@
                   data-reserved-path={r.path}
                   data-reserved-kind={r.kind}
                   onclick={() => open(r.path)}
-                >{RESERVED_GLYPH[r.kind]}</button>
+                ><ReservedGlyph kind={r.kind} /></button>
               {/each}
             </div>
           {/if}
@@ -886,7 +898,12 @@
   }
 
   .reserved-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
     border: none;
     background: none;
     color: inherit;

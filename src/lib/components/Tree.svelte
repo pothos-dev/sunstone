@@ -7,7 +7,7 @@
   import { treeDnd } from '$lib/state/treeDnd.svelte';
   import { dropZoneHandlers } from '$lib/treeDnd';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { indexChild, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
+  import { folderNameClick, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
   import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
 
@@ -51,11 +51,9 @@
   // way.
   function onNameClick() {
     focusRow();
-    if (indexPath !== null && selected !== indexPath) {
-      onopen(indexPath);
-    } else {
-      toggle();
-    }
+    const action = folderNameClick(node, selected);
+    if (action === 'toggle') toggle();
+    else onopen(action.open);
   }
 
   function openMenu(e: MouseEvent) {
@@ -158,11 +156,6 @@
   // listing here (slice: reserved-files).
   const ordinaryChildren = $derived(ordinaryChildrenOf(node));
 
-  // This folder's index page (`index.md`), if it has one. There is no longer an
-  // index icon: clicking the folder name opens it (see `onNameClick`), so the
-  // path is all we need here.
-  const indexPath = $derived(node.isDir ? indexChild(node) : null);
-
   // The reserved files surfaced as folder-row icons, in a stable order, each as
   // { kind, path } so the affordance can open it. `index` is deliberately
   // excluded — it is reached by clicking the folder name instead — leaving just
@@ -198,7 +191,7 @@
          name) and always toggles expansion; the name button (below) opens the
          index page when there is one, and is hidden from assistive tech to avoid
          a duplicate announcement. Any reserved-file icons (just `log` now) sit
-         between the caret and the label. -->
+         at the row's right edge, after the label. -->
     <button
       class="caret-col twisty-toggle"
       type="button"
@@ -209,9 +202,6 @@
     >
       <span class="twisty" class:open={expanded}>▸</span>
     </button>
-    {#each reservedAffordances as r (r.path)}
-      <ReservedFileButton entry={r} selected={selected === r.path} placement="row" {onopen} />
-    {/each}
     <button
       class="entry dir-toggle name-toggle"
       type="button"
@@ -221,6 +211,9 @@
     >
       <span class="name">{displayName}</span>
     </button>
+    {#each reservedAffordances as r (r.path)}
+      <ReservedFileButton entry={r} selected={selected === r.path} placement="row" {onopen} />
+    {/each}
   </div>
   {#if expanded}
     <ul class="children">

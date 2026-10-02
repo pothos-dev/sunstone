@@ -13,6 +13,8 @@ import {
   linearMove,
   explorerKeyIntent,
   setNodeTitle,
+  explorerTitle,
+  folderNameClick,
   treeLabel,
   type VisibleRow,
 } from './treeNav';
@@ -410,5 +412,29 @@ describe('setNodeTitle', () => {
     const root = make();
     expect(setNodeTitle(root, 'missing.md', 'X')).toBe(false);
     expect(leaf(root).title).toBe('Old');
+  });
+});
+
+describe('explorerTitle / folderNameClick', () => {
+  const root: TreeNode = {
+    name: 'bundle',
+    path: '',
+    isDir: true,
+    children: [{ name: 'index.md', path: 'index.md', isDir: false, title: 'Knowledge Base' }],
+  };
+  const bare: TreeNode = { name: 'bundle', path: '', isDir: true, children: [] };
+
+  test('the root index title names the Explorer, unless titles are off', () => {
+    expect(explorerTitle(root)).toBe('Knowledge Base');
+    expect(explorerTitle(root, false)).toBe('Explorer');
+    expect(explorerTitle(bare)).toBe('Explorer');
+    expect(explorerTitle(null)).toBe('Explorer');
+  });
+
+  test('opens the index first, then toggles once it is open', () => {
+    expect(folderNameClick(root, null)).toEqual({ open: 'index.md' });
+    expect(folderNameClick(root, 'other.md')).toEqual({ open: 'index.md' });
+    expect(folderNameClick(root, 'index.md')).toBe('toggle');
+    expect(folderNameClick(bare, null)).toBe('toggle');
   });
 });

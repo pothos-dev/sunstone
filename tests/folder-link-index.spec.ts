@@ -69,5 +69,5 @@ test('a link to the Bundle root opens the root index.md', async ({ page }) => {
   await expect(editor).toContainText('Back to the start page');
   await clickLink(page, 'the start page');
   await expect(editor).toContainText('reserved');
-  await expect(page.locator('[data-reserved-path="index.md"]')).toHaveClass(/selected/);
+  await expect(page.getByTestId('tile-title')).toHaveAttribute('title', 'index.md');
 });

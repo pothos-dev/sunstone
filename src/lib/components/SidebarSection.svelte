@@ -21,6 +21,8 @@
     expanded: boolean;
     /** Toggle handler (the parent flips its own state). */
     ontoggle: () => void;
+    /** Click on the header title; defaults to `ontoggle`. The chevron always toggles. */
+    ontitleclick?: () => void;
     /** Optional test id; the header/body get `${testid}-header`/`-body`. */
     testid?: string;
     /** Optional header actions, rendered beside the title (always visible, even
@@ -39,14 +41,22 @@
     children: Snippet;
   }
 
-  let { title, expanded, ontoggle, testid, actions, region: regionParams, children }: Props =
-    $props();
+  let {
+    title,
+    expanded,
+    ontoggle,
+    ontitleclick,
+    testid,
+    actions,
+    region: regionParams,
+    children,
+  }: Props = $props();
 </script>
 
 <section class="section" data-testid={testid} aria-label={title}>
-  <!-- Chevron and title are split into two toggle controls so optional header
-       `actions` (e.g. the Explorer's root index/log icons) can sit between them,
-       directly in front of the label. The chevron button is the accessible
+  <!-- Chevron and title are two controls: the chevron always toggles, the title
+       runs `ontitleclick` (default: toggle). Optional header `actions` (e.g. the
+       Explorer's root log icon) sit at the right edge, after the title. The chevron button is the accessible
        control (testid + aria state); the title button is a redundant click
        target hidden from assistive tech to avoid a duplicate announcement. -->
   <div class="header">
@@ -60,18 +70,19 @@
     >
       <span class="chevron" class:open={expanded} aria-hidden="true">▸</span>
     </button>
-    {#if actions}
-      <div class="header-actions">{@render actions()}</div>
-    {/if}
     <button
       type="button"
       class="header-toggle title-toggle"
       tabindex="-1"
       aria-hidden="true"
-      onclick={ontoggle}
+      data-testid={testid ? `${testid}-title` : undefined}
+      onclick={ontitleclick ?? ontoggle}
     >
       <span class="title">{title}</span>
     </button>
+    {#if actions}
+      <div class="header-actions">{@render actions()}</div>
+    {/if}
   </div>
   {#if regionParams}
     <!-- Region body: ALWAYS mounted (even collapsed) so the focus backbone can
@@ -158,6 +169,7 @@
     align-items: center;
     flex: none;
     gap: 0.15rem;
+    padding-right: 0.4rem;
   }
 
   .chevron {

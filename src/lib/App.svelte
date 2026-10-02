@@ -24,7 +24,7 @@
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { reservedChildren } from '$lib/treeNav';
+  import { explorerTitle, folderNameClick, reservedChildren } from '$lib/treeNav';
   import { outlineNav, backlinksNav } from '$lib/state/listFocusNav.svelte';
   import { listRegionNav } from '$lib/state/listRegionNav.svelte';
   import { routeAppHotkey } from '$lib/appHotkeys';
@@ -528,7 +528,19 @@
 
   // --- Tree CRUD: context menu + dialogs --------------------------------------
   let treeCrud = $state<ReturnType<typeof TreeCrud> | null>(null);
-  const rootReservedSorted = $derived(bundle.tree ? reservedChildren(bundle.tree) : []);
+  // The root index.md is reached by clicking the Explorer header title (like a
+  // folder name), so only the other reserved files keep a header icon.
+  const rootReservedSorted = $derived(
+    bundle.tree ? reservedChildren(bundle.tree).filter((r) => r.kind !== 'index') : [],
+  );
+
+  // Explorer header title click: open the root index.md, or collapse/expand the
+  // Explorer once it is already open (the folder-name rule).
+  function onExplorerTitleClick() {
+    const action = bundle.tree ? folderNameClick(bundle.tree, editor.path) : 'toggle';
+    if (action === 'toggle') session.setExplorerOpen(!session.explorerOpen);
+    else openConcept(action.open);
+  }
 
   $effect(() => {
     const notice = treeActions.notice;
@@ -564,9 +576,10 @@
     onResize={(w) => session.setLeftSidebarWidth(w)}
   >
     <SidebarSection
-      title="Explorer"
+      title={explorerTitle(bundle.tree, session.titlesShown)}
       expanded={session.explorerVisible}
       ontoggle={() => session.setExplorerOpen(!session.explorerOpen)}
+      ontitleclick={onExplorerTitleClick}
       testid="explorer-section"
       region={{
         id: 'explorer',

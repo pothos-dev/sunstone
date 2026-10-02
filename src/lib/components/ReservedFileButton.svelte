@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * One Reserved-file icon button (slice: reserved-files): the `☰`/`🕑` glyph
+   * One Reserved-file icon button (slice: reserved-files): the outline icon
    * that opens a Bundle's `index.md` / `log.md` directly. Two placements share
    * the markup (accessible name, `data-reserved-*` stamps) and differ only in
    * chrome:
@@ -9,7 +9,8 @@
    *   - `row`    — inside a folder row of the tree: out of the tab order (the
    *     row owns keyboard nav) and the click never reaches the row.
    */
-  import { RESERVED_FILES, RESERVED_GLYPH } from '$lib/reserved';
+  import { RESERVED_FILES } from '$lib/reserved';
+  import ReservedGlyph from '$lib/components/ReservedGlyph.svelte';
   import type { ReservedEntry } from '$lib/treeNav';
 
   interface Props {
@@ -38,7 +39,7 @@
     if (placement === 'row') e.stopPropagation();
     onopen(entry.path);
   }}
->{RESERVED_GLYPH[entry.kind]}</button>
+><ReservedGlyph kind={entry.kind} /></button>
 
 <style>
   /* header: the Bundle-root icons in the Explorer Section header. */
@@ -79,8 +80,13 @@
 
   /* row: the per-folder icons inside a tree row. */
   .reserved-btn.in-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
     width: 1.4rem;
+    align-self: stretch;
+    padding: 0;
     border: none;
     background: none;
     color: inherit;

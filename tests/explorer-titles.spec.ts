@@ -42,3 +42,12 @@ test('explorer titles: titled Concepts and folders, toggled from the rail', asyn
     'concepts',
   );
 });
+
+test('explorer titles: the Explorer header is named by the root index title', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('tree')).toBeVisible();
+  const title = page.getByTestId('explorer-section-title');
+  await expect(title).toHaveText('Knowledge Base');
+  await page.getByTestId('rail-titles').click();
+  await expect(title).toHaveText('Explorer');
+});

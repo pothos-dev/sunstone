@@ -289,3 +289,24 @@ export function setNodeTitle(root: TreeNode, path: string, title: string | null)
   };
   return walk(root);
 }
+
+/**
+ * The Explorer Section header label: the Bundle root `index.md`'s title (with
+ * `useTitles`), else `Explorer`.
+ */
+export function explorerTitle(root: TreeNode | null, useTitles = true): string {
+  return (useTitles && root && folderTitle(root)) || 'Explorer';
+}
+
+/**
+ * What a click on a folder's name does — the folder row in the Explorer, and the
+ * Explorer header for the Bundle root: open the folder's `index.md` unless it
+ * is already the open Concept (`selected`), otherwise toggle the folder.
+ */
+export function folderNameClick(
+  node: TreeNode,
+  selected: string | null,
+): { open: string } | 'toggle' {
+  const index = indexChild(node);
+  return index !== null && index !== selected ? { open: index } : 'toggle';
+}
