@@ -96,6 +96,12 @@ class SessionStore {
    */
   frontmatterShown = $state<boolean>(false);
   /**
+   * Label Concepts and folders by their frontmatter `title` (a folder by its
+   * `index.md`'s) in the Explorer and Tile headers, instead of the filename.
+   * Toggled from the left activity rail; defaults on.
+   */
+  titlesShown = $state<boolean>(true);
+  /**
    * Editor view mode (persist-editor-mode) — the boolean `editing`/`read` shared
    * by every tile. Seeds `buildEditor`'s `initialMode` on launch and is written
    * through `setEditorMode` when the user toggles the per-tile Edit button, so the
@@ -173,6 +179,7 @@ class SessionStore {
       this.backlinksOpen = s.backlinksOpen;
       this.outlineOpen = s.outlineOpen;
       this.frontmatterShown = s.frontmatterShown;
+      this.titlesShown = s.titlesShown;
       this.editorMode = s.editorMode;
       // The full tiling layout (null on a fresh/old Bundle — App migrates from
       // `lastOpenConcept` then).
@@ -277,7 +284,7 @@ class SessionStore {
   }
 
   /** Assign `this[key] = value` and schedule a persist, unless unchanged. */
-  #setIfChanged<K extends 'explorerOpen' | 'tagsOpen' | 'backlinksOpen' | 'outlineOpen' | 'frontmatterShown' | 'editorMode'>(
+  #setIfChanged<K extends 'explorerOpen' | 'tagsOpen' | 'backlinksOpen' | 'outlineOpen' | 'frontmatterShown' | 'titlesShown' | 'editorMode'>(
     key: K,
     value: this[K],
   ): void {
@@ -334,6 +341,11 @@ class SessionStore {
   /** Record the global Frontmatter show/hide flag and schedule a persist. */
   setFrontmatterShown(shown: boolean): void {
     this.#setIfChanged('frontmatterShown', shown);
+  }
+
+  /** Record the label-by-title flag and schedule a persist. */
+  setTitlesShown(shown: boolean): void {
+    this.#setIfChanged('titlesShown', shown);
   }
 
   /** Record the editor view mode and schedule a persist. */
@@ -446,6 +458,7 @@ class SessionStore {
       leftSidebarWidth: this.leftSidebarWidth,
       rightSidebarWidth: this.rightSidebarWidth,
       frontmatterShown: this.frontmatterShown,
+      titlesShown: this.titlesShown,
       editorMode: this.editorMode,
       layout: this.layout,
       window: this.#window,

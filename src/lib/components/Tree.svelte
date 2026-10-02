@@ -147,9 +147,10 @@
   });
 
   // The tree shows only Concepts (`.md` files) and folders; any other file type
-  // in the Bundle is ignored. A Concept shows its frontmatter `title`, else its
-  // filename without the `.md` extension.
-  const displayName = $derived(treeLabel(node));
+  // in the Bundle is ignored. A Concept shows its frontmatter `title` and a
+  // folder its `index.md`'s (unless the rail's titles toggle is off), else the
+  // filename without the `.md` extension / the folder name.
+  const displayName = $derived(treeLabel(node, session.titlesShown));
 
   // Reserved files (`index.md`/`log.md`) are NOT shown as ordinary tree leaves;
   // they are surfaced as per-folder affordances on the containing folder row

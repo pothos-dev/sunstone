@@ -46,8 +46,9 @@ test('tile header: Edit toggle, undo/redo, review + export live in the header', 
   // above the editor.
   const header = page.getByTestId('tile-header');
   await expect(header).toBeVisible();
-  await expect(page.getByTestId('tile-title')).toHaveText('concepts/CodeMirror');
-  await expect(page.getByTestId('tile-title-dir')).toHaveText('concepts/');
+  // The folder crumb is labelled by `concepts/index.md`'s title.
+  await expect(page.getByTestId('tile-title')).toHaveText('Concepts/CodeMirror');
+  await expect(page.getByTestId('tile-title-dir')).toHaveText('Concepts/');
   // The tooltip carries the exact path, title-derived label or not.
   await expect(page.getByTestId('tile-title')).toHaveAttribute(
     'title',
@@ -194,7 +195,7 @@ test('tile header: breadcrumbs open a folder index and show it in the Explorer',
   await livePreview.click();
 
   const crumbs = page.getByTestId('tile-crumb');
-  await expect(crumbs).toHaveText(['concepts', 'editor']);
+  await expect(crumbs).toHaveText(['Concepts', 'editor']);
 
   // `editor/` has no index.md: the crumb leaves the Concept open and just
   // expands + highlights the folder in the Explorer.
@@ -208,7 +209,8 @@ test('tile header: breadcrumbs open a folder index and show it in the Explorer',
   // `concepts/` has an index.md: the crumb opens it.
   await crumbs.nth(0).click();
   await expect(page.getByTestId('tile-title')).toHaveAttribute('title', 'concepts/index.md');
-  await expect(page.getByTestId('tile-crumb')).toHaveText(['concepts']);
+  // A titled index.md stands for its folder: no crumb for the folder itself.
+  await expect(page.getByTestId('tile-crumb')).toHaveCount(0);
   await expect(tree.locator('.row[data-row-path="concepts"]')).toHaveClass(/focused-item/);
 });
 
@@ -225,7 +227,7 @@ test('tile header: a breadcrumb re-opens a collapsed Explorer Section and shows 
   }
   await livePreview.click();
   const crumbs = page.getByTestId('tile-crumb');
-  await expect(crumbs).toHaveText(['concepts', 'editor']);
+  await expect(crumbs).toHaveText(['Concepts', 'editor']);
 
   // Collapse the Explorer folder AND the Explorer Section itself: the tree
   // unmounts entirely.

@@ -14,7 +14,7 @@
   // button controls.
   //
   // Presentational only: it owns no business state. The toggle / quick-nav /
-  // search buttons call back into the parent, which flips the SAME flags the
+  // search / titles buttons call back into the parent, which flips the SAME flags the
   // keybindings flip — so both entry points converge on one code path.
   //
   // The bottom-pinned area holds an optional `bottom` slot (web fills it with
@@ -40,6 +40,10 @@
     onQuickNav?: () => void;
     /** Toggle the full-text search panel (same flag as Ctrl+Shift+F). */
     onSearch?: () => void;
+    /** Whether Concepts and folders are labelled by their frontmatter `title`. */
+    titlesShown?: boolean;
+    /** Flip {@link titlesShown}; the button is shown only when this is passed. */
+    onToggleTitles?: () => void;
     /** Optional bottom-pinned controls, rendered just above the user slot.
      *  Desktop passes none; the web viewer fills it with the theme toggle. */
     bottom?: Snippet;
@@ -56,6 +60,8 @@
     onToggleSidebar,
     onQuickNav,
     onSearch,
+    titlesShown = true,
+    onToggleTitles,
     bottom,
     user,
   }: Props = $props();
@@ -141,6 +147,24 @@
         </svg>
       </button>
     {/if}
+    {#if onToggleTitles}
+      <button
+        type="button"
+        class="rail-btn"
+        class:active={titlesShown}
+        data-testid="rail-titles"
+        title={titlesShown ? 'Show filenames instead of titles' : 'Show titles instead of filenames'}
+        aria-label="Show titles"
+        aria-pressed={titlesShown}
+        onclick={onToggleTitles}
+      >
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <!-- "T" glyph: label by title. -->
+          <line x1="3.5" y1="3.5" x2="12.5" y2="3.5" stroke="currentColor" stroke-width="1.6" />
+          <line x1="8" y1="3.5" x2="8" y2="12.5" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      </button>
+    {/if}
   </div>
 
   <!-- Bottom-pinned controls. `bottom` (web: theme toggle) sits just above the
@@ -207,6 +231,12 @@
 
   .rail-btn:hover {
     background: var(--hover);
+    opacity: 1;
+  }
+
+  /* A toggle that is on reads in the accent colour. */
+  .rail-btn.active {
+    color: var(--accent);
     opacity: 1;
   }
 

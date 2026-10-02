@@ -19,6 +19,7 @@ describe('sessionFromBundleState', () => {
       leftSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       rightSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       frontmatterShown: false,
+      titlesShown: true,
       editorMode: 'read',
       layout: null,
       window: undefined,
@@ -37,6 +38,7 @@ describe('sessionFromBundleState', () => {
       outlineOpen: false,
       rightSidebarOpen: true,
       frontmatterShown: true,
+      titlesShown: false,
       editorMode: 'editing',
     });
     expect(s.lastOpenConcept).toBe('a.md');
@@ -49,6 +51,7 @@ describe('sessionFromBundleState', () => {
     expect(s.outlineOpen).toBe(false);
     expect(s.rightSidebarOpen).toBe(true);
     expect(s.frontmatterShown).toBe(true);
+    expect(s.titlesShown).toBe(false);
     expect(s.editorMode).toBe('editing');
   });
 
@@ -110,6 +113,7 @@ describe('bundleStateFromSession', () => {
       rightSidebarWidth: 320,
       outlineOpen: false,
       frontmatterShown: true,
+      titlesShown: false,
       editorMode: 'editing' as const,
       layout,
       window: geometry,

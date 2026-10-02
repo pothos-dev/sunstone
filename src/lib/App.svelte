@@ -369,7 +369,7 @@
   // backend — the effect below re-runs only when the string itself changes.
   const title = $derived.by(() => {
     void indexStore.version;
-    return windowTitle(editor.path, splitFrontmatter(editor.content).yaml);
+    return windowTitle(editor.path, splitFrontmatter(editor.content).yaml, session.titlesShown);
   });
   $effect(() => {
     if (__SUNSTONE_WEB__) return;
@@ -547,6 +547,8 @@
     onToggleSidebar={() => session.setLeftSidebarOpen(!session.leftSidebarVisible)}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
+    titlesShown={session.titlesShown}
+    onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
     user={account}
   />
 

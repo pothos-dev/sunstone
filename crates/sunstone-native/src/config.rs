@@ -93,6 +93,10 @@ pub struct BundleState {
     /// GLOBAL Frontmatter show/hide flag — the ADR-0008 name the frontend now
     /// writes (it still reads `properties_shown` as a fallback).
     pub frontmatter_shown: Option<bool>,
+    /// Whether the Explorer and Tile headers label Concepts and folders by their
+    /// frontmatter `title` (vs the filename). Optional; the frontend defaults it
+    /// to `true` on read.
+    pub titles_shown: Option<bool>,
     /// Persisted tiling workspace layout (multi-concept-tiling ticket 06): the row
     /// of columns of tiles (order + weights, each tile's Concept path + view-mode,
     /// and the active tile). Round-tripped as OPAQUE JSON — the frontend owns the
@@ -572,6 +576,13 @@ mod tests {
         let st: BundleState = serde_json::from_str(r#"{ "frontmatterShown": true }"#).unwrap();
         let json = serde_json::to_value(&st).unwrap();
         assert_eq!(json["frontmatterShown"], serde_json::json!(true));
+    }
+
+    #[test]
+    fn titles_shown_round_trips() {
+        let st: BundleState = serde_json::from_str(r#"{ "titlesShown": false }"#).unwrap();
+        let json = serde_json::to_value(&st).unwrap();
+        assert_eq!(json["titlesShown"], serde_json::json!(false));
     }
 
     #[test]

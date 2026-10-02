@@ -358,6 +358,24 @@ describe('treeLabel', () => {
       'concepts',
     );
   });
+
+  const customers: TreeNode = {
+    name: 'customers',
+    path: 'customers',
+    isDir: true,
+    children: [{ name: 'index.md', path: 'customers/index.md', isDir: false, title: 'Kunden' }],
+  };
+
+  test('a folder with a titled index.md shows that title', () => {
+    expect(treeLabel(customers)).toBe('Kunden');
+  });
+
+  test('titles off: filenames and folder names', () => {
+    expect(treeLabel(customers, false)).toBe('customers');
+    expect(treeLabel({ name: 'cm.md', path: 'cm.md', isDir: false, title: 'CodeMirror' }, false)).toBe(
+      'cm',
+    );
+  });
 });
 
 describe('setNodeTitle', () => {

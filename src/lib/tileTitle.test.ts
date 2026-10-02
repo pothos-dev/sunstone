@@ -115,3 +115,43 @@ test('indexCrumbs: attaches each folder index.md, null where absent', () => {
 test('indexCrumbs: every index is null before the tree loads', () => {
   expect(indexCrumbs(folderCrumbs('a'), null)).toEqual([{ name: 'a', folder: 'a', index: null }]);
 });
+
+test('tileTitle: the filename stem when titles are off', () => {
+  expect(tileTitle('concepts/codemirror.md', 'title: CodeMirror 6\n', false)).toBe('codemirror');
+});
+
+test('tileHeaderLabel: a titled index.md drops its own folder from the prefix', () => {
+  const label = tileHeaderLabel('area/customers/index.md', 'title: Kunden\n');
+  expect(label).toMatchObject({ dir: 'area/', name: 'Kunden' });
+  expect(label.crumbs.map((c) => c.folder)).toEqual(['area']);
+});
+
+test('tileHeaderLabel: an untitled index.md, or titles off, keeps its folder', () => {
+  expect(tileHeaderLabel('customers/index.md', '')).toMatchObject({
+    dir: 'customers/',
+    name: 'index',
+  });
+  expect(tileHeaderLabel('customers/index.md', 'title: Kunden\n', false)).toMatchObject({
+    dir: 'customers/',
+    name: 'index',
+  });
+});
+
+test('indexCrumbs: a crumb is named by its folder index title unless titles are off', () => {
+  const tree: TreeNode = {
+    name: '',
+    path: '',
+    isDir: true,
+    children: [
+      {
+        name: 'customers',
+        path: 'customers',
+        isDir: true,
+        children: [{ name: 'index.md', path: 'customers/index.md', isDir: false, title: 'Kunden' }],
+      },
+    ],
+  };
+  const crumbs = folderCrumbs('customers');
+  expect(indexCrumbs(crumbs, tree)[0].name).toBe('Kunden');
+  expect(indexCrumbs(crumbs, tree, false)[0].name).toBe('customers');
+});

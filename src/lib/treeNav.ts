@@ -238,6 +238,29 @@ export function explorerKeyIntent(
  * header breadcrumbs, which open a folder's index when it has one.
  */
 export function folderIndexPath(root: TreeNode | null, folder: string): string | null {
+  const node = findFolder(root, folder);
+  return node ? indexChild(node) : null;
+}
+
+/** The frontmatter `title` of the `index.md` directly under folder `node`, if any. */
+export function folderTitle(node: TreeNode): string | null {
+  const index = indexChild(node);
+  return node.children?.find((c) => c.path === index)?.title ?? null;
+}
+
+/**
+ * The Explorer label for `node`. With `useTitles` (the default), a Concept shows
+ * its frontmatter `title` and a folder its `index.md`'s title; otherwise, or
+ * when there is none, a Concept shows its filename without the `.md` extension
+ * and a folder its own name.
+ */
+export function treeLabel(node: TreeNode, useTitles = true): string {
+  if (node.isDir) return (useTitles && folderTitle(node)) || node.name;
+  return (useTitles && node.title) || stripMd(node.name);
+}
+
+/** The folder node at bundle-relative `folder` (`''` = the root), or null. */
+export function findFolder(root: TreeNode | null, folder: string): TreeNode | null {
   let node: TreeNode | undefined = root ?? undefined;
   if (node && folder !== '') {
     const parts = folder.split('/');
@@ -246,16 +269,7 @@ export function folderIndexPath(root: TreeNode | null, folder: string): string |
       node = node.children?.find((c) => c.isDir && c.path === path);
     }
   }
-  return node ? indexChild(node) : null;
-}
-
-/**
- * The Explorer label for `node`: a Concept's frontmatter `title` when it has
- * one, else its filename without the `.md` extension; a folder's own name.
- */
-export function treeLabel(node: TreeNode): string {
-  if (node.isDir) return node.name;
-  return node.title ?? stripMd(node.name);
+  return node ?? null;
 }
 
 /**

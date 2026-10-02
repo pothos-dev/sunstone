@@ -180,8 +180,10 @@
   // re-pushes it. The header then falls back to the filename stem while the body
   // shows the right Concept (a rare flake in tile-header.spec.ts). `tile.content`
   // is the source both halves derive from, so reading it here cannot go stale.
-  const headerLabel = $derived(tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml));
-  const headerCrumbs = $derived(indexCrumbs(headerLabel.crumbs, bundle.tree));
+  const headerLabel = $derived(
+    tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml, session.titlesShown),
+  );
+  const headerCrumbs = $derived(indexCrumbs(headerLabel.crumbs, bundle.tree, session.titlesShown));
 
   // A header breadcrumb opens that folder's index.md (when it has one and it is
   // not already open) and shows the folder in the Explorer.

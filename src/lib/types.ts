@@ -185,6 +185,12 @@ export type BundleState = {
    */
   propertiesShown?: boolean;
   /**
+   * Whether the Explorer and Tile headers label Concepts and folders by their
+   * frontmatter `title` (a folder by its `index.md`'s) instead of the filename.
+   * Toggled from the left activity rail; defaults to `true` on read.
+   */
+  titlesShown?: boolean;
+  /**
    * The editor's view mode — the boolean `editing`/`read` (editing-boolean-edit-
    * toggle), restored on relaunch (persist-editor-mode). Optional so older files
    * tolerate its absence; the session store migrates the legacy tri-state values

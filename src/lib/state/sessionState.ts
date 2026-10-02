@@ -22,6 +22,7 @@ export interface SessionFields {
   leftSidebarWidth: number;
   rightSidebarWidth: number;
   frontmatterShown: boolean;
+  titlesShown: boolean;
   editorMode: EditorMode;
   layout: StoredLayout | null;
   /** Opaque window geometry owned by Rust; carried through untouched. */
@@ -36,6 +37,7 @@ export interface SessionFields {
  *   Tags and the right Sidebar default COLLAPSED;
  * - `frontmatterShown` defaults hidden, falling back to its pre-ADR-0008 name
  *   `propertiesShown` so an existing user's choice survives the rename;
+ * - `titlesShown` (label by frontmatter `title`) defaults on;
  * - the legacy tri-state `editorMode` ('edit'/'hybrid'/'view') migrates to
  *   'editing'/'read', and an absent one defaults to 'read';
  * - sidebar widths default to the shared default and are clamped, so a
@@ -57,6 +59,7 @@ export function sessionFromBundleState(state: BundleState): SessionFields {
     leftSidebarWidth: clampSidebarWidth(state.leftSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH),
     rightSidebarWidth: clampSidebarWidth(state.rightSidebarWidth ?? DEFAULT_SIDEBAR_WIDTH),
     frontmatterShown: state.frontmatterShown ?? state.propertiesShown ?? false,
+    titlesShown: state.titlesShown ?? true,
     editorMode: migrateEditorMode(state.editorMode),
     layout: state.layout ?? null,
     window: state.window,
@@ -82,6 +85,7 @@ export function bundleStateFromSession(fields: SessionFields): BundleState {
     rightSidebarWidth: fields.rightSidebarWidth,
     outlineOpen: fields.outlineOpen,
     frontmatterShown: fields.frontmatterShown,
+    titlesShown: fields.titlesShown,
     editorMode: fields.editorMode,
     layout: fields.layout,
     window: fields.window,
