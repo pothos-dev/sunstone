@@ -113,6 +113,8 @@ export type KnownBundle = {
   lastOpened: number | null;
   /** whether the folder still exists on disk (a moved/deleted folder is flagged, not dropped) */
   exists: boolean;
+  /** the root `index.md`'s frontmatter `title`, shown in place of the path */
+  title?: string | null;
 };
 
 /**

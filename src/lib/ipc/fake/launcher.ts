@@ -50,7 +50,13 @@ export function seedKnownBundles(): KnownBundle[] {
   const min = 60_000;
   return [
     { path: '/home/user/Knowledge Base', name: 'Knowledge Base', lastOpened: now - 5 * min, exists: true },
-    { path: '/home/user/Project Notes', name: 'Project Notes', lastOpened: now - 120 * min, exists: true },
+    {
+      path: '/home/user/Project Notes',
+      name: 'Project Notes',
+      lastOpened: now - 120 * min,
+      exists: true,
+      title: 'Projektnotizen',
+    },
     { path: '/home/user/Archive', name: 'Archive', lastOpened: now - 3 * 24 * 60 * min, exists: true },
   ];
 }

@@ -89,6 +89,23 @@ test('the filter box is focused on load and fuzzy-trims the list', async ({ page
   await expect(items).toHaveCount(3);
 });
 
+test('a folder with a titled root index.md shows the title over its path', async ({ page }) => {
+  await gotoLauncher(page);
+  const items = page.getByTestId('launcher-item');
+  await expect(items).toHaveCount(3);
+
+  const notes = items.nth(1);
+  await expect(notes.getByTestId('launcher-title')).toHaveText('Projektnotizen');
+  await expect(notes).toContainText('/home/user/Project Notes');
+  // Untitled folders show just the path.
+  await expect(items.nth(0).getByTestId('launcher-title')).toHaveCount(0);
+
+  // The filter matches the title as well as the path.
+  await page.keyboard.type('projektn');
+  await expect(items).toHaveCount(1);
+  await expect(items.nth(0)).toHaveAttribute('data-path', '/home/user/Project Notes');
+});
+
 test('↑/↓ move the selection and Enter opens the selected folder', async ({ page }) => {
   await gotoLauncher(page);
 

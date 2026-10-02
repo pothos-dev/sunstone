@@ -313,7 +313,9 @@ pub fn save_window_state(bundle_root: &Path, window: WindowState) -> Result<(), 
 /// as derived from the per-Bundle store. `path` is the store key (the Bundle's
 /// absolute path); `name` is its display basename; `last_opened` drives the
 /// most-recent-first ordering; `exists` is whether the folder is still present on
-/// disk (the launcher can flag a moved/deleted folder without dropping it).
+/// disk (the launcher can flag a moved/deleted folder without dropping it);
+/// `title` is the frontmatter `title` of the Bundle's root `index.md`, which the
+/// launcher shows in place of the path.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KnownBundle {
@@ -321,6 +323,7 @@ pub struct KnownBundle {
     pub name: String,
     pub last_opened: Option<i64>,
     pub exists: bool,
+    pub title: Option<String>,
 }
 
 /// Milliseconds since the Unix epoch, or `0` if the clock is before it (never in
@@ -341,6 +344,13 @@ fn display_name(path: &str) -> String {
         .map(|n| n.to_string_lossy().into_owned())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| path.to_string())
+}
+
+/// The frontmatter `title` of `<root>/index.md`, or `None` when the file is
+/// missing/unreadable or has no title.
+fn root_index_title(root: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(root.join("index.md")).ok()?;
+    sunstone_shared::frontmatter::parse_frontmatter(&content).title
 }
 
 /// Record that `bundle_root` was just opened: stamp its `last_opened` with the
@@ -378,6 +388,7 @@ pub fn list_known_bundles() -> Vec<KnownBundle> {
             name: display_name(path),
             last_opened: state.last_opened,
             exists: Path::new(path).is_dir(),
+            title: root_index_title(Path::new(path)),
             path: path.clone(),
         })
         .collect();
@@ -539,6 +550,7 @@ mod tests {
             name: name.to_string(),
             last_opened: last,
             exists: true,
+            title: None,
         };
         let mut list = vec![
             mk("older", Some(100)),
@@ -606,5 +618,15 @@ mod tests {
         // A never-seen Bundle takes the incoming state as-is.
         let fresh = merge_frontend_state(None, BundleState { last_opened: None, ..Default::default() });
         assert!(fresh.last_opened.is_none());
+    }
+
+    #[test]
+    fn root_index_title_reads_the_bundle_index() {
+        let root = std::env::temp_dir().join(format!("sunstone-title-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        assert_eq!(root_index_title(&root), None);
+        std::fs::write(root.join("index.md"), "---\ntitle: Kunden\n---\n# x\n").unwrap();
+        assert_eq!(root_index_title(&root).as_deref(), Some("Kunden"));
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

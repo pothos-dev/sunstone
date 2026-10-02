@@ -71,3 +71,23 @@ describe('launcherRows', () => {
     expect(row.bundle.path.slice(row.positions[0], row.positions[3] + 1)).toBe('Arch');
   });
 });
+
+describe('launcherRows: titles', () => {
+  const known = [
+    bundle('/home/user/customers', { title: 'Kunden' }),
+    bundle('/home/user/Archive'),
+  ];
+
+  test('a folder matches through its title, highlighting the title', () => {
+    const rows = launcherRows('kund', known);
+    expect(paths(rows)).toEqual(['/home/user/customers']);
+    expect(rows[0].titlePositions).toEqual([0, 1, 2, 3]);
+    expect(rows[0].positions).toEqual([]);
+  });
+
+  test('a path match still works for a titled folder', () => {
+    const rows = launcherRows('cust', known);
+    expect(paths(rows)).toEqual(['/home/user/customers']);
+    expect(rows[0].positions.length).toBe(4);
+  });
+});

@@ -11,7 +11,7 @@
 
   // The launcher: shown when Sunstone starts with no Bundle (`sunstone` alone).
   // A palette over the previously-opened folders — an auto-focused filter box on
-  // top, then one single-line row per folder path (most-recent first, each
+  // top, then one row per folder — its root index title over its path (most-recent first, each
   // removable), plus an "Open folder…" native picker. Typing fuzzy-filters the
   // list (matched chars highlighted), ↑/↓ step the selection and Enter opens it.
   // Opening a folder opens it in-process, then we reload so `DesktopShell`
@@ -188,11 +188,20 @@
               onmousemove={() => (selected = i)}
               onclick={() => open(row.bundle.path)}
             >
-              <span class="path"
-                >{#each highlightPositions(row.bundle.path, row.positions) as seg}<span
-                    class:hit={seg.match}>{seg.text}</span
-                  >{/each}</span
-              >
+              <span class="label">
+                {#if row.bundle.title}
+                  <span class="title" data-testid="launcher-title"
+                    >{#each highlightPositions(row.bundle.title, row.titlePositions) as seg}<span
+                        class:hit={seg.match}>{seg.text}</span
+                      >{/each}</span
+                  >
+                {/if}
+                <span class="path" class:sub={!!row.bundle.title}
+                  >{#each highlightPositions(row.bundle.path, row.positions) as seg}<span
+                      class:hit={seg.match}>{seg.text}</span
+                    >{/each}</span
+                >
+              </span>
               {#if !row.bundle.exists}
                 <span class="badge" title="Folder not found on disk">missing</span>
               {/if}
@@ -324,7 +333,7 @@
     border-radius: var(--radius-md);
   }
 
-  /* One folder = one line: the path stretches, the badges/timestamp stay put. */
+  /* One folder = one row: the label stretches, the badges/timestamp stay put. */
   .row {
     flex: 1 1 auto;
     min-width: 0;
@@ -352,16 +361,30 @@
     opacity: 0.6;
   }
 
-  .path {
+  /* The root index title (when there is one) over the path. */
+  .label {
     flex: 1 1 auto;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .title,
+  .path {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 0.9rem;
   }
 
-  /* Fuzzy-match hits inside the path. */
+  /* Under a title, the path is the secondary line. */
+  .path.sub {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  /* Fuzzy-match hits inside the title / path. */
+  .title .hit,
   .path .hit {
     color: var(--accent);
     font-weight: 700;
@@ -384,6 +407,7 @@
     font-weight: 600;
   }
 
+  .item.missing .title,
   .item.missing .path {
     color: var(--text-muted);
   }
