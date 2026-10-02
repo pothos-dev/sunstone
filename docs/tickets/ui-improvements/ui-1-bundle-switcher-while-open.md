@@ -24,3 +24,12 @@ This is desktop-only. The web shell serves a single Bundle and has no known-fold
 - [ ] The switcher does not appear in the web shell
 - [ ] Playwright covers open, filter, switch and dismiss over the fake backend
 - [ ] All four gates green
+
+## Comments
+
+- 2026-10-02 — Prototype on branch `prototype/bundle-switcher`
+  (`src/lib/components/BundleSwitcher.prototype.svelte`): a left-rail icon
+  opening one of three dropdowns, `?variant=A|B|C` — A Menu (compact, no
+  filter), B Palette (the launcher as a popover: filter, ↑/↓/Enter, forget,
+  Open folder…), C Panel (full-height flyout: current card, Recent / Missing
+  groups). Verdict pending.

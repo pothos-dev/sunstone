@@ -20,6 +20,7 @@
   import SidebarSection from '$lib/components/SidebarSection.svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
+  import BundleSwitcher from '$lib/components/BundleSwitcher.prototype.svelte';
   import TileGrid from '$lib/components/TileGrid.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
@@ -561,8 +562,15 @@
     onSearch={() => (searchOpen = !searchOpen)}
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
+    top={__SUNSTONE_WEB__ ? undefined : bundleSwitcher}
     user={account}
   />
+
+  {#snippet bundleSwitcher()}
+    <BundleSwitcher
+      beforeSwitch={() => Promise.all([workspace.flushPendingWrites(), session.flushPending()])}
+    />
+  {/snippet}
 
   <Sidebar
     side="left"

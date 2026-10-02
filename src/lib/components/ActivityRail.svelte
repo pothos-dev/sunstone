@@ -44,6 +44,8 @@
     titlesShown?: boolean;
     /** Flip {@link titlesShown}; the button is shown only when this is passed. */
     onToggleTitles?: () => void;
+    /** Optional controls at the very top of the rail (PROTOTYPE: Bundle switcher). */
+    top?: Snippet;
     /** Optional bottom-pinned controls, rendered just above the user slot.
      *  Desktop passes none; the web viewer fills it with the theme toggle. */
     bottom?: Snippet;
@@ -62,6 +64,7 @@
     onSearch,
     titlesShown = true,
     onToggleTitles,
+    top,
     bottom,
     user,
   }: Props = $props();
@@ -79,6 +82,7 @@
   data-testid={side === 'left' ? 'activity-rail' : 'activity-rail-right'}
 >
   <div class="rail-top">
+    {#if top}{@render top()}{/if}
     <button
       type="button"
       class="rail-btn"
