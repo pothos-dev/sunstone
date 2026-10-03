@@ -14,7 +14,7 @@
   // button controls.
   //
   // Presentational only: it owns no business state. The toggle / quick-nav /
-  // search / titles buttons call back into the parent, which flips the SAME flags the
+  // search / titles / font-size buttons call back into the parent, which flips the SAME flags the
   // keybindings flip — so both entry points converge on one code path.
   //
   // The bottom-pinned area holds an optional `bottom` slot (web fills it with
@@ -44,6 +44,12 @@
     titlesShown?: boolean;
     /** Flip {@link titlesShown}; the button is shown only when this is passed. */
     onToggleTitles?: () => void;
+    /** Current UI zoom as a percentage, shown in the font-size buttons' tooltips. */
+    zoomPercent?: number;
+    /** Step the UI zoom (same as Ctrl/Cmd +/-). The joined font-size button is
+     *  shown only when both are passed. */
+    onZoomIn?: () => void;
+    onZoomOut?: () => void;
     /** Optional bottom-pinned controls, rendered just above the user slot.
      *  Desktop passes none; the web viewer fills it with the theme toggle. */
     bottom?: Snippet;
@@ -62,6 +68,9 @@
     onSearch,
     titlesShown = true,
     onToggleTitles,
+    zoomPercent = 100,
+    onZoomIn,
+    onZoomOut,
     bottom,
     user,
   }: Props = $props();
@@ -171,6 +180,36 @@
        avatar/login slot, which is reserved + EMPTY on desktop (no `user`
        snippet) and filled by the web viewer with a sign-in / sign-out. -->
   <div class="rail-bottom">
+    {#if onZoomIn && onZoomOut}
+      <!-- Font size: one joined button, larger on top, smaller below. -->
+      <div class="rail-joined" role="group" aria-label="Font size" data-testid="rail-zoom">
+        <button
+          type="button"
+          class="rail-btn"
+          data-testid="rail-zoom-in"
+          title="Larger text (Ctrl++) · {zoomPercent}%"
+          aria-label="Larger text"
+          onclick={onZoomIn}
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <line x1="3.5" y1="8" x2="12.5" y2="8" stroke="currentColor" stroke-width="1.5" />
+            <line x1="8" y1="3.5" x2="8" y2="12.5" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="rail-btn"
+          data-testid="rail-zoom-out"
+          title="Smaller text (Ctrl+-) · {zoomPercent}%"
+          aria-label="Smaller text"
+          onclick={onZoomOut}
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <line x1="3.5" y1="8" x2="12.5" y2="8" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+      </div>
+    {/if}
     {#if bottom}{@render bottom()}{/if}
     <div
       class="rail-user"
@@ -244,6 +283,24 @@
     outline: 2px solid var(--accent-ring);
     outline-offset: -2px;
     opacity: 1;
+  }
+
+  /* Two rail buttons fused into one outlined control, split by a hairline. */
+  .rail-joined {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .rail-joined .rail-btn {
+    height: 1.6rem;
+    border-radius: 0;
+  }
+
+  .rail-joined .rail-btn + .rail-btn {
+    border-top: 1px solid var(--border);
   }
 
   /* Reserved bottom slot: kept in the layout (so the rail always reserves the

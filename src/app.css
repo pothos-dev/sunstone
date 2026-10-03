@@ -91,8 +91,6 @@
      free — `var(--text)` etc. re-resolve in the editor's themed context. */
   --atomic-editor-font: var(--font-ui);
   --atomic-editor-font-mono: var(--font-mono);
-  /* Base prose size for the editor (headings scale off this via `em`). */
-  --atomic-editor-body-size: 14px;
   --atomic-editor-fg: var(--text);
   --atomic-editor-fg-muted: var(--text-muted);
   --atomic-editor-fg-faint: var(--text-faint);
@@ -232,6 +230,11 @@ body {
    factor. Pinning it decouples our UI from that. */
 html {
   font-size: 16px;
+  /* Base prose size for the editor (headings scale off this via `em`). Set on
+     <html> rather than in the theme blocks: those also match the app root, and
+     a re-declaration there would shadow the UI-zoom value the zoom store writes
+     onto <html>. */
+  --atomic-editor-body-size: 14px;
 }
 
 body {

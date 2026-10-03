@@ -928,9 +928,10 @@
 
   .tree {
     padding: 0.25rem 0.35rem;
-    /* Match the desktop explorer tree, which hard-pins 14px (App.svelte
-       `.tree-tile`). Both tree components reset with `font: inherit`. */
-    font-size: 14px;
+    /* Same size as the rendered Concept body, like the desktop explorer
+       (`ExplorerPane.svelte` `.tree-tile`). Both tree components reset with
+       `font: inherit`. */
+    font-size: var(--rendered-body-size, 14px);
   }
 
   .reader {

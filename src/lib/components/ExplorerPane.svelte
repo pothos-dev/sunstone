@@ -169,9 +169,12 @@
 </div>
 
 <style>
+  /* Same face and size as the Concept body in the editor, so both follow the
+     UI zoom (Ctrl +/-) together. */
   .tree-tile {
     padding: 0.5rem;
-    font-size: 14px;
+    font-family: var(--atomic-editor-font);
+    font-size: var(--atomic-editor-body-size, 14px);
   }
 
   .tree-tile:focus {

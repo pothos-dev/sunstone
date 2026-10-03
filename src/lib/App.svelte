@@ -561,6 +561,9 @@
     onSearch={() => (searchOpen = !searchOpen)}
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
+    zoomPercent={Math.round(zoom.scale * 100)}
+    onZoomIn={() => zoom.in()}
+    onZoomOut={() => zoom.out()}
     user={account}
   />
 
