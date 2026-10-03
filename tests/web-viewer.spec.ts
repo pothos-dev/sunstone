@@ -365,6 +365,8 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
   // toggle + a user slot; the menu stub is gone.
   await expect(page.getByTestId('activity-rail')).toBeVisible();
   await expect(page.getByTestId('rail-menu')).toHaveCount(0);
+  // No Bundle switcher on the web: it serves a single Bundle (ui-1).
+  await expect(page.getByTestId('rail-bundle-switcher')).toHaveCount(0);
   await expect(page.getByTestId('rail-quicknav')).toBeVisible();
   await expect(page.getByTestId('rail-search')).toBeVisible();
   await expect(page.getByTestId('theme-toggle')).toBeVisible();

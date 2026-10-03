@@ -21,6 +21,7 @@ function ctx(over: Partial<AppHotkeyContext> = {}): AppHotkeyContext {
     frontmatterEditing: false,
     quickNavOpen: false,
     quickNavTagActive: false,
+    bundleSwitcher: true,
     ...over,
   };
 }
@@ -49,6 +50,22 @@ describe('routeAppHotkey', () => {
     expect(
       routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'f' }), ctx({ conceptOpen: false })),
     ).toEqual({ kind: 'toggle-search' });
+  });
+
+  test('Ctrl+O / Cmd+O toggles the Bundle switcher, only where it exists', () => {
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: 'o' }), ctx())).toEqual({
+      kind: 'toggle-bundle-switcher',
+    });
+    expect(routeAppHotkey(keydown({ metaKey: true, key: 'O' }), ctx())).toEqual({
+      kind: 'toggle-bundle-switcher',
+    });
+    // Also with no Concept open.
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: 'o' }), ctx({ conceptOpen: false }))).toEqual({
+      kind: 'toggle-bundle-switcher',
+    });
+    // Web: no switcher, so the key is left to the browser.
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: 'o' }), ctx({ bundleSwitcher: false }))).toBeNull();
+    expect(routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'o' }), ctx())).toBeNull();
   });
 
   test('Ctrl+P / Cmd+P prints only when a Concept is open', () => {

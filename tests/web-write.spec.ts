@@ -74,6 +74,8 @@ test('authed Cmd/Ctrl+S edits a Concept and lands a real commit as the signed-in
     // the BODY (frontmatter is split into the Frontmatter Region).
     const content = await openFromTree(page, rel);
     await expect(content).toContainText('Original body line');
+    // The web shell serves one Bundle: no Bundle switcher (desktop-only, ui-1).
+    await expect(page.getByTestId('rail-bundle-switcher')).toHaveCount(0);
 
     await typeAtEnd(page, content, `\n\n${marker}`);
     // Editing marks the buffer dirty: the header Save button appears (its

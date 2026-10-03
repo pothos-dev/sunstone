@@ -6,7 +6,7 @@
   import type { KnownBundle } from '$lib/types';
   import { relativeTime } from '$lib/relativeTime';
   import { launcherRows } from '$lib/launcherRows';
-  import { highlightPositions } from '$lib/highlight';
+  import KnownBundleLabel from '$lib/components/KnownBundleLabel.svelte';
   import { clampIndex, listKeyIntent, stepIndex } from '$lib/listNav';
 
   // The launcher: shown when Sunstone starts with no Bundle (`sunstone` alone).
@@ -188,20 +188,7 @@
               onmousemove={() => (selected = i)}
               onclick={() => open(row.bundle.path)}
             >
-              <span class="label">
-                {#if row.bundle.title}
-                  <span class="title" data-testid="launcher-title"
-                    >{#each highlightPositions(row.bundle.title, row.titlePositions) as seg}<span
-                        class:hit={seg.match}>{seg.text}</span
-                      >{/each}</span
-                  >
-                {/if}
-                <span class="path" class:sub={!!row.bundle.title}
-                  >{#each highlightPositions(row.bundle.path, row.positions) as seg}<span
-                      class:hit={seg.match}>{seg.text}</span
-                    >{/each}</span
-                >
-              </span>
+              <KnownBundleLabel {row} />
               {#if !row.bundle.exists}
                 <span class="badge" title="Folder not found on disk">missing</span>
               {/if}
@@ -361,35 +348,6 @@
     opacity: 0.6;
   }
 
-  /* The root index title (when there is one) over the path. */
-  .label {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .title,
-  .path {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.9rem;
-  }
-
-  /* Under a title, the path is the secondary line. */
-  .path.sub {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-  }
-
-  /* Fuzzy-match hits inside the title / path. */
-  .title .hit,
-  .path .hit {
-    color: var(--accent);
-    font-weight: 700;
-  }
-
   .when {
     flex: none;
     color: var(--text-faint);
@@ -405,11 +363,6 @@
     color: var(--danger);
     font-size: 0.68rem;
     font-weight: 600;
-  }
-
-  .item.missing .title,
-  .item.missing .path {
-    color: var(--text-muted);
   }
 
   .forget {

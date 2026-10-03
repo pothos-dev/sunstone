@@ -13,6 +13,7 @@
   import ReservedFileButton from '$lib/components/ReservedFileButton.svelte';
   import TreeCrud from '$lib/components/TreeCrud.svelte';
   import QuickNav from '$lib/components/QuickNav.svelte';
+  import BundleSwitcher from '$lib/components/BundleSwitcher.svelte';
   import SearchPanel from '$lib/components/SearchPanel.svelte';
   import Backlinks from '$lib/components/Backlinks.svelte';
   import Outline from '$lib/components/Outline.svelte';
@@ -81,6 +82,9 @@
 
   // Quick-nav palette (Ctrl+K) + full-text search (Ctrl+Shift+F) overlays.
   let quickNavOpen = $state(false);
+  // The Bundle switcher popover (ticket ui-1). Desktop only: the web shell serves
+  // a single Bundle and has no known-folder list.
+  let switcherOpen = $state(false);
   let quickNavTagActive = $state(false);
   let searchOpen = $state(false);
 
@@ -238,6 +242,7 @@
         ),
         quickNavOpen,
         quickNavTagActive,
+        bundleSwitcher: !__SUNSTONE_WEB__,
       });
       if (intent === null) return;
       switch (intent.kind) {
@@ -248,6 +253,10 @@
         case 'toggle-search':
           e.preventDefault();
           searchOpen = !searchOpen;
+          return;
+        case 'toggle-bundle-switcher':
+          e.preventDefault();
+          switcherOpen = !switcherOpen;
           return;
         case 'print':
           e.preventDefault();
@@ -559,6 +568,8 @@
     onToggleSidebar={() => session.setLeftSidebarOpen(!session.leftSidebarVisible)}
     onQuickNav={() => (quickNavOpen = !quickNavOpen)}
     onSearch={() => (searchOpen = !searchOpen)}
+    onSwitchBundle={__SUNSTONE_WEB__ ? undefined : () => (switcherOpen = !switcherOpen)}
+    {switcherOpen}
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
     zoomPercent={Math.round(zoom.scale * 100)}
@@ -728,6 +739,18 @@
     toggleTestid="rail-toggle-right"
     onToggleSidebar={() => session.setRightSidebarOpen(!session.rightSidebarVisible)}
   />
+
+  {#if !__SUNSTONE_WEB__}
+    <BundleSwitcher
+      open={switcherOpen}
+      beforeSwitch={async () => {
+        const unsaved = await workspace.flushAllWrites();
+        await session.flushPending();
+        return unsaved;
+      }}
+      onclose={() => (switcherOpen = false)}
+    />
+  {/if}
 
   <QuickNav
     open={quickNavOpen}

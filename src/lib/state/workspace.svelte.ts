@@ -453,6 +453,14 @@ export class Workspace {
     return this.#registry.flushPending();
   }
 
+  /**
+   * Write every open Document now (leaving the Bundle) and return the paths
+   * that could not be saved — a held write or a failed one.
+   */
+  flushAllWrites(): Promise<string[]> {
+    return this.#registry.flushAll();
+  }
+
   /** Set the post-save hook on every Document in the pool. */
   setOnSaved(cb: ((path: string, content: string) => void) | null): void {
     this.#registry.setOnSaved(cb);

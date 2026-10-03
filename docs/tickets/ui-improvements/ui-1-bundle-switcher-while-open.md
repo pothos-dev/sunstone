@@ -1,5 +1,5 @@
 ---
-status: ready
+status: done
 ---
 
 # ui-1: Switch Bundles without restarting
@@ -14,13 +14,43 @@ Present it as an overlay in the manner of quick-nav, not as a replacement shell:
 
 This is desktop-only. The web shell serves a single Bundle and has no known-folder list, so the affordance must not appear there.
 
-- [ ] A hotkey and a visible affordance both open a Bundle switcher over the open editor
-- [ ] The switcher lists previously-opened folders most-recently-opened first, filtered by the same fuzzy path matching and match highlighting as the startup launcher, with no duplicated row-building logic
-- [ ] The currently-open Bundle is marked as current and selecting it is a no-op that closes the overlay
-- [ ] Choosing another folder opens it and lands in the editor on that Bundle, with its own View state restored
-- [ ] A Concept with unsaved changes never loses them across a switch
-- [ ] A folder can be forgotten from the switcher, and "Open folder…" reaches the native picker, matching the startup launcher
-- [ ] Escape dismisses the overlay through the unified Escape peel and restores focus to the Region that had it
-- [ ] The switcher does not appear in the web shell
-- [ ] Playwright covers open, filter, switch and dismiss over the fake backend
-- [ ] All four gates green
+- [x] A hotkey and a visible affordance both open a Bundle switcher over the open editor
+- [x] The switcher lists previously-opened folders most-recently-opened first, filtered by the same fuzzy path matching and match highlighting as the startup launcher, with no duplicated row-building logic
+- [x] The currently-open Bundle is marked as current and selecting it is a no-op that closes the overlay
+- [x] Choosing another folder opens it and lands in the editor on that Bundle, with its own View state restored
+- [x] A Concept with unsaved changes never loses them across a switch
+- [x] A folder can be forgotten from the switcher, and "Open folder…" reaches the native picker, matching the startup launcher
+- [x] Escape dismisses the overlay through the unified Escape peel and restores focus to the Region that had it
+- [x] The switcher does not appear in the web shell
+- [x] Playwright covers open, filter, switch and dismiss over the fake backend
+- [x] All four gates green
+
+## Decisions
+
+- Presentation → a popover anchored to a new icon at the top of the left
+  activity rail, in the shape of the startup launcher (auto-focused fuzzy
+  filter, ↑/↓/Enter, title over path, forget ×, "Open folder…"). Chosen from a
+  three-variant prototype (Menu / Palette / Panel) on the throwaway branch
+  `prototype/bundle-switcher`; the user picked Palette.
+- Hotkey → Ctrl/Cmd+O ("open folder"), routed right after quick-nav and Search
+  so it cannot shadow any later branch.
+- Unsaved changes → every open Document is flushed through the save gate
+  before switching; if one still cannot be written (frontmatter that does not
+  parse holds the write), the switch is refused and names the Concept.
+- The current Bundle cannot be forgotten from the switcher (no × on its row).
+
+
+## Comments
+
+- 2026-10-02 — Prototype on the throwaway branch `prototype/bundle-switcher`
+  (`src/lib/components/BundleSwitcher.prototype.svelte`): a left-rail icon
+  opening one of three dropdowns via `?variant=A|B|C` — A Menu (compact, no
+  filter), B Palette (the launcher as a popover), C Panel (full-height flyout
+  with a current card and Recent / Missing groups).
+- 2026-10-03 — Verdict: B, Palette. Built as `BundleSwitcher.svelte`; the
+  title-over-path row label is shared with the launcher as
+  `KnownBundleLabel.svelte`. The rail button does not take focus on mousedown,
+  so a cancel returns focus to the Region that had it. The fake backend's
+  `bundleRoot` now reports the folder opened this session so the switcher can
+  mark it current; it does not model per-Bundle View state (the Rust store
+  keys it by root, as before).

@@ -26,11 +26,14 @@ export interface AppHotkeyContext {
   quickNavOpen: boolean;
   /** The quick-nav tag drill-down is active (a local peel layer). */
   quickNavTagActive: boolean;
+  /** The Bundle switcher exists in this shell (desktop only, never on web). */
+  bundleSwitcher: boolean;
 }
 
 export type AppHotkeyIntent =
   | { kind: 'toggle-quicknav' }
   | { kind: 'toggle-search' }
+  | { kind: 'toggle-bundle-switcher' }
   | { kind: 'print' }
   | { kind: 'find' }
   | { kind: 'undo' }
@@ -73,6 +76,13 @@ export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotk
   if (matchesHotkey(e, { key: 'k' })) return { kind: 'toggle-quicknav' };
 
   if (matchesHotkey(e, { key: 'f', shift: true })) return { kind: 'toggle-search' };
+
+  // Bundle switcher: Ctrl/Cmd+O. Desktop only — on web the key stays the
+  // browser's.
+  if (matchesHotkey(e, { key: 'o' })) {
+    if (!ctx.bundleSwitcher) return null;
+    return { kind: 'toggle-bundle-switcher' };
+  }
 
   // Export as PDF: Ctrl/Cmd+P opens the clean print/PDF preview for the active
   // Concept. Only when a Concept is open; otherwise let the browser handle it.

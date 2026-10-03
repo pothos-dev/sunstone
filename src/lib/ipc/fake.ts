@@ -225,7 +225,9 @@ if (typeof window !== 'undefined') {
 
 export const fakeBackend: Backend = {
   async bundleRoot(): Promise<string> {
-    return FAKE_BUNDLE_ROOT;
+    // The folder the launcher / Bundle switcher last opened this session, so
+    // the switcher can mark it current; the fixture root otherwise.
+    return getFakeOpenBundle() ?? FAKE_BUNDLE_ROOT;
   },
 
   // --- Launcher seam (in-browser stand-in for the runtime Bundle switch) ------

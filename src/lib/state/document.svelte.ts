@@ -218,6 +218,17 @@ export class DocumentRegistry {
     await Promise.all([...this.#docs.values()].map((doc) => doc.flushPending()));
   }
 
+  /**
+   * Write every dirty Document now, through the save gate ({@link Document.flush}),
+   * and return the paths still unsaved afterwards — those whose write is held
+   * (frontmatter that does not parse) or failed. Used before a Bundle switch.
+   */
+  async flushAll(): Promise<string[]> {
+    const docs = [...this.#docs.values()];
+    await Promise.all(docs.map((doc) => doc.flush()));
+    return docs.filter((doc) => doc.dirty).map((doc) => doc.path);
+  }
+
   /** Forget the Document at `path` (e.g. after its file was removed on disk). */
   drop(path: string): void {
     this.#docs.delete(path);
