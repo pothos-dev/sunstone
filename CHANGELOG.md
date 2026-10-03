@@ -4,6 +4,43 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-10-03
+
+### Added
+
+- `sunstone serve [BUNDLE] [--port PORT]` serves the desktop editor in a
+  browser on localhost instead of opening a window. Saves write to disk
+  without committing; git history still shows.
+- `sunstone ./docs guide/setup.md#install` opens a Document in the Bundle,
+  scrolled to the heading.
+- The Explorer labels Concepts and folders by their frontmatter `title`
+  (a folder by its `index.md`'s), and so do the Tile header crumbs. A
+  left-rail button switches back to filenames, remembered per Bundle.
+- The Explorer header shows the Bundle's root `index.md` title and opens it
+  on click.
+- The launcher shows a known folder's root `index.md` title over its path,
+  and its filter matches the title too.
+- Switch Bundles without closing the editor: a left-rail button or
+  Ctrl/Cmd+O opens the known-folder list as a popover. Open Documents are
+  saved first.
+- A +/- button at the bottom of the right rail changes the font size, like
+  Ctrl +/-.
+
+### Changed
+
+- The Explorer uses the same font and size as the Concept body, and both
+  follow the font size.
+- The `log.md` icons sit at the right edge of the Explorer header and folder
+  rows; the root index icon is gone.
+
+### Fixed
+
+- Ctrl +/- now also resizes the Concept body, not just the surrounding UI.
+- Clicking formatted text in a table in read mode no longer shows its
+  `**`, `_` or backtick markers.
+- Following a link to a heading in another Concept scrolls to that heading
+  instead of the top.
+
 ## [0.21.0] - 2026-09-30
 
 ### Added
