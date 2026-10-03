@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 
 /**
- * The left rail's joined font-size button steps the UI zoom exactly like
+ * The right rail's joined font-size button steps the UI zoom exactly like
  * Ctrl +/-, and the explorer tree is set in the same face and size as the
  * Concept body at every zoom level.
  */
@@ -26,6 +26,10 @@ test('rail font-size button zooms; explorer matches the Concept body', async ({ 
   };
 
   await expectMatching('14px');
+
+  // The font-size button sits on the right rail only.
+  await expect(page.getByTestId('activity-rail-right').getByTestId('rail-zoom')).toBeVisible();
+  await expect(page.getByTestId('activity-rail').getByTestId('rail-zoom')).toHaveCount(0);
 
   await page.getByTestId('rail-zoom-in').click();
   await expect(page.locator('html')).toHaveCSS('font-size', '17.6px');

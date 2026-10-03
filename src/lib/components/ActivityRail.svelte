@@ -13,8 +13,8 @@
   // it mirrors per `side`, so the filled edge always points at the Sidebar the
   // button controls.
   //
-  // Presentational only: it owns no business state. The Bundle switcher /
-  // toggle / quick-nav / search / titles / font-size buttons call back into the parent, which flips the SAME flags the
+  // Presentational only: it owns no business state. The toggle / Bundle
+  // switcher / quick-nav / search / titles / font-size buttons call back into the parent, which flips the SAME flags the
   // keybindings flip — so both entry points converge on one code path.
   //
   // The bottom-pinned area holds an optional `bottom` slot (web fills it with
@@ -94,42 +94,6 @@
   data-testid={side === 'left' ? 'activity-rail' : 'activity-rail-right'}
 >
   <div class="rail-top">
-    {#if onSwitchBundle}
-      <!-- Bundle switcher: sits above everything else on the rail, so its
-           popover opens beside the top of the rail. A mouse click does not
-           take focus, so the Region that had it stays the overlay's opener and
-           a cancel (Escape / outside click) returns focus there. -->
-      <button
-        type="button"
-        class="rail-btn"
-        class:active={switcherOpen}
-        data-testid="rail-bundle-switcher"
-        title="Switch Bundle (Ctrl+O)"
-        aria-label="Switch Bundle"
-        aria-haspopup="dialog"
-        aria-expanded={switcherOpen}
-        onmousedown={(e) => e.preventDefault()}
-        onclick={onSwitchBundle}
-      >
-        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
-          <!-- stacked folders glyph -->
-          <path
-            d="M2 5.5V12a1 1 0 0 0 1 1h9.5"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.2"
-            stroke-linecap="round"
-          />
-          <path
-            d="M4 3.5h2.6l1.2 1.3H13a1 1 0 0 1 1 1V10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.3"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </button>
-    {/if}
     <button
       type="button"
       class="rail-btn"
@@ -165,6 +129,43 @@
         {/if}
       </svg>
     </button>
+
+    {#if onSwitchBundle}
+      <!-- Bundle switcher: just below the Sidebar toggle, so its popover
+           opens beside the top of the rail. A mouse click does not
+           take focus, so the Region that had it stays the overlay's opener and
+           a cancel (Escape / outside click) returns focus there. -->
+      <button
+        type="button"
+        class="rail-btn"
+        class:active={switcherOpen}
+        data-testid="rail-bundle-switcher"
+        title="Switch Bundle (Ctrl+O)"
+        aria-label="Switch Bundle"
+        aria-haspopup="dialog"
+        aria-expanded={switcherOpen}
+        onmousedown={(e) => e.preventDefault()}
+        onclick={onSwitchBundle}
+      >
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <!-- stacked folders glyph -->
+          <path
+            d="M2 5.5V12a1 1 0 0 0 1 1h9.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+          />
+          <path
+            d="M4 3.5h2.6l1.2 1.3H13a1 1 0 0 1 1 1V10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    {/if}
 
     {#if onQuickNav}
       <button

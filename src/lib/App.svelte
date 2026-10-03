@@ -572,9 +572,6 @@
     {switcherOpen}
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
-    zoomPercent={Math.round(zoom.scale * 100)}
-    onZoomIn={() => zoom.in()}
-    onZoomOut={() => zoom.out()}
     user={account}
   />
 
@@ -738,6 +735,9 @@
     sidebarLabel="Outline & Backlinks"
     toggleTestid="rail-toggle-right"
     onToggleSidebar={() => session.setRightSidebarOpen(!session.rightSidebarVisible)}
+    zoomPercent={Math.round(zoom.scale * 100)}
+    onZoomIn={() => zoom.in()}
+    onZoomOut={() => zoom.out()}
   />
 
   {#if !__SUNSTONE_WEB__}

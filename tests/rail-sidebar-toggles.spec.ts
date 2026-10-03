@@ -26,15 +26,19 @@ test('rails carry the Sidebar toggles; collapsing goes to width 0', async ({ pag
 
   const leftToggle = page.getByTestId('rail-toggle-left');
   const rightToggle = page.getByTestId('rail-toggle-right');
-  // Each toggle sits at the top of its rail, above the other rail buttons —
-  // on the left, just below the Bundle switcher (ui-1), which heads the rail.
+  // Each toggle sits at the very top of its rail, above the other rail
+  // buttons; on the left the Bundle switcher (ui-1) and quick nav follow.
   await expect(leftRail.locator('button').nth(0)).toHaveAttribute(
     'data-testid',
-    'rail-bundle-switcher',
+    'rail-toggle-left',
   );
   await expect(leftRail.locator('button').nth(1)).toHaveAttribute(
     'data-testid',
-    'rail-toggle-left',
+    'rail-bundle-switcher',
+  );
+  await expect(leftRail.locator('button').nth(2)).toHaveAttribute(
+    'data-testid',
+    'rail-quicknav',
   );
   await expect(rightRail.locator('button').first()).toHaveAttribute(
     'data-testid',
