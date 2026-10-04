@@ -4,6 +4,17 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-10-04
+
+### Added
+
+- Sunstone updates itself. On launch, the AppImage, macOS and Windows
+  installs check for a newer release, download it in the background, and
+  run it from the next launch. On Windows the installer runs after you close
+  Sunstone. `.deb`/`.rpm` installs are left to the package manager. Set
+  `SUNSTONE_NO_UPDATE` to skip the check. Versions before 0.23.0 need one
+  manual install of this release to start updating.
+
 ## [0.22.0] - 2026-10-03
 
 ### Added
