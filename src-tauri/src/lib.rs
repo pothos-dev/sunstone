@@ -5,6 +5,7 @@ mod pdf;
 mod serve;
 mod session;
 mod startup;
+mod updater;
 
 use std::sync::Arc;
 
@@ -81,6 +82,7 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, asset::handle)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             // The Session is the swappable seam between launcher mode (no Bundle)
             // and an open Bundle. It owns the current `AppState` + watcher and is
@@ -89,6 +91,7 @@ pub fn run() {
             app.manage(sess.clone());
 
             startup::wire_window_persistence(app, sess.clone());
+            updater::spawn_check(app.handle());
 
             // Open the startup Bundle if one was named (env/CLI); otherwise leave
             // the Session empty so the frontend shows the launcher. `open` builds
@@ -149,6 +152,13 @@ pub fn run() {
             commands::load_bundle_state,
             commands::save_bundle_state
         ])
-        .run(context)
-        .expect("error while running tauri application");
+        .build(context)
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // A Windows update downloaded this session installs once the
+            // window is gone (see `updater`).
+            if let tauri::RunEvent::Exit = event {
+                updater::install_pending(app);
+            }
+        });
 }

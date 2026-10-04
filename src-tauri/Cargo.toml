@@ -30,6 +30,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Native save-file chooser for the print window's "Save as PDF" button.
 tauri-plugin-dialog = "2"
+# Silent self-update of the installed bundle from the GitHub release feed
+# (`updater.rs`); the installers are signed in CI with the key in tauri.conf.json.
+tauri-plugin-updater = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
 

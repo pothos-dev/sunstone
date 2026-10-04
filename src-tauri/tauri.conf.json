@@ -31,6 +31,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhBQjFBMkQ0RDI1Qjc4RTAKUldUZ2VGdlMxS0t4aW9wWGFlTm93MG15TlpnaCtKN3h1NkVoV1pPNnVxS1VHdmp5NDZ5bkg1eFcK",
+      "endpoints": [
+        "https://github.com/pothos-dev/sunstone/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

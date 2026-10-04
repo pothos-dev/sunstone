@@ -107,9 +107,16 @@ jobs:
       - name: Build the browser wasm module
         run: bun run build:wasm
 
+      # `createUpdaterArtifacts` in tauri.conf.json makes tauri-action sign the
+      # installers with this key (public half in the same file) and merge every
+      # platform into the release's `latest.json`, the feed the in-app updater
+      # polls. The private key lives outside the repo; losing it strands every
+      # installed copy on its current version.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
