@@ -869,8 +869,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 32px;
+    height: 32px;
     border: none;
     border-radius: var(--radius-sm, 6px);
     background: none;

@@ -18,9 +18,15 @@
   // keybindings flip — so both entry points converge on one code path.
   //
   // The bottom-pinned area holds an optional `bottom` slot (web fills it with
-  // the theme toggle) sitting just above the avatar/login slot. That user slot
-  // is reserved but EMPTY on desktop; the web anon read surface fills it (via
-  // the optional `user` snippet) with the real Auth.js sign-in / sign-out.
+  // the theme toggle) sitting just above the avatar/login slot. The left rail
+  // always reserves that user slot (EMPTY on desktop; the web anon read surface
+  // fills it via the optional `user` snippet with the real Auth.js sign-in /
+  // sign-out). The right rail has no user slot, so its joined font-size button
+  // sits flush on the rail's bottom edge, spanning the full rail width.
+  //
+  // Every rail dimension is in px, not rem: the UI zoom scales the root
+  // font-size, and a rail whose icons grew with it would overflow its fixed
+  // 48px width at high zoom levels.
 
   import type { Snippet } from 'svelte';
   import type { SidebarSide } from '$lib/sidebarResize';
@@ -86,6 +92,12 @@
   const dividerX = $derived(side === 'left' ? 6.5 : 9.5);
   const fillX = $derived(side === 'left' ? 2 : 9.5);
   const fillW = 4.5;
+
+  const userSlot = $derived(side === 'left' || user !== undefined);
+  const zoomShown = $derived(onZoomIn !== undefined && onZoomOut !== undefined);
+  // Nothing renders below the font-size button: drop the bottom padding so it
+  // meets the rail's bottom edge.
+  const zoomFlush = $derived(zoomShown && !bottom && !userSlot);
 </script>
 
 <nav
@@ -222,8 +234,8 @@
   <!-- Bottom-pinned controls. `bottom` (web: theme toggle) sits just above the
        avatar/login slot, which is reserved + EMPTY on desktop (no `user`
        snippet) and filled by the web viewer with a sign-in / sign-out. -->
-  <div class="rail-bottom">
-    {#if onZoomIn && onZoomOut}
+  <div class="rail-bottom" class:flush={zoomFlush}>
+    {#if zoomShown}
       <!-- Font size: one joined button, larger on top, smaller below. -->
       <div class="rail-joined" role="group" aria-label="Font size" data-testid="rail-zoom">
         <button
@@ -254,13 +266,15 @@
       </div>
     {/if}
     {#if bottom}{@render bottom()}{/if}
-    <div
-      class="rail-user"
-      data-testid={side === 'left' ? 'rail-user' : 'rail-user-right'}
-      aria-hidden={!user}
-    >
-      {#if user}{@render user()}{/if}
-    </div>
+    {#if userSlot}
+      <div
+        class="rail-user"
+        data-testid={side === 'left' ? 'rail-user' : 'rail-user-right'}
+        aria-hidden={!user}
+      >
+        {#if user}{@render user()}{/if}
+      </div>
+    {/if}
   </div>
 </nav>
 
@@ -273,7 +287,6 @@
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 0.4rem 0;
     background: var(--bg-elevated);
   }
 
@@ -288,18 +301,31 @@
 
   .rail-top,
   .rail-bottom {
+    align-self: stretch;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.35rem;
+    gap: 6px;
+  }
+
+  .rail-top {
+    padding-top: 6px;
+  }
+
+  .rail-bottom {
+    padding-bottom: 6px;
+  }
+
+  .rail-bottom.flush {
+    padding-bottom: 0;
   }
 
   .rail-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 32px;
+    height: 32px;
     border: none;
     border-radius: var(--radius-sm);
     background: none;
@@ -328,17 +354,17 @@
     opacity: 1;
   }
 
-  /* Two rail buttons fused into one outlined control, split by a hairline. */
+  /* Two rail buttons fused into one full-width control, split by a hairline. */
   .rail-joined {
+    align-self: stretch;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
+    border-top: 1px solid var(--border);
   }
 
   .rail-joined .rail-btn {
-    height: 1.6rem;
+    width: 100%;
+    height: 28px;
     border-radius: 0;
   }
 
@@ -350,7 +376,7 @@
      space) but paints nothing on desktop. */
   .rail-user {
     flex: none;
-    width: 2rem;
-    height: 2rem;
+    width: 32px;
+    height: 32px;
   }
 </style>

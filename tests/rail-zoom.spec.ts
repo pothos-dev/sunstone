@@ -31,9 +31,24 @@ test('rail font-size button zooms; explorer matches the Concept body', async ({ 
   await expect(page.getByTestId('activity-rail-right').getByTestId('rail-zoom')).toBeVisible();
   await expect(page.getByTestId('activity-rail').getByTestId('rail-zoom')).toHaveCount(0);
 
+  // It spans the full rail width and sits flush on the rail's bottom edge.
+  const railBox = (await page.getByTestId('activity-rail-right').boundingBox())!;
+  const zoomBox = (await page.getByTestId('rail-zoom').boundingBox())!;
+  expect(Math.round(railBox.x + railBox.width - (zoomBox.x + zoomBox.width))).toBe(0);
+  expect(Math.round(zoomBox.width)).toBe(Math.round(railBox.width) - 1); // minus the hairline
+  expect(Math.round(railBox.y + railBox.height - (zoomBox.y + zoomBox.height))).toBe(0);
+
+  const toggleSize = async () => {
+    const box = (await page.getByTestId('rail-toggle-left').boundingBox())!;
+    return [box.width, box.height];
+  };
+  const sizeAt100 = await toggleSize();
+
   await page.getByTestId('rail-zoom-in').click();
   await expect(page.locator('html')).toHaveCSS('font-size', '17.6px');
   await expectMatching('15.4px');
+  // Rail chrome is px-pinned: zoom never resizes its buttons.
+  expect(await toggleSize()).toEqual(sizeAt100);
 
   await page.getByTestId('rail-zoom-out').click();
   await page.getByTestId('rail-zoom-out').click();
