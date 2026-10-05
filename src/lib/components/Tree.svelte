@@ -301,8 +301,10 @@
   }
 
   /* Folder rows highlight as a whole (the twisty/name halves are transparent),
-     so the split toggle still reads as one row. */
-  .row.dir:hover {
+     so the split toggle still reads as one row — except while the pointer is
+     on the twisty, which then lights up on its own (see `.twisty-toggle:hover`)
+     so it reads as "toggle expansion", not "open the folder's page". */
+  .row.dir:hover:not(:has(.twisty-toggle:hover)) {
     background: var(--hover);
   }
 
@@ -352,8 +354,10 @@
     justify-content: center;
   }
 
-  /* The twisty half is a bare button (no .entry chrome) — the row owns the hover
-     highlight (see `.row.dir:hover`), so it stays transparent. */
+  /* The twisty half is a bare button (no .entry chrome). Hovering it paints a
+     caret-sized chip with an accent ring and an accent caret, and the row's own
+     hover highlight steps aside (see `.row.dir:hover`), so the click target is
+     plainly the disclosure toggle rather than the folder name. */
   .twisty-toggle {
     border: none;
     background: none;
@@ -362,6 +366,18 @@
     padding: 0;
     cursor: pointer;
     border-radius: var(--radius-sm);
+    transition:
+      background 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  .twisty-toggle:hover {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-ring);
+  }
+
+  .twisty-toggle:hover .twisty {
+    color: var(--accent);
   }
 
   .name-toggle:hover {

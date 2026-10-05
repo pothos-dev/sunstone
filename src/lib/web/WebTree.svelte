@@ -102,7 +102,10 @@
     border-radius: var(--radius-sm);
   }
 
-  .row.dir:hover {
+  /* The whole folder row highlights on hover, except while the pointer is on
+     the twisty: then only the twisty lights up, so it reads as "toggle
+     expansion" rather than "open the folder's page". */
+  .row.dir:hover:not(:has(.twisty-toggle:hover)) {
     background: var(--hover);
   }
 
@@ -125,6 +128,24 @@
     padding: 0;
     cursor: pointer;
     border-radius: var(--radius-sm);
+    transition:
+      background 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  .twisty-toggle:hover {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent-ring);
+  }
+
+  .twisty-toggle:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: -2px;
+  }
+
+  .twisty-toggle:hover .twisty,
+  .twisty-toggle:focus-visible .twisty {
+    color: var(--accent);
   }
 
   .twisty {
