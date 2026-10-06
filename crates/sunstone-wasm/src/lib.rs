@@ -18,6 +18,7 @@ use wasm_bindgen::prelude::*;
 use sunstone_shared::citations::{self, CitationRef};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
+use sunstone_shared::footnotes::{self, Footnote};
 use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
@@ -221,6 +222,19 @@ pub fn find_citation_refs(text: String) -> Vec<CitationRef> {
 #[wasm_bindgen(js_name = citationDefPos)]
 pub fn citation_def_pos(text: String, num: String) -> Option<usize> {
     citations::citation_def_pos(&text, &num)
+}
+
+/// Every footnote reference and definition (`[^label]` / `[^label]:`) in
+/// `text`, in document order.
+#[wasm_bindgen(js_name = scanFootnotes)]
+pub fn scan_footnotes(text: String) -> Vec<Footnote> {
+    footnotes::scan_footnotes(&text)
+}
+
+/// The offset of footnote `label`'s definition (`[^label]:`), or `null`.
+#[wasm_bindgen(js_name = footnoteDefPos)]
+pub fn footnote_def_pos(text: String, label: String) -> Option<usize> {
+    footnotes::footnote_def_pos(&text, &label)
 }
 
 /// A Concept's bundle path → its pretty viewer URL pathname (drops `.md` and a

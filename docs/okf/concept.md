@@ -55,7 +55,7 @@ The body is where Sunstone's viewer/editor adds the most beyond plain markdown �
 - **Live preview** — Obsidian-style hybrid editing (source is truth; inactive lines render styled, the cursor line shows raw markup) via CodeMirror 6 decorations. See [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md) and the [editor docs](/editor/index.md).
 - **Outline** — the open Concept's headings in document order, derived live from the body (**frontmatter and fenced code excluded**). Powers the **Outline** [Section](/GLOSSARY.md).
 - **Diagrams** — ` ```mermaid ` fenced blocks are **rendered** as diagrams. To the spec these are just fenced code ([§4.2](/okf/spec.md#42-body)); Sunstone renders them via its own block-replace CodeMirror field (`securityLevel: 'strict'`, lazy-loaded). See [ADR 0005](/adr/0005-mermaid-block-rendering.md).
-- **Citations** — Sunstone honours the legacy `# Citations` convention ([§13.1](/okf/spec.md#131-breaking-changes)) _and_ adds inline **citation-reference superscripts**: a `[n]` token following a word renders as a clickable superscript that jumps to the matching `[n]` row. This is a Sunstone affordance beyond the spec. See [Linking → Citations](/okf/linking.md#citations).
+- **Citations** — Sunstone honours the legacy `# Citations` convention ([§13.1](/okf/spec.md#131-breaking-changes)) _and_ adds inline **citation-reference superscripts**: a `[n]` token following a word renders as a clickable superscript that jumps to the matching `[n]` row. This is a Sunstone affordance beyond the spec. See [Linking → Citations](/okf/linking.md#citations). Markdown footnotes (`[^label]` / `[^label]:`) render the same way and are the form to write new attribution in; see [Linking → Footnotes](/okf/linking.md#footnotes).
 - **Wikilinks** — `[[name]]` links resolve by filename, a Sunstone-only secondary link form (OKF uses path-based markdown links only). See [Linking](/okf/linking.md) and [ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md).
 - **CriticMarkup** and other custom extensions round out the [editor's own extensions](/editor/custom-extensions.md).
 
@@ -70,7 +70,7 @@ The `# Schema` / `# Examples` conventional headings ([§4.2](/okf/spec.md#42-bod
 | Conformance nagging | Consumers must not reject | OKF lint + completion only in a Bundle declaring `okf_version` ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md)) |
 | Required `type` | REQUIRED | Tolerated, **not enforced** — no conformance nag |
 | Mermaid | Just fenced code | **Rendered** as diagrams ([ADR 0005](/adr/0005-mermaid-block-rendering.md)) |
-| Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list, **plus** inline `[n]` superscript refs |
+| Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list, **plus** inline `[n]` superscript refs and `[^label]` footnotes |
 | Links in body | Path-based markdown links ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 
 ## Related

@@ -28,3 +28,24 @@ describe('renderConcept citations', () => {
     expect(html).not.toContain('citation-def');
   });
 });
+
+// Footnotes must match the Rust `footnotes_to_sentinels` markup (ov-14).
+describe('renderConcept footnotes', () => {
+  test('a reference links to its definition, labels as written', () => {
+    const { html } = renderConcept('Claim [^2] here.\n\n[^2]: The source.\n');
+    expect(html).toContain('Claim <sup class="footnote-ref"><a href="#fn-2">[2]</a></sup> here.');
+    expect(html).toContain('<p><a id="fn-2" class="footnote-def">[2]</a> The source.</p>');
+  });
+
+  test('a reference with no definition is broken and unlinked', () => {
+    const { html } = renderConcept('Claim[^9].\n');
+    expect(html).toContain('<sup class="footnote-ref broken">[9]</sup>');
+    expect(html).not.toContain('#fn-9');
+  });
+
+  test('citations and footnotes render side by side', () => {
+    const { html } = renderConcept('a.[6] b[^1]\n\n[6] row\n[^1]: note\n');
+    expect(html).toContain('href="#cite-6"');
+    expect(html).toContain('href="#fn-1"');
+  });
+});

@@ -14,6 +14,7 @@
 pub mod citations;
 pub mod critic;
 pub mod embed;
+pub mod footnotes;
 pub mod frontmatter;
 pub mod links;
 pub mod outline;

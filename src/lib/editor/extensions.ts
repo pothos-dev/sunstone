@@ -41,6 +41,7 @@ import { embedBlocks } from './embeds';
 import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
+import { footnotes, footnoteTheme } from './footnotes';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
@@ -253,6 +254,9 @@ export function modeExtensions(
     // the cursor. Placed after inlinePreview so the replace decoration overrides
     // the stray reference-link syntax colour on the middle number.
     citations(reading),
+    // Footnotes: `[^label]` renders as a superscript that jumps to its
+    // `[^label]:` definition (ov-14). Same modes and placement as citations.
+    footnotes(reading),
     // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown
     // keeps the hyphens). `reading` always renders; `editing` reveals the raw
     // run under the cursor.
@@ -378,6 +382,7 @@ export function editorExtensions(
     // Citation superscript-link + jump-target styling (static; the decorations
     // are mode-gated in `modeExtensions`).
     citationTheme,
+    footnoteTheme,
     // Heading-identity tracking for slug-anchor rewriting (slug-anchor-rewrite):
     // baselines the open Concept's heading slugs and follows each heading across
     // edits so the host can rewrite inbound anchors when a heading is renamed.

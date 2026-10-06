@@ -29,6 +29,7 @@ import type {
   CriticMarkKind,
   Annotation,
   CitationRef,
+  Footnote,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -51,6 +52,7 @@ export type {
   CriticMarkKind,
   Annotation,
   CitationRef,
+  Footnote,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -154,6 +156,16 @@ export function findCitationRefs(text: string): CitationRef[] {
 /** Offset of citation `num`'s definition row (line-start `[num]`), or null. */
 export function citationDefPos(text: string, num: string): number | null {
   return mod ? (mod.citationDefPos(text, num) ?? null) : null;
+}
+
+/** Every footnote reference and definition (`[^label]` / `[^label]:`) in `text`. */
+export function scanFootnotes(text: string): Footnote[] {
+  return mod ? mod.scanFootnotes(text) : [];
+}
+
+/** Offset of footnote `label`'s definition (`[^label]:`), or null. */
+export function footnoteDefPos(text: string, label: string): number | null {
+  return mod ? (mod.footnoteDefPos(text, label) ?? null) : null;
 }
 
 /**

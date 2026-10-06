@@ -21,6 +21,7 @@ import {
   scanHeadings,
   parseCriticMarks,
   findCitationRefs,
+  scanFootnotes,
   type CriticMark,
 } from '$lib/wasm/exports';
 
@@ -38,6 +39,14 @@ export function renderConcept(content: string): RenderPayload {
   const offset = frontmatterLineCount(content);
   const byLine = new Map<number, OutlineHeading>();
   for (const h of outline) byLine.set(h.line - offset - 1, h);
+
+  // Footnote labels with a definition anywhere in the body (case-insensitive,
+  // as the shared scanner matches them), so a per-line reference knows it.
+  definedFootnotes = new Set(
+    scanFootnotes(body)
+      .filter((f) => f.def)
+      .map((f) => f.label.toLowerCase()),
+  );
 
   const htmlParts: string[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -66,11 +75,39 @@ function renderInline(text: string, lineStart = false): string {
   let out = '';
   let pos = 0;
   for (const mark of marks) {
-    out += renderTextWithCitations(text.slice(pos, mark.from), lineStart && pos === 0);
+    out += renderTextWithFootnotes(text.slice(pos, mark.from), lineStart && pos === 0);
     out += renderMark(mark);
     pos = mark.to;
   }
-  out += renderTextWithCitations(text.slice(pos), lineStart && pos === 0);
+  out += renderTextWithFootnotes(text.slice(pos), lineStart && pos === 0);
+  return out;
+}
+
+/** Labels defined in the Concept being rendered (set by `renderConcept`). */
+let definedFootnotes = new Set<string>();
+
+/**
+ * Render footnotes to the SAME markup the Rust renderer emits
+ * (`footnotes_to_sentinels`), handing the text between them to the citation
+ * renderer. A definition counts only when this run is at the line start.
+ * Omits Rust's `<br>` between consecutive definitions (one line per `<p>` here).
+ */
+function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
+  let out = '';
+  let p = 0;
+  for (const f of scanFootnotes(seg)) {
+    out += renderTextWithCitations(seg.slice(p, f.from), atLineStart && p === 0);
+    const label = escapeHtml(f.label).replace(/"/g, '&quot;');
+    if (f.def && atLineStart) {
+      out += `<a id="fn-${label}" class="footnote-def">[${label}]</a>`;
+    } else if (definedFootnotes.has(f.label.toLowerCase())) {
+      out += `<sup class="footnote-ref"><a href="#fn-${label}">[${label}]</a></sup>`;
+    } else {
+      out += `<sup class="footnote-ref broken">[${label}]</sup>`;
+    }
+    p = f.to;
+  }
+  out += renderTextWithCitations(seg.slice(p), atLineStart && p === 0);
   return out;
 }
 

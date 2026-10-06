@@ -38,6 +38,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `outline` | ATX-only heading scan (`scan_headings` → `OutlineHeading`) and `find_heading_line`. |
 | `critic` | CriticMarkup parse/group — `parse_critic_marks`, `pair_annotations`, `annotation_at` (offset-span structs). |
 | `citations` | Inline citation scanning — `find_citation_refs`, `find_citation_defs`, `citation_def_pos`. |
+| `footnotes` | Markdown footnote scanning — `scan_footnotes` (references + definitions), `footnote_def_pos`. |
 | `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
 | `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, the move/rename engine (`rewrite::moves`) and the Backlinks markdown-link extraction (`markdown_link_hrefs`, used by the native index) all walk — extraction and rewriting can never disagree on what counts as a link (a fenced link is neither extracted nor rewritten; a markdown link in inline code is both). |
 
@@ -74,7 +75,7 @@ It exposes two shapes over the shared kernels:
   same code that runs natively.
 - **Free (handle-less) exports** — per-call kernels for frontmatter
   (`splitFrontmatter`, `parseFrontmatter*`), render-derived scanners
-  (`scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `conceptToUrl`),
+  (`scanHeadings`, `parseCriticMarks`, `findCitationRefs`, `scanFootnotes`, `conceptToUrl`),
   and the fake backend's corpus-walking variants (`resolveLinkIn`,
   `rewriteAnchors`, `planMoveRewrites`, …) that take an explicit path-set or
   corpus rather than the handle's.

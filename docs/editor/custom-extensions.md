@@ -19,6 +19,7 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | Wikilinks | `wiki-links.ts` | atomic `wikiLinks` + overlay `ViewPlugin` | `[[name]]` rendering / navigation |
 | Broken links | `broken-links.ts` | `ViewPlugin` + `StateEffect` | Dashed-red styling of unresolved `[](…)` |
 | Citations | `citations.ts` | `ViewPlugin` + `WidgetType` + flash `StateField` | `[n]` superscript → jump to citation row |
+| Footnotes | `footnotes.ts` | `ViewPlugin` + `WidgetType` (shares the citation flash field) | `[^label]` superscript → jump to `[^label]:` definition |
 | CriticMarkup | `criticMarkup.ts`, `criticMarkupView.ts` | `StateField` decorations + `gutter` + `hoverTooltip` | Highlights, comments, track-changes |
 | Anchor tracking | `anchor-tracking.ts` | `StateField` + `StateEffect` | Follow heading slugs across edits for rename-rewrite |
 | Frontmatter | `frontmatter-field.ts` | `StateField` + `invertedEffects` | Structured frontmatter in unified undo |
@@ -58,6 +59,10 @@ Notable techniques:
 ## Citations
 
 `citations(reading)` renders an inline `[n]` that follows a word as a clickable superscript that scrolls to the matching `[n] …` citation row lower in the Concept and flashes it (~1.2s). Two-part architecture: a `ViewPlugin` builds the superscript `Decoration.replace({ widget })` (its `CitationWidget` overrides `ignoreEvent() → false` so the click reaches the DOM handler), and a separate `citationFlashField` `StateField` holds the flash `Decoration.line` so it survives viewport recompute and maps through edits. It relies on the [patch](/editor/atomic-editor-patch.md)'s url-less-`Link` fix (so `[n]` arrives as literal text) and is placed after `inlinePreview` so its replace decoration wins over the stray reference-link syntax colour.
+
+## Footnotes
+
+`footnotes(reading)` does the same for markdown footnotes over the shared `scanFootnotes` kernel: a `[^label]` reference becomes a superscript `[label]` that jumps to its `[^label]:` definition through the citations' `jumpAndFlash` (installing `citationFlashField` too, which CodeMirror dedupes), each definition marker becomes a `[label]` row head, and a reference with no definition renders dashed red and ignores clicks. In hybrid mode a reference shows raw under the cursor and a definition marker shows raw while the cursor is on its line. Labels render as written. See [Linking → Footnotes](/okf/linking.md#footnotes).
 
 ## CriticMarkup
 

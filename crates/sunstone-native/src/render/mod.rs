@@ -32,12 +32,14 @@
 //!
 //! This module is split into: the pipeline above (here), the CriticMarkup
 //! sentinel pass (`critic.rs`), the citation-superscript sentinel pass
-//! (`citations.rs`) and the Embed pass (`embeds.rs`); the two sentinel passes
-//! share their scan/substitute plumbing via `sentinel::Sentinels`.
+//! (`citations.rs`), the footnote sentinel pass (`footnotes.rs`) and the Embed
+//! pass (`embeds.rs`); the sentinel passes share their scan/substitute plumbing
+//! via `sentinel::Sentinels`.
 
 mod citations;
 mod critic;
 mod embeds;
+mod footnotes;
 mod sentinel;
 
 use std::path::Path;
@@ -60,6 +62,7 @@ use sunstone_shared::wikilink::{self, parse_target};
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
+use footnotes::footnotes_to_sentinels;
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -159,6 +162,10 @@ pub fn render_body(
     //     reference link (which is what made the middle number look highlighted).
     let (body, citation_repls) = citations_to_sentinels(&body);
 
+    // 0c. Footnotes (`[^label]` / `[^label]:`) the same way (ov-14), with the
+    //     shared scanner instead of comrak's renumbering footnote extension.
+    let (body, footnote_repls) = footnotes_to_sentinels(&body);
+
     // 1. Rewrite `[[wikilinks]]` to markdown links carrying a resolution marker
     //    URL, so comrak parses them as ordinary links we finish uniformly below.
     let prepared = wikilink::replace_wikilinks(&body, |raw| {
@@ -209,6 +216,7 @@ pub fn render_body(
     let html = substitute_critic_sentinels(&html, &critic_repls);
     // Substitute the citation sentinels with their superscript-link / anchor HTML.
     let html = substitute_citation_sentinels(&html, &citation_repls);
+    let html = footnote_repls.substitute(&html);
 
     RenderPayload {
         html,

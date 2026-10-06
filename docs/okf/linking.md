@@ -29,6 +29,7 @@ All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-test
 | Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
 | Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
 | Citation refs | `citations.rs` (`find_citation_refs`, `find_citation_defs`, `citation_def_pos`) | `findCitationRefs`, `citationDefPos` |
+| Footnotes | `footnotes.rs` (`scan_footnotes`, `footnote_def_pos`) | `scanFootnotes`, `footnoteDefPos` |
 | Rename/move rewrite | `rewrite/moves.rs` (`plan_rewrites`, `build_move_map`), `rewrite/relpath.rs` (path math) | `planMoveRewrites` (the fake backend's `planRewrites`) |
 
 Rename/move rewrite has a single implementation too: native `rename_and_rewrite` drives it around the filesystem, and the fake backend's `planRewrites` hands its in-memory corpus to `planMoveRewrites`, so Chromium/Playwright exercise the same engine. The one remaining TS stand-in is the fake's Backlinks extraction (`outboundLinks` in `src/lib/ipc/fake/links.ts`, over the wasm resolvers). The CodeMirror extensions (`src/lib/editor/*.ts`) are the thin **view/authoring** layer over those wasm exports, never a second copy of the logic.
@@ -141,6 +142,19 @@ Sunstone recognises two related but distinct things under the citation banner:
 - `citation_def_pos(text, num)` (`citationDefPos`) returns the offset of the first `find_citation_defs` row numbered `num`, or `null` for a dangling reference.
 
 `src/lib/editor/citations.ts` is the thin CodeMirror layer: a `CitationWidget` superscript, a click handler that scrolls to the definition and briefly flashes it, active in hybrid + reading modes (in hybrid the raw token is revealed under the cursor for editing; absent in source `edit` mode).
+
+The "follows a word" rule means a space-separated `text [6]` is **not** a citation reference. New documents should use footnotes (below) instead; the `/llm-wiki` skill's `migrate-footnotes.ts` script converts existing `[n]` documents.
+
+### Footnotes
+
+Markdown footnotes are the standard form of per-claim attribution (OKF v0.2 §5.1, and what GFM, pandoc and Obsidian understand). `sunstone-shared/src/footnotes.rs` is the detector:
+
+- `scan_footnotes(text)` (`scanFootnotes`) returns every footnote in document order. A **definition** is a `[^label]:` at the start of a line (after at most three spaces); its span runs through the `:`, and the footnote text after it stays ordinary markdown. Any other `[^label]` is a **reference**, unless it is preceded by `[` (a wikilink) or followed by `(` (a markdown link). A label is one or more characters other than whitespace and brackets, and labels match case-insensitively. Fenced code and inline code spans are skipped. Each reference carries `defined`, false for a dangling one.
+- `footnote_def_pos(text, label)` (`footnoteDefPos`) returns the offset of the first definition of `label`, or `null`.
+
+Labels are shown **as written**: `[^2]` renders as a superscript `[2]`, and nothing is renumbered. Joining a label to a `sources[].id` in the Frontmatter is [ov-10](/tickets/okf-v02/ov-10-sources-provenance-family.md)'s job and not done yet.
+
+`src/lib/editor/footnotes.ts` mirrors the citation layer: a superscript widget that jumps to the definition and flashes it (sharing `citationFlashField`), a `[label]` row-head widget over each definition marker (raw while the cursor is on that line in hybrid mode), and a dashed red, unclickable superscript for a dangling reference. The native render's `render/footnotes.rs` emits the same through a sentinel pass: `<sup class="footnote-ref"><a href="#fn-label">[label]</a></sup>`, a `<sup class="footnote-ref broken">` for a dangling one, and `<a id="fn-label" class="footnote-def">[label]</a>` at each definition, which stays where it was written. comrak's own footnote extension is not used, because it renumbers footnotes and moves the definitions to the end of the document.
 
 ## Broken links
 

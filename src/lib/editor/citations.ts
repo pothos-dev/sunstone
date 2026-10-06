@@ -87,7 +87,7 @@ const setCitationFlash = StateEffect.define<number | null>();
  * the target is obvious in reading mode (where there is no caret). Set by
  * `jumpToCitation` and cleared on a timer.
  */
-const citationFlashField = StateField.define<DecorationSet>({
+export const citationFlashField = StateField.define<DecorationSet>({
   create() {
     return Decoration.none;
   },
@@ -111,17 +111,25 @@ const citationFlashField = StateField.define<DecorationSet>({
 
 /**
  * Scroll to citation `num`'s definition row and flash it. No-op when the number
- * has no matching row (a dangling reference). The flash clears after ~1.2s.
+ * has no matching row (a dangling reference).
  */
 function jumpToCitation(view: EditorView, num: string): void {
   const pos = citationDefPos(view.state.doc.toString(), num);
-  if (pos == null) return;
+  if (pos != null) jumpAndFlash(view, pos);
+}
+
+/**
+ * Scroll to `pos` and flash its line. Shared with the footnote extension, which
+ * must install `citationFlashField` too (CodeMirror dedupes the field).
+ */
+export function jumpAndFlash(view: EditorView, pos: number): void {
   view.dispatch({
     effects: [EditorView.scrollIntoView(pos, { y: 'center' }), setCitationFlash.of(pos)],
     // Editable modes: park the caret at the row too. Reading mode has no caret,
     // so the flash carries the feedback.
     selection: view.state.readOnly ? undefined : { anchor: pos },
   });
+  // The flash clears after ~1.2s.
   setTimeout(() => {
     view.dispatch({ effects: setCitationFlash.of(null) });
   }, 1200);

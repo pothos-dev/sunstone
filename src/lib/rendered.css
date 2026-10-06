@@ -112,6 +112,38 @@
   text-decoration: none;
 }
 
+/* --- Footnotes (ov-14) --------------------------------------------------------
+   `[^label]` → a superscript link to the line-start `[^label]:` definition,
+   which renders as a plain row head (the jump target). A reference with no
+   definition is a `broken` superscript with no link. Mirrors the editor's
+   `.cm-footnote-ref` / `.cm-footnote-def`. */
+.rendered sup.footnote-ref {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.rendered sup.footnote-ref a {
+  color: var(--accent, #d9622b);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rendered sup.footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+.rendered sup.footnote-ref.broken {
+  color: var(--danger, #c0392b);
+  font-weight: 600;
+  text-decoration: underline dashed;
+}
+
+.rendered a.footnote-def {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
 /* --- CriticMarkup track-changes + annotations -------------------------------
    The shared Rust renderer emits these inline in the Concept body:
      <ins class="critic-add">    addition
