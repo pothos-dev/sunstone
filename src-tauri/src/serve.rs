@@ -22,6 +22,8 @@ pub(crate) fn run(opts: ServeOptions, context: tauri::Context<tauri::Wry>) {
     let served = sunstone_server::serve_local(LocalServeOptions {
         bundle_root,
         port: opts.port,
+        bind: opts.bind,
+        allowed_hosts: opts.allowed_hosts,
         assets: app_shell_assets(context),
     });
     if let Err(e) = tauri::async_runtime::block_on(served) {

@@ -28,7 +28,9 @@ into a database you can't grep.
 Prefer a browser tab to a window? `sunstone serve ./notes` serves the same
 editor at `http://localhost:3000/` (`--port` to change it). It listens on
 localhost only and needs no sign-in, and edits save to disk just as they do
-in the app.
+in the app. To put it behind a reverse proxy, pass the public name with
+`--allow-host notes.example.com` (and `--bind 0.0.0.0` if the proxy can't
+reach localhost). There is still no sign-in, so the proxy has to handle access.
 
 ## Built for the Google Open Knowledge Format
 
