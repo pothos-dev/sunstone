@@ -4,6 +4,27 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-10-06
+
+### Added
+
+- Footnotes. A `[^label]` reference renders as a superscript `[label]`.
+  Clicking it jumps to its `[^label]:` definition and flashes it. A reference
+  with no definition is shown as broken. Works in the editor and the web viewer.
+- The frontmatter YAML editor can fold nested blocks. A folded block shows what
+  it hides ("3 entries", "2 keys"). `sources` and `verified` start folded when
+  a Concept opens.
+- `sunstone serve` can run behind a reverse proxy. `--allow-host NAME` accepts
+  requests for that host name, and `--bind ADDR` listens on an address other
+  than localhost. There is still no sign-in, so the proxy has to control access.
+
+### Fixed
+
+- The side rails no longer grow past their width when you zoom the UI. The
+  font-size button now spans the full rail at the bottom edge.
+- Hovering a folder's caret in the tree highlights only the caret, making it
+  clear that clicking toggles the folder rather than opening its page.
+
 ## [0.23.0] - 2026-10-04
 
 ### Added
