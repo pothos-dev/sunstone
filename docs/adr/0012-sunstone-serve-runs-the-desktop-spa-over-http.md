@@ -27,16 +27,33 @@ into a token so that axum knows who is writing. `sunstone serve` has one user, t
 the machine, which is the desktop's trust model, and the desktop has no gate either. In
 place of the token:
 
-- the listeners bind **loopback only**: 127.0.0.1, plus `[::1]` when the machine has IPv6;
+- the listeners bind **loopback** by default: 127.0.0.1, plus `[::1]` when the machine has
+  IPv6;
 - a middleware refuses any request whose `Host` is not `localhost` / `127.0.0.1` / `[::1]`
-  (with any port), or whose `Origin`, when sent, names another host. This is what stops
-  **DNS rebinding**: a hostile page whose domain re-resolves to 127.0.0.1 counts as
+  (with any port) or a name passed with `--allow-host`, or whose `Origin`, when sent, names
+  another host. This is what stops **DNS rebinding**: a hostile page whose domain re-resolves to 127.0.0.1 counts as
   same-origin to the browser, but it still sends its own domain as `Host`;
 - the write routes take JSON bodies (`axum::Json` requires `application/json`), so a
   cross-origin `fetch` needs a CORS preflight, and this server never answers one.
 
 Other users on a shared machine can still reach the port. That is the same exposure as any
-local dev server, and it is why this mode stays loopback-only and offers no `--host`.
+local dev server.
+
+### Behind a reverse proxy (amended)
+
+The loopback-only version could not sit behind a reverse proxy: the proxy forwards the
+public name as `Host` and the page's `https://` origin as `Origin`, and the guard refused
+both. The workaround was a second proxy that rewrote both headers to `localhost`, which
+turned the guard off entirely. Two opt-in flags replace it:
+
+- `--allow-host NAME` (repeatable) adds exact host names to the trusted set. `Origin` may
+  then be `http://` or `https://`. Any other name still gets a 403, so DNS rebinding stays
+  closed: the attacker's domain is not on the list.
+- `--bind ADDR` listens on another address, for a proxy that cannot reach loopback (e.g. a
+  container on a Docker bridge). The binary warns when ADDR is not loopback.
+
+Neither flag adds a sign-in. Whoever can reach the proxy can edit the Bundle, so access
+control belongs in the proxy.
 
 ## Considered options
 

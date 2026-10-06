@@ -12,17 +12,21 @@
 //! The trust model is the desktop's — the one user is the person at the
 //! machine — so the local shape drops the JWT gate. What stands in for it:
 //!
-//! - the listeners bind **loopback only** — 127.0.0.1, plus `[::1]` where the
-//!   machine has IPv6 — never a routable address;
-//! - [`guard_loopback`] refuses any request whose `Host` (or, when present,
-//!   `Origin`) is not a loopback name. That closes DNS rebinding — a hostile
-//!   page whose domain re-resolves to 127.0.0.1 is same-origin to itself but
-//!   still sends its own `Host` — and cross-site form posts;
+//! - the listeners bind **loopback** — 127.0.0.1, plus `[::1]` where the
+//!   machine has IPv6 — unless the caller names another address
+//!   ([`LocalServeOptions::bind`], for a reverse proxy that cannot reach
+//!   loopback);
+//! - [`guard_host`] refuses any request whose `Host` (or, when present,
+//!   `Origin`) is neither a loopback name nor one the caller allowed
+//!   ([`LocalServeOptions::allowed_hosts`], the proxy's public name). That
+//!   closes DNS rebinding — a hostile page whose domain re-resolves to
+//!   127.0.0.1 is same-origin to itself but still sends its own `Host` — and
+//!   cross-site form posts;
 //! - the write routes take JSON bodies, so a cross-origin `fetch` needs a CORS
 //!   preflight this server never answers.
 
 use std::future::IntoFuture;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -54,6 +58,13 @@ pub struct LocalServeOptions {
     /// The loopback port to listen on. `0` picks a free one — a library-level
     /// convenience (the tests use it); the CLI insists on a real port.
     pub port: u16,
+    /// The address to listen on; `None` is loopback (127.0.0.1, plus `[::1]`
+    /// where available). Anything else is reachable by whoever can route to
+    /// it, with no sign-in — meant for a reverse proxy on another interface.
+    pub bind: Option<IpAddr>,
+    /// Host names accepted in `Host` / `Origin` besides the loopback ones —
+    /// the public name a reverse proxy forwards under. Lowercase, no port.
+    pub allowed_hosts: Vec<String>,
     /// The desktop SPA build.
     pub assets: AppShellAssets,
 }
@@ -71,45 +82,66 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
         return Err(format!("{} is not a folder", root.display()));
     }
 
-    // Bind before building the index, so a taken port fails fast. IPv4 is
-    // required; `[::1]` on the same port is best-effort (a machine without
-    // IPv6 just serves 127.0.0.1), so a client resolving `localhost` to `::1`
-    // still connects.
-    let addr = SocketAddr::from(([127, 0, 0, 1], opts.port));
-    let v4 = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
+    // Bind before building the index, so a taken port fails fast. The main
+    // address is required; on the default loopback bind, `[::1]` on the same
+    // port is best-effort (a machine without IPv6 just serves 127.0.0.1), so a
+    // client resolving `localhost` to `::1` still connects.
+    let addr = SocketAddr::new(opts.bind.unwrap_or(IpAddr::from([127, 0, 0, 1])), opts.port);
+    let main = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
         format!("cannot listen on {addr}: {e} (pick another port with --port)")
     })?;
-    let port = v4.local_addr().map(|a| a.port()).unwrap_or(opts.port);
-    let v6 = tokio::net::TcpListener::bind(SocketAddr::from((
-        [0, 0, 0, 0, 0, 0, 0, 1],
-        port,
-    )))
-    .await
-    .ok();
+    let port = main.local_addr().map(|a| a.port()).unwrap_or(opts.port);
+    let v6 = match opts.bind {
+        None => tokio::net::TcpListener::bind(SocketAddr::from((
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            port,
+        )))
+        .await
+        .ok(),
+        Some(_) => None,
+    };
 
     let (state, _watcher) = crate::start(Config::local(root.clone(), port), root.clone());
-    let app = app(crate::router(state), opts.assets);
+    let app = app(crate::router(state), opts.assets, opts.allowed_hosts.clone());
 
-    eprintln!("Serving {} at http://localhost:{port}/", root.display());
+    match opts.bind {
+        None => eprintln!("Serving {} at http://localhost:{port}/", root.display()),
+        Some(ip) => {
+            eprintln!("Serving {} on {}", root.display(), SocketAddr::new(ip, port));
+            if !ip.is_loopback() {
+                eprintln!(
+                    "warning: anyone who can reach this address can read and edit the \
+                     Bundle, with no sign-in"
+                );
+            }
+        }
+    }
+    if !opts.allowed_hosts.is_empty() {
+        eprintln!("Also answering as: {}", opts.allowed_hosts.join(", "));
+    }
     eprintln!("Press Ctrl+C to stop.");
     let served = match v6 {
         Some(v6) => tokio::try_join!(
-            axum::serve(v4, app.clone()).into_future(),
+            axum::serve(main, app.clone()).into_future(),
             axum::serve(v6, app).into_future(),
         )
         .map(|_| ()),
-        None => axum::serve(v4, app).await,
+        None => axum::serve(main, app).await,
     };
     served.map_err(|e| format!("server error: {e}"))
 }
 
-/// The API router plus the app-shell fallback, behind the loopback guard.
-fn app(api: Router, assets: AppShellAssets) -> Router {
+/// The API router plus the app-shell fallback, behind the host guard.
+fn app(api: Router, assets: AppShellAssets, allowed_hosts: Vec<String>) -> Router {
+    let allowed: Arc<[String]> = allowed_hosts.into();
     api.fallback(move |uri: Uri| {
         let assets = assets.clone();
         async move { app_shell(&assets, uri.path()) }
     })
-    .layer(middleware::from_fn(guard_loopback))
+    .layer(middleware::from_fn(move |req: Request, next: Next| {
+        let allowed = allowed.clone();
+        async move { guard_host(&allowed, req, next).await }
+    }))
 }
 
 /// Serve a built file, or the marked `index.html` for any route the SPA owns.
@@ -199,36 +231,44 @@ fn shell_content_type(rel: &str) -> &'static str {
     }
 }
 
-/// Refuse a request whose `Host` is not loopback, or whose `Origin` (sent on
-/// cross-origin and on non-GET same-origin requests) names a non-loopback
-/// host. See the module docs for why this replaces the JWT gate.
-async fn guard_loopback(req: Request, next: Next) -> Response {
-    if !headers_are_loopback(req.headers()) {
-        return (StatusCode::FORBIDDEN, "sunstone serve only answers localhost").into_response();
+/// Refuse a request whose `Host` is not trusted, or whose `Origin` (sent on
+/// cross-origin and on non-GET same-origin requests) names an untrusted host.
+/// Trusted is loopback plus `allowed`. See the module docs for why this
+/// replaces the JWT gate.
+async fn guard_host(allowed: &[String], req: Request, next: Next) -> Response {
+    if !headers_are_trusted(req.headers(), allowed) {
+        return (
+            StatusCode::FORBIDDEN,
+            "sunstone serve only answers localhost (see --allow-host)",
+        )
+            .into_response();
     }
     next.run(req).await
 }
 
-/// Whether `Host` names loopback and `Origin` — absent on a same-origin GET —
-/// does too. A missing `Host` fails: HTTP/1.1 requires one.
-fn headers_are_loopback(headers: &HeaderMap) -> bool {
+/// Whether `Host` names a trusted host and `Origin` — absent on a same-origin
+/// GET — does too. A missing `Host` fails: HTTP/1.1 requires one. `Origin` may
+/// be `https://`: a TLS-terminating proxy forwards the page's own origin.
+fn headers_are_trusted(headers: &HeaderMap, allowed: &[String]) -> bool {
+    let trusted = |authority: &str| is_trusted_authority(authority, allowed);
     let host_ok = headers
         .get(HOST)
         .and_then(|h| h.to_str().ok())
-        .is_some_and(is_loopback_authority);
+        .is_some_and(trusted);
     let origin_ok = match headers.get(ORIGIN) {
         None => true,
         Some(origin) => origin
             .to_str()
             .ok()
-            .and_then(|o| o.strip_prefix("http://"))
-            .is_some_and(is_loopback_authority),
+            .and_then(|o| o.strip_prefix("http://").or_else(|| o.strip_prefix("https://")))
+            .is_some_and(trusted),
     };
     host_ok && origin_ok
 }
 
-/// Whether `authority` (`host[:port]`) names this machine's loopback.
-fn is_loopback_authority(authority: &str) -> bool {
+/// Whether `authority` (`host[:port]`) names this machine's loopback or one of
+/// the `allowed` host names (compared without the port, case-insensitively).
+fn is_trusted_authority(authority: &str, allowed: &[String]) -> bool {
     let host = if let Some(rest) = authority.strip_prefix('[') {
         match rest.split_once(']') {
             Some((h, tail)) if tail.is_empty() || tail.starts_with(':') => h,
@@ -237,10 +277,9 @@ fn is_loopback_authority(authority: &str) -> bool {
     } else {
         authority.split(':').next().unwrap_or("")
     };
-    matches!(
-        host.to_ascii_lowercase().as_str(),
-        "localhost" | "127.0.0.1" | "::1"
-    )
+    let host = host.to_ascii_lowercase();
+    matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
+        || (!host.is_empty() && allowed.iter().any(|a| *a == host))
 }
 
 #[cfg(test)]
@@ -265,7 +304,7 @@ mod tests {
         let state = server_state(Config::local(seeded_bundle("local"), 0));
         assert_eq!(state.cfg.shape, crate::config::Shape::Local);
         let root = state.app.bundle_root.clone();
-        (app(crate::router(state), assets()), root)
+        (app(crate::router(state), assets(), vec!["notes.example.com".into()]), root)
     }
 
     async fn send(req: HttpRequest<Body>) -> (StatusCode, HeaderMap, String) {
@@ -297,19 +336,32 @@ mod tests {
     }
 
     #[test]
-    fn only_loopback_authorities_pass() {
-        for ok in ["localhost", "localhost:3000", "LOCALHOST:1", "127.0.0.1:3000", "[::1]:3000", "[::1]"] {
-            assert!(is_loopback_authority(ok), "{ok} should pass");
+    fn only_loopback_and_allowed_authorities_pass() {
+        let allowed = ["notes.example.com".to_string()];
+        for ok in [
+            "localhost",
+            "localhost:3000",
+            "LOCALHOST:1",
+            "127.0.0.1:3000",
+            "[::1]:3000",
+            "[::1]",
+            "notes.example.com",
+            "Notes.Example.com:443",
+        ] {
+            assert!(is_trusted_authority(ok, &allowed), "{ok} should pass");
         }
+        assert!(!is_trusted_authority("notes.example.com", &[]), "nothing allowed by default");
         for bad in [
             "evil.example:3000",
             "localhost.evil.example",
             "127.0.0.2:3000",
             "[::1]evil",
             "0.0.0.0:3000",
+            "evil.notes.example.com",
+            "notes.example.com.evil",
             "",
         ] {
-            assert!(!is_loopback_authority(bad), "{bad} should be refused");
+            assert!(!is_trusted_authority(bad, &allowed), "{bad} should be refused");
         }
     }
 
@@ -403,5 +455,31 @@ mod tests {
 
         let no_host = HttpRequest::get("/").body(Body::empty()).unwrap();
         assert_eq!(send(no_host).await.0, StatusCode::FORBIDDEN);
+
+        // An allowed name does not vouch for a foreign Origin.
+        let proxied_cross = HttpRequest::get("/api/tree")
+            .header(HOST, "notes.example.com")
+            .header(ORIGIN, "https://evil.example")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(send(proxied_cross).await.0, StatusCode::FORBIDDEN);
+    }
+
+    /// Behind a TLS-terminating reverse proxy the request keeps the public
+    /// name as `Host` and the page's `https://` origin.
+    #[tokio::test]
+    async fn an_allowed_host_passes_through_a_proxy() {
+        let req = HttpRequest::builder()
+            .method(Method::PUT)
+            .uri("/api/concept")
+            .header(HOST, "notes.example.com")
+            .header(ORIGIN, "https://notes.example.com")
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(r##"{"path":"note.md","content":"# Proxied\n"}"##))
+            .unwrap();
+        let (app, root) = test_app();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+        assert_eq!(std::fs::read_to_string(root.join("note.md")).unwrap(), "# Proxied\n");
     }
 }

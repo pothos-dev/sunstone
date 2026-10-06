@@ -9,6 +9,8 @@
 //! parse (no `clap`) to keep the dependency surface small; the grammar is tiny
 //! and the logic is pure so it can be unit-tested.
 
+use std::net::IpAddr;
+
 /// Options for launching the app (the `Run` action).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct RunOptions {
@@ -33,8 +35,13 @@ pub struct ServeOptions {
     /// The Bundle root from the command line; `None` means `SUNSTONE_BUNDLE`,
     /// else the current directory (there is no launcher to fall back to).
     pub bundle: Option<String>,
-    /// The loopback port to listen on.
+    /// The port to listen on.
     pub port: u16,
+    /// `--bind ADDR`: listen there instead of loopback.
+    pub bind: Option<IpAddr>,
+    /// `--allow-host NAME` (repeatable): host names to answer besides
+    /// localhost, lowercased — the public name a reverse proxy forwards under.
+    pub allowed_hosts: Vec<String>,
 }
 
 /// What the parsed command line tells the binary to do.
@@ -99,30 +106,52 @@ where
 }
 
 /// `sunstone serve`'s grammar: one optional positional Bundle path plus
-/// `-p`/`--port N` (or `--port=N`); `--help`/`--version` as for the app.
+/// `-p`/`--port N`, `--bind ADDR` and `--allow-host NAME` (each also as
+/// `--flag=VALUE`); `--help`/`--version` as for the app.
 fn parse_serve_args<I, S>(args: I) -> CliAction
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    let mut bundle = None;
-    let mut port = DEFAULT_SERVE_PORT;
+    let mut opts = ServeOptions {
+        bundle: None,
+        port: DEFAULT_SERVE_PORT,
+        bind: None,
+        allowed_hosts: Vec::new(),
+    };
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let a = arg.as_ref();
-        let port_value = match a {
+        match a {
             "-h" | "--help" => return CliAction::Help,
             "-V" | "--version" => return CliAction::Version,
-            "-p" | "--port" => match args.next() {
-                Some(v) => Some(v.as_ref().to_string()),
-                None => return CliAction::Error(format!("'{a}' needs a port number")),
-            },
-            _ => a.strip_prefix("--port=").map(str::to_string),
+            _ => {}
+        }
+        let (flag, inline) = match a.split_once('=') {
+            Some((f, v)) if f.starts_with("--") => (f, Some(v.to_string())),
+            _ => (a, None),
         };
-        if let Some(v) = port_value {
-            match v.parse::<u16>() {
-                Ok(p) if p != 0 => port = p,
-                _ => return CliAction::Error(format!("'{v}' is not a valid port")),
+        if matches!(flag, "-p" | "--port" | "--bind" | "--allow-host") {
+            let Some(v) = inline.or_else(|| args.next().map(|v| v.as_ref().to_string())) else {
+                return CliAction::Error(format!("'{flag}' needs a value"));
+            };
+            match flag {
+                "--bind" => match v.parse::<IpAddr>() {
+                    Ok(ip) => opts.bind = Some(ip),
+                    Err(_) => return CliAction::Error(format!("'{v}' is not an IP address")),
+                },
+                "--allow-host" => match parse_host_name(&v) {
+                    Some(h) => opts.allowed_hosts.push(h),
+                    None => {
+                        return CliAction::Error(format!(
+                            "'{v}' is not a host name (give it without scheme or port)"
+                        ))
+                    }
+                },
+                _ => match v.parse::<u16>() {
+                    Ok(p) if p != 0 => opts.port = p,
+                    _ => return CliAction::Error(format!("'{v}' is not a valid port")),
+                },
             }
             continue;
         }
@@ -131,14 +160,24 @@ where
                 "unknown option '{a}' for serve\n\nTry 'sunstone --help' for usage."
             ));
         }
-        if bundle.is_some() {
+        if opts.bundle.is_some() {
             return CliAction::Error(format!(
                 "unexpected extra argument '{a}'\n\nTry 'sunstone --help' for usage."
             ));
         }
-        bundle = Some(a.to_string());
+        opts.bundle = Some(a.to_string());
     }
-    CliAction::Serve(ServeOptions { bundle, port })
+    CliAction::Serve(opts)
+}
+
+/// An `--allow-host` value, lowercased: a bare host name (`notes.example.com`),
+/// no scheme, port, path or wildcard.
+fn parse_host_name(v: &str) -> Option<String> {
+    let ok = !v.is_empty()
+        && v.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
+        && !v.starts_with(['.', '-'])
+        && !v.ends_with('.');
+    ok.then(|| v.to_ascii_lowercase())
 }
 
 /// The `--version` line, e.g. `sunstone 0.10.0`.
@@ -155,7 +194,7 @@ A CLI-launched markdown editor with first-class Open Knowledge Format support.
 
 Usage:
   {name} [BUNDLE [DOCUMENT[#HEADING]]]
-  {name} serve [BUNDLE] [--port PORT]
+  {name} serve [BUNDLE] [--port PORT] [--bind ADDR] [--allow-host NAME]...
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
@@ -173,7 +212,11 @@ Serve:
   Instead of opening a window, serve the editor to your browser at
   http://localhost:PORT/ (localhost only, no sign-in). BUNDLE defaults to the
   current directory. Edits save to disk as in the app.
-  -p, --port PORT  Port to listen on (default {port})
+  -p, --port PORT     Port to listen on (default {port})
+  --bind ADDR         Listen on ADDR instead of 127.0.0.1 (e.g. 0.0.0.0).
+                      There is no sign-in: whoever reaches it can edit.
+  --allow-host NAME   Also answer requests for host NAME, e.g. the public
+                      name of a reverse proxy in front (repeatable)
 ",
         name = env!("CARGO_PKG_NAME"),
         version = env!("CARGO_PKG_VERSION"),
@@ -277,6 +320,8 @@ mod tests {
         CliAction::Serve(ServeOptions {
             bundle: bundle.map(str::to_string),
             port,
+            bind: None,
+            allowed_hosts: Vec::new(),
         })
     }
 
@@ -302,11 +347,45 @@ mod tests {
             vec!["serve", "--port=70000"],
             vec!["serve", "--detached"],
             vec!["serve", "a", "b"],
+            vec!["serve", "--bind"],
+            vec!["serve", "--bind", "localhost"],
+            vec!["serve", "--allow-host"],
+            vec!["serve", "--allow-host", "https://notes.example.com"],
+            vec!["serve", "--allow-host=notes.example.com:443"],
+            vec!["serve", "--allow-host", "*.example.com"],
+            vec!["serve", "--allow-host="],
         ] {
             assert!(
                 matches!(parse_args(args.clone()), CliAction::Error(_)),
                 "{args:?} should be an error"
             );
+        }
+    }
+
+    #[test]
+    fn serve_takes_a_bind_address_and_allowed_hosts() {
+        let expected = CliAction::Serve(ServeOptions {
+            bundle: Some("./docs".into()),
+            port: 3001,
+            bind: Some("0.0.0.0".parse().unwrap()),
+            allowed_hosts: vec!["notes.example.com".into(), "wiki.lan".into()],
+        });
+        assert_eq!(
+            parse_args([
+                "serve",
+                "./docs",
+                "--bind",
+                "0.0.0.0",
+                "--allow-host",
+                "Notes.Example.com",
+                "--allow-host=wiki.lan",
+                "--port=3001",
+            ]),
+            expected
+        );
+        match parse_args(["serve", "--bind=::"]) {
+            CliAction::Serve(o) => assert_eq!(o.bind, Some("::".parse().unwrap())),
+            other => panic!("expected Serve, got {other:?}"),
         }
     }
 
