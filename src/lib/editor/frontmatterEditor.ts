@@ -1,9 +1,18 @@
 import { EditorView, keymap, type KeyBinding } from '@codemirror/view';
-import { EditorState, Annotation, Compartment, type Extension } from '@codemirror/state';
+import { EditorState, Annotation, Compartment, Text, type Extension } from '@codemirror/state';
+import {
+  codeFolding,
+  foldEffect,
+  foldGutter,
+  foldService,
+  foldedRanges,
+  unfoldEffect,
+} from '@codemirror/language';
 import { defaultKeymap, indentWithTab, redo, undo } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { blockForHost, formatYaml, trimBlock } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
+import { defaultYamlFolds, yamlFoldAt } from './yamlFold';
 
 import {
   commitFrontmatterGroup,
@@ -64,6 +73,8 @@ export interface FrontmatterEditor {
   setReadOnly(readOnly: boolean): void;
   /** Close any open typing group NOW (blur, save, Concept switch). */
   commitGroup(): void;
+  /** Drop every fold and fold the default keys again (a Concept opened). */
+  foldDefaults(): void;
   /** Move DOM focus into the YAML. */
   focus(): void;
   /** Tear down: cancels the pending group timer after committing it. */
@@ -138,6 +149,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
       keymap.of(historyForwarding),
       keymap.of([...closeBracketsKeymap, indentWithTab, ...defaultKeymap]),
       closeBrackets(),
+      yamlFolding(),
       EditorView.lineWrapping,
       EditorView.updateListener.of((update) => {
         if (!update.docChanged) return;
@@ -158,6 +170,18 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
   });
 
   const view = new EditorView({ state, parent });
+
+  function foldDefaults(): void {
+    const doc = view.state.doc;
+    const effects = [];
+    const folded = foldedRanges(view.state).iter();
+    for (; folded.value; folded.next()) effects.push(unfoldEffect.of({ from: folded.from, to: folded.to }));
+    for (const f of defaultYamlFolds(doc.toString())) {
+      effects.push(foldEffect.of({ from: doc.line(f.header + 1).to, to: doc.line(f.last + 1).to }));
+    }
+    if (effects.length) view.dispatch({ effects });
+  }
+  foldDefaults();
 
   // Fetch the grammar + linter and slot them in. The editor is usable (and
   // typed into) while this is in flight; the reconfigure only adds decoration.
@@ -184,6 +208,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
       view.dispatch({ effects: readOnlySlice.reconfigure(readOnlyExtension(readOnly)) });
     },
     commitGroup,
+    foldDefaults,
     focus(): void {
       view.focus();
     },
@@ -221,4 +246,63 @@ function formatView(view: EditorView): boolean {
 /** Run the format command against an editor handle (the Region's control). */
 export function formatFrontmatter(editor: FrontmatterEditor): boolean {
   return formatView(editor.view);
+}
+
+// --- Folding (ov-15) ---------------------------------------------------------
+//
+// Indentation folding over the pure `yamlFold` logic, loaded with the editor
+// (not with the lazy grammar, which only folds flow collections). Folds are
+// display state: they never touch the YAML text or the host's history.
+
+/** The doc's lines, split once per doc version (the gutter asks per line). */
+const linesOf = (() => {
+  const cache = new WeakMap<Text, string[]>();
+  return (doc: Text): string[] => {
+    let lines = cache.get(doc);
+    if (!lines) cache.set(doc, (lines = doc.toString().split('\n')));
+    return lines;
+  };
+})();
+
+function yamlFolding(): Extension {
+  return [
+    foldService.of((state, lineStart) => {
+      const line = state.doc.lineAt(lineStart);
+      const fold = yamlFoldAt(linesOf(state.doc), line.number - 1);
+      return fold ? { from: line.to, to: state.doc.line(fold.last + 1).to } : null;
+    }),
+    codeFolding({
+      preparePlaceholder: (state, range) => {
+        const line = state.doc.lineAt(range.from);
+        return yamlFoldAt(linesOf(state.doc), line.number - 1)?.summary ?? '…';
+      },
+      placeholderDOM: (_view, onclick, summary: string) => {
+        const el = document.createElement('span');
+        el.className = 'cm-foldPlaceholder';
+        el.textContent = summary;
+        el.title = 'Unfold';
+        el.setAttribute('aria-label', `Folded: ${summary}`);
+        el.dataset.testid = 'frontmatter-fold';
+        el.onclick = onclick;
+        return el;
+      },
+    }),
+    foldGutter(),
+    EditorView.theme({
+      '.cm-foldPlaceholder': {
+        margin: '0 0.4em',
+        padding: '0 0.4em',
+        border: 'none',
+        borderRadius: '3px',
+        background: 'var(--accent-soft)',
+        color: 'var(--text-muted)',
+        fontSize: '0.85em',
+        cursor: 'pointer',
+      },
+      '.cm-foldGutter .cm-gutterElement': {
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+      },
+    }),
+  ];
 }

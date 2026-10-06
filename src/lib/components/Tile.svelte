@@ -17,7 +17,7 @@
   // Document (the registry dedupes by path); each Tile's build effect re-syncs its
   // view to the shared buffer via a minimal change, so an edit in one tile shows
   // in the other without jumping the untouched tile's caret.
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { EditorView } from '@codemirror/view';
   import { undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
   import { backend } from '$lib/ipc';
@@ -121,6 +121,9 @@
   // frontmatter field (the single source of truth — ADR 0008) so this Tile's
   // Frontmatter Region can render it.
   let frontmatterYaml = $state<string>('');
+  // Bumped each time a Concept is loaded into the editor, so the Frontmatter
+  // Region re-applies its default folds (ov-15) on a switch but not on undo.
+  let frontmatterConcept = $state(0);
   let frontmatterRef = $state<ReturnType<typeof Frontmatter> | null>(null);
   let frontmatterHost = $state<HTMLDivElement | null>(null);
   // A pending request to put focus in the YAML: `'yaml'` after an undo/redo
@@ -532,6 +535,7 @@
         },
       });
       frontmatterYaml = yaml;
+      frontmatterConcept = untrack(() => frontmatterConcept) + 1;
       viewReady = true;
       view.dom.setAttribute('data-theme', theme.resolved);
       syncHistoryDepths();
@@ -541,6 +545,7 @@
       tile.scrollProbe = () => view?.scrollDOM.scrollTop ?? null;
     } else {
       setEditorConcept(view, body, yaml, fences, tile.activePath);
+      frontmatterConcept = untrack(() => frontmatterConcept) + 1;
     }
 
     if (pendingScrollLine !== null && view) {
@@ -747,6 +752,7 @@
         bind:this={frontmatterRef}
         host={viewReady ? view : null}
         yaml={frontmatterYaml}
+        concept={frontmatterConcept}
         readOnly={!editing}
         onEscape={escapeFrontmatter}
         onBlur={() => {

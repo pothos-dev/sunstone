@@ -15,7 +15,7 @@
   // off by default) up in Tile.svelte, so a collapsed Region costs nothing: the
   // editor is not built and the YAML grammar chunk is never fetched.
 
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import type { EditorView } from '@codemirror/view';
   import {
     buildFrontmatterEditor,
@@ -30,6 +30,8 @@
     host: EditorView | null;
     /** The open Concept's frontmatter YAML, mirrored out of `host`. */
     yaml: string;
+    /** Changes whenever a different Concept is loaded: re-apply default folds. */
+    concept: number;
     /** Read mode: same YAML, verbatim and highlighted, but not editable. */
     readOnly: boolean;
     /** Inner Escape layer: leave YAML editing, keep the Region focused. */
@@ -38,7 +40,7 @@
     onBlur?: () => void;
   }
 
-  let { host, yaml, readOnly, onEscape, onBlur }: Props = $props();
+  let { host, yaml, concept, readOnly, onEscape, onBlur }: Props = $props();
 
   let editorParent = $state<HTMLDivElement | null>(null);
   let editor: FrontmatterEditor | null = null;
@@ -78,6 +80,19 @@
   $effect(() => {
     void editorBuilt;
     editor?.setReadOnly(readOnly);
+  });
+
+  // A different Concept: fold `sources` / `verified` again (ov-15). The editor
+  // folds them itself when built, so only a later switch needs this. Sync first
+  // so the folds land on the new Concept's YAML.
+  let foldedFor = untrack(() => concept);
+  $effect(() => {
+    void editorBuilt;
+    const current = concept;
+    if (!editor || current === foldedFor) return;
+    foldedFor = current;
+    editor.syncFromHost(untrack(() => yaml));
+    editor.foldDefaults();
   });
 
   onDestroy(() => {
