@@ -71,7 +71,7 @@ function git(cwd: string, args: string[]): void {
  * `rmSync`-ing the directory itself — so the root inode survives. Playwright can
  * start the `webServer`s (the Rust server begins watching this path) *before*
  * `globalSetup` runs, so deleting-and-recreating the directory would orphan the
- * server's recursive `inotify` watch and silently kill `/api/events` SSE
+ * server's recursive `inotify` watch and silently kill `/_api/events` SSE
  * delivery (breaking every live-reload / concurrency spec while leaving the
  * write+commit path working). Keeping the root inode keeps the watch live.
  *

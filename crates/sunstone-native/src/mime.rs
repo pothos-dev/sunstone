@@ -2,7 +2,7 @@
 //!
 //! Both shells serve Attachment bytes — the desktop over the
 //! `sunstone-asset://` URI scheme (`src-tauri/src/asset.rs`) and the web over
-//! `GET /api/asset` (`sunstone-server`'s `routes_asset.rs`) — and they must
+//! `GET /_api/asset` (`sunstone-server`'s `routes_asset.rs`) — and they must
 //! agree on the header, so the mapping lives here rather than twice.
 //!
 //! Deliberately a `match` and not a MIME-sniffing crate: the recognised set is

@@ -20,7 +20,7 @@ import type {
  *
  * Three implementations satisfy it:
  *  - `tauri.ts`  — desktop, via `invoke(...)` / `listen(...)`
- *  - `http.ts`   — web, via `fetch` to `/api/...` on sunstone-server
+ *  - `http.ts`   — web, via `fetch` to `/_api/...` on sunstone-server
  *  - `fake.ts`   — in-memory over a seeded fixture Bundle (for Chromium/Playwright)
  *
  * When a slice adds a Rust command, add a method here and implement it in ALL
@@ -113,7 +113,7 @@ export interface Backend {
    * unsubscribe function.
    *
    * Only the git-synced `sunstone-server` deployment ever emits these: `http.ts`
-   * listens for the named `sync` event on the SAME `/api/events` connection
+   * listens for the named `sync` event on the SAME `/_api/events` connection
    * `onFileChanged` uses, and `tauri.ts` is a deliberate NO-OP (the desktop runs
    * no sync loop, so no notice can ever arrive). Inbound content changes are NOT
    * reported here — they ride the ordinary `onFileChanged` watcher path.
@@ -369,7 +369,7 @@ export interface Backend {
    * supplies its own scheme (ADR-0011):
    *   - `tauri.ts` — `sunstone-asset://localhost/<path>`, resolved per request
    *     against the live `Session` in Rust;
-   *   - `http.ts`  — `/api/asset?path=…`, same-origin behind the `/api` proxy;
+   *   - `http.ts`  — `/_api/asset?path=…`, same-origin behind the `/_api` proxy;
    *   - `fake.ts`  — a `data:` URL from the in-memory fixture (the desktop
    *     Playwright suite serves a static SPA with no file server).
    *

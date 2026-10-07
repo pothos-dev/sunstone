@@ -7,10 +7,10 @@ import { test, expect } from './fixtures';
  * seeded `data:` URLs — so it can never prove that the name-resolved Embed form
  * works against a real Bundle on disk. This spec does, over the web e2e stack:
  * the real `sunstone-server` indexing `tests/fixtures/web-bundle` (which carries
- * `assets/wide.png`, a 64x16 PNG) behind the SSR web build's `/api` proxy.
+ * `assets/wide.png`, a 64x16 PNG) behind the SSR web build's `/_api` proxy.
  *
  * Two links in one chain are asserted here:
- *   1. `GET /api/attachment-paths` — the seam method `Backend.listAttachmentPaths`
+ *   1. `GET /_api/attachment-paths` — the seam method `Backend.listAttachmentPaths`
  *      is implemented against (`Index::attachment_paths` over the live index),
  *      and the reason the frontend's Embed corpus is no longer empty outside the
  *      fake;
@@ -27,12 +27,12 @@ const NATURAL_HEIGHT = 16;
 test('the Attachment index is served over its own route, separate from the Concept list', async ({
   page,
 }) => {
-  const attachments = await (await page.request.get('/api/attachment-paths')).json();
+  const attachments = await (await page.request.get('/_api/attachment-paths')).json();
   expect(attachments).toEqual([ATTACHMENT]);
 
   // Two corpora, never one filtered list: the Attachment is absent from the
   // `.md`-only Concept set that feeds the tree, Quick nav and wikilinks.
-  const concepts: string[] = await (await page.request.get('/api/concept-paths')).json();
+  const concepts: string[] = await (await page.request.get('/_api/concept-paths')).json();
   expect(concepts).toContain('embeds.md');
   expect(concepts).not.toContain(ATTACHMENT);
 });
@@ -51,12 +51,12 @@ test('`![[name.png]]` resolves by name against a real Bundle and the image loads
 
   // The NAME-resolved one: `![[wide.png]]` found `assets/wide.png` bundle-wide.
   const byName = images.first();
-  await expect(byName).toHaveAttribute('src', '/api/asset?path=assets%2Fwide.png');
+  await expect(byName).toHaveAttribute('src', '/_api/asset?path=assets%2Fwide.png');
   // The accessible name is the filename with extension (ADR-0010), so this is
   // also proof the target that was resolved is the Attachment, not the alt text.
   await expect(byName).toHaveAttribute('alt', 'wide.png');
 
-  // It genuinely DECODED — the bytes came back over `/api/asset`, not just a
+  // It genuinely DECODED — the bytes came back over `/_api/asset`, not just a
   // plausible-looking `src`. (`loading="lazy"`, so bring it into view first.)
   await byName.scrollIntoViewIfNeeded();
   await expect

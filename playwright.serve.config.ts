@@ -35,7 +35,7 @@ export default defineConfig({
   webServer: {
     // `cargo run`, not a hardcoded `target/` path — see playwright.web.config.ts.
     command: `bun run build && cargo run -q -p sunstone -- serve ${SERVE_BUNDLE_DIR} --port ${SERVE_PORT}`,
-    url: `http://localhost:${SERVE_PORT}/api/bundle-root`,
+    url: `http://localhost:${SERVE_PORT}/_api/bundle-root`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
   },

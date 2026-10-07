@@ -4,10 +4,10 @@ import { handle as authHandle } from './auth';
 import { needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
 
 /**
- * Same-origin `/api/*` proxy (WEB build only, adapter-node), now with the
+ * Same-origin `/_api/*` proxy (WEB build only, adapter-node), now with the
  * authenticated write path (tickets 04/07).
  *
- * The browser-side `http.ts` Backend and SSR `load` fetch relative `/api/...`
+ * The browser-side `http.ts` Backend and SSR `load` fetch relative `/_api/...`
  * so there is ONE public origin (the SvelteKit server) and no CORS. This hook
  * forwards to the Rust `sunstone-server` at `SUNSTONE_API_INTERNAL`
  * (default `http://localhost:8787`).
@@ -22,7 +22,7 @@ import { needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
  * rejected here with a 401 (axum never sees it).
  *
  * The upstream response BODY is streamed straight through (not buffered), so the
- * SSE `/api/events` stream reaches the browser incrementally. For
+ * SSE `/_api/events` stream reaches the browser incrementally. For
  * `text/event-stream` we add `cache-control: no-cache` so no intermediary
  * buffers the stream.
  *
@@ -38,7 +38,7 @@ const JWT_SECRET = process.env.SUNSTONE_JWT_SECRET ?? '';
 
 const apiProxy: Handle = async ({ event, resolve }) => {
   const { pathname, search } = event.url;
-  if (!pathname.startsWith('/api/')) return resolve(event);
+  if (!pathname.startsWith('/_api/')) return resolve(event);
 
   const method = event.request.method;
   // Resolve the session only when the request needs it (every write, plus the
@@ -70,5 +70,5 @@ const apiProxy: Handle = async ({ event, resolve }) => {
 };
 
 // Auth.js first (populates `event.locals.auth()` + serves `/auth/*`), then the
-// `/api` proxy which depends on the resolved session for writes.
+// `/_api` proxy which depends on the resolved session for writes.
 export const handle = sequence(authHandle, apiProxy);

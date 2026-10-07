@@ -763,7 +763,7 @@ mod tests {
     #[test]
     fn an_empty_origin_downgrades_git_synced_to_git_local() {
         // Spec 1 §1's documented trap: a trap to document, not to fix. `GET
-        // /api/sync-status` reporting `shape` is the prescribed post-deploy check.
+        // /_api/sync-status` reporting `shape` is the prescribed post-deploy check.
         let cfg = ok(&[(BRANCH_ENV, "main"), (ORIGIN_ENV, "")]);
         assert_eq!(cfg.shape, Shape::GitLocal);
         assert!(cfg.git().unwrap().origin.is_none());

@@ -517,7 +517,7 @@ export const fakeBackend: Backend = {
 
   // Attachments (slice: attachment-files). The desktop Playwright suite serves a
   // STATIC SPA over this backend — there is no file server behind it — so a
-  // `sunstone-asset://` or `/api/asset` URL would resolve to nothing. The fake
+  // `sunstone-asset://` or `/_api/asset` URL would resolve to nothing. The fake
   // therefore hands back a `data:` URL carrying the fixture bytes, which still
   // honours ADR-0011 (a URL crosses the seam, never bytes) and lets a spec
   // assert an Embed genuinely LOADED, not merely that an `<img>` exists. An

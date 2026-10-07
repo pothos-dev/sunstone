@@ -1,10 +1,10 @@
-//! The web shell's **Attachment** transport: `GET /api/asset?path=<rel>`
+//! The web shell's **Attachment** transport: `GET /_api/asset?path=<rel>`
 //! (ADR-0011).
 //!
 //! The one route in this crate that answers with raw bytes rather than
 //! `Json<T>` or SSE. It is deliberately **unauthenticated**, exactly like
-//! `/api/concept` and `/api/render`: an Attachment is as readable as the Concept
-//! that embeds it. Only `/api/history` and `/api/file-at-rev` are gated.
+//! `/_api/concept` and `/_api/render`: an Attachment is as readable as the Concept
+//! that embeds it. Only `/_api/history` and `/_api/file-at-rev` are gated.
 //!
 //! No `tower-http`/`ServeDir`. That would be a second authority on where the
 //! Bundle root is, next to `state.app.bundle_root`; one hand-written handler
@@ -48,7 +48,7 @@ pub(crate) struct AssetQuery {
     pub(crate) path: String,
 }
 
-/// `GET /api/asset?path=<rel>` → the Attachment's bytes with a `Content-Type`
+/// `GET /_api/asset?path=<rel>` → the Attachment's bytes with a `Content-Type`
 /// from [`mime::content_type_for`] (the same table the desktop's
 /// `sunstone-asset://` scheme serves from, so the two shells cannot drift).
 pub(crate) async fn asset_handler(
@@ -149,7 +149,7 @@ mod tests {
         let root = temp_bundle();
         std::fs::write(root.join("a%2Fb.png"), b"literal-percent").unwrap();
 
-        let uri: axum::http::Uri = "/api/asset?path=a%252Fb.png".parse().unwrap();
+        let uri: axum::http::Uri = "/_api/asset?path=a%252Fb.png".parse().unwrap();
         let q = Query::<AssetQuery>::try_from_uri(&uri).unwrap();
         assert_eq!(q.path, "a%2Fb.png");
 
@@ -160,7 +160,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
 
         // And a nested path's `%2F` separators decode back to real separators.
-        let uri: axum::http::Uri = "/api/asset?path=assets%2Fsub%2Flogo.png".parse().unwrap();
+        let uri: axum::http::Uri = "/_api/asset?path=assets%2Fsub%2Flogo.png".parse().unwrap();
         let q = Query::<AssetQuery>::try_from_uri(&uri).unwrap();
         assert_eq!(q.path, "assets/sub/logo.png");
     }

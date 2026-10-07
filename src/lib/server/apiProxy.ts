@@ -1,5 +1,5 @@
 /**
- * The pure decisions behind the same-origin `/api/*` proxy in
+ * The pure decisions behind the same-origin `/_api/*` proxy in
  * `src/hooks.server.ts` (WEB build only). The hook does the I/O — resolve the
  * Auth.js session, buffer the request body, `fetch` upstream, stream the
  * response back — and asks this module what to do:
@@ -20,17 +20,17 @@ import { mintWriteJwt, type WriteClaims } from './jwt';
 
 /**
  * GET routes that take the session→mint→forward branch anyway (git-sync spec
- * §11): the git read seam. `/api/file-at-rev` returns the full text of any path
+ * §11): the git read seam. `/_api/file-at-rev` returns the full text of any path
  * at any revision — including content deliberately DELETED from the Bundle — so
  * unguarded it would make every version of every file readable by an anonymous
- * visitor; `/api/history` is the index that makes those revisions enumerable, so
+ * visitor; `/_api/history` is the index that makes those revisions enumerable, so
  * the two are gated together. The gate IS the write gate (`src/auth.ts`:
  * authenticated == authorized), hence `SUNSTONE_JWT_SECRET` unset ⇒ no history.
  *
  * `http.ts` folds this branch's 401/503 into the seam's `gitMissing`, so a
  * signed-out reader sees the review-diff toggle disabled, not an error.
  */
-export const GATED_READS: ReadonlySet<string> = new Set(['/api/history', '/api/file-at-rev']);
+export const GATED_READS: ReadonlySet<string> = new Set(['/_api/history', '/_api/file-at-rev']);
 
 /** Any method other than GET/HEAD is a write. */
 export function isWrite(method: string): boolean {
@@ -65,10 +65,10 @@ export type PlanInput = {
 };
 
 /**
- * Decide how to proxy one `/api/*` request.
+ * Decide how to proxy one `/_api/*` request.
  *
  * Reads (GET/HEAD) forward with only `accept` (`text/event-stream` for
- * `/api/events`, else `application/json`). A request that needs auth is
+ * `/_api/events`, else `application/json`). A request that needs auth is
  * rejected 401 without a signed-in user carrying both name and email, then 503
  * when no JWT secret is configured (in that order); otherwise it forwards
  * `authorization: Bearer <jwt>`. A write additionally forwards `content-type`
@@ -85,7 +85,7 @@ export function planProxy({
 }: PlanInput): ProxyPlan {
   const write = isWrite(method);
   const headers: Record<string, string> = {
-    accept: pathname === '/api/events' ? 'text/event-stream' : 'application/json',
+    accept: pathname === '/_api/events' ? 'text/event-stream' : 'application/json',
   };
 
   if (needsAuth(method, pathname)) {

@@ -5,7 +5,7 @@ import { mountShell, enterEdit } from './web-shell';
 /**
  * WEB GIT HISTORY, session-gated (git-sync spec §11).
  *
- * `GET /api/history` and `GET /api/file-at-rev` are the two GETs that take the
+ * `GET /_api/history` and `GET /_api/file-at-rev` are the two GETs that take the
  * WRITE chokepoint's session→mint-JWT→forward branch (`hooks.server.ts`'s
  * `GATED_READS`), because `fileAtRev` returns the full text of any path at any
  * revision — including content deliberately DELETED from the Bundle — and the
@@ -27,8 +27,8 @@ import { mountShell, enterEdit } from './web-shell';
  *    rejects") true on the web.
  */
 
-const HISTORY_URL = '/api/history?path=good.md';
-const FILE_AT_REV_URL = '/api/file-at-rev?path=good.md&rev=HEAD';
+const HISTORY_URL = '/_api/history?path=good.md';
+const FILE_AT_REV_URL = '/_api/file-at-rev?path=good.md&rev=HEAD';
 
 /** The tooltip `reviewAvailability` shows when the toggle IS available. */
 const REVIEW_ENABLED_TOOLTIP = 'Review changes since the last commit (HEAD)';

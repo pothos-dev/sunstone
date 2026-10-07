@@ -1,5 +1,5 @@
-//! Web git history routes (Spec 2 §11): `GET /api/history` and
-//! `GET /api/file-at-rev`, both behind the existing [`AuthedUser`] extractor.
+//! Web git history routes (Spec 2 §11): `GET /_api/history` and
+//! `GET /_api/file-at-rev`, both behind the existing [`AuthedUser`] extractor.
 //!
 //! `sunstone_native::git`'s `file_history` / `file_at_rev` are reused
 //! **verbatim** — their outcomes map 1:1 onto the seam's statuses, so these
@@ -72,7 +72,7 @@ pub struct FileAtRevQuery {
     pub rev: String,
 }
 
-/// `GET /api/history?path=` → [`FileHistory`].
+/// `GET /_api/history?path=` → [`FileHistory`].
 ///
 /// `AuthedUser` in the signature is the proof this route is gated (§11). In the
 /// plain shape it returns [`FileHistory::NotARepo`] **without spawning git**.
@@ -94,7 +94,7 @@ pub async fn history_handler(
     Ok(Json(git::file_history(&state.app.bundle_root, &q.path)))
 }
 
-/// `GET /api/file-at-rev?path=&rev=` → [`FileAtRev`].
+/// `GET /_api/file-at-rev?path=&rev=` → [`FileAtRev`].
 ///
 /// Same gate and same plain-shape short-circuit ([`FileAtRev::NotARepo`]) as
 /// [`history_handler`].

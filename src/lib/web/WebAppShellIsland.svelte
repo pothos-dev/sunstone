@@ -289,7 +289,7 @@
     // (1) SSE routing — the SINGLE file-change handler on web.
     const unsubscribe = backend.onFileChanged(handleChange);
 
-    // (6) Sync notices ride the SAME `/api/events` connection (a named `sync`
+    // (6) Sync notices ride the SAME `/_api/events` connection (a named `sync`
     //     event); only a git-synced server ever emits one.
     const unsubscribeSync = backend.onSyncNotice(showSyncNotice);
 

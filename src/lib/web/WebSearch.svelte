@@ -4,7 +4,7 @@
    *
    * A hydrated interactive island: the parent (WebViewer) owns the Ctrl+Shift+F
    * keybinding and toggles `open`. Typing a query is DEBOUNCED then sent to
-   * `backend.search` (the HTTP seam → proxied `/api/search` → core ripgrep
+   * `backend.search` (the HTTP seam → proxied `/_api/search` → core ripgrep
    * search). Results list the Concept path, line number and matching line, with
    * the matched substring highlighted. Selecting a hit opens that Concept in the
    * viewer (via the same path-URL routing links use).

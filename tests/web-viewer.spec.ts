@@ -17,7 +17,7 @@ const LIVE_NOTE = join(WEB_BUNDLE_DIR, 'live-note.md');
  *
  * Drives the SSR'd web shell (adapter-node) against the read-only HTTP backend
  * (`sunstone-server` over the `tests/fixtures/web-bundle` fixture, proxied
- * through `/api`). Asserts:
+ * through `/_api`). Asserts:
  *   - the Explorer tree is server-rendered and present,
  *   - opening a Concept shows RENDERED HTML (headings/paragraphs) + a read-only
  *     Properties view (frontmatter), NOT raw markdown / CodeMirror,
@@ -74,7 +74,7 @@ test('web viewer renders a Concept read-only with resolved + broken links', asyn
 /**
  * Live reload over SSE (slice: web-live-reload-sse). An EXTERNAL edit to the
  * Bundle on disk (the web app never writes) is delivered to the viewer via
- * `/api/events` and reacts: a create/delete refreshes the tree, and a modify to
+ * `/_api/events` and reacts: a create/delete refreshes the tree, and a modify to
  * the open Concept re-renders it — all without a manual refresh. Drives real
  * filesystem changes against the fixture Bundle the Rust server watches.
  * Saves a screenshot to tests/screenshots/web-live-reload.png.
@@ -205,10 +205,10 @@ test('index-backed sidebars: backlinks, tags, and outline', async ({ page }) => 
 
 /**
  * The Tags Section is hidden entirely when the Bundle carries no tags (as on
- * desktop). Driven by mocking `/api/tags` empty at the browser network layer.
+ * desktop). Driven by mocking `/_api/tags` empty at the browser network layer.
  */
 test('tags section is hidden when the bundle has no tags', async ({ page }) => {
-  await page.route('**/api/tags', (route) =>
+  await page.route('**/_api/tags', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
   );
   await page.goto('/');

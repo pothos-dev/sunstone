@@ -10,7 +10,7 @@ function plan(over: Partial<PlanInput> & { headers?: Record<string, string> } = 
   const { headers = {}, ...rest } = over;
   return planProxy({
     method: 'GET',
-    pathname: '/api/tree',
+    pathname: '/_api/tree',
     reqHeaders: new Headers(headers),
     user: undefined,
     secret: 'sekrit',
@@ -21,19 +21,19 @@ function plan(over: Partial<PlanInput> & { headers?: Record<string, string> } = 
 
 describe('needsAuth', () => {
   test('plain GET/HEAD reads are open', () => {
-    expect(needsAuth('GET', '/api/tree')).toBe(false);
-    expect(needsAuth('HEAD', '/api/concept')).toBe(false);
-    expect(needsAuth('GET', '/api/events')).toBe(false);
+    expect(needsAuth('GET', '/_api/tree')).toBe(false);
+    expect(needsAuth('HEAD', '/_api/concept')).toBe(false);
+    expect(needsAuth('GET', '/_api/events')).toBe(false);
   });
 
   test('every non-GET/HEAD method is a write and needs auth', () => {
     for (const m of ['PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS', 'get']) {
-      expect(needsAuth(m, '/api/concept')).toBe(true);
+      expect(needsAuth(m, '/_api/concept')).toBe(true);
     }
   });
 
   test('the git read seam is gated on GET and HEAD', () => {
-    expect([...GATED_READS].sort()).toEqual(['/api/file-at-rev', '/api/history']);
+    expect([...GATED_READS].sort()).toEqual(['/_api/file-at-rev', '/_api/history']);
     for (const p of GATED_READS) {
       expect(needsAuth('GET', p)).toBe(true);
       expect(needsAuth('HEAD', p)).toBe(true);
@@ -41,8 +41,8 @@ describe('needsAuth', () => {
   });
 
   test('gating matches the exact pathname only', () => {
-    expect(needsAuth('GET', '/api/history/')).toBe(false);
-    expect(needsAuth('GET', '/api/historyx')).toBe(false);
+    expect(needsAuth('GET', '/_api/history/')).toBe(false);
+    expect(needsAuth('GET', '/_api/historyx')).toBe(false);
   });
 });
 
@@ -63,8 +63,8 @@ describe('planProxy — open reads', () => {
     });
   });
 
-  test('/api/events asks for an event stream', () => {
-    expect(plan({ pathname: '/api/events' })).toEqual({
+  test('/_api/events asks for an event stream', () => {
+    expect(plan({ pathname: '/_api/events' })).toEqual({
       kind: 'forward',
       headers: { accept: 'text/event-stream' },
       needsBody: false,
@@ -91,8 +91,8 @@ describe('planProxy — auth rejections', () => {
   });
 
   test('a gated read without a session is 401', () => {
-    expect(plan({ pathname: '/api/history' })).toEqual({ kind: 'reject', status: 401, body: 'not signed in' });
-    expect(plan({ pathname: '/api/file-at-rev' })).toEqual({ kind: 'reject', status: 401, body: 'not signed in' });
+    expect(plan({ pathname: '/_api/history' })).toEqual({ kind: 'reject', status: 401, body: 'not signed in' });
+    expect(plan({ pathname: '/_api/file-at-rev' })).toEqual({ kind: 'reject', status: 401, body: 'not signed in' });
   });
 
   test('401 wins over 503: no session and no secret is still 401', () => {
@@ -105,7 +105,7 @@ describe('planProxy — auth rejections', () => {
       status: 503,
       body: 'write auth is not configured',
     });
-    expect(plan({ pathname: '/api/history', user: USER, secret: '' })).toEqual({
+    expect(plan({ pathname: '/_api/history', user: USER, secret: '' })).toEqual({
       kind: 'reject',
       status: 503,
       body: 'write auth is not configured',
@@ -145,7 +145,7 @@ describe('planProxy — authorised forwards', () => {
 
   test('a gated read forwards the bearer but no client headers and no body', () => {
     const p = plan({
-      pathname: '/api/file-at-rev',
+      pathname: '/_api/file-at-rev',
       user: USER,
       headers: { 'content-type': 'application/json', 'x-sunstone-client': 'tab-7' },
     });
@@ -162,7 +162,7 @@ describe('planProxy — authorised forwards', () => {
   test('defaults to the real HS256 minter keyed with the secret', () => {
     const p = planProxy({
       method: 'PUT',
-      pathname: '/api/concept',
+      pathname: '/_api/concept',
       reqHeaders: new Headers(),
       user: USER,
       secret: 'sekrit',

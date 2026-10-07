@@ -87,7 +87,7 @@ pub struct RenderPayload {
 /// shell can serve (af-1, ADR-0011). It is a MAPPER rather than the prefix
 /// ADR-0011 first proposed, because the two shells' URL shapes are not
 /// prefix-compatible — `sunstone-asset://localhost/<whole path percent-encoded>`
-/// on the desktop versus `/api/asset?path=<encoded>` on the web. See
+/// on the desktop versus `/_api/asset?path=<encoded>` on the web. See
 /// `render/embeds.rs`.
 pub fn render_concept(
     root: &Path,
@@ -403,7 +403,7 @@ mod tests {
     }
 
     /// Render with an Attachment corpus too, through a stand-in for the web
-    /// shell's mapper (`/api/asset?path=…`). The desktop's mapper is a different
+    /// shell's mapper (`/_api/asset?path=…`). The desktop's mapper is a different
     /// SHAPE, which is the whole reason the renderer takes a mapper rather than
     /// ADR-0011's original prefix; `commands.rs` owns that one.
     fn render_with(
@@ -421,7 +421,7 @@ mod tests {
             &all,
             &move |p| set.iter().any(|x| x == p),
             &attachments,
-            &|p| format!("/api/asset?path={}", sunstone_shared::url::query_encode(p)),
+            &|p| format!("/_api/asset?path={}", sunstone_shared::url::query_encode(p)),
         )
     }
 
@@ -559,7 +559,7 @@ mod tests {
         // in both shells. Relative to the Concept's own directory.
         let p = render_with("![logo](logo.png)", "docs/a.md", &["docs/a.md"], &["docs/logo.png"]);
         assert!(p.html.contains(r#"<img class="embed-image""#), "{}", p.html);
-        assert!(p.html.contains(r#"src="/api/asset?path=docs%2Flogo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"src="/_api/asset?path=docs%2Flogo.png""#), "{}", p.html);
         assert!(p.html.contains(r#"alt="logo""#));
         assert!(p.html.contains(r#"loading="lazy""#));
         // The mapped `src` replaces the author's — no raw relative path survives.
@@ -569,7 +569,7 @@ mod tests {
     #[test]
     fn a_bundle_absolute_markdown_embed_resolves_from_the_root() {
         let p = render_with("![](/assets/logo.png)", "deep/a.md", &["deep/a.md"], &["assets/logo.png"]);
-        assert!(p.html.contains(r#"src="/api/asset?path=assets%2Flogo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"src="/_api/asset?path=assets%2Flogo.png""#), "{}", p.html);
         // No author alt → the accessible name is the filename WITH extension
         // (ADR-0010: `alt=""` would be a lie for an embedded diagram).
         assert!(p.html.contains(r#"alt="logo.png""#));
@@ -580,7 +580,7 @@ mod tests {
         // comrak does not know `![[ … ]]` and `replace_wikilinks` deliberately
         // skips embeds — this is the pre-comrak conversion doing the work.
         let p = render_with("see ![[logo.png]] here", "deep/a.md", &["deep/a.md"], &["assets/sub/logo.png"]);
-        assert!(p.html.contains(r#"src="/api/asset?path=assets%2Fsub%2Flogo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"src="/_api/asset?path=assets%2Fsub%2Flogo.png""#), "{}", p.html);
         assert!(p.html.contains(r#"alt="logo.png""#));
         // The raw syntax is gone from the output.
         assert!(!p.html.contains("[["));
@@ -594,7 +594,7 @@ mod tests {
             &["a.md"],
             &["deep/nested/logo.png", "logo.png"],
         );
-        assert!(p.html.contains(r#"src="/api/asset?path=logo.png""#), "{}", p.html);
+        assert!(p.html.contains(r#"src="/_api/asset?path=logo.png""#), "{}", p.html);
     }
 
     #[test]

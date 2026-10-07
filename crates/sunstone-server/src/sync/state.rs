@@ -62,7 +62,7 @@ impl SyncState {
 
     /// The interior, tolerating a poisoned lock by taking it anyway.
     ///
-    /// A tick that panicked must not turn `GET /api/sync-status` — the
+    /// A tick that panicked must not turn `GET /_api/sync-status` — the
     /// unauthenticated probe surface — into a 500: the counters are plain values,
     /// so the worst case is a stale reading of exactly the fields §10.5 already
     /// describes as "as of the last tick".

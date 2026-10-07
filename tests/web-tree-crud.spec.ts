@@ -8,7 +8,7 @@ import { mountShell, openFromTree, typeAtEnd, headCommit, commitCount } from './
 /**
  * Tree CRUD + the structural-op gate over the full-App WEB shell (branch
  * `feat/enable-web-writing`; ticket 08 §5). An authed user's create / rename /
- * delete from the interactive `App` tree each drive the real `/api` write chain
+ * delete from the interactive `App` tree each drive the real `/_api` write chain
  * and land a git commit in the served fixture repo. Renaming a linked-to Concept
  * also rewrites its inbound links (folded into the one rename commit).
  *

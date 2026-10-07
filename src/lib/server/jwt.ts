@@ -1,5 +1,5 @@
 /**
- * Mint the short-lived HS256 JWT the `/api` hook forwards to `sunstone-server`
+ * Mint the short-lived HS256 JWT the `/_api` hook forwards to `sunstone-server`
  * on a write (tickets 04 §4 / 07 §3). Server-side only (node:crypto): the token
  * lives on the hook → axum hop and never reaches the browser.
  *

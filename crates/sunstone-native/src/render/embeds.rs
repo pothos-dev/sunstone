@@ -13,7 +13,7 @@
 //!
 //! * desktop — `sunstone-asset://localhost/<encodeURIComponent(path)>`, where
 //!   the WHOLE path is one percent-encoded segment (`a/b.png` → `a%2Fb.png`);
-//! * web — `/api/asset?path=<percent-encoded path>`, a query value.
+//! * web — `/_api/asset?path=<percent-encoded path>`, a query value.
 //!
 //! No string prefix produces both, so the renderer takes a
 //! `&dyn Fn(&str) -> String` mapping a bundle-relative path to a URL and each
@@ -271,7 +271,7 @@ mod tests {
 
     fn web(path: &str) -> String {
         format!(
-            "/api/asset?path={}",
+            "/_api/asset?path={}",
             sunstone_shared::url::query_encode(path)
         )
     }
@@ -287,7 +287,7 @@ mod tests {
         assert_eq!(
             table,
             vec![EmbedRender::Image {
-                src: "/api/asset?path=img.png".into(),
+                src: "/_api/asset?path=img.png".into(),
                 alt: "a".into(),
                 style: None,
             }]

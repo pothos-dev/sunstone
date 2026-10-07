@@ -31,7 +31,7 @@ import { mountShell, openFromTree } from './web-shell';
  * there and NO notice UI exists).
  *
  * The stimulus therefore has to arrive the way production delivers it: a named
- * `sync` event on the ONE shared `/api/events` EventSource (§10.3). Only a
+ * `sync` event on the ONE shared `/_api/events` EventSource (§10.3). Only a
  * git-SYNCED deployment's loop emits those, and the web e2e server is a plain
  * fixture repo with no origin — so `observeEventSources` SUBCLASSES
  * `window.EventSource` before any page script runs, keeping the real connection
@@ -54,7 +54,7 @@ const SSE_SETTLE_MS = 1500;
 
 /**
  * Observe every `EventSource` the page opens, without replacing the transport:
- * the subclass calls `super(...)`, so the real `/api/events` connection is made
+ * the subclass calls `super(...)`, so the real `/_api/events` connection is made
  * and every real event still arrives. Must run before the page's scripts, hence
  * `addInitScript` in a `beforeEach`.
  */
@@ -243,7 +243,7 @@ test('two notices QUEUE rather than replace, and dismiss one at a time', async (
 test('no sync notice ever renders on the anonymous viewer surface', async ({ page }) => {
   // §10.4: editor islands ONLY. A pure reader has no stake in either event, and
   // `WebViewer` deliberately has no notice slot — even though it holds a live
-  // `/api/events` connection of its own (live reload), which is what the dispatch
+  // `/_api/events` connection of its own (live reload), which is what the dispatch
   // below rides. `driveSyncNotice` fails if that connection is absent, so this
   // cannot pass vacuously.
   await page.context().clearCookies();

@@ -64,7 +64,7 @@ export type FileChangeOrigin = {
  * A divergence notice from the server's git sync loop (git-sync spec §10.2) —
  * the ONE case where a committed web action did not land where its author would
  * look for it. Delivered over the seam by `Backend.onSyncNotice`, which on the
- * web rides the named `sync` SSE event on the SAME `/api/events` connection the
+ * web rides the named `sync` SSE event on the SAME `/_api/events` connection the
  * `FileChange` stream uses. Paths are bundle-relative, forward-slash.
  *
  *  - `forked`          — a conflicting web version of `path` was saved beside it

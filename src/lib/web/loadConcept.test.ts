@@ -29,10 +29,10 @@ function fakeFetch(routes: Record<string, Route>): typeof fetch {
 }
 
 const OK_ROUTES: Record<string, Route> = {
-  '/api/bundle-root': { status: 200, body: '/bundle' },
-  '/api/tree': { status: 200, body: TREE },
+  '/_api/bundle-root': { status: 200, body: '/bundle' },
+  '/_api/tree': { status: 200, body: TREE },
   '/auth/session': { status: 200, body: null },
-  '/api/render?path=good.md': { status: 200, body: { html: '<p>hi</p>', frontmatter: [], outline: [] } },
+  '/_api/render?path=good.md': { status: 200, body: { html: '<p>hi</p>', frontmatter: [], outline: [] } },
 };
 
 describe('loadConcept', () => {
@@ -45,23 +45,23 @@ describe('loadConcept', () => {
     expect(data.user).toBeNull();
   });
 
-  test('a failing /api/tree surfaces the upstream status, not a JSON parse error', async () => {
-    const f = fakeFetch({ ...OK_ROUTES, '/api/tree': { status: 503, body: 'upstream down' } });
+  test('a failing /_api/tree surfaces the upstream status, not a JSON parse error', async () => {
+    const f = fakeFetch({ ...OK_ROUTES, '/_api/tree': { status: 503, body: 'upstream down' } });
     const err = await loadConcept(f, 'good').then(
       () => null,
       (e: unknown) => e as { status?: number; body?: { message?: string } },
     );
     expect(err?.status).toBe(502);
-    expect(err?.body?.message).toBe('Cannot load /api/tree: 503: upstream down');
+    expect(err?.body?.message).toBe('Cannot load /_api/tree: 503: upstream down');
   });
 
-  test('a failing /api/bundle-root surfaces the upstream status', async () => {
-    const f = fakeFetch({ ...OK_ROUTES, '/api/bundle-root': { status: 500, body: '' } });
+  test('a failing /_api/bundle-root surfaces the upstream status', async () => {
+    const f = fakeFetch({ ...OK_ROUTES, '/_api/bundle-root': { status: 500, body: '' } });
     const err = await loadConcept(f, '').then(
       () => null,
       (e: unknown) => e as { status?: number; body?: { message?: string } },
     );
     expect(err?.status).toBe(502);
-    expect(err?.body?.message).toBe('Cannot load /api/bundle-root: 500: no response body');
+    expect(err?.body?.message).toBe('Cannot load /_api/bundle-root: 500: no response body');
   });
 });

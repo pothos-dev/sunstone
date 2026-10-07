@@ -1,7 +1,7 @@
 // Unit tests for the fake backend's Attachment fixture and for the URL shapes
 // the three `Backend.attachmentUrl` implementations build (slice:
 // attachment-files). The URL shapes are a CONTRACT other slices build against —
-// the Rust `sunstone-asset://` scheme handler and the server's `GET /api/asset`
+// the Rust `sunstone-asset://` scheme handler and the server's `GET /_api/asset`
 // route both parse what is asserted here.
 import { describe, expect, test } from 'bun:test';
 import { ATTACHMENTS, attachmentPaths, fakeAttachmentUrl } from './attachments';
@@ -75,13 +75,13 @@ describe('attachmentUrl — URL shapes', () => {
     expect(tauriBackend.attachmentUrl('')).toBe('sunstone-asset://localhost/');
   });
 
-  test('http: /api/asset with the path as an encoded query parameter', () => {
+  test('http: /_api/asset with the path as an encoded query parameter', () => {
     expect(httpBackend.attachmentUrl('concepts/assets/wide.png')).toBe(
-      '/api/asset?path=concepts%2Fassets%2Fwide.png',
+      '/_api/asset?path=concepts%2Fassets%2Fwide.png',
     );
     // Spaces and other URL-significant characters survive intact.
     expect(httpBackend.attachmentUrl('my notes/a&b.png')).toBe(
-      '/api/asset?path=my%20notes%2Fa%26b.png',
+      '/_api/asset?path=my%20notes%2Fa%26b.png',
     );
   });
 

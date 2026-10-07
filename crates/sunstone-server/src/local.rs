@@ -151,8 +151,8 @@ fn app(api: Router, assets: AppShellAssets, allowed_hosts: Vec<String>) -> Route
 /// Serve a built file, or the marked `index.html` for any route the SPA owns.
 fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
     let rel = path.trim_start_matches('/');
-    // An unrouted `/api/…` is a client bug, not a page: no SPA fallback.
-    if rel == "api" || rel.starts_with("api/") {
+    // An unrouted `/_api/…` is a client bug, not a page: no SPA fallback.
+    if rel == "_api" || rel.starts_with("_api/") {
         return StatusCode::NOT_FOUND.into_response();
     }
     // The network-boundary guard every path-taking route uses (AGENTS.md):
@@ -399,7 +399,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_files_and_unknown_api_routes_are_404() {
-        for path in ["/_app/missing.js", "/api/nope", "/api"] {
+        for path in ["/_app/missing.js", "/_api/nope", "/_api"] {
             let (status, _, body) = send(get(path)).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
             assert!(!body.contains(SERVE_MARKER), "{path} must not fall back to the SPA");
@@ -419,7 +419,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_api_is_served_on_the_same_origin() {
-        let (status, _, body) = send(get("/api/concept?path=note.md")).await;
+        let (status, _, body) = send(get("/_api/concept?path=note.md")).await;
         assert_eq!(status, StatusCode::OK);
         assert!(body.contains("Hello"));
     }
@@ -428,7 +428,7 @@ mod tests {
     async fn a_write_needs_no_token() {
         let req = HttpRequest::builder()
             .method(Method::PUT)
-            .uri("/api/concept")
+            .uri("/_api/concept")
             .header(HOST, "127.0.0.1:3000")
             .header(ORIGIN, "http://127.0.0.1:3000")
             .header(CONTENT_TYPE, "application/json")
@@ -443,14 +443,14 @@ mod tests {
     #[tokio::test]
     async fn a_foreign_host_or_origin_is_refused() {
         // DNS rebinding: the page's own domain arrives as the Host.
-        let rebound = HttpRequest::get("/api/concept?path=note.md")
+        let rebound = HttpRequest::get("/_api/concept?path=note.md")
             .header(HOST, "evil.example:3000")
             .body(Body::empty())
             .unwrap();
         assert_eq!(send(rebound).await.0, StatusCode::FORBIDDEN);
 
         // A cross-site request names its origin.
-        let cross = HttpRequest::get("/api/tree")
+        let cross = HttpRequest::get("/_api/tree")
             .header(HOST, "localhost:3000")
             .header(ORIGIN, "https://evil.example")
             .body(Body::empty())
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(send(no_host).await.0, StatusCode::FORBIDDEN);
 
         // An allowed name does not vouch for a foreign Origin.
-        let proxied_cross = HttpRequest::get("/api/tree")
+        let proxied_cross = HttpRequest::get("/_api/tree")
             .header(HOST, "notes.example.com")
             .header(ORIGIN, "https://evil.example")
             .body(Body::empty())
@@ -475,7 +475,7 @@ mod tests {
     async fn an_allowed_host_passes_through_a_proxy() {
         let req = HttpRequest::builder()
             .method(Method::PUT)
-            .uri("/api/concept")
+            .uri("/_api/concept")
             .header(HOST, "notes.example.com")
             .header(ORIGIN, "https://notes.example.com")
             .header(CONTENT_TYPE, "application/json")

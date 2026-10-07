@@ -76,7 +76,7 @@ pub(crate) enum ServerEvent {
 }
 
 /// Shared server state: the domain `AppState` (bundle root + index), the
-/// broadcast sender every `/api/events` connection subscribes to, the global
+/// broadcast sender every `/_api/events` connection subscribes to, the global
 /// write lock serializing the write→commit critical section (ticket 05/07 §4),
 /// the parsed environment [`Config`] (Spec 2 §2 — nothing downstream re-reads the
 /// environment), and the sync loop's shared state (§8.1/§10.5).
@@ -93,7 +93,7 @@ pub(crate) struct ServerState {
     /// the `AuthedUser` extractor (`jwt_secret`: `None` disables writing — every
     /// write route 401s) and the loop.
     pub(crate) cfg: Config,
-    /// The loop's wake-up `Notify` plus the counters `GET /api/sync-status`
+    /// The loop's wake-up `Notify` plus the counters `GET /_api/sync-status`
     /// reports. Present in every shape; only the git-synced shape mutates it.
     pub(crate) sync: SyncState,
 }
@@ -170,7 +170,7 @@ pub async fn serve_from_env() {
     }
     eprintln!("sunstone-server: serving bundle {}", root.display());
 
-    // Write auth: the HS256 secret shared with the SvelteKit `/api` hook, read
+    // Write auth: the HS256 secret shared with the SvelteKit `/_api` hook, read
     // off the one parse above (nothing downstream re-reads the environment).
     // Absent → writing is disabled (every write route 401s) — a safe read-only
     // default — and, per §11, so is history.
@@ -250,60 +250,60 @@ fn start(cfg: Config, root: PathBuf) -> (Arc<ServerState>, Option<WatcherHandle>
 /// Build the full route table (read + write) over a `ServerState`.
 fn router(state: Arc<ServerState>) -> Router {
     Router::new()
-        // `/api/concept` carries the read (GET) plus the per-method write verbs
+        // `/_api/concept` carries the read (GET) plus the per-method write verbs
         // (ticket 07 §1): PUT overwrites, POST creates, DELETE removes (by query).
         .route(
-            "/api/concept",
+            "/_api/concept",
             get(routes_read::concept_handler)
                 .put(routes_write::write_concept_handler)
                 .post(routes_write::create_concept_handler)
                 .delete(routes_write::delete_concept_handler),
         )
-        .route("/api/folder", post(routes_write::create_folder_handler))
-        .route("/api/rename", post(routes_write::rename_handler))
-        .route("/api/move", post(routes_write::move_handler))
+        .route("/_api/folder", post(routes_write::create_folder_handler))
+        .route("/_api/rename", post(routes_write::rename_handler))
+        .route("/_api/move", post(routes_write::move_handler))
         .route(
-            "/api/rewrite-anchors",
+            "/_api/rewrite-anchors",
             post(routes_write::rewrite_anchors_handler),
         )
-        .route("/api/bundle-root", get(routes_read::bundle_root_handler))
-        .route("/api/tree", get(routes_read::tree_handler))
-        .route("/api/render", get(routes_read::render_handler))
+        .route("/_api/bundle-root", get(routes_read::bundle_root_handler))
+        .route("/_api/tree", get(routes_read::tree_handler))
+        .route("/_api/render", get(routes_read::render_handler))
         // Attachment bytes (ADR-0011). Unauthenticated, exactly like
-        // `/api/concept` and `/api/render`: an Attachment is as readable as the
+        // `/_api/concept` and `/_api/render`: an Attachment is as readable as the
         // Concept that embeds it.
-        .route("/api/asset", get(routes_asset::asset_handler))
-        .route("/api/search", get(routes_read::search_handler))
-        .route("/api/backlinks", get(routes_read::backlinks_handler))
-        .route("/api/tags", get(routes_read::tags_handler))
+        .route("/_api/asset", get(routes_asset::asset_handler))
+        .route("/_api/search", get(routes_read::search_handler))
+        .route("/_api/backlinks", get(routes_read::backlinks_handler))
+        .route("/_api/tags", get(routes_read::tags_handler))
         .route(
-            "/api/concepts-by-tag",
+            "/_api/concepts-by-tag",
             get(routes_read::concepts_by_tag_handler),
         )
-        .route("/api/types", get(routes_read::types_handler))
-        .route("/api/keys", get(routes_read::keys_handler))
+        .route("/_api/types", get(routes_read::types_handler))
+        .route("/_api/keys", get(routes_read::keys_handler))
         .route(
-            "/api/concept-paths",
+            "/_api/concept-paths",
             get(routes_read::concept_paths_handler),
         )
-        // The Attachment counterpart of `/api/concept-paths` — a separate list,
+        // The Attachment counterpart of `/_api/concept-paths` — a separate list,
         // not a filter (the index keeps the two corpora apart). Unauthenticated
-        // for the same reason `/api/asset` is.
+        // for the same reason `/_api/asset` is.
         .route(
-            "/api/attachment-paths",
+            "/_api/attachment-paths",
             get(routes_read::attachment_paths_handler),
         )
-        .route("/api/events", get(routes_read::events_handler))
+        .route("/_api/events", get(routes_read::events_handler))
         // Git history (Spec 2 §11) — both gated by the `AuthedUser` extractor,
         // because `file-at-rev` returns the full text of any path at any
         // revision, including content deliberately deleted from the Bundle.
-        .route("/api/history", get(history::history_handler))
-        .route("/api/file-at-rev", get(history::file_at_rev_handler))
+        .route("/_api/history", get(history::history_handler))
+        .route("/_api/file-at-rev", get(history::file_at_rev_handler))
         // Operator status (§10.5) — deliberately UNAUTHENTICATED and
         // content-free, so a monitoring probe needs no token.
-        .route("/api/sync-status", get(sync::sync_status_handler))
+        .route("/_api/sync-status", get(sync::sync_status_handler))
         // Build identification, unauthenticated for the same reason.
-        .route("/api/version", get(routes_read::version_handler))
+        .route("/_api/version", get(routes_read::version_handler))
         .with_state(state)
 }
 

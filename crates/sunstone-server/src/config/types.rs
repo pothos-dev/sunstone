@@ -12,7 +12,7 @@ use sunstone_native::git::CommitIdentity;
 /// The deployment shape (Spec 1 §1). The three Sunstone Web shapes derive from
 /// the env presence gate; [`Shape::Local`] is never parsed from the environment
 /// — only `sunstone serve` builds it ([`Config::local`]). Serialized as `plain`
-/// / `git-local` / `git-synced` / `local` for `GET /api/sync-status` (§10.5).
+/// / `git-local` / `git-synced` / `local` for `GET /_api/sync-status` (§10.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Shape {

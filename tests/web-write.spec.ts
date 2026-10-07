@@ -50,9 +50,9 @@ test('unauthenticated visit mounts no app shell and cannot write (401)', async (
   await expect(page.getByTestId('web-app-shell')).toHaveCount(0);
   await expect(page.locator('.cm-content')).toHaveCount(0);
 
-  // The `/api` write proxy is the enforcement chokepoint: a write with no
+  // The `/_api` write proxy is the enforcement chokepoint: a write with no
   // session is rejected 401 (the JWT is never minted, axum never sees it).
-  const res = await page.request.put('/api/concept', {
+  const res = await page.request.put('/_api/concept', {
     data: { path: TARGET_REL, content: TARGET_BODY },
     failOnStatusCode: false,
   });

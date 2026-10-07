@@ -65,14 +65,14 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
   // One shared secret for the session cookie (Auth.js requirement). Distinct
   // from SUNSTONE_JWT_SECRET (the hook→axum write token).
   secret: process.env.AUTH_SECRET,
-  // Behind the `/api`/reverse proxy the Host header is trusted by the operator.
+  // Behind the `/_api`/reverse proxy the Host header is trusted by the operator.
   trustHost: true,
   providers: providers(),
   // Cookie hardening (ticket 04 §7): HttpOnly + SameSite=Lax + Secure in prod;
   // combined with SvelteKit's built-in Origin check this covers cookie-CSRF.
   session: { strategy: 'jwt' },
   callbacks: {
-    // Carry name+email onto the session so the `/api` hook can mint the write
+    // Carry name+email onto the session so the `/_api` hook can mint the write
     // JWT and so the page can decide whether to show the Edit affordance.
     async session({ session, token }) {
       if (session.user) {

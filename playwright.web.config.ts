@@ -2,10 +2,10 @@
 //
 // Unlike the desktop suite (playwright.config.ts, static SPA + in-memory fake),
 // the web viewer is architecturally bound to the HTTP backend: it renders only
-// in the SSR web build and reads through `/api/*`. So this config boots the
+// in the SSR web build and reads through `/_api/*`. So this config boots the
 // real read-only stack end-to-end — the `sunstone-server` Rust binary over a
 // small committed fixture Bundle (`tests/fixtures/web-bundle`), plus the
-// adapter-node SvelteKit server proxying `/api` to it — and drives the viewer
+// adapter-node SvelteKit server proxying `/_api` to it — and drives the viewer
 // against that read-only backend (the faithful analog of "the fake backend's
 // read-only subset": no write path). The fixture has deterministic content
 // (resolvable + broken links, frontmatter, headings) so render assertions hold.
@@ -86,12 +86,12 @@ export default defineConfig({
       // `/srv/repo` in every shipped binary; the `e2e` feature compiles in the
       // `SUNSTONE_E2E_REPO_DIR` override that points it here instead.
       command: `SUNSTONE_E2E_REPO_DIR=${WEB_BUNDLE_DIR} SUNSTONE_GIT_BRANCH=${WEB_BUNDLE_BRANCH} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} cargo run -q -p sunstone-server --features e2e`,
-      url: `http://localhost:${RUST_PORT}/api/bundle-root`,
+      url: `http://localhost:${RUST_PORT}/_api/bundle-root`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
     },
     {
-      // The SSR web build (adapter-node, default `build/` out), proxying /api to
+      // The SSR web build (adapter-node, default `build/` out), proxying /_api to
       // the Rust server. `reuseExistingServer` lets a pre-started server be
       // reused (needed in sandboxes that protect in-repo build dirs — build to a
       // temp dir and start it by hand, then Playwright reuses it on this port).

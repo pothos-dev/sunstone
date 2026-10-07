@@ -2,7 +2,7 @@
 //
 //  - WEB build (`SUNSTONE_TARGET=web`): `@sveltejs/adapter-node` with SSR on
 //    (see `+layout.ts`), so the read-only viewer is server-rendered then
-//    hydrates and is served by a Node process behind the `/api` proxy.
+//    hydrates and is served by a Node process behind the `/_api` proxy.
 //  - DEFAULT (desktop/Tauri): `@sveltejs/adapter-static` in SPA mode
 //    (fallback index.html, `ssr = false`) — unchanged. Tauri has no Node
 //    server, so the frontend must be a static SPA.

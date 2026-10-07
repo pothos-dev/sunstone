@@ -1,5 +1,5 @@
-//! Write routes (ticket 07): `/api/concept` (PUT/POST/DELETE), `/api/folder`,
-//! `/api/rename`, `/api/move`, `/api/rewrite-anchors`.
+//! Write routes (ticket 07): `/_api/concept` (PUT/POST/DELETE), `/_api/folder`,
+//! `/_api/rename`, `/_api/move`, `/_api/rewrite-anchors`.
 //!
 //! Every handler takes `AuthedUser` (proof it is gated; reads omit it), checks
 //! each path it names at the network boundary ([`guard_write_paths`]), and runs

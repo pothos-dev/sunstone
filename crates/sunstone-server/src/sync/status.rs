@@ -1,5 +1,5 @@
 //! The sync loop's two operator/user surfaces: the `sync` SSE notice (§10.2)
-//! and `GET /api/sync-status` (§10.5).
+//! and `GET /_api/sync-status` (§10.5).
 
 use std::sync::Arc;
 
@@ -67,7 +67,7 @@ impl SyncNotice {
     }
 }
 
-// --- §10.5 GET /api/sync-status ---------------------------------------------
+// --- §10.5 GET /_api/sync-status ---------------------------------------------
 
 /// The operator status payload. **Content-free by rule:** no error strings, no
 /// remote URL, no branch name — only booleans, counts, an age and the shape.
@@ -99,7 +99,7 @@ pub struct SyncStatus {
     pub last_sync_age_secs: Option<u64>,
 }
 
-/// `GET /api/sync-status` — **unauthenticated** (see [`SyncStatus`]). Answers in
+/// `GET /_api/sync-status` — **unauthenticated** (see [`SyncStatus`]). Answers in
 /// every shape; a shape with no loop reports its defaults and a `null` age.
 pub async fn sync_status_handler(State(state): State<Arc<ServerState>>) -> Json<SyncStatus> {
     Json(state.sync.snapshot(state.cfg.shape))

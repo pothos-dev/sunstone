@@ -28,7 +28,7 @@
 //!
 //! [`bundle::resolve`] is the one confinement primitive (absolute-reject,
 //! `..`-component-reject, `canonicalize`, `starts_with(root)`), shared with
-//! every other read path and with `GET /api/asset` on the web shell. Anything it
+//! every other read path and with `GET /_api/asset` on the web shell. Anything it
 //! rejects is a **403**; a path it accepts whose bytes are unreadable (missing
 //! file, a directory) is a **404**.
 

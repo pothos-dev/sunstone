@@ -99,7 +99,7 @@ test('writeConcept PUTs JSON with the client-id header and resolves on 204', asy
   const get = stubFetch(new Response(null, { status: 204 }));
   await expect(httpBackend.writeConcept('a.md', 'hello')).resolves.toBeUndefined();
   const { url, init } = get();
-  expect(url).toBe('/api/concept');
+  expect(url).toBe('/_api/concept');
   expect(init.method).toBe('PUT');
   expect(JSON.parse(init.body as string)).toEqual({ path: 'a.md', content: 'hello' });
   expect((init.headers as Record<string, string>)['x-sunstone-client']).toBe(CLIENT_ID);
@@ -108,20 +108,20 @@ test('writeConcept PUTs JSON with the client-id header and resolves on 204', asy
 test('createConcept and createFolder POST to their nouns', async () => {
   let get = stubFetch(new Response(null, { status: 204 }));
   await httpBackend.createConcept('n.md');
-  expect(get().url).toBe('/api/concept');
+  expect(get().url).toBe('/_api/concept');
   expect(get().init.method).toBe('POST');
   expect(JSON.parse(get().init.body as string)).toEqual({ path: 'n.md' });
 
   get = stubFetch(new Response(null, { status: 204 }));
   await httpBackend.createFolder('sub');
-  expect(get().url).toBe('/api/folder');
+  expect(get().url).toBe('/_api/folder');
   expect(JSON.parse(get().init.body as string)).toEqual({ path: 'sub' });
 });
 
 test('deletePath DELETEs with a query param, no body', async () => {
   const get = stubFetch(new Response(null, { status: 204 }));
   await httpBackend.deletePath('a/b.md');
-  expect(get().url).toBe('/api/concept?path=a%2Fb.md');
+  expect(get().url).toBe('/_api/concept?path=a%2Fb.md');
   expect(get().init.method).toBe('DELETE');
   expect(get().init.body).toBeUndefined();
 });
@@ -137,7 +137,7 @@ test('renamePath / movePath POST and parse the RewriteSummary', async () => {
     linksChanged: 3,
     filesChanged: 2,
   });
-  expect(get().url).toBe('/api/rename');
+  expect(get().url).toBe('/_api/rename');
   expect(JSON.parse(get().init.body as string)).toEqual({ from: 'a.md', to: 'b.md' });
 
   get = stubFetch(
@@ -147,7 +147,7 @@ test('renamePath / movePath POST and parse the RewriteSummary', async () => {
     }),
   );
   await httpBackend.movePath('a.md', 'sub');
-  expect(get().url).toBe('/api/move');
+  expect(get().url).toBe('/_api/move');
   expect(JSON.parse(get().init.body as string)).toEqual({ from: 'a.md', toDir: 'sub' });
 });
 
@@ -159,7 +159,7 @@ test('rewriteAnchors POSTs target + renames', async () => {
     }),
   );
   await httpBackend.rewriteAnchors('t.md', [{ from: 'intro', to: 'setup' }]);
-  expect(get().url).toBe('/api/rewrite-anchors');
+  expect(get().url).toBe('/_api/rewrite-anchors');
   expect(JSON.parse(get().init.body as string)).toEqual({
     target: 't.md',
     renames: [{ from: 'intro', to: 'setup' }],
@@ -188,7 +188,7 @@ test('the web keeps one View state key; a served origin keys it by Bundle root',
 
 // --- index read shaping: types + keys --------------------------------------
 
-test('allTypes GETs /api/types and returns the string array', async () => {
+test('allTypes GETs /_api/types and returns the string array', async () => {
   const get = stubFetch(
     new Response(JSON.stringify(['concept', 'index']), {
       status: 200,
@@ -196,10 +196,10 @@ test('allTypes GETs /api/types and returns the string array', async () => {
     }),
   );
   await expect(httpBackend.allTypes()).resolves.toEqual(['concept', 'index']);
-  expect(get().url).toBe('/api/types');
+  expect(get().url).toBe('/_api/types');
 });
 
-test('allKeys GETs /api/keys and returns the string array', async () => {
+test('allKeys GETs /_api/keys and returns the string array', async () => {
   const get = stubFetch(
     new Response(JSON.stringify(['description', 'tags', 'title', 'type']), {
       status: 200,
@@ -207,11 +207,11 @@ test('allKeys GETs /api/keys and returns the string array', async () => {
     }),
   );
   await expect(httpBackend.allKeys()).resolves.toEqual(['description', 'tags', 'title', 'type']);
-  expect(get().url).toBe('/api/keys');
+  expect(get().url).toBe('/_api/keys');
 });
 
 // --- gated git read routes (git-sync spec §11) ------------------------------
-// `/api/history` + `/api/file-at-rev` are session-gated in `hooks.server.ts`, so
+// `/_api/history` + `/_api/file-at-rev` are session-gated in `hooks.server.ts`, so
 // the seam has to distinguish "you cannot have history here" (an unavailable
 // capability → `gitMissing`, which just disables the review-diff toggle) from a
 // real error. Per the seam's contract, ONLY a path escape (400) rejects; every
@@ -226,7 +226,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-test('fileHistory GETs /api/history and passes the FileHistory through', async () => {
+test('fileHistory GETs /_api/history and passes the FileHistory through', async () => {
   const commits = [
     {
       hash: 'abc1234',
@@ -241,7 +241,7 @@ test('fileHistory GETs /api/history and passes the FileHistory through', async (
     status: 'ok',
     commits,
   });
-  expect(get().url).toBe('/api/history?path=notes%2Ffoo.md');
+  expect(get().url).toBe('/_api/history?path=notes%2Ffoo.md');
 });
 
 test('fileHistory passes a git-backed unavailable status through untouched', async () => {
@@ -272,13 +272,13 @@ test('a network-level throw yields gitMissing, not a rejection', async () => {
   });
 });
 
-test('fileAtRev GETs /api/file-at-rev with path + rev and returns the content', async () => {
+test('fileAtRev GETs /_api/file-at-rev with path + rev and returns the content', async () => {
   const get = stubFetch(jsonResponse({ status: 'ok', content: '# hi' }));
   await expect(httpBackend.fileAtRev('notes/foo.md', 'HEAD~1')).resolves.toEqual({
     status: 'ok',
     content: '# hi',
   });
-  expect(get().url).toBe('/api/file-at-rev?path=notes%2Ffoo.md&rev=HEAD~1');
+  expect(get().url).toBe('/_api/file-at-rev?path=notes%2Ffoo.md&rev=HEAD~1');
 });
 
 test('fileAtRev maps every non-400 failure to gitMissing', async () => {

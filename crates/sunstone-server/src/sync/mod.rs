@@ -1,5 +1,5 @@
 //! The sync loop (Spec 2 §8) plus its two operator/user surfaces: the `sync`
-//! SSE notice (§10.2) and `GET /api/sync-status` (§10.5). **git-synced only.**
+//! SSE notice (§10.2) and `GET /_api/sync-status` (§10.5). **git-synced only.**
 //!
 //! # Scheduling (§8.1)
 //!

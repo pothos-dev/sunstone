@@ -32,7 +32,7 @@
 //! **No boot `ls-remote` probe** (§4.2): on a fresh volume the clone already
 //! proves reachability, and on an adopted repo a network hiccup must not stop
 //! the container from serving reads. Ongoing reachability is
-//! `GET /api/sync-status`'s job.
+//! `GET /_api/sync-status`'s job.
 
 mod fsutil;
 mod ssh;
@@ -426,7 +426,7 @@ fn branch_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> S
 
 /// §4.4's loud refusal for an adopted repo pointing somewhere else. Names both
 /// URLs and both ways out — the *only* place either URL is printed, since
-/// `GET /api/sync-status` is content-free by rule (§10.5).
+/// `GET /_api/sync-status` is content-free by rule (§10.5).
 fn origin_mismatch(repo_root: &Path, configured: &str, found: Option<&str>) -> String {
     let found = match found {
         Some(url) => format!("has origin {url}"),

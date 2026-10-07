@@ -11,7 +11,7 @@ import { mountShell, openFromTree, typeAtEnd } from './web-shell';
  * `feat/enable-web-writing`; ticket 08). A test-authed user is editing a Concept
  * in the mounted `App.svelte` shell when a SECOND writer changes that same file
  * on disk. The running `sunstone-server` watcher broadcasts a `FileChange` over
- * `/api/events`; `WebAppShellIsland` — the SINGLE web `onFileChanged` handler —
+ * `/_api/events`; `WebAppShellIsland` — the SINGLE web `onFileChanged` handler —
  * routes the active buffer by the ticket-08 rules: clean buffer → silent reload
  * + a non-blocking `web-updated-notice`; dirty buffer → the blocking
  * `web-conflict-modal`; an external delete of a dirty active Concept →

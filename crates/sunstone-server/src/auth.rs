@@ -1,7 +1,7 @@
 //! Write-auth: HS256 JWT mint/verify + the `AuthedUser` axum extractor.
 //!
 //! The trust model (ticket 04): reads are open; every WRITE route is gated. The
-//! SvelteKit `/api` hook resolves the OAuth/OIDC session and, only if valid,
+//! SvelteKit `/_api` hook resolves the OAuth/OIDC session and, only if valid,
 //! mints a short-lived HS256 JWT it forwards to axum as `Authorization: Bearer`.
 //! axum **verifies the token itself** — it is self-defending even if reachable
 //! on the network (loopback binding becomes optional defence-in-depth).
@@ -231,7 +231,7 @@ mod tests {
         state: &Arc<ServerState>,
         auth_header: Option<&str>,
     ) -> Result<AuthedUser, StatusCode> {
-        let mut req = axum::http::Request::builder().uri("/api/concept");
+        let mut req = axum::http::Request::builder().uri("/_api/concept");
         if let Some(h) = auth_header {
             req = req.header(AUTHORIZATION, h);
         }

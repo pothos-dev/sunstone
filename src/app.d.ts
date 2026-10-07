@@ -4,7 +4,7 @@ declare global {
     // interface Error {}
     interface Locals {
       /** Resolved Auth.js session accessor (web build; populated by the auth
-       * hook). The `/api` proxy uses it to gate + attribute writes. */
+       * hook). The `/_api` proxy uses it to gate + attribute writes. */
       auth(): Promise<import('@auth/sveltekit').Session | null>;
     }
     // interface PageData {}

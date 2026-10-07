@@ -172,7 +172,7 @@ impl WriteShape {
             }
     }
 
-    /// `PUT /api/concept` — overwrite an existing Concept's body.
+    /// `PUT /_api/concept` — overwrite an existing Concept's body.
     ///
     /// Normally lands a fresh `edit <path> via web` commit. But the tree-CRUD
     /// "create a new Concept" flow is TWO seam calls — `createConcept` (→
@@ -216,7 +216,7 @@ impl WriteShape {
         Ok(WriteResult::change("modified", path.to_string()))
     }
 
-    /// `POST /api/concept` — create a new empty Concept, commit `create`.
+    /// `POST /_api/concept` — create a new empty Concept, commit `create`.
     pub fn create_concept(
         &self,
         app: &AppState,
@@ -231,7 +231,7 @@ impl WriteShape {
         Ok(WriteResult::change("created", path.to_string()))
     }
 
-    /// `POST /api/folder` — create a folder. An empty directory cannot be
+    /// `POST /_api/folder` — create a folder. An empty directory cannot be
     /// committed (git tracks no empty dirs), so there is nothing to commit here
     /// in **any** shape; the folder enters history when its first Concept lands.
     /// We still broadcast a `created` so every client refreshes its tree.
@@ -241,7 +241,7 @@ impl WriteShape {
         Ok(WriteResult::change("created", path.to_string()))
     }
 
-    /// `POST /api/rename` — rename/move + auto link rewrite, commit `rename`.
+    /// `POST /_api/rename` — rename/move + auto link rewrite, commit `rename`.
     pub fn rename_path(
         &self,
         app: &AppState,
@@ -262,7 +262,7 @@ impl WriteShape {
         Ok(structural_result(summary, from, to))
     }
 
-    /// `POST /api/move` — move into a folder + auto link rewrite, commit `move`.
+    /// `POST /_api/move` — move into a folder + auto link rewrite, commit `move`.
     pub fn move_path(
         &self,
         app: &AppState,
@@ -289,7 +289,7 @@ impl WriteShape {
         Ok(structural_result(summary, from, &to))
     }
 
-    /// `DELETE /api/concept?path=` — delete a Concept/folder, commit `delete`.
+    /// `DELETE /_api/concept?path=` — delete a Concept/folder, commit `delete`.
     pub fn delete_path(
         &self,
         app: &AppState,
@@ -304,7 +304,7 @@ impl WriteShape {
         Ok(WriteResult::change("removed", path.to_string()))
     }
 
-    /// `POST /api/rewrite-anchors` — rewrite inbound anchors after a heading
+    /// `POST /_api/rewrite-anchors` — rewrite inbound anchors after a heading
     /// rename, folding into the preceding `edit … via web` commit when it is ours
     /// (ticket 07 §5: amend-else-fresh). The plain shape writes the fixups and
     /// stops there — again with no `head_commit` probe.

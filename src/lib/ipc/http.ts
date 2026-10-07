@@ -32,12 +32,12 @@ import type {
  * Reads (`bundleRoot`, `listTree`, `readConcept`, the index queries, search,
  * render) are open. WRITES (`writeConcept`, Tree CRUD, `rewriteAnchors`) are the
  * authenticated, git-backed write path (ticket 07): each maps 1:1 to a server
- * write route; the `/api` hook attaches the auth JWT on writes only. A few
+ * write route; the `/_api` hook attaches the auth JWT on writes only. A few
  * launcher/session methods are inapplicable on the web (single fixed Bundle,
  * View state client-side) and stay inert.
  *
- * Requests target relative `/api/...` (same origin). In the browser those hit
- * the SvelteKit origin and are proxied to the Rust server (see the `/api`
+ * Requests target relative `/_api/...` (same origin). In the browser those hit
+ * the SvelteKit origin and are proxied to the Rust server (see the `/_api`
  * proxy in `src/hooks.server.ts`), avoiding CORS and keeping one public origin.
  * SSR reads its data directly in `+page.ts`'s `load`, so this seam is primarily
  * the hydrated-island path.
@@ -67,7 +67,7 @@ export function bundleStateKey(served: boolean, bundleRoot: string): string {
  * (which the browser does not await) stays synchronous after the load. */
 let stateKey: string | null = servedDesktop ? null : bundleStateKey(false, '');
 async function resolveStateKey(): Promise<string> {
-  stateKey ??= bundleStateKey(true, await getJson<string>('/api/bundle-root'));
+  stateKey ??= bundleStateKey(true, await getJson<string>('/_api/bundle-root'));
   return stateKey;
 }
 
@@ -112,7 +112,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 /**
- * GET a *gated* git read route (`/api/history`, `/api/file-at-rev`), mapping an
+ * GET a *gated* git read route (`/_api/history`, `/_api/file-at-rev`), mapping an
  * UNAVAILABLE CAPABILITY to the seam's graceful status instead of an error
  * (git-sync spec §11).
  *
@@ -268,8 +268,8 @@ export function parseSyncNotice(data: string): SyncNotice | null {
   return null;
 }
 
-// --- The ONE `/api/events` connection, shared by both event streams. ---------
-// `/api/events` multiplexes two SSE streams over a single connection: unnamed
+// --- The ONE `/_api/events` connection, shared by both event streams. ---------
+// `/_api/events` multiplexes two SSE streams over a single connection: unnamed
 // `message` events carrying a `FileChange` (the watcher) and named `sync` events
 // carrying a `SyncNotice` (the git sync loop, git-sync spec §10.3). Both seam
 // subscriptions ride THIS source — a second `EventSource` would buy a second
@@ -281,10 +281,10 @@ export function parseSyncNotice(data: string): SyncNotice | null {
 let eventSource: EventSource | null = null;
 let eventRefs = 0;
 
-/** Open (or join) the shared `/api/events` connection; `null` under SSR. */
+/** Open (or join) the shared `/_api/events` connection; `null` under SSR. */
 function acquireEvents(): EventSource | null {
   if (typeof EventSource === 'undefined') return null; // SSR / non-browser
-  if (!eventSource) eventSource = new EventSource('/api/events');
+  if (!eventSource) eventSource = new EventSource('/_api/events');
   eventRefs += 1;
   return eventSource;
 }
@@ -300,14 +300,14 @@ function releaseEvents(): void {
 
 export const httpBackend: Backend = {
   bundleRoot(): Promise<string> {
-    return getJson<string>('/api/bundle-root');
+    return getJson<string>('/_api/bundle-root');
   },
 
   // Launcher seam: the web build always serves a single, fixed Bundle and has no
   // launcher UI, so `currentBundle` reports that Bundle as open and the rest are
   // inert (never reached by the web viewer).
   currentBundle(): Promise<string | null> {
-    return getJson<string>('/api/bundle-root');
+    return getJson<string>('/_api/bundle-root');
   },
   // No command line on the web: the URL addresses the open Concept instead.
   takeStartupDocument(): Promise<StartupDocument | null> {
@@ -331,38 +331,38 @@ export const httpBackend: Backend = {
   },
 
   listTree(): Promise<TreeNode> {
-    return getJson<TreeNode>('/api/tree');
+    return getJson<TreeNode>('/_api/tree');
   },
 
   readConcept(path: string): Promise<string> {
-    return getJson<string>(`/api/concept?path=${encodeURIComponent(path)}`);
+    return getJson<string>(`/_api/concept?path=${encodeURIComponent(path)}`);
   },
 
   // --- Write path (ticket 07): authenticated, git-backed, commit-per-op. -----
-  // Each maps 1:1 to a `sunstone-server` write route; the `/api` hook attaches
+  // Each maps 1:1 to a `sunstone-server` write route; the `/_api` hook attaches
   // the auth JWT (writes only). `x-sunstone-client` carries this tab's clientId
   // so the SSE echo of our own write is dropped (see `onFileChanged`). Errors
   // surface via `httpWriteError` (401/400/404/409/500).
   writeConcept(path: string, content: string): Promise<void> {
-    return sendJson<void>('PUT', '/api/concept', { path, content });
+    return sendJson<void>('PUT', '/_api/concept', { path, content });
   },
   createConcept(path: string): Promise<void> {
-    return sendJson<void>('POST', '/api/concept', { path });
+    return sendJson<void>('POST', '/_api/concept', { path });
   },
   createFolder(path: string): Promise<void> {
-    return sendJson<void>('POST', '/api/folder', { path });
+    return sendJson<void>('POST', '/_api/folder', { path });
   },
   renamePath(from: string, to: string): Promise<RewriteSummary> {
-    return sendJson<RewriteSummary>('POST', '/api/rename', { from, to });
+    return sendJson<RewriteSummary>('POST', '/_api/rename', { from, to });
   },
   movePath(from: string, toDir: string): Promise<RewriteSummary> {
-    return sendJson<RewriteSummary>('POST', '/api/move', { from, toDir });
+    return sendJson<RewriteSummary>('POST', '/_api/move', { from, toDir });
   },
   deletePath(path: string): Promise<void> {
-    return sendJson<void>('DELETE', `/api/concept?path=${encodeURIComponent(path)}`);
+    return sendJson<void>('DELETE', `/_api/concept?path=${encodeURIComponent(path)}`);
   },
   rewriteAnchors(target: string, renames: AnchorRename[]): Promise<RewriteSummary> {
-    return sendJson<RewriteSummary>('POST', '/api/rewrite-anchors', { target, renames });
+    return sendJson<RewriteSummary>('POST', '/_api/rewrite-anchors', { target, renames });
   },
 
   // `saveBundleState` is off the server write surface (ticket 07 §6): it is
@@ -374,11 +374,11 @@ export const httpBackend: Backend = {
     return Promise.resolve();
   },
 
-  // --- Filesystem change events over SSE (`/api/events`). -------------------
+  // --- Filesystem change events over SSE (`/_api/events`). -------------------
   // Every connected browser live-updates when Concepts change on disk — edited
   // by an external tool or another web client (this tab's own writes are
   // dropped by the `isOwnEcho` check below). `EventSource` targets the
-  // relative `/api/events` (proxied to the Rust server, streamed un-buffered);
+  // relative `/_api/events` (proxied to the Rust server, streamed un-buffered);
   // it auto-reconnects on a dropped connection. The returned unsubscribe is
   // synchronous (matching the seam contract): it closes the stream at once.
   onFileChanged(cb: (change: FileChange) => void): () => void {
@@ -399,7 +399,7 @@ export const httpBackend: Backend = {
   },
 
   // --- Git sync-loop divergence notices (git-sync spec §10.3). ---------------
-  // The loop sends `event: sync` frames on the SAME `/api/events` stream;
+  // The loop sends `event: sync` frames on the SAME `/_api/events` stream;
   // `EventSource` dispatches a named event ONLY to a matching listener, so the
   // unnamed `message` channel above (and `parseFileChange`, and the `FileChange`
   // type) is untouched. No second connection, no polling.
@@ -418,46 +418,46 @@ export const httpBackend: Backend = {
     };
   },
 
-  // --- Index-backed read queries over the proxied `/api/...` routes. --------
+  // --- Index-backed read queries over the proxied `/_api/...` routes. --------
   // Back the read-only sidebar Sections (Backlinks, Tags) served by the core
   // in-memory index. Paths crossing the seam are bundle-relative, forward-slash.
   listConceptPaths(): Promise<string[]> {
-    return getJson<string[]>('/api/concept-paths');
+    return getJson<string[]>('/_api/concept-paths');
   },
-  // The Attachment counterpart of `/api/concept-paths`: its own route over the
+  // The Attachment counterpart of `/_api/concept-paths`: its own route over the
   // index's own Attachment corpus, not a filter over the concept list (see
   // `Backend.listAttachmentPaths`). Unauthenticated like every other read.
   listAttachmentPaths(): Promise<string[]> {
-    return getJson<string[]>('/api/attachment-paths');
+    return getJson<string[]>('/_api/attachment-paths');
   },
   backlinks(path: string): Promise<string[]> {
-    return getJson<string[]>(`/api/backlinks?path=${encodeURIComponent(path)}`);
+    return getJson<string[]>(`/_api/backlinks?path=${encodeURIComponent(path)}`);
   },
   allTags(): Promise<TagCount[]> {
-    return getJson<TagCount[]>('/api/tags');
+    return getJson<TagCount[]>('/_api/tags');
   },
   conceptsByTag(tag: string): Promise<string[]> {
-    return getJson<string[]>(`/api/concepts-by-tag?tag=${encodeURIComponent(tag)}`);
+    return getJson<string[]>(`/_api/concepts-by-tag?tag=${encodeURIComponent(tag)}`);
   },
 
   // New-concept `type` autocomplete + frontmatter key autocomplete, served by
-  // the core in-memory index over the read-only `/api/types` + `/api/keys`
+  // the core in-memory index over the read-only `/_api/types` + `/_api/keys`
   // routes (the OKF recommended keys are merged in client-side).
   allTypes(): Promise<string[]> {
-    return getJson<string[]>('/api/types');
+    return getJson<string[]>('/_api/types');
   },
   allKeys(): Promise<string[]> {
-    return getJson<string[]>('/api/keys');
+    return getJson<string[]>('/_api/keys');
   },
   loadBundleState(): Promise<BundleState> {
     return loadHttpBundleState();
   },
 
-  // Bundle-wide full-text search over the proxied `/api/search` (backed by the
+  // Bundle-wide full-text search over the proxied `/_api/search` (backed by the
   // core ripgrep search: case-insensitive literal, ordered by path then line,
   // capped server-side). An empty/whitespace query yields `[]` (no scan).
   search(query: string): Promise<SearchHit[]> {
-    return getJson<SearchHit[]>(`/api/search?q=${encodeURIComponent(query)}`);
+    return getJson<SearchHit[]>(`/_api/search?q=${encodeURIComponent(query)}`);
   },
 
   // Git seam over the two SESSION-GATED read routes (git-sync spec §11):
@@ -471,31 +471,31 @@ export const httpBackend: Backend = {
   // hanging. The server maps git's own outcomes 1:1 (`notARepo` / `untracked` /
   // `noHistory` / `gitMissing`); only a path escape (400) rejects.
   fileHistory(path: string): Promise<FileHistory> {
-    return getGatedGit<FileHistory>(`/api/history?path=${encodeURIComponent(path)}`, {
+    return getGatedGit<FileHistory>(`/_api/history?path=${encodeURIComponent(path)}`, {
       status: 'gitMissing',
     });
   },
   fileAtRev(path: string, rev: string): Promise<FileAtRev> {
     return getGatedGit<FileAtRev>(
-      `/api/file-at-rev?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(rev)}`,
+      `/_api/file-at-rev?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(rev)}`,
       { status: 'gitMissing' },
     );
   },
 
-  // Server-quality render over the proxied `/api/render` — the same route the
+  // Server-quality render over the proxied `/_api/render` — the same route the
   // web viewer's `loadConcept` uses (body HTML + frontmatter + outline). Paths
   // are bundle-relative, forward-slash.
   renderConcept(path: string): Promise<RenderPayload> {
-    return getJson<RenderPayload>(`/api/render?path=${encodeURIComponent(path)}`);
+    return getJson<RenderPayload>(`/_api/render?path=${encodeURIComponent(path)}`);
   },
 
-  // Attachment bytes come from the server's `GET /api/asset` (ADR-0011), the
-  // same relative, same-origin `/api/...` shape every other read uses — so it
+  // Attachment bytes come from the server's `GET /_api/asset` (ADR-0011), the
+  // same relative, same-origin `/_api/...` shape every other read uses — so it
   // rides the `src/hooks.server.ts` proxy and needs no CORS. Unlike the other
   // methods this one only BUILDS the URL (the browser does the fetching, as the
   // `<img>` loads), which is why it is synchronous; see `Backend.attachmentUrl`.
   attachmentUrl(path: string): string {
-    return `/api/asset?path=${encodeURIComponent(path)}`;
+    return `/_api/asset?path=${encodeURIComponent(path)}`;
   },
 
   // The web app already runs in a browser: the browser-shell fallbacks shared

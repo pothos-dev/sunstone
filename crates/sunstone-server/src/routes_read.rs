@@ -1,7 +1,7 @@
-//! Read-only routes: `/api/bundle-root`, `/api/tree`, `/api/concept` (GET),
-//! `/api/render`, `/api/search`, `/api/backlinks`, `/api/tags`,
-//! `/api/concepts-by-tag`, `/api/types`, `/api/keys`, `/api/concept-paths`,
-//! `/api/attachment-paths`, `/api/events` (SSE) and `/api/version`, plus the shared
+//! Read-only routes: `/_api/bundle-root`, `/_api/tree`, `/_api/concept` (GET),
+//! `/_api/render`, `/_api/search`, `/_api/backlinks`, `/_api/tags`,
+//! `/_api/concepts-by-tag`, `/_api/types`, `/_api/keys`, `/_api/concept-paths`,
+//! `/_api/attachment-paths`, `/_api/events` (SSE) and `/_api/version`, plus the shared
 //! [`read_index`] helper. Errors map through [`crate::api_error`].
 
 use std::convert::Infallible;
@@ -34,7 +34,7 @@ pub(crate) struct VersionInfo {
     commit: Option<&'static str>,
 }
 
-/// `GET /api/version`. Unauthenticated and content-free, like `/api/sync-status`.
+/// `GET /_api/version`. Unauthenticated and content-free, like `/_api/sync-status`.
 pub(crate) async fn version_handler() -> Json<VersionInfo> {
     Json(VersionInfo {
         version: env!("CARGO_PKG_VERSION"),
@@ -85,7 +85,7 @@ pub(crate) async fn render_handler(
 /// The web shell's Attachment-URL mapper, handed to the shared renderer so an
 /// Embed's `src` is fetchable from the SSR'd page (af-1, ADR-0011).
 ///
-/// The shape is `routes_asset.rs`'s — `/api/asset?path=<percent-encoded>` — and
+/// The shape is `routes_asset.rs`'s — `/_api/asset?path=<percent-encoded>` — and
 /// must stay identical to `http.ts`'s `attachmentUrl`. Relative and same-origin,
 /// so it rides the `src/hooks.server.ts` proxy and needs no CORS.
 ///
@@ -93,7 +93,7 @@ pub(crate) async fn render_handler(
 /// ADR-0011 first proposed: a query value and the desktop's single
 /// percent-encoded path segment are not two prefixes over the same string.
 fn asset_url(path: &str) -> String {
-    format!("/api/asset?path={}", query_encode(path))
+    format!("/_api/asset?path={}", query_encode(path))
 }
 
 #[derive(Deserialize)]
@@ -173,12 +173,12 @@ pub(crate) async fn concept_paths_handler(
 }
 
 /// Every **Attachment** path in the Bundle index (af-1), sorted. Deliberately a
-/// SEPARATE route from `/api/concept-paths` rather than a flag on it, mirroring
+/// SEPARATE route from `/_api/concept-paths` rather than a flag on it, mirroring
 /// the two separate corpora in the index: the concept list stays `.md`-only for
 /// the tree / Quick nav / Wikilink consumers, and this one is the Embed
 /// resolver's candidate set.
 ///
-/// Unauthenticated, exactly like `/api/concept-paths` and `/api/asset`: it is a
+/// Unauthenticated, exactly like `/_api/concept-paths` and `/_api/asset`: it is a
 /// list of file names in a Bundle whose bytes are already served unauthenticated.
 pub(crate) async fn attachment_paths_handler(
     State(state): State<Arc<ServerState>>,
@@ -300,11 +300,11 @@ mod tests {
         // `?path=` query, and `http.ts`'s `attachmentUrl`
         // (`encodeURIComponent`). A drift here silently 404s every Embed in the
         // SSR'd page, which no other test would notice.
-        assert_eq!(asset_url("assets/logo.png"), "/api/asset?path=assets%2Flogo.png");
-        assert_eq!(asset_url("a b+c.png"), "/api/asset?path=a%20b%2Bc.png");
+        assert_eq!(asset_url("assets/logo.png"), "/_api/asset?path=assets%2Flogo.png");
+        assert_eq!(asset_url("a b+c.png"), "/_api/asset?path=a%20b%2Bc.png");
         // A literal `%` in a filename is escaped, so ONE decode (axum's `Query`)
         // recovers it — the invariant `routes_asset.rs` pins from the other side.
-        assert_eq!(asset_url("a%2Fb.png"), "/api/asset?path=a%252Fb.png");
+        assert_eq!(asset_url("a%2Fb.png"), "/_api/asset?path=a%252Fb.png");
     }
 
     #[test]
@@ -316,14 +316,14 @@ mod tests {
         let index = sunstone_native::index::Index::build(&root);
         let payload = render::render_concept(&root, &index, "note.md", &asset_url).unwrap();
         assert!(
-            payload.html.contains(r#"src="/api/asset?path=assets%2Flogo.png""#),
+            payload.html.contains(r#"src="/_api/asset?path=assets%2Flogo.png""#),
             "{}",
             payload.html
         );
     }
 
-    /// What `/api/attachment-paths` serves, over a real on-disk Bundle: the
-    /// Attachment corpus, sorted, and DISJOINT from `/api/concept-paths`. The
+    /// What `/_api/attachment-paths` serves, over a real on-disk Bundle: the
+    /// Attachment corpus, sorted, and DISJOINT from `/_api/concept-paths`. The
     /// handler itself is a three-line wrapper over this; the contract worth
     /// pinning is that the two routes never return each other's files (the
     /// `.md`-only concept list feeds the tree, Quick nav and wikilinks).
@@ -414,7 +414,7 @@ mod tests {
         assert!(!index.concept_exists("nope.md"));
     }
 
-    /// §10.3 wire contract of `/api/events`: a `FileChange` goes out **unnamed**
+    /// §10.3 wire contract of `/_api/events`: a `FileChange` goes out **unnamed**
     /// (no `event:` field, so it lands in `onmessage`), and a `SyncNotice` goes
     /// out as a **named** `sync` event (dispatched only to
     /// `addEventListener('sync', …)`), both as JSON `data:` payloads on the one
@@ -509,9 +509,9 @@ mod tests {
         .unwrap();
         let index = sunstone_native::index::Index::build(&root);
 
-        // `/api/types` → distinct, sorted frontmatter `type` values.
+        // `/_api/types` → distinct, sorted frontmatter `type` values.
         assert_eq!(index.all_types(), vec!["concept", "index"]);
-        // `/api/keys` → distinct, sorted top-level frontmatter keys.
+        // `/_api/keys` → distinct, sorted top-level frontmatter keys.
         assert_eq!(
             index.all_keys(),
             vec!["description", "tags", "title", "type"]

@@ -16,7 +16,7 @@ import { printPageData } from '$lib/print/printData';
  * empty path. Nested Concepts are served by the `[...concept]` route; both share
  * `loadConcept`. In the DEFAULT (desktop/Tauri) build `__SUNSTONE_WEB__` is a
  * compile-time `false`, so the body is dead-code-eliminated and the static SPA
- * is untouched (never hits `/api`).
+ * is untouched (never hits `/_api`).
  */
 export const load: PageLoad = async ({ fetch, url }) => {
   const print = printPageData(url);
