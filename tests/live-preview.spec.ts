@@ -33,7 +33,10 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
 
   // --- Inactive lines render styled ---------------------------------------
   // Heading rendered with the atomic-editor heading class (sized via theme).
-  const h1 = editor.locator('.cm-atomic-h1').first();
+  // Matched by text, not `.first()`: CodeMirror only renders the visible range,
+  // so after the scroll below the first `.cm-atomic-h1` in the DOM is a lower
+  // heading until CodeMirror re-renders the top.
+  const h1 = editor.locator('.cm-atomic-h1', { hasText: 'Live Preview' });
   await expect(h1).toBeVisible();
   await expect(h1).toContainText('Live Preview');
 
@@ -79,6 +82,9 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
   await scroller.evaluate((el) => {
     el.scrollTop = 0;
   });
+  // CodeMirror re-renders the top on the next frame, not synchronously; measure
+  // only once the heading is back in view, or `before` is a stale position.
+  await expect(h1).toBeInViewport();
 
   // --- Cursor line reveals raw markdown markup ----------------------------
   // On an inactive heading line the leading `#` is hidden by the live preview.
@@ -89,11 +95,11 @@ test('live preview: rich markdown renders, cursor line shows raw markup', async 
   // The active line now contains the raw markup including the `#` marker.
   const activeLine = editor.locator('.cm-activeLine').first();
   await expect(activeLine).toContainText('# Live Preview');
-  const after = await editor.locator('.cm-atomic-h1, .cm-activeLine').first().boundingBox();
+  const after = await activeLine.boundingBox();
   // No vertical layout jump: the heading line stays at the same top position.
-  if (before && after) {
-    expect(Math.abs(after.y - before.y)).toBeLessThan(4);
-  }
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(4);
 
   await page.screenshot({
     path: 'tests/screenshots/live-preview.png',
