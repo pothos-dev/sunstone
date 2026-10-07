@@ -4,6 +4,35 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.1] - 2026-10-07
+
+### Changed
+
+- Footnotes are numbered 1, 2, 3 in the order they are first cited, shown as
+  a plain superscript number instead of the bracketed label. Hovering one
+  shows its label. Footnotes cited back to back are separated by a comma
+  (¹,²).
+- A footnote whose label matches the `id` of a `sources` entry in the
+  frontmatter counts as resolved even without a `[^label]:` definition in the
+  body, as OKF v0.2 intends. It is no longer shown as broken.
+- The HTTP API of Sunstone Web and `sunstone serve` moved from `/api` to
+  `/_api`, so a Bundle folder named `api/` can have pretty URLs.
+
+### Added
+
+- `sunstone serve` deep links: a URL such as `/guide/setup#install` or
+  `/guide/setup.md#install` opens that Concept at the anchor, and the address
+  bar follows the open Concept, so a copied URL links back to it.
+
+### Fixed
+
+- Unfolding `sources` or `verified` in the frontmatter editor stays unfolded
+  while you type.
+- Footnotes whose label differs only in case from their definition
+  (`[^Src]` and `[^src]:`) jump to it in the web viewer.
+- `sunstone serve --help` describes `--bind` correctly, and a failed bind only
+  suggests another port when the port is actually in use.
+
 ## [0.24.0] - 2026-10-06
 
 ### Added
