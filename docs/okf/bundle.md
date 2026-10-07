@@ -59,7 +59,7 @@ Sunstone leans into the spec's "git repository (recommended)" distribution: the 
 
 ### What is _not_ part of the Bundle
 
-Per-user UI state — last-open Concept, expanded folders, sidebar flags, window geometry — is **View state**, held per user (desktop: OS config dir; web: the browser) and **never written into the Bundle**. The code names it after the Bundle (`BundleState`, `/api/bundle-state`), a flagged misnomer sharpened now that the Bundle is the git-committed content the web write path commits. See the [Glossary note](/GLOSSARY.md#flagged-ambiguities).
+Per-user UI state — last-open Concept, expanded folders, sidebar flags, window geometry — is **View state**, held per user (desktop: OS config dir; web: the browser) and **never written into the Bundle**. The code names it after the Bundle (`BundleState`, `/_api/bundle-state`), a flagged misnomer sharpened now that the Bundle is the git-committed content the web write path commits. See the [Glossary note](/GLOSSARY.md#flagged-ambiguities).
 
 ## Where Sunstone deviates from the pure spec
 

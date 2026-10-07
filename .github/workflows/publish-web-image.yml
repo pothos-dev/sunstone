@@ -65,7 +65,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          # Compiled into the server and reported by `GET /api/version`.
+          # Compiled into the server and reported by `GET /_api/version`.
           build-args: |
             SUNSTONE_COMMIT=${{ github.sha }}
           cache-from: type=gha

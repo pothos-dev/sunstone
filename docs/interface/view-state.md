@@ -10,7 +10,7 @@ timestamp: 2026-07-23
 
 **View state** is the per-user UI state Sunstone restores when you reopen a Bundle: which Concept was open, which tree folders were expanded, which [Sidebars](/interface/sidebars.md) and Sections were collapsed, the editor view-mode, the tiling [layout](/editor/editor-layout.md), and the window geometry. It is **held per user and never written into the Bundle** — the Bundle is the git-committed content ([Bundle](/okf/bundle.md)); View state is not part of it. This is the OKF "no `.obsidian` equivalent" rule.
 
-> **Naming.** The code still calls this `BundleState` / `saveBundleState` / `loadBundleState` / `/api/bundle-state`, named after the Bundle even though it is *not* Bundle content. The [glossary](/GLOSSARY.md) resolves the term to **View state**; the code rename is a later slice.
+> **Naming.** The code still calls this `BundleState` / `saveBundleState` / `loadBundleState` / `/_api/bundle-state`, named after the Bundle even though it is *not* Bundle content. The [glossary](/GLOSSARY.md) resolves the term to **View state**; the code rename is a later slice.
 
 ## Where it is stored
 

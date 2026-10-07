@@ -88,7 +88,7 @@ still overrides that binary if needed.
 
 ### 2. Web e2e suite — `playwright.web.config.ts`
 
-The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over a throwaway git repo seeded from the committed fixture Bundle `tests/fixtures/web-bundle` (`tests/web-bundle.ts`, on branch `main`), plus the real adapter-node SSR build (`SUNSTONE_TARGET=web`) proxying `/api` to it. The server runs the **git-local** shape, so every web write lands a real commit and history is served. A git shape's repo is the constant `/srv/repo` in every shipped binary; the suite builds the server with `--features e2e`, which compiles in the `SUNSTONE_E2E_REPO_DIR` override pointing it at the temp repo (a non-`e2e` binary warns and ignores it). This is the only place the web chrome (`web-viewer`, the editor island, concurrency modals) renders, so all **web** behaviour is proven here.
+The **real** stack end-to-end: it boots the `sunstone-server` Rust binary over a throwaway git repo seeded from the committed fixture Bundle `tests/fixtures/web-bundle` (`tests/web-bundle.ts`, on branch `main`), plus the real adapter-node SSR build (`SUNSTONE_TARGET=web`) proxying `/_api` to it. The server runs the **git-local** shape, so every web write lands a real commit and history is served. A git shape's repo is the constant `/srv/repo` in every shipped binary; the suite builds the server with `--features e2e`, which compiles in the `SUNSTONE_E2E_REPO_DIR` override pointing it at the temp repo (a non-`e2e` binary warns and ignores it). This is the only place the web chrome (`web-viewer`, the editor island, concurrency modals) renders, so all **web** behaviour is proven here.
 
 ```bash
 mkdir -p /tmp/sunstone-web-bundle   # must pre-exist: the server may start

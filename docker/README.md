@@ -10,13 +10,13 @@ continuously reconciled with a git remote — see the security note below. It sh
 as a **single Docker image** that runs two processes side by side:
 
 - **`sunstone-server`** — the Rust API (axum over `sunstone-native`), serving
-  `/api/*` (tree, concept, render, search, backlinks, tags, history, SSE events)
+  `/_api/*` (tree, concept, render, search, backlinks, tags, history, SSE events)
   over the Bundle. Its write routes require a JWT signed with
   `SUNSTONE_JWT_SECRET`; the base image sets no such secret, so every write
   returns `401` and the API is effectively read-only. In the **git-synced** shape
   this process also runs the **[sync loop](#the-sync-loop-third-moving-part)**.
 - **`node build`** — the SvelteKit **adapter-node** SSR server. It renders pages,
-  hydrates in the browser, and proxies `/api/*` to the Rust API (see
+  hydrates in the browser, and proxies `/_api/*` to the Rust API (see
   `src/hooks.server.ts`). This is the single public origin.
 
 > This is separate from the **desktop** release flow (the `/deploy` skill, which
@@ -82,7 +82,7 @@ volume classed as a disposable cache.
 > #  "pendingCommits":0,"lastSyncAgeSecs":3}
 > ```
 >
-> `GET /api/sync-status` is unauthenticated and deliberately **content-free** —
+> `GET /_api/sync-status` is unauthenticated and deliberately **content-free** —
 > booleans, counts, an age and the shape, never an error string, remote URL or
 > branch name (diagnostic detail lives in `docker logs`). It is **not** a
 > healthcheck: an unreachable remote must not mark the container unhealthy,
@@ -90,7 +90,7 @@ volume classed as a disposable cache.
 > `pendingCommits` is the number to alert on — it is literally how much web work
 > exists only inside this container.
 >
-> To confirm which build is running, `GET /api/version` (also unauthenticated)
+> To confirm which build is running, `GET /_api/version` (also unauthenticated)
 > reports the release version and, for an image built with
 > `--build-arg SUNSTONE_COMMIT=<sha>` (the publish workflow passes
 > `github.sha`), the commit; otherwise `commit` is `null`:
@@ -158,7 +158,7 @@ where the Bundle root actually is in a git shape.
 
 ## Live reload & concurrent viewers
 
-The API exposes `/api/events` as a Server-Sent Events stream fed by the
+The API exposes `/_api/events` as a Server-Sent Events stream fed by the
 filesystem watcher; the SSR proxy streams it through un-buffered. Any number of
 browsers can view the same container concurrently, and an external edit to the
 Bundle on the host is pushed to every connected viewer.
@@ -323,7 +323,7 @@ manager — the values still show in `docker inspect`. It is the best of the opt
 available here, not actual secret hygiene.
 
 The clone lives in the `repo` **named volume**, which is a **cache, not the record
-of truth** — origin is. It is safe to delete whenever `/api/sync-status` reports
+of truth** — origin is. It is safe to delete whenever `/_api/sync-status` reports
 `pendingCommits: 0`.
 
 ## Host-side deploy runbook
@@ -415,7 +415,7 @@ Those two events — *fork created* and *deletion reverted* — are the only one
 are told about, as a dismissible notice in the editor. Fetch and push failures are
 never shown to users: nothing is lost, and there is no user action to take. They go
 to `docker logs` (on transition, with the git error text) and to
-`/api/sync-status`. Logging is quiet by default: every content change is logged
+`/_api/sync-status`. Logging is quiet by default: every content change is logged
 always, and a successful no-op tick logs nothing at all.
 
 ## Relocating origin (e.g. to GitLab)
@@ -506,7 +506,7 @@ Volumes and paths:
 | `/bundle` | bind mount (`:ro` in the plain stacks) | The Bundle in the **plain** shape, from `SUNSTONE_BUNDLE_HOST`. Ignored in git shapes. |
 | `/bundle-src` | baked into the image | The dex stack's seed source (`SUNSTONE_BUNDLE_SEED_FROM`). |
 
-There is deliberately **no healthcheck** on `/api/sync-status`: an unreachable
+There is deliberately **no healthcheck** on `/_api/sync-status`: an unreachable
 remote must not mark the container unhealthy, because offline tolerance is
 intentional and a restart fixes nothing.
 

@@ -6,7 +6,7 @@
 # external `git push` and web edits reconcile (tickets 03/07).
 #
 # The volume is a CACHE, not the record of truth — origin is. It is safe to
-# delete when `GET /api/sync-status` reports pendingCommits: 0.
+# delete when `GET /_api/sync-status` reports pendingCommits: 0.
 #
 #   cp docker/wiki.env.example ./wiki.env   # then fill it in
 #   docker compose -f docker-compose.wiki.yml up -d

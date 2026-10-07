@@ -64,7 +64,7 @@ After the CHANGELOG is approved, set the new version in **all six** places (use 
 1. `package.json` — `.version`
 2. `src-tauri/tauri.conf.json` — `.version`
 3. `src-tauri/Cargo.toml` — `[package] version`
-4. `crates/sunstone-server/Cargo.toml` — `[package] version` (reported by the web server's `GET /api/version`)
+4. `crates/sunstone-server/Cargo.toml` — `[package] version` (reported by the web server's `GET /_api/version`)
 5. `Cargo.lock` — the `version` under `[[package]] name = "sunstone"`
 6. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-server"`
 

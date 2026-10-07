@@ -278,7 +278,7 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
   class (state) + **`TileSlot`** (geometry); `Pane` is reserved for the domain region. See
   [Editor layout](/editor/editor-layout.md#how-the-code-models-a-tile).
 - The code names per-user UI state (`BundleState`, `saveBundleState`, `loadBundleState`,
-  `/api/bundle-state`) after the **Bundle**, but it is **not** part of the Bundle: it is
+  `/_api/bundle-state`) after the **Bundle**, but it is **not** part of the Bundle: it is
   last-open Concept, expanded folders, sidebar flags, and window geometry — held per user
   and never committed. The misnomer is sharper now that the **Bundle** is the git-committed
   content the web write path commits. Resolved term: **View state** — per-user, client-held

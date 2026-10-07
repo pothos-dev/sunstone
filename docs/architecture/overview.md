@@ -33,13 +33,13 @@ flowchart TD
   FE["Web frontend (src/)<br/>Backend interface"]
   WASM["sunstone-wasm<br/>(in-process)"]
   DS["Desktop shell<br/>#tauri::command"]
-  SV["sunstone-server<br/>axum /api"]
+  SV["sunstone-server<br/>axum /_api"]
   CORE["sunstone-native<br/>bundle · index · search<br/>render · git · watcher"]
   SHARED["sunstone-shared<br/>links · slug · rewrite<br/>frontmatter · outline · critic"]
   FS["Bundle on disk<br/>(markdown + git)"]
 
   FE -->|"tauri.ts: invoke"| DS
-  FE -->|"http.ts: fetch /api"| SV
+  FE -->|"http.ts: fetch /_api"| SV
   FE -->|"ensureWasm(): call"| WASM
   DS --> CORE
   SV --> CORE
@@ -66,22 +66,22 @@ flowchart TD
 
 ## Web path
 
-Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/api`. Reads are open; on a write — and on the two gated history reads, `/api/history` and `/api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/api/events`).
+Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/_api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/_api`. Reads are open; on a write — and on the two gated history reads, `/_api/history` and `/_api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/_api/events`).
 
 ```mermaid
 flowchart TD
   BR["Browser"] -->|"HTTPS"| NODE["SSR Node server<br/>(adapter-node + Auth.js)"]
   NODE -->|"render + hydrate"| BR
-  NODE -->|"proxy /api, mint JWT"| SV["sunstone-server (axum)"]
+  NODE -->|"proxy /_api, mint JWT"| SV["sunstone-server (axum)"]
   SV --> CORE["sunstone-native"]
   CORE --> GIT["Bundle git repo"]
   LOOP["sync loop (git-synced only)<br/>fetch · rebase · push"] --> CORE
   SV -.->|"spawns · shares the write lock"| LOOP
   LOOP -->|"git over ssh"| ORIGIN["origin (bare repo / forge)"]
-  SV -->|"SSE /api/events"| NODE
+  SV -->|"SSE /_api/events"| NODE
 ```
 
-A web deployment takes one of **three shapes**, derived from the *presence* of `SUNSTONE_GIT_*` configuration rather than any mode flag: **plain** (a folder, no git, Save writes the file), **git-local** (commits stay in the container) and **git-synced** (the server clones an origin on boot and runs the sync loop, so web edits and external `git push`es reconcile continuously). Only git-synced spawns the loop, and only it exposes the operator route `/api/sync-status`. The loop takes the same in-process write lock the write path takes, and its in-place rewrites reach browsers through the ordinary watcher → SSE path; the two outcomes users must know about — a conflicting edit forked beside the original, or a web deletion dropped — arrive as a named `sync` event on that same connection. See [ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md), and the [Glossary](/GLOSSARY.md) for the shape vocabulary.
+A web deployment takes one of **three shapes**, derived from the *presence* of `SUNSTONE_GIT_*` configuration rather than any mode flag: **plain** (a folder, no git, Save writes the file), **git-local** (commits stay in the container) and **git-synced** (the server clones an origin on boot and runs the sync loop, so web edits and external `git push`es reconcile continuously). Only git-synced spawns the loop, and only it exposes the operator route `/_api/sync-status`. The loop takes the same in-process write lock the write path takes, and its in-place rewrites reach browsers through the ordinary watcher → SSE path; the two outcomes users must know about — a conflicting edit forked beside the original, or a web deletion dropped — arrive as a named `sync` event on that same connection. See [ADR 0007](/adr/0007-server-owns-the-git-sync-loop.md), and the [Glossary](/GLOSSARY.md) for the shape vocabulary.
 
 Both processes ship as a single Docker image, running non-root; see `docker/README.md` for the three stacks, the normative env/volume table, and the internal-network / open-reads caveat.
 
