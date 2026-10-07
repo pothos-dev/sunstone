@@ -66,12 +66,13 @@ test('Explorer keyboard nav: move/expand/collapse/descend/parent, clamp, roving 
 
   // Enter the Explorer by clicking a FILE row (clicking a folder row's body
   // would hit its toggle). A click makes the row the Focused item (roving
-  // tabindex) without arrowing yet. `concepts` + `concepts/editor` are seeded
-  // expanded by `freshLoad`, so the nested file is visible.
-  await tree.locator('.row[data-row-path="concepts/editor/live-preview.md"]').click();
-  await expect.poll(() => rovingRow(page)).toBe('concepts/editor/live-preview.md');
+  // tabindex) without arrowing yet. The clicked Concept opens, and a folder
+  // holding the open Concept cannot fold, so pick one outside `concepts/editor`,
+  // which this test collapses below.
+  await tree.locator('.row[data-row-path="concepts/annotated.md"]').click();
+  await expect.poll(() => rovingRow(page)).toBe('concepts/annotated.md');
   await expect.poll(() => rovingCount(page)).toBe(1);
-  await expect.poll(() => focusedRow(page)).toBe('concepts/editor/live-preview.md');
+  await expect.poll(() => focusedRow(page)).toBe('concepts/annotated.md');
 
   // Home jumps to the first visible row; ArrowUp there clamps (no wrap).
   await page.keyboard.press('Home');

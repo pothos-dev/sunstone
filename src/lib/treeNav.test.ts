@@ -15,6 +15,7 @@ import {
   setNodeTitle,
   explorerTitle,
   folderNameClick,
+  holdsPath,
   treeLabel,
   type VisibleRow,
 } from './treeNav';
@@ -49,6 +50,26 @@ const tree: TreeNode = {
   ],
 };
 
+describe('holdsPath', () => {
+  test('every ancestor folder of a Concept holds it', () => {
+    const p = 'concepts/editor/live-preview.md';
+    expect(holdsPath('concepts', p)).toBe(true);
+    expect(holdsPath('concepts/editor', p)).toBe(true);
+  });
+
+  test('unrelated folders, prefix look-alikes, the root and no Concept do not', () => {
+    expect(holdsPath('other', 'concepts/a.md')).toBe(false);
+    expect(holdsPath('concept', 'concepts/a.md')).toBe(false);
+    expect(holdsPath('', 'concepts/a.md')).toBe(false);
+    expect(holdsPath('concepts', null)).toBe(false);
+  });
+
+  test("a reserved file shows on its folder's row, so only the ancestors hold it", () => {
+    expect(holdsPath('concepts/editor', 'concepts/editor/index.md')).toBe(false);
+    expect(holdsPath('concepts', 'concepts/editor/index.md')).toBe(true);
+  });
+});
+
 describe('flattenVisible', () => {
   test('returns [] for a null root', () => {
     expect(flattenVisible(null, () => true)).toEqual([]);
@@ -61,6 +82,21 @@ describe('flattenVisible', () => {
     expect(concepts.isDir).toBe(true);
     expect(concepts.expanded).toBe(false);
     expect(concepts.depth).toBe(0);
+  });
+
+  test('pinned folders show expanded and are marked; own-expanded ones are not pinned', () => {
+    const open = 'concepts/editor/live-preview.md';
+    const rows = flattenVisible(tree, (p) => p === 'concepts', (p) => holdsPath(p, open));
+    expect(rows.map((r) => r.path)).toEqual([
+      'readme.md',
+      'concepts',
+      'concepts/codemirror.md',
+      'concepts/editor',
+      'concepts/editor/live-preview.md',
+    ]);
+    expect(rows[1]).toMatchObject({ expanded: true });
+    expect(rows[1].pinned).toBeUndefined();
+    expect(rows[3]).toMatchObject({ expanded: true, pinned: true });
   });
 
   test('descends into expanded folders, skipping reserved + non-md files', () => {
@@ -337,6 +373,17 @@ describe('explorerKeyIntent', () => {
     expect(explorerKeyIntent(' ', rows, 2)).toEqual({ expand: true });
     expect(explorerKeyIntent('Enter', rows, 3)).toEqual({ open: true });
     expect(explorerKeyIntent('Enter', rows, -1)).toBeNull();
+  });
+
+  test('a pinned folder has nothing to collapse: Left goes up, Enter expands it', () => {
+    const pinned = [
+      row('p', '', true, true),
+      { ...row('p/q', 'p', true, true), pinned: true },
+      row('p/q/a.md', 'p/q'),
+    ];
+    expect(explorerKeyIntent('h', pinned, 1)).toEqual({ focus: 'p' });
+    expect(explorerKeyIntent('Enter', pinned, 1)).toEqual({ expand: true });
+    expect(explorerKeyIntent('l', pinned, 1)).toEqual({ focus: 'p/q/a.md' });
   });
 
   test('unrelated keys are not handled', () => {

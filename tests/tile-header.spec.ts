@@ -198,9 +198,10 @@ test('tile header: breadcrumbs open a folder index and show it in the Explorer',
   await expect(crumbs).toHaveText(['Concepts', 'editor']);
 
   // `editor/` has no index.md: the crumb leaves the Concept open and just
-  // expands + highlights the folder in the Explorer.
+  // highlights the folder in the Explorer. (It holds the open Concept, so it
+  // shows expanded even when collapsed.)
   await tree.locator('.row[data-row-path="concepts/editor"]').click(); // collapse it
-  await expect(livePreview).toHaveCount(0);
+  await expect(livePreview).toBeVisible();
   await crumbs.nth(1).click();
   await expect(page.getByTestId('tile-title')).toHaveAttribute('title', 'concepts/editor/live-preview.md');
   await expect(livePreview).toBeVisible();

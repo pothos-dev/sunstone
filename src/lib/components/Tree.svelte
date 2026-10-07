@@ -7,7 +7,7 @@
   import { treeDnd } from '$lib/state/treeDnd.svelte';
   import { dropZoneHandlers } from '$lib/treeDnd';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { folderNameClick, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
+  import { folderNameClick, holdsPath, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
   import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
 
@@ -66,12 +66,18 @@
   // on launch). A fresh Bundle starts with every folder collapsed, so reading it
   // here gives the restored set (empty by default). Toggling reports back to the
   // store, which persists.
-  const expanded = $derived(node.isDir && session.isExpanded(node.path));
+  //
+  // A folder holding the open Concept is shown expanded regardless — a
+  // temporary override that follows the open Concept and never touches the
+  // persisted state, so the folder folds back once another Concept (or none)
+  // is open, unless the user expanded it themselves.
+  const ownExpanded = $derived(node.isDir && session.isExpanded(node.path));
+  const expanded = $derived(ownExpanded || (node.isDir && holdsPath(node.path, selected)));
 
   const indent = $derived(depth * 16);
 
   function toggle() {
-    session.setExpanded(node.path, !expanded);
+    session.setExpanded(node.path, !ownExpanded);
   }
 
   const isMarkdown = $derived(!node.isDir && isMarkdownName(node.name));

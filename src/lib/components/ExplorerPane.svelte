@@ -19,7 +19,7 @@
   import { dropZoneHandlers } from '$lib/treeDnd';
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { flattenVisible, neighborAfterRemoval, ordinaryChildren } from '$lib/treeNav';
+  import { flattenVisible, holdsPath, neighborAfterRemoval, ordinaryChildren } from '$lib/treeNav';
 
   interface Props {
     /** The TreeCrud dialogs/menu App renders (null until mounted). */
@@ -59,9 +59,15 @@
 
   const rootOrdinary = $derived(bundle.tree ? ordinaryChildren(bundle.tree) : []);
 
+  // The folders holding the open Concept show expanded on top of their own
+  // state (Tree.svelte does the same per row), so keyboard nav walks those rows.
+  const isExpanded = (p: string) => session.isExpanded(p);
+  const isPinned = (p: string) => holdsPath(p, selected);
+
   function onTreeKeydown(e: KeyboardEvent) {
     const handled = explorerNav.handleKeydown(e, bundle.tree, {
-      isExpanded: (p) => session.isExpanded(p),
+      isExpanded,
+      isPinned,
       setExpanded: (p, open) => session.setExpanded(p, open),
       openConcept: onopenFocus,
     });
@@ -75,7 +81,7 @@
     const crudHandled = explorerNav.handleCrudKeydown(e, {
       rename: (p) => crud?.requestRename(p),
       remove: (p) => {
-        const rows = flattenVisible(bundle.tree, (q) => session.isExpanded(q));
+        const rows = flattenVisible(bundle.tree, isExpanded, isPinned);
         ondeleterequest(neighborAfterRemoval(rows, p));
         crud?.requestDelete(p);
       },
@@ -109,7 +115,7 @@
   export function focusFirstRow(): boolean {
     const root = bundle.tree;
     if (!treePane || !root) return false;
-    const first = flattenVisible(root, (q) => session.isExpanded(q))[0]?.path;
+    const first = flattenVisible(root, isExpanded, isPinned)[0]?.path;
     if (first === undefined) return false;
     explorerNav.setFocused(first);
     return focusRow(first);

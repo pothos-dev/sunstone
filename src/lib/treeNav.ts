@@ -12,7 +12,7 @@
 // its own pure module with unit tests.
 
 import type { TreeNode } from '$lib/types';
-import { isMarkdownName, stripMd } from '$lib/path';
+import { dirname, isMarkdownName, stripMd } from '$lib/path';
 import { isReservedFile, reservedKind, type ReservedKind } from '$lib/reserved';
 
 /** One row in the flattened visible-rows list. */
@@ -25,8 +25,14 @@ export interface VisibleRow {
   depth: number;
   /** bundle-relative path of the containing folder ('' = Bundle root). */
   parentPath: string;
-  /** For a folder row: whether it is currently expanded. (false for files) */
+  /** For a folder row: whether it is currently shown expanded. (false for files) */
   expanded: boolean;
+  /**
+   * For a folder row: shown expanded ONLY because it holds the open Concept
+   * (see `holdsPath`) — its own expanded state is collapsed, so there is
+   * nothing to collapse. Absent = false.
+   */
+  pinned?: boolean;
 }
 
 /**
@@ -71,27 +77,46 @@ export function indexChild(node: TreeNode): string | null {
 }
 
 /**
+ * Whether `folder` (bundle-relative) must be expanded for `path`'s Explorer row
+ * to show — the Explorer shows such a folder expanded while `path` is the open
+ * Concept, on top of the folder's own expanded state. That override is
+ * temporary: it follows the open Concept and never touches the persisted
+ * expanded set. A reserved file (`index.md` / `log.md`) shows on its folder's
+ * own row, so it only needs that folder's ancestors.
+ */
+export function holdsPath(folder: string, path: string | null): boolean {
+  if (path === null || folder === '') return false;
+  const row = isReservedFile(path) ? dirname(path) : path;
+  return row.startsWith(`${folder}/`);
+}
+
+/**
  * Flatten the Bundle tree into the ordered list of VISIBLE rows: a depth-first
- * walk over the ordinary children of `root`, descending into a folder only when
- * `isExpanded(folderPath)` is true. `root` is the Bundle-root node (`path: ''`)
- * and is NOT itself a row — only its descendants are.
+ * walk over the ordinary children of `root`, descending into a folder when
+ * `isExpanded(folderPath)` or `isPinned(folderPath)` is true (pinned = held open
+ * by the open Concept, see `holdsPath`). `root` is the Bundle-root node
+ * (`path: ''`) and is NOT itself a row — only its descendants are.
  */
 export function flattenVisible(
   root: TreeNode | null,
   isExpanded: (path: string) => boolean,
+  isPinned: (path: string) => boolean = () => false,
 ): VisibleRow[] {
   const rows: VisibleRow[] = [];
   if (root === null) return rows;
 
   const walk = (node: TreeNode, depth: number, parentPath: string): void => {
     for (const child of ordinaryChildren(node)) {
-      const expanded = child.isDir && isExpanded(child.path);
+      const own = child.isDir && isExpanded(child.path);
+      const pinned = child.isDir && !own && isPinned(child.path);
+      const expanded = own || pinned;
       rows.push({
         path: child.path,
         isDir: child.isDir,
         depth,
         parentPath,
         expanded,
+        ...(pinned ? { pinned } : {}),
       });
       if (child.isDir && expanded) walk(child, depth + 1, child.path);
     }
@@ -194,10 +219,12 @@ export interface RowKeyIntent<Id> {
  * * linear movement — see `linearMove`;
  * * Right / `l`: collapsed folder → expand; expanded folder → into its first
  *   child; file → no-op;
- * * Left / `h`: expanded folder → collapse; otherwise → its parent folder
- *   (root-level rows have none: no-op);
+ * * Left / `h`: expanded folder → collapse; otherwise (incl. a pinned folder,
+ *   which has nothing to collapse) → its parent folder (root-level rows have
+ *   none: no-op);
  * * Right/Left with nothing focused → the first row;
- * * Enter / Space: folder → toggle; file → open. Unhandled with nothing focused.
+ * * Enter / Space: folder → toggle its own expanded state (a pinned folder's is
+ *   collapsed, so it expands); file → open. Unhandled with nothing focused.
  */
 export function explorerKeyIntent(
   key: string,
@@ -220,13 +247,13 @@ export function explorerKeyIntent(
     case 'ArrowLeft':
     case 'h': {
       if (!row) return rows.length ? { focus: rows[0].path } : null;
-      if (row.isDir && row.expanded) return { expand: false };
+      if (row.isDir && row.expanded && !row.pinned) return { expand: false };
       return row.parentPath !== '' ? { focus: row.parentPath } : {};
     }
     case 'Enter':
     case ' ':
       if (!row) return null;
-      return row.isDir ? { expand: !row.expanded } : { open: true };
+      return row.isDir ? { expand: !row.expanded || !!row.pinned } : { open: true };
     default:
       return null;
   }

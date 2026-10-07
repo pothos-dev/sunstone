@@ -18,8 +18,10 @@ import { isPlainKey } from '$lib/keynav';
 
 /** Side-effects the handler invokes; supplied by ExplorerPane.svelte. */
 export interface ExplorerNavActions {
-  /** Whether a folder path is currently expanded. */
+  /** Whether a folder path is currently expanded (its own, persisted state). */
   isExpanded: (path: string) => boolean;
+  /** Whether a folder is held open by the open Concept (`treeNav.holdsPath`). */
+  isPinned?: (path: string) => boolean;
   /** Set a folder's expanded state (persists via the session store). */
   setExpanded: (path: string, expanded: boolean) => void;
   /** Open a Concept and move focus to the Editor (Enter on a file row). */
@@ -70,7 +72,7 @@ class ExplorerNavStore {
     // Region move, Ctrl/Cmd = palettes/undo). Only plain keys navigate the tree.
     if (!isPlainKey(e)) return false;
 
-    const rows = flattenVisible(root, actions.isExpanded);
+    const rows = flattenVisible(root, actions.isExpanded, actions.isPinned);
     if (rows.length === 0) return false;
 
     const current = indexOfPath(rows, this.focusedPath);
