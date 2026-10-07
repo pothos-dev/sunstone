@@ -43,6 +43,12 @@ describe('renderConcept footnotes', () => {
     expect(html).not.toContain('#fn-9');
   });
 
+  test('mixed-case labels share one lowercased anchor', () => {
+    const { html } = renderConcept('x[^Src]\n\n[^src]: s\n');
+    expect(html).toContain('<a href="#fn-src">[Src]</a>');
+    expect(html).toContain('<a id="fn-src" class="footnote-def">[src]</a>');
+  });
+
   test('citations and footnotes render side by side', () => {
     const { html } = renderConcept('a.[6] b[^1]\n\n[6] row\n[^1]: note\n');
     expect(html).toContain('href="#cite-6"');

@@ -24,10 +24,17 @@ use super::sentinel::Sentinels;
 const FN_OPEN: char = '\u{E004}';
 const FN_CLOSE: char = '\u{E005}';
 
+/// The `fn-…` anchor for `label`. Labels match case-insensitively, so the
+/// anchor is lowercased while the label is shown as written.
+fn footnote_anchor(label: &str) -> String {
+    attr_escape(&label.to_lowercase())
+}
+
 fn footnote_ref_html(label: &str, defined: bool) -> String {
     let l = attr_escape(label);
     if defined {
-        format!(r##"<sup class="footnote-ref"><a href="#fn-{l}">[{l}]</a></sup>"##)
+        let a = footnote_anchor(label);
+        format!(r##"<sup class="footnote-ref"><a href="#fn-{a}">[{l}]</a></sup>"##)
     } else {
         format!(r#"<sup class="footnote-ref broken">[{l}]</sup>"#)
     }
@@ -35,8 +42,9 @@ fn footnote_ref_html(label: &str, defined: bool) -> String {
 
 fn footnote_def_html(label: &str, after_def: bool) -> String {
     let l = attr_escape(label);
+    let a = footnote_anchor(label);
     let br = if after_def { "<br>" } else { "" };
-    format!(r#"{br}<a id="fn-{l}" class="footnote-def">[{l}]</a>"#)
+    format!(r#"{br}<a id="fn-{a}" class="footnote-def">[{l}]</a>"#)
 }
 
 /// Rewrite footnote markers in `body` to sentinel tokens, returning the prepared
@@ -116,6 +124,13 @@ mod tests {
         let html = render("x[^1]\n\n[^1]: https://x.example\n");
         assert!(html.contains(r#"<a id="fn-1" class="footnote-def">[1]</a>"#), "{html}");
         assert!(html.contains("https://x.example"), "{html}");
+    }
+
+    #[test]
+    fn mixed_case_labels_share_one_anchor() {
+        let html = render("x[^Src]\n\n[^src]: s\n");
+        assert!(html.contains(r##"<a href="#fn-src">[Src]</a>"##), "{html}");
+        assert!(html.contains(r#"<a id="fn-src" class="footnote-def">[src]</a>"#), "{html}");
     }
 
     #[test]

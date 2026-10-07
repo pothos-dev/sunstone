@@ -98,10 +98,12 @@ function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
   for (const f of scanFootnotes(seg)) {
     out += renderTextWithCitations(seg.slice(p, f.from), atLineStart && p === 0);
     const label = escapeHtml(f.label).replace(/"/g, '&quot;');
+    // Labels match case-insensitively: one lowercased anchor, label as written.
+    const anchor = escapeHtml(f.label.toLowerCase()).replace(/"/g, '&quot;');
     if (f.def && atLineStart) {
-      out += `<a id="fn-${label}" class="footnote-def">[${label}]</a>`;
+      out += `<a id="fn-${anchor}" class="footnote-def">[${label}]</a>`;
     } else if (definedFootnotes.has(f.label.toLowerCase())) {
-      out += `<sup class="footnote-ref"><a href="#fn-${label}">[${label}]</a></sup>`;
+      out += `<sup class="footnote-ref"><a href="#fn-${anchor}">[${label}]</a></sup>`;
     } else {
       out += `<sup class="footnote-ref broken">[${label}]</sup>`;
     }
