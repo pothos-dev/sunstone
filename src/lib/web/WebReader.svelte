@@ -564,7 +564,7 @@
     <main class="reader" aria-label="Concept">
       {#if data.renderError}
         <p class="status error" data-testid="reader-error">
-          Cannot render {data.selected}: {data.renderError}
+          {data.renderError}
         </p>
       {:else if data.rendered === null}
         <p class="status" data-testid="reader-empty">Select a Concept to read it.</p>

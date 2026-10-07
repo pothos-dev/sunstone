@@ -157,3 +157,49 @@ test('dirty buffer: an external delete of the active Concept shows the deleted s
     rmSync(abs, { force: true });
   }
 });
+
+test('clean buffer: a git-style swap (unlink + create) reloads in place, URL kept', async ({
+  page,
+}) => {
+  const rel = 'swap-target.md';
+  const { content, abs } = await openScratch(page, rel, scratchBody('Swap Target', 'Old body.'));
+  try {
+    const url = page.url();
+    // A git checkout replaces a file by unlinking it and writing the new one, so
+    // the watcher reports `removed` then `created` for the active path.
+    rmSync(abs);
+    writeFileSync(abs, scratchBody('Swap Target', 'SWAPPED_IN body.'));
+
+    await expect(content).toContainText('SWAPPED_IN', { timeout: 15_000 });
+    // Past the deleted-state grace period: still on the Concept, no banner.
+    await page.waitForTimeout(2000);
+    expect(page.url()).toBe(url);
+    await expect(page.getByTestId('web-deleted-state')).toHaveCount(0);
+  } finally {
+    rmSync(abs, { force: true });
+  }
+});
+
+test('clean buffer: an external delete shows the deleted state and keeps the URL', async ({
+  page,
+}) => {
+  const rel = 'clean-delete-target.md';
+  const { content, abs } = await openScratch(
+    page,
+    rel,
+    scratchBody('Clean Delete Target', 'Original body.'),
+  );
+  try {
+    const url = page.url();
+    rmSync(abs, { force: true });
+
+    await expect(page.getByTestId('web-deleted-state')).toBeVisible({ timeout: 15_000 });
+    // Nothing to re-create from a clean buffer: only Close.
+    await expect(page.getByTestId('web-deleted-save')).toHaveCount(0);
+    await expect(page.getByTestId('web-deleted-discard')).toHaveText('Close');
+    expect(page.url()).toBe(url);
+    await expect(content).toContainText('Original body.');
+  } finally {
+    rmSync(abs, { force: true });
+  }
+});

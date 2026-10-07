@@ -41,8 +41,11 @@
      * created, or a web deletion dropped. DISMISSIBLE, never auto-dismissed.
      */
     syncNotices: PendingSyncNotice[];
-    /** Deleted-state banner: the active Concept was removed remotely (dirty). */
-    deleted: { author: string | null } | null;
+    /**
+     * Deleted-state banner: the active Concept was removed remotely. A dirty
+     * buffer can be re-created via Save; a clean one only closes.
+     */
+    deleted: { author: string | null; dirty: boolean } | null;
     /** Blocking conflict dialog: dirty buffer, active Concept changed remotely. */
     conflict: { author: string | null } | null;
     /**
@@ -117,11 +120,13 @@
   <div class="banner deleted" data-testid="web-deleted-state" role="alert">
     <span class="banner-msg">{deletedStateText(deleted.author)}</span>
     <span class="banner-actions">
-      <button type="button" data-testid="web-deleted-save" onclick={onDeletedRecreate}
-        >Save (re-create)</button
-      >
+      {#if deleted.dirty}
+        <button type="button" data-testid="web-deleted-save" onclick={onDeletedRecreate}
+          >Save (re-create)</button
+        >
+      {/if}
       <button type="button" data-testid="web-deleted-discard" onclick={onDeletedDiscard}
-        >Discard</button
+        >{deleted.dirty ? 'Discard' : 'Close'}</button
       >
     </span>
   </div>

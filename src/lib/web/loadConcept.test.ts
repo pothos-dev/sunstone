@@ -45,6 +45,19 @@ describe('loadConcept', () => {
     expect(data.user).toBeNull();
   });
 
+  test('an unknown path reports the Concept as not found instead of falling back', async () => {
+    const data = await loadConcept(fakeFetch(OK_ROUTES), 'gone');
+    expect(data.selected).toBeNull();
+    expect(data.rendered).toBeNull();
+    expect(data.renderError).toBe('Concept not found: /gone');
+  });
+
+  test('the root with no index.md is the empty state, not an error', async () => {
+    const data = await loadConcept(fakeFetch(OK_ROUTES), '');
+    expect(data.selected).toBeNull();
+    expect(data.renderError).toBeNull();
+  });
+
   test('a failing /_api/tree surfaces the upstream status, not a JSON parse error', async () => {
     const f = fakeFetch({ ...OK_ROUTES, '/_api/tree': { status: 503, body: 'upstream down' } });
     const err = await loadConcept(f, 'good').then(

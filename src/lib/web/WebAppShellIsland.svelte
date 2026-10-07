@@ -41,6 +41,7 @@
   import type { Document } from '$lib/state/document.svelte';
   import type { FileChange, SyncNotice } from '$lib/types';
   import {
+    DELETED_GRACE_MS,
     gateProceeds,
     routeFileChange,
     structuralOpGated,
@@ -138,7 +139,7 @@
 
   // --- Concurrency surfaces (all thin over concurrency.ts) --------------------
   let conflict = $state<{ author: string | null } | null>(null);
-  let deleted = $state<{ author: string | null } | null>(null);
+  let deleted = $state<{ author: string | null; path: string } | null>(null);
   let updated = $state<{ author: string | null; id: number } | null>(null);
   let updatedSeq = 0;
   // The three-way modals carry the outgoing Document + a resolver back into the
@@ -168,6 +169,30 @@
       conflictBurst = null;
     }, 120);
   }
+
+  // A git sync replaces a file by unlink + create, so the active Concept is
+  // briefly "removed" before it reappears. Hold the deleted state back for a
+  // grace period and cancel it when the path comes back — never drop the buffer
+  // (that empties the Tile and the URL sync would send the browser to `/`).
+  let deletedGrace: ReturnType<typeof setTimeout> | null = null;
+  function cancelDeleted(): void {
+    if (deletedGrace) clearTimeout(deletedGrace);
+    deletedGrace = null;
+    deleted = null;
+  }
+  function raiseDeleted(path: string, author: string | null): void {
+    if (deletedGrace) clearTimeout(deletedGrace);
+    deletedGrace = setTimeout(() => {
+      deletedGrace = null;
+      if (editor.path === path) deleted = { author, path };
+    }, DELETED_GRACE_MS);
+  }
+  // The banner offers Save (re-create) once the orphan holds edits, so it tracks
+  // the live dirtiness; it goes away when the Tile moves to another Concept.
+  const deletedState = $derived(deleted && { author: deleted.author, dirty: editor.dirty });
+  $effect(() => {
+    if (deleted && editor.path !== deleted.path) cancelDeleted();
+  });
 
   function showUpdatedNotice(author: string | null): void {
     updated = { author, id: ++updatedSeq };
@@ -205,6 +230,8 @@
     void indexStore.refresh();
 
     const action = routeFileChange(change, editor.path, editor.dirty);
+    // The active Concept is back (e.g. the second half of a git swap).
+    if (action.type === 'reload' || action.type === 'conflict') cancelDeleted();
     switch (action.type) {
       case 'refresh':
         break;
@@ -217,13 +244,10 @@
         raiseConflict(action.author);
         break;
       case 'deleted':
-        if (!action.dirty) {
-          // Clean buffer, nothing to reload to → drop the buffer to empty state.
-          if (editor.path !== null) void editor.onExternalChange('removed', [editor.path]);
-        } else {
-          // Dirty buffer becomes an orphan the user can re-create via Save.
-          deleted = { author: action.author };
-        }
+        // Keep the buffer (and the URL) and show the deleted state: a dirty
+        // buffer is an orphan the user can re-create via Save, a clean one is
+        // closed only when the user asks.
+        if (editor.path !== null) raiseDeleted(editor.path, action.author);
         break;
     }
   }
@@ -341,6 +365,7 @@
       window.removeEventListener('keydown', onKeydown, true);
       window.removeEventListener('beforeunload', onBeforeUnload);
       if (conflictBurst) clearTimeout(conflictBurst);
+      if (deletedGrace) clearTimeout(deletedGrace);
     };
   });
 </script>
@@ -366,7 +391,7 @@
       {conceptName}
       {updated}
       {syncNotices}
-      {deleted}
+      deleted={deletedState}
       {conflict}
       {leave}
       {structural}

@@ -63,6 +63,14 @@ export function routeFileChange(
   return dirty ? { type: 'conflict', author } : { type: 'reload', author };
 }
 
+/**
+ * How long a `removed` of the active Concept waits before the deleted state
+ * shows. A git sync (pull/checkout) replaces a file by unlink + create, so the
+ * `removed` is followed by a `created` for the same path within milliseconds;
+ * only a removal that is still standing after this window is a real delete.
+ */
+export const DELETED_GRACE_MS = 1000;
+
 /** A structural tree operation that may need the clean-buffer gate. */
 export type StructuralOp = 'create' | 'rename' | 'move' | 'delete';
 

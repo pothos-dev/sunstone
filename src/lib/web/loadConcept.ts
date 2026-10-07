@@ -94,7 +94,8 @@ async function fetchShellJson<T>(fetchFn: typeof fetch, path: string): Promise<T
  * `fetch` is relative (`/_api/...`), routed through the SvelteKit server (SSR) or
  * the browser origin (client nav), both proxied to `sunstone-server` (see
  * `src/hooks.server.ts`). The pretty path is resolved to a real Concept path
- * against the tree's file set (`urlToConcept`); an unknown path renders empty.
+ * against the tree's file set (`urlToConcept`); an unknown path keeps the shell
+ * and reports `renderError` (the URL stays put — no fallback to the root).
  */
 export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promise<WebPageData> {
   const [bundleRoot, tree, user] = await Promise.all([
@@ -112,8 +113,11 @@ export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promi
       rendered = (await res.json()) as RenderPayload;
     } else {
       // Broken/missing target: keep the shell, surface the error read-only.
-      renderError = `${res.status}: ${(await res.text().catch(() => '')) || 'not found'}`;
+      const detail = (await res.text().catch(() => '')) || 'not found';
+      renderError = `Cannot render ${selected}: ${res.status}: ${detail}`;
     }
+  } else if (urlPath !== '') {
+    renderError = `Concept not found: /${urlPath}`;
   }
 
   return { web: true, bundleRoot, tree, selected, rendered, renderError, user };
