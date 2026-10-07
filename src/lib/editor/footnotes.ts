@@ -15,14 +15,14 @@ import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 // ---------------------------------------------------------------------------
 // Footnotes (ov-14)
 //
-// A `[^label]` reference renders as a superscript `[n]`, its label's number by
-// first reference (the label shows on hover). A click scrolls to its
+// A `[^label]` reference renders as a superscript `n`, its label's number by
+// first reference (the label shows on hover; `1,2` for adjacent ones). A click scrolls to its
 // `[^label]:` definition and flashes that line, the same jump the `[n]`
 // citations make (the shared `jumpFlash`). A label that matches a
 // `sources[].id` in the Frontmatter is resolved even without a body definition
 // (OKF v0.2 §5.1); it has no jump target until the Sources section (ov-10). A
 // label with neither renders as broken. A definition's `[^label]:` marker
-// renders as a `[n]` row head.
+// renders as an `n` row head.
 //
 // Recognition is the shared Rust `scan_footnotes` (over wasm); this module is
 // the thin CodeMirror layer. Modes follow `citations.ts`: reading always
@@ -37,13 +37,20 @@ class FootnoteRefWidget extends WidgetType {
   }
   eq(other: FootnoteRefWidget): boolean {
     const [a, b] = [this.f, other.f];
-    return a.label === b.label && a.num === b.num && a.defined === b.defined && a.hasDef === b.hasDef;
+    return (
+      a.label === b.label &&
+      a.num === b.num &&
+      a.defined === b.defined &&
+      a.hasDef === b.hasDef &&
+      a.followsRef === b.followsRef
+    );
   }
   toDOM(): HTMLElement {
-    const { label, num, defined, hasDef } = this.f;
+    const { label, num, defined, hasDef, followsRef } = this.f;
     const sup = document.createElement('sup');
     sup.className = defined ? 'cm-footnote-ref' : 'cm-footnote-ref cm-footnote-broken';
-    sup.textContent = `[${num}]`;
+    // `1,2` rather than `12` for adjacent references.
+    sup.textContent = followsRef ? `,${num}` : `${num}`;
     sup.dataset.footnote = label;
     if (hasDef) {
       sup.setAttribute('role', 'link');
@@ -77,7 +84,7 @@ class FootnoteDefWidget extends WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span');
     span.className = 'cm-footnote-def';
-    span.textContent = `[${this.num}]`;
+    span.textContent = `${this.num}`;
     span.title = this.label;
     return span;
   }

@@ -2,11 +2,11 @@
 //!
 //! Detection is `sunstone_shared::footnotes::scan_footnotes`, the same code the
 //! editor's widgets (`src/lib/editor/footnotes.ts`) call through wasm:
-//!   - a `[^label]` reference → a superscript `[n]` (its number by first use)
+//!   - a `[^label]` reference → a superscript `n` (its number by first use; a comma before one that directly follows another, `1,2`)
 //!     linking to the body definition; without a body definition but with a
 //!     matching `sources[].id`, a resolved superscript with no link yet (the
 //!     Sources section is ov-10); with neither, a non-link `broken` one;
-//!   - a line-start `[^label]:` definition → a `[n]` row head carrying
+//!   - a line-start `[^label]:` definition → an `n` row head carrying
 //!     `id="fn-label"` (the jump target); the footnote text after it stays
 //!     ordinary markdown, rendered where it was written.
 //!
@@ -34,13 +34,14 @@ fn footnote_anchor(label: &str) -> String {
 
 fn footnote_ref_html(f: &Footnote) -> String {
     let (l, n) = (attr_escape(&f.label), f.num);
+    let sep = if f.follows_ref { "," } else { "" };
     if f.has_def {
         let a = footnote_anchor(&f.label);
-        format!(r##"<sup class="footnote-ref" title="{l}"><a href="#fn-{a}">[{n}]</a></sup>"##)
+        format!(r##"<sup class="footnote-ref" title="{l}">{sep}<a href="#fn-{a}">{n}</a></sup>"##)
     } else if f.defined {
-        format!(r#"<sup class="footnote-ref" title="{l}">[{n}]</sup>"#)
+        format!(r#"<sup class="footnote-ref" title="{l}">{sep}{n}</sup>"#)
     } else {
-        format!(r#"<sup class="footnote-ref broken" title="{l}">[{n}]</sup>"#)
+        format!(r#"<sup class="footnote-ref broken" title="{l}">{sep}{n}</sup>"#)
     }
 }
 
@@ -48,7 +49,7 @@ fn footnote_def_html(f: &Footnote, after_def: bool) -> String {
     let (l, n) = (attr_escape(&f.label), f.num);
     let a = footnote_anchor(&f.label);
     let br = if after_def { "<br>" } else { "" };
-    format!(r#"{br}<a id="fn-{a}" class="footnote-def" title="{l}">[{n}]</a>"#)
+    format!(r#"{br}<a id="fn-{a}" class="footnote-def" title="{l}">{n}</a>"#)
 }
 
 /// Rewrite footnote markers in `body` to sentinel tokens, returning the prepared
@@ -99,11 +100,11 @@ mod tests {
     fn reference_links_to_its_definition() {
         let html = render("Claim [^2] here.\n\n[^2]: The source.\n");
         assert!(
-            html.contains(r##"Claim <sup class="footnote-ref" title="2"><a href="#fn-2">[1]</a></sup> here."##),
+            html.contains(r##"Claim <sup class="footnote-ref" title="2"><a href="#fn-2">1</a></sup> here."##),
             "{html}"
         );
         assert!(
-            html.contains(r#"<p><a id="fn-2" class="footnote-def" title="2">[1]</a> The source.</p>"#),
+            html.contains(r#"<p><a id="fn-2" class="footnote-def" title="2">1</a> The source.</p>"#),
             "{html}"
         );
     }
@@ -111,7 +112,7 @@ mod tests {
     #[test]
     fn dangling_reference_is_broken_and_unlinked() {
         let html = render("Claim[^9].\n");
-        assert!(html.contains(r#"<sup class="footnote-ref broken" title="9">[1]</sup>"#), "{html}");
+        assert!(html.contains(r#"<sup class="footnote-ref broken" title="9">1</sup>"#), "{html}");
         assert!(!html.contains("#fn-9"), "{html}");
     }
 
@@ -127,15 +128,15 @@ mod tests {
         // `[^1]: https://x` is a link reference definition to plain comrak; the
         // sentinel pass consumes the marker first, so the URL stays visible.
         let html = render("x[^1]\n\n[^1]: https://x.example\n");
-        assert!(html.contains(r#"<a id="fn-1" class="footnote-def" title="1">[1]</a>"#), "{html}");
+        assert!(html.contains(r#"<a id="fn-1" class="footnote-def" title="1">1</a>"#), "{html}");
         assert!(html.contains("https://x.example"), "{html}");
     }
 
     #[test]
     fn mixed_case_labels_share_one_anchor() {
         let html = render("x[^Src]\n\n[^src]: s\n");
-        assert!(html.contains(r##"<a href="#fn-src">[1]</a>"##), "{html}");
-        assert!(html.contains(r#"<a id="fn-src" class="footnote-def" title="src">[1]</a>"#), "{html}");
+        assert!(html.contains(r##"<a href="#fn-src">1</a>"##), "{html}");
+        assert!(html.contains(r#"<a id="fn-src" class="footnote-def" title="src">1</a>"#), "{html}");
     }
 
     #[test]
@@ -149,11 +150,18 @@ mod tests {
     fn string_labels_number_by_first_use_and_sources_resolve_them() {
         let body = "---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n---\n\nA[^phase-1] B[^ssi-web] C[^phase-1]\n\n[^phase-1]: Brief\n";
         let html = render(body);
-        assert!(html.contains(r##"A<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">[1]</a></sup>"##), "{html}");
+        assert!(html.contains(r##"A<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a></sup>"##), "{html}");
         // `ssi-web` has no body definition but is a `sources` id: resolved, unlinked.
-        assert!(html.contains(r#"B<sup class="footnote-ref" title="ssi-web">[2]</sup>"#), "{html}");
-        assert!(html.contains(r##"C<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">[1]</a>"##), "{html}");
+        assert!(html.contains(r#"B<sup class="footnote-ref" title="ssi-web">2</sup>"#), "{html}");
+        assert!(html.contains(r##"C<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a>"##), "{html}");
         assert!(!html.contains("broken"), "{html}");
+    }
+
+    #[test]
+    fn adjacent_references_get_a_comma() {
+        let html = render("x[^a][^b] y[^a]\n\n[^a]: A\n[^b]: B\n");
+        assert!(html.contains(r##"<a href="#fn-a">1</a></sup><sup class="footnote-ref" title="b">,<a href="#fn-b">2</a>"##), "{html}");
+        assert!(html.contains(r##"y<sup class="footnote-ref" title="a"><a href="#fn-a">1</a>"##), "{html}");
     }
 
     #[test]

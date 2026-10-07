@@ -4,10 +4,10 @@ import { test, expect } from './fixtures';
 /**
  * ov-14: footnotes.
  *
- * A `[^label]` reference renders as a superscript `[n]` (`.cm-footnote-ref`), n
+ * A `[^label]` reference renders as a superscript `n` (`.cm-footnote-ref`), n
  * by first reference, in the live-preview editor; clicking it scrolls to the
  * `[^label]:` definition and flashes that line (`.cm-citation-target`, the flash
- * the citations share). A definition's marker renders as a `[n]` row head
+ * the citations share). A definition's marker renders as an `n` row head
  * (`.cm-footnote-def`). A label matching a `sources[].id` resolves without a
  * body definition; one with neither is broken. Driven against the fake backend.
  */
@@ -44,15 +44,15 @@ test('references number by first use, with the label on hover', async ({ page })
   const editor = await openConcept(page);
   const refs = editor.locator('.cm-footnote-ref');
   await expect(refs).toHaveCount(4);
-  await expect(refs.nth(0)).toHaveText('[1]');
+  await expect(refs.nth(0)).toHaveText('1');
   await expect(refs.nth(0)).toHaveAttribute('title', '21');
-  await expect(refs.nth(1)).toHaveText('[2]');
+  await expect(refs.nth(1)).toHaveText(',2'); // directly after [^21]: comma-separated;
   await expect(refs.first()).toHaveJSProperty('tagName', 'SUP');
   // `[^99]` has neither a definition nor a source.
-  await expect(refs.nth(2)).toHaveText('[3]');
+  await expect(refs.nth(2)).toHaveText('3');
   await expect(refs.nth(2)).toHaveClass(/cm-footnote-broken/);
   // `[^ssi-web]` has no body definition but matches a `sources` id.
-  await expect(refs.nth(3)).toHaveText('[4]');
+  await expect(refs.nth(3)).toHaveText('4');
   await expect(refs.nth(3)).toHaveAttribute('title', 'ssi-web');
   await expect(refs.nth(3)).not.toHaveClass(/cm-footnote-broken/);
   await expect(editor.locator('.cm-footnote-broken')).toHaveCount(1);
@@ -68,5 +68,5 @@ test('clicking a reference jumps to its definition and flashes it', async ({ pag
   await expect(defLine).toBeInViewport();
   // The definition marker renders as a row head. (The click does not focus the
   // editor, so the caret parked on the line does not reveal the raw marker.)
-  await expect(defLine.locator('.cm-footnote-def')).toHaveText('[1]');
+  await expect(defLine.locator('.cm-footnote-def')).toHaveText('1');
 });

@@ -63,7 +63,7 @@ Notable techniques:
 
 ## Footnotes
 
-`footnotes(reading)` does the same for markdown footnotes over the shared `scanFootnotes` kernel: a `[^label]` reference becomes a superscript `[n]` (numbered by first reference, label on hover) that jumps to its `[^label]:` definition through the shared `jumpAndFlash` (installing `jumpFlashField` too, which CodeMirror dedupes), each definition marker becomes a `[n]` row head, and a reference with no definition renders dashed red and ignores clicks. A label matching a `sources[].id` (read from `frontmatterField` through `sourceIds`) counts as resolved without a body definition; it renders in accent colour but has no jump target yet. In hybrid mode a reference shows raw under the cursor and a definition marker shows raw while the cursor is on its line. See [Linking → Footnotes](/okf/linking.md#footnotes).
+`footnotes(reading)` does the same for markdown footnotes over the shared `scanFootnotes` kernel: a `[^label]` reference becomes a superscript `n` (numbered by first reference, label on hover, `,n` when it directly follows another) that jumps to its `[^label]:` definition through the shared `jumpAndFlash` (installing `jumpFlashField` too, which CodeMirror dedupes), each definition marker becomes an `n` row head, and a reference with no definition renders dashed red and ignores clicks. A label matching a `sources[].id` (read from `frontmatterField` through `sourceIds`) counts as resolved without a body definition; it renders in accent colour but has no jump target yet. In hybrid mode a reference shows raw under the cursor and a definition marker shows raw while the cursor is on its line. See [Linking → Footnotes](/okf/linking.md#footnotes).
 
 ## CriticMarkup
 

@@ -54,6 +54,10 @@ pub struct Footnote {
     pub defined: bool,
     /// Whether the label has a body definition (a jump target in the text).
     pub has_def: bool,
+    /// A reference that starts exactly where the previous reference ends
+    /// (`[^a][^b]`). Renderers separate it with a comma so `1` `2` does not
+    /// read as `12`.
+    pub follows_ref: bool,
 }
 
 /// Every footnote reference and definition in `text`, in document order.
@@ -123,11 +127,14 @@ pub fn scan_footnotes(text: &str, source_ids: &[String]) -> Vec<Footnote> {
         }
     }
 
+    let mut prev_ref_end: Option<usize> = None;
     found
         .into_iter()
         .map(|(from, to, label, def)| {
             let key = label.to_lowercase();
             let has_def = with_def.contains(&key);
+            let follows_ref = !def && prev_ref_end == Some(from);
+            prev_ref_end = (!def).then_some(to);
             Footnote {
                 from: utf16_at[from],
                 to: utf16_at[to],
@@ -136,6 +143,7 @@ pub fn scan_footnotes(text: &str, source_ids: &[String]) -> Vec<Footnote> {
                 def,
                 defined: has_def || sources.contains(&key),
                 has_def,
+                follows_ref,
             }
         })
         .collect()
@@ -307,6 +315,12 @@ mod tests {
                 ("only-def".into(), 4),
             ]
         );
+    }
+
+    #[test]
+    fn adjacent_references_are_marked() {
+        let f = scan_footnotes("a[^1][^2] b [^3]\n[^4]: x", &[]);
+        assert_eq!(f.iter().map(|f| f.follows_ref).collect::<Vec<_>>(), vec![false, true, false, false]);
     }
 
     #[test]

@@ -105,14 +105,15 @@ function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
     const anchor = escapeHtml(f.label.toLowerCase()).replace(/"/g, '&quot;');
     const whole = footnotesByLabel.get(f.label.toLowerCase()) ?? f;
     const n = whole.num;
+    const sep = f.followsRef ? ',' : '';
     if (f.def && atLineStart) {
-      out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">[${n}]</a>`;
+      out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">${n}</a>`;
     } else if (whole.hasDef) {
-      out += `<sup class="footnote-ref" title="${label}"><a href="#fn-${anchor}">[${n}]</a></sup>`;
+      out += `<sup class="footnote-ref" title="${label}">${sep}<a href="#fn-${anchor}">${n}</a></sup>`;
     } else if (whole.defined) {
-      out += `<sup class="footnote-ref" title="${label}">[${n}]</sup>`;
+      out += `<sup class="footnote-ref" title="${label}">${sep}${n}</sup>`;
     } else {
-      out += `<sup class="footnote-ref broken" title="${label}">[${n}]</sup>`;
+      out += `<sup class="footnote-ref broken" title="${label}">${sep}${n}</sup>`;
     }
     p = f.to;
   }
