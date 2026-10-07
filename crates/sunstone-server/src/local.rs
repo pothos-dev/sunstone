@@ -173,9 +173,9 @@ fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
                 .into_response();
         }
         // A missing *file* (it has an extension) is a 404; anything else is a
-        // route the SPA resolves client-side.
-        let last = rel.rsplit('/').next().unwrap_or(rel);
-        if last.contains('.') {
+        // route the SPA resolves client-side. A `.md` path is such a route too:
+        // a deep link naming a Concept by its Bundle path (`/guide/setup.md`).
+        if !is_spa_route(rel) {
             return StatusCode::NOT_FOUND.into_response();
         }
     }
@@ -193,6 +193,17 @@ fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
             "this build has no app shell: run `bun run build` first",
         )
             .into_response(),
+    }
+}
+
+/// Whether a path that names no built file still belongs to the SPA: a pretty
+/// Concept URL (no extension on the last segment) or a Concept's Bundle path
+/// (`.md`). The SPA resolves either to a Concept (`src/lib/ipc/servedStartup.ts`).
+fn is_spa_route(rel: &str) -> bool {
+    let last = rel.rsplit('/').next().unwrap_or(rel);
+    match last.rsplit_once('.') {
+        None => true,
+        Some((_, ext)) => ext.eq_ignore_ascii_case("md"),
     }
 }
 
@@ -379,7 +390,18 @@ mod tests {
 
     #[tokio::test]
     async fn the_root_and_spa_routes_serve_the_marked_index() {
-        for path in ["/", "/index.html", "/some/route", "/?print=note.md&toolbar=1"] {
+        for path in [
+            "/",
+            "/index.html",
+            "/some/route",
+            "/?print=note.md&toolbar=1",
+            // Deep links to a Concept: pretty, by Bundle path, and under a
+            // top-level `api/` folder, which the `/_api` prefix leaves free.
+            "/guide/setup",
+            "/guide/setup.md",
+            "/guide/Setup.MD",
+            "/api/notes",
+        ] {
             let (status, headers, body) = send(get(path)).await;
             assert_eq!(status, StatusCode::OK, "{path}");
             assert_eq!(headers[CONTENT_TYPE], "text/html; charset=utf-8");
@@ -399,7 +421,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_files_and_unknown_api_routes_are_404() {
-        for path in ["/_app/missing.js", "/_api/nope", "/_api"] {
+        for path in ["/_app/missing.js", "/_api/nope", "/_api", "/assets/logo.png"] {
             let (status, _, body) = send(get(path)).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
             assert!(!body.contains(SERVE_MARKER), "{path} must not fall back to the SPA");

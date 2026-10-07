@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
+  import { replaceState } from '$app/navigation';
   import { backend } from '$lib/ipc';
+  import { servedDesktop } from '$lib/ipc/served';
+  import { conceptHref } from '$lib/web/urlSync';
   import { bundle } from '$lib/state/bundle.svelte';
   import { editor } from '$lib/state/editor.svelte';
   import { indexStore } from '$lib/state/index.svelte';
@@ -148,7 +151,11 @@
       // used to leave the raw YAML block sitting in the editable body on the
       // very first restored tile.
       const [startupDoc] = await Promise.all([
-        backend.takeStartupDocument().catch(() => null),
+        // A dead `sunstone serve` deep link rejects with its message.
+        backend.takeStartupDocument().catch((e: unknown) => {
+          if (e instanceof Error) treeActions.notify(e.message);
+          return null;
+        }),
         bundle.load(),
         session.load(),
         ensureWasm(),
@@ -392,6 +399,16 @@
       session.setLastOpenConcept(path);
       if (path !== null) session.pushRecentFile(path);
     }
+  });
+
+  // `sunstone serve`: keep the address bar on the active Tile's Concept, so a
+  // copied URL is a deep link and a reload lands back on it. Replaced, never
+  // pushed: every Tile keeps its own Back/Forward, and browser history entries
+  // would fight them (why the web build allows only one Tile).
+  $effect(() => {
+    if (!servedDesktop) return;
+    const href = conceptHref(editor.path);
+    if (session.restored && href !== location.pathname) replaceState(href, {});
   });
 
   // Persist the full tiling layout (columns + weights, each tile's Concept +

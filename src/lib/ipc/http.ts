@@ -2,6 +2,8 @@ import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
 import { servedDesktop } from './served';
+import { startupFromUrl } from './servedStartup';
+import { urlToConceptInline } from '$lib/web/conceptUrl';
 import {
   openPrintTab,
   noSavePdf,
@@ -278,6 +280,9 @@ export function parseSyncNotice(data: string): SyncNotice | null {
 // Handlers are attached with `addEventListener` (not `onmessage =`) precisely
 // because the source is shared: assignment would let a second subscriber clobber
 // the first's handler, and an unsubscribe could not detach just its own.
+/** `takeStartupDocument` hands the URL's Concept out once per page load. */
+let startupTaken = false;
+
 let eventSource: EventSource | null = null;
 let eventRefs = 0;
 
@@ -309,9 +314,30 @@ export const httpBackend: Backend = {
   currentBundle(): Promise<string | null> {
     return getJson<string>('/_api/bundle-root');
   },
-  // No command line on the web: the URL addresses the open Concept instead.
-  takeStartupDocument(): Promise<StartupDocument | null> {
-    return Promise.resolve(null);
+  // No command line in a browser. Under `sunstone serve` the page URL names the
+  // Concept instead (a deep link); on Sunstone Web the route `load` has already
+  // opened it (`initialConcept`), so there is nothing to hand out.
+  async takeStartupDocument(): Promise<StartupDocument | null> {
+    if (!servedDesktop || startupTaken) return null;
+    startupTaken = true;
+    const { pathname, hash } = window.location;
+    // Imported lazily: `$lib/wasm` needs SvelteKit's runtime, which the unit
+    // suites importing this module do not have.
+    const [paths, wasm] = await Promise.all([
+      getJson<string[]>('/_api/concept-paths'),
+      import('$lib/wasm').then((m) => m.ensureWasm()),
+    ]);
+    const index = wasm ? new wasm.BundleIndex(paths) : null;
+    let link;
+    try {
+      link = startupFromUrl(pathname, hash, paths, (p) =>
+        index ? (index.urlToConcept(p) ?? null) : urlToConceptInline(p, paths),
+      );
+    } finally {
+      index?.free();
+    }
+    if (link?.kind === 'missing') throw new Error(`No Concept at ${link.urlPath}`);
+    return link?.doc ?? null;
   },
   listKnownBundles(): Promise<KnownBundle[]> {
     return Promise.resolve([]);

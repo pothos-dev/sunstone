@@ -49,7 +49,9 @@ export interface Backend {
   /**
    * The Document named on the command line after the Bundle, handed out once:
    * later calls (e.g. after a webview reload) return `null`, as does a launch
-   * that named none. The editor opens it after restoring the layout.
+   * that named none. The editor opens it after restoring the layout. Under
+   * `sunstone serve` the page URL names it instead (`ipc/servedStartup.ts`); a
+   * URL with no Concept behind it rejects, and the editor shows the message.
    */
   takeStartupDocument(): Promise<StartupDocument | null>;
 

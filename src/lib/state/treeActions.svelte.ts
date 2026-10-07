@@ -186,6 +186,11 @@ class TreeActionsStore {
     this.#showRewriteNotice(summary);
   }
 
+  /** Surface any other one-line message in the same toast (e.g. a dead deep link). */
+  notify(message: string): void {
+    this.notice = { id: ++this.#noticeSeq, message };
+  }
+
   /**
    * Surface a brief notice when a move auto-rewrote links. Nothing is shown when
    * no links changed (the common case), keeping it unobtrusive.

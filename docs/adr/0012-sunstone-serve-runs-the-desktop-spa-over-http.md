@@ -7,7 +7,7 @@ experience in a browser tab, not Sunstone Web on a laptop:
 - **One process, one origin.** The desktop binary links `sunstone-server` as a library and
   calls `serve_local` (`crates/sunstone-server/src/local.rs`): the ordinary API route table
   plus a fallback that serves the static SPA build. There is no SvelteKit Node process and no
-  `/api` proxy; the browser talks to axum directly.
+  `/_api` proxy; the browser talks to axum directly.
 - **The desktop frontend, unchanged.** The SPA is the one Tauri embeds into the binary
   (`tauri::Context::assets`); a dev build, which embeds nothing, reads `build/` from disk.
   The server stamps `window.__SUNSTONE_SERVE__` into every `index.html` it serves, and
@@ -54,6 +54,44 @@ turned the guard off entirely. Two opt-in flags replace it:
 
 Neither flag adds a sign-in. Whoever can reach the proxy can edit the Bundle, so access
 control belongs in the proxy.
+
+## Deep links to a Concept (amended)
+
+The desktop window takes a Concept on the command line
+(`sunstone ./docs guide/setup.md#install`); the browser tab had no way to name one. The
+page URL now does that job, in the same scheme Sunstone Web uses, so a link works against
+either:
+
+| URL | Opens |
+|-----|-------|
+| `/guide/setup` | `guide/setup.md` (the pretty URL, `concept_url` / `url_to_concept`) |
+| `/guide` | `guide/index.md`, which wins over a `guide.md` |
+| `/guide/setup.md` | `guide/setup.md` (the Bundle path, as copied from the repo) |
+| `…#install` | the same, scrolled to the `install` heading |
+| `/` | nothing: the restored layout stands |
+
+- **The startup-Document seam carries it.** `http.ts`'s `takeStartupDocument` reads
+  `location` and resolves it (`ipc/servedStartup.ts`), and `App.svelte` opens the result
+  into the restored active Tile exactly as it opens a command-line Document. The other
+  Tiles are left alone. A URL with no Concept behind it opens nothing and shows
+  "No Concept at /guide/nope".
+- **The server routes `.md` paths to the SPA.** The app-shell fallback used to 404 any
+  last segment with an extension; a `.md` one now gets `index.html` like an extensionless
+  route. Other missing files still 404.
+- **The address bar follows the active Tile.** `App.svelte` writes the active Tile's pretty
+  URL with SvelteKit's `replaceState`, so a copied URL is a deep link and a reload lands
+  back on it. It replaces and never pushes: each Tile has its own Back/Forward, and browser
+  history entries would fight them. That conflict is why the web build allows a single
+  Tile, and serve mode keeps the tiling layout.
+- **The API moved from `/api` to `/_api`.** Under `/api` a Concept in a top-level `api/`
+  folder had no URL: the fallback 404s unrouted API paths on purpose (a client calling a
+  route that does not exist should get an error, not a page), and Sunstone Web's proxy
+  claims the whole prefix. The underscore sits beside SvelteKit's own `/_app/`. Concepts
+  under `_api/` or `_app/` still cannot be linked by path.
+- **Root only.** The SPA is built for `/`: its assets load from `/_app/…`, the backend
+  fetches `/_api/…`, and Concept URLs start at `/`. Behind a proxy that mounts it under a
+  subpath (`https://host/notes/`), every one of those requests misses. Give it its own
+  host name or port instead.
 
 ## Considered options
 
