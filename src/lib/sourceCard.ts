@@ -5,7 +5,10 @@ import type { Source } from '$lib/wasm/exports';
 //
 // The details of a `sources` entry, shown the moment the pointer enters a
 // footnote that cites it or a title in the Sources section; the native `title`
-// tooltip waits about a second and cannot be styled. One card at a time,
+// tooltip waits about a second and cannot be styled. The editor attaches it to
+// its widgets (`attachSourceCard`); the web viewer binds it once over the
+// server-rendered body (`bindSourceCards`), whose source footnotes and titles
+// carry their entry as `data-source` JSON (`render/footnotes.rs`). One card at a time,
 // fixed-positioned in `document.body` so the editor's scroller cannot clip it,
 // styled by `.source-card` in `app.css`. It hides on leave, on click and on
 // any scroll.
@@ -109,6 +112,38 @@ export function attachSourceCard(anchor: HTMLElement, s: Source): void {
   anchor.addEventListener('mousedown', () => {
     if (current?.anchor === anchor) hide();
   });
+}
+
+/**
+ * Show cards over every `[data-source]` element inside `root` (server-rendered
+ * HTML). Delegated, so it survives the body being replaced. Returns the unbind.
+ */
+export function bindSourceCards(root: HTMLElement): () => void {
+  const anchorOf = (t: EventTarget | null) =>
+    t instanceof Element ? (t.closest('[data-source]') as HTMLElement | null) : null;
+  const over = (e: MouseEvent) => {
+    const a = anchorOf(e.target);
+    if (!a || !root.contains(a) || current?.anchor === a) return;
+    try {
+      show(a, JSON.parse(a.dataset.source ?? '') as Source);
+    } catch {
+      // Malformed data: no card.
+    }
+  };
+  const out = (e: MouseEvent) => {
+    const a = anchorOf(e.target);
+    if (a && current?.anchor === a && !a.contains(e.relatedTarget as Node | null)) hide();
+  };
+  const down = () => hide();
+  root.addEventListener('mouseover', over);
+  root.addEventListener('mouseout', out);
+  root.addEventListener('mousedown', down);
+  return () => {
+    root.removeEventListener('mouseover', over);
+    root.removeEventListener('mouseout', out);
+    root.removeEventListener('mousedown', down);
+    hide();
+  };
 }
 
 /** Remove the card if its anchor is inside `dom` (a widget being destroyed). */

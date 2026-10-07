@@ -167,8 +167,8 @@ pub fn render_body(
     //     label that is a `sources[].id` links to that entry's resource (ov-17).
     let yaml = split(content).yaml;
     let link = |url: &str| link_attrs(url, source_path, exists);
-    let sources = sunstone_shared::sources::sources(yaml);
-    let (body, footnote_repls) = footnotes_to_sentinels(&body, &sources, &link);
+    let source_list = sunstone_shared::sources::source_list(strip_frontmatter(content), yaml);
+    let (body, footnote_repls) = footnotes_to_sentinels(&body, &source_list, &link);
 
     // 1. Rewrite `[[wikilinks]]` to markdown links carrying a resolution marker
     //    URL, so comrak parses them as ordinary links we finish uniformly below.
@@ -222,7 +222,6 @@ pub fn render_body(
     let html = substitute_citation_sentinels(&html, &citation_repls);
     let mut html = footnote_repls.substitute(&html);
     // The virtual Sources section closes the body (ov-17); it is not in the file.
-    let source_list = sunstone_shared::sources::source_list(strip_frontmatter(content), yaml);
     html.push_str(&sources_section_html(&source_list, &link));
 
     RenderPayload {

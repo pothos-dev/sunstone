@@ -2,6 +2,7 @@
   import type { RenderPayload, TagCount, TreeNode } from '$lib/types';
   import type { WebUser } from './loadConcept';
   import { onMount } from 'svelte';
+  import { bindSourceCards } from '$lib/sourceCard';
   import { goto, invalidateAll } from '$app/navigation';
   import { backend } from '$lib/ipc';
   import { applyTheme, theme } from '$lib/state/theme.svelte';
@@ -182,6 +183,15 @@
     const el = articleEl;
     if (!el) return;
     return wireRemoteEmbeds(el);
+  });
+
+  // --- Source hover cards (ov-17) ---
+  // Footnotes citing a `sources` entry and the Sources section titles carry
+  // their entry as `data-source`; one delegated binding shows the card.
+  $effect(() => {
+    const el = articleEl;
+    if (!el) return;
+    return bindSourceCards(el);
   });
 
   // --- Persist UI state (localStorage) — gated until the initial load applies. ---

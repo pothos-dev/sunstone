@@ -50,9 +50,6 @@ pub struct Source {
     /// The footnote number of the first `[^id]` citing this entry, or `None`
     /// when the body does not cite it.
     pub num: Option<usize>,
-    /// Hover text: title, resource, then the credibility signals present, one
-    /// per line.
-    pub hover: String,
 }
 
 /// Classify a `resource` value.
@@ -87,7 +84,7 @@ pub fn sources(yaml: &str) -> Vec<Source> {
         .map(|e| {
             let field = |k: &str| e.get(k).and_then(scalar);
             let resource = field("resource").unwrap_or_default();
-            let mut s = Source {
+            Source {
                 id: field("id"),
                 kind: resource_kind(&resource),
                 resource,
@@ -96,10 +93,7 @@ pub fn sources(yaml: &str) -> Vec<Source> {
                 usage_count: field("usage_count"),
                 last_modified: field("last_modified"),
                 num: None,
-                hover: String::new(),
-            };
-            s.hover = hover(&s);
-            s
+            }
         })
         .collect()
 }
@@ -138,31 +132,6 @@ fn scalar(v: &Value) -> Option<String> {
     }
 }
 
-fn hover(s: &Source) -> String {
-    let mut lines: Vec<String> = Vec::new();
-    if let Some(t) = &s.title {
-        lines.push(t.clone());
-    }
-    if !s.resource.is_empty() {
-        lines.push(s.resource.clone());
-    }
-    if let Some(a) = &s.author {
-        lines.push(format!("Author: {a}"));
-    }
-    if let Some(m) = &s.last_modified {
-        lines.push(format!("Last modified: {m}"));
-    }
-    if let Some(u) = &s.usage_count {
-        lines.push(format!("Usage count: {u}"));
-    }
-    if lines.is_empty() {
-        if let Some(id) = &s.id {
-            lines.push(id.clone());
-        }
-    }
-    lines.join("\n")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,8 +156,8 @@ mod tests {
         assert_eq!(s[1].usage_count.as_deref(), Some("5"));
         assert_eq!(s[2].id, None);
         assert_eq!(s[2].kind, ResourceKind::Descriptor);
-        assert_eq!(s[0].hover, "Bee\n/x/b.md");
-        assert_eq!(s[1].hover, "https://a.example\nAuthor: human:dan\nUsage count: 5");
+        assert_eq!(s[0].title.as_deref(), Some("Bee"));
+        assert_eq!(s[1].author.as_deref(), Some("human:dan"));
     }
 
     #[test]

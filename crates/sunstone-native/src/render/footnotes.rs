@@ -5,8 +5,9 @@
 //!   - a `[^label]` reference → a superscript `n` (its number by first use; a
 //!     comma before one that directly follows another, `1,2`). A label that is
 //!     a `sources[].id` links straight to that entry's `resource` (an in-Bundle
-//!     Concept or an external URL) with the entry's details on hover, and stays
-//!     unlinked when the resource is a scope descriptor. Any other label links
+//!     Concept or an external URL), and stays unlinked when the resource is a
+//!     scope descriptor. It carries the entry as `data-source` JSON, which the
+//!     web viewer's hover card reads (`src/lib/sourceCard.ts`). Any other label links
 //!     to its body definition, or is a non-link `broken` one without one;
 //!   - a line-start `[^label]:` definition → an `n` row head carrying
 //!     `id="fn-label"` (the jump target); the footnote text after it stays
@@ -44,6 +45,13 @@ fn footnote_anchor(label: &str) -> String {
     attr_escape(&label.to_lowercase())
 }
 
+/// `data-source="…"`: the entry as JSON (the wasm `Source` shape) for the
+/// hover card.
+fn source_data(s: &Source) -> String {
+    let json = serde_json::to_string(s).unwrap_or_default();
+    format!(r#"data-source="{}""#, attr_escape(&json))
+}
+
 /// The `sources` entry a label cites, if any (first entry with the id).
 fn source_for<'s>(sources: &'s [Source], label: &str) -> Option<&'s Source> {
     let wanted = label.to_lowercase();
@@ -56,12 +64,12 @@ fn footnote_ref_html(f: &Footnote, source: Option<&Source>, link: LinkAttrs) -> 
     let (l, n) = (attr_escape(&f.label), f.num);
     let sep = if f.follows_ref { "," } else { "" };
     if let Some(s) = source {
-        let t = attr_escape(&s.hover);
+        let d = source_data(s);
         if s.kind == ResourceKind::Descriptor {
-            format!(r#"<sup class="footnote-ref source" title="{t}">{sep}{n}</sup>"#)
+            format!(r#"<sup class="footnote-ref source" {d}>{sep}{n}</sup>"#)
         } else {
             let a = link(&s.resource);
-            format!(r#"<sup class="footnote-ref source" title="{t}">{sep}<a {a}>{n}</a></sup>"#)
+            format!(r#"<sup class="footnote-ref source" {d}>{sep}<a {a}>{n}</a></sup>"#)
         }
     } else if f.has_def {
         let a = footnote_anchor(&f.label);
@@ -82,7 +90,7 @@ fn footnote_def_html(f: &Footnote, after_def: bool) -> String {
 
 /// Rewrite footnote markers in `body` to sentinel tokens, returning the prepared
 /// body plus the sentinel replacements. `sources` are the Concept's `sources`
-/// entries; `link` builds the anchor attributes for a followable resource.
+/// entries, numbered (`source_list`); `link` builds the anchor attributes for a followable resource.
 /// Offsets are UTF-16 units, so the body is sliced over its UTF-16 units.
 pub(super) fn footnotes_to_sentinels(
     body: &str,
@@ -133,12 +141,12 @@ pub(super) fn sources_section_html(list: &[Source], link: LinkAttrs) -> String {
     );
     for s in list {
         let num = s.num.map(|n| n.to_string()).unwrap_or_default();
-        let t = attr_escape(&s.hover);
+        let d = source_data(s);
         let label = attr_escape(s.title.as_deref().unwrap_or(&s.resource));
         let title = if s.kind == ResourceKind::Descriptor {
-            format!(r#"<span class="source-title" title="{t}">{label}</span>"#)
+            format!(r#"<span class="source-title" {d}>{label}</span>"#)
         } else {
-            format!(r#"<a {} title="{t}"><span class="source-title">{label}</span></a>"#, link(&s.resource))
+            format!(r#"<a {} {d}><span class="source-title">{label}</span></a>"#, link(&s.resource))
         };
         let resource = if s.title.is_some() && !s.resource.is_empty() {
             format!(r#"<span class="source-resource">{}</span>"#, attr_escape(&s.resource))
@@ -223,7 +231,8 @@ mod tests {
         let html = render(body);
         assert!(html.contains(r##"A<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a></sup>"##), "{html}");
         // `ssi-web` has no body definition but is a `sources` id: it links to the resource.
-        assert!(html.contains(r#"B<sup class="footnote-ref source" title="https://x"><a href="https://x" target="_blank" rel="noopener noreferrer">2</a></sup>"#), "{html}");
+        assert!(html.contains(r#"B<sup class="footnote-ref source" data-source="{&quot;id&quot;:&quot;ssi-web&quot;"#), "{html}");
+        assert!(html.contains(r#"<a href="https://x" target="_blank" rel="noopener noreferrer">2</a></sup>"#), "{html}");
         assert!(html.contains(r##"C<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a>"##), "{html}");
         assert!(!html.contains("broken"), "{html}");
     }
@@ -253,19 +262,19 @@ mod tests {
     #[test]
     fn source_footnotes_link_to_the_resource() {
         let html = render_in(WITH_SOURCES, "notes/a.md", &["notes/a.md", "docs/spec.md"]);
+        // The entry rides along as JSON (the wasm `Source` shape) for the hover card.
+        let web = r#"data-source="{&quot;id&quot;:&quot;web&quot;,&quot;resource&quot;:&quot;https://x.example/a?b=1&amp;c=2&quot;,&quot;kind&quot;:&quot;url&quot;,&quot;title&quot;:null,&quot;author&quot;:null,&quot;usageCount&quot;:null,&quot;lastModified&quot;:null,&quot;num&quot;:1}""#;
         assert!(
-            html.contains(r#"A<sup class="footnote-ref source" title="https://x.example/a?b=1&amp;c=2"><a href="https://x.example/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">1</a></sup>"#),
+            html.contains(&format!(r#"A<sup class="footnote-ref source" {web}><a href="https://x.example/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">1</a></sup>"#)),
             "{html}"
         );
         assert!(
-            html.contains("B<sup class=\"footnote-ref source\" title=\"The spec\n/docs/spec.md\"><a class=\"internal-link\" data-path=\"docs/spec.md\""),
+            html.contains(r#"&quot;num&quot;:2}"><a class="internal-link" data-path="docs/spec.md""#),
             "{html}"
         );
         // A scope descriptor is resolved but not a link.
-        assert!(
-            html.contains(r#"<sup class="footnote-ref source" title="all queries in project X">,3</sup>"#),
-            "{html}"
-        );
+        assert!(html.contains(r#"&quot;num&quot;:3}">,3</sup>"#), "{html}");
+        assert!(!html.contains(" title=\"all queries"), "{html}");
     }
 
     #[test]
@@ -278,7 +287,8 @@ mod tests {
             .collect();
         assert!(order.windows(2).all(|w| w[0] < w[1]), "{section}");
         assert!(section.contains(r#"<li><span class="source-num">2</span><span class="source-body"><a class="internal-link" data-path="docs/spec.md""#), "{section}");
-        assert!(section.contains(r#"<span class="source-title" title="all queries in project X">all queries in project X</span>"#), "{section}");
+        assert!(section.contains(r#"<span class="source-title" data-source="{&quot;id&quot;:&quot;scope&quot;"#), "{section}");
+        assert!(section.contains(r#"&quot;num&quot;:3}">all queries in project X</span>"#), "{section}");
         // `../u.md` from `notes/a.md` is `u.md`, which does not exist.
         assert!(section.contains(r#"<li><span class="source-num"></span><span class="source-body"><a class="internal-link broken" data-path="u.md""#), "{section}");
     }

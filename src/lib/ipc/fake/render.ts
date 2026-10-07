@@ -104,17 +104,22 @@ function sourceLinkAttrs(s: Source): string {
   return `href="${attr(s.resource)}"`;
 }
 
+/** `data-source="…"`: the entry as JSON for the hover card (Rust's `source_data`). */
+function sourceData(s: Source): string {
+  return `data-source="${attr(JSON.stringify(s))}"`;
+}
+
 /** The Sources section, in the SAME markup as Rust's `sources_section_html`. */
 function renderSourcesSection(list: Source[]): string {
   if (list.length === 0) return '';
   let out = `<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">`;
   for (const s of list) {
-    const t = attr(s.hover);
+    const d = sourceData(s);
     const label = attr(s.title ?? s.resource);
     const title =
       s.kind === 'descriptor'
-        ? `<span class="source-title" title="${t}">${label}</span>`
-        : `<a ${sourceLinkAttrs(s)} title="${t}"><span class="source-title">${label}</span></a>`;
+        ? `<span class="source-title" ${d}>${label}</span>`
+        : `<a ${sourceLinkAttrs(s)} ${d}><span class="source-title">${label}</span></a>`;
     const resource =
       s.title != null && s.resource
         ? `<span class="source-resource">${attr(s.resource)}</span>`
@@ -145,11 +150,11 @@ function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
     if (f.def && atLineStart) {
       out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">${n}</a>`;
     } else if (source) {
-      const t = attr(source.hover);
+      const d = sourceData(source);
       out +=
         source.kind === 'descriptor'
-          ? `<sup class="footnote-ref source" title="${t}">${sep}${n}</sup>`
-          : `<sup class="footnote-ref source" title="${t}">${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
+          ? `<sup class="footnote-ref source" ${d}>${sep}${n}</sup>`
+          : `<sup class="footnote-ref source" ${d}>${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
     } else if (whole.hasDef) {
       out += `<sup class="footnote-ref" title="${label}">${sep}<a href="#fn-${anchor}">${n}</a></sup>`;
     } else if (whole.defined) {

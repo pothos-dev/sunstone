@@ -3,7 +3,7 @@ import { StateField, type EditorState, type Extension } from '@codemirror/state'
 import type { Source } from '$lib/wasm/exports';
 import { sourceList } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
-import { attachSourceCard, detachSourceCard } from './sourceCard';
+import { attachSourceCard, detachSourceCard } from '$lib/sourceCard';
 
 // ---------------------------------------------------------------------------
 // Sources section (ov-17)
@@ -17,7 +17,7 @@ import { attachSourceCard, detachSourceCard } from './sourceCard';
 // (`onLinkClick`: a Concept in the app, a URL in the browser); a scope
 // descriptor is plain text.
 //
-// The list itself (order, numbers, resource kinds, hover text) is the shared
+// The list itself (order, numbers, resource kinds) is the shared
 // Rust `source_list` over wasm; this module only builds the DOM. The native
 // render emits the same section (`sources_section_html`).
 // ---------------------------------------------------------------------------

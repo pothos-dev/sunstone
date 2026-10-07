@@ -12,7 +12,7 @@ import { scanFootnotes, footnoteDefPos } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
 import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 import { stateSources, sourcesById } from './sources';
-import { attachSourceCard, detachSourceCard } from './sourceCard';
+import { attachSourceCard, detachSourceCard } from '$lib/sourceCard';
 
 // ---------------------------------------------------------------------------
 // Footnotes (ov-14)
@@ -52,9 +52,7 @@ class FootnoteRefWidget extends WidgetType {
       a.defined === b.defined &&
       a.hasDef === b.hasDef &&
       a.followsRef === b.followsRef &&
-      s?.resource === t?.resource &&
-      s?.kind === t?.kind &&
-      s?.hover === t?.hover
+      JSON.stringify(s) === JSON.stringify(t)
     );
   }
   toDOM(): HTMLElement {

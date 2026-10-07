@@ -13,7 +13,8 @@ All notable changes to Sunstone are documented in this file. The format is based
   not cited in the text follow without a number. The list is only shown, never
   written to the file.
 - Hovering a footnote that cites a source, or a title in the Sources list,
-  shows a card with the source's title, resource, author and dates right away. Clicking it opens the source: another Concept in the app,
+  shows a card with the source's title, resource, author and dates right away,
+  in the app and in the web viewer. Clicking it opens the source: another Concept in the app,
   or a web address in the browser.
 
 ## [0.24.1] - 2026-10-07

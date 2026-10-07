@@ -44,14 +44,24 @@ describe('renderConcept footnotes', () => {
       '---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n    title: SSI\n  - id: all\n    resource: all queries in X\n  - id: unused\n    resource: /u.md\n---\n\nA[^b] B[^ssi-web][^all]\n\n[^b]: B\n',
     );
     expect(html).toContain('A<sup class="footnote-ref" title="b"><a href="#fn-b">1</a></sup>');
-    expect(html).toContain('B<sup class="footnote-ref source" title="SSI\nhttps://x"><a href="https://x">2</a></sup>');
-    expect(html).toContain('<sup class="footnote-ref source" title="all queries in X">,3</sup>');
+    // Each source element carries its entry as JSON for the hover card.
+    const d = (id: string | null, resource: string, kind: string, title: string | null, num: number | null) =>
+      'data-source="' +
+      JSON.stringify({ id, resource, kind, title, author: null, usageCount: null, lastModified: null, num })
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;') +
+      '"';
+    const ssi = d('ssi-web', 'https://x', 'url', 'SSI', 2);
+    const all = d('all', 'all queries in X', 'descriptor', null, 3);
+    const unused = d('unused', '/u.md', 'path', null, null);
+    expect(html).toContain(`B<sup class="footnote-ref source" ${ssi}><a href="https://x">2</a></sup>`);
+    expect(html).toContain(`<sup class="footnote-ref source" ${all}>,3</sup>`);
     // The Sources section closes the body: cited by number, then uncited.
     expect(html).toContain(
       '<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">' +
-        '<li><span class="source-num">2</span><span class="source-body"><a href="https://x" title="SSI\nhttps://x"><span class="source-title">SSI</span></a><span class="source-resource">https://x</span></span></li>' +
-        '<li><span class="source-num">3</span><span class="source-body"><span class="source-title" title="all queries in X">all queries in X</span></span></li>' +
-        '<li><span class="source-num"></span><span class="source-body"><a href="/u.md" title="/u.md"><span class="source-title">/u.md</span></a></span></li>' +
+        `<li><span class="source-num">2</span><span class="source-body"><a href="https://x" ${ssi}><span class="source-title">SSI</span></a><span class="source-resource">https://x</span></span></li>` +
+        `<li><span class="source-num">3</span><span class="source-body"><span class="source-title" ${all}>all queries in X</span></span></li>` +
+        `<li><span class="source-num"></span><span class="source-body"><a href="/u.md" ${unused}><span class="source-title">/u.md</span></a></span></li>` +
         '</ol></section>',
     );
   });
