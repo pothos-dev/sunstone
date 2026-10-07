@@ -325,9 +325,6 @@ body {
   margin-bottom: 4px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
 }
 
 .source-card-num {
@@ -337,7 +334,6 @@ body {
   background: var(--accent);
   color: var(--accent-contrast);
   text-align: center;
-  letter-spacing: 0;
 }
 
 .source-card-title {

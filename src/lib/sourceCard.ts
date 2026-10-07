@@ -36,12 +36,6 @@ export function placeCard(a: Rect, w: number, h: number, vw: number, vh: number)
   return { left: Math.max(left, MARGIN), top };
 }
 
-const KIND_LABEL: Record<Source['kind'], string> = {
-  url: 'Web',
-  path: 'In this Bundle',
-  descriptor: 'Scope',
-};
-
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) {
   const e = document.createElement(tag);
   e.className = cls;
@@ -54,10 +48,11 @@ function buildCard(s: Source): HTMLElement {
   const card = el('div', 'source-card');
   card.dataset.testid = 'source-card';
   card.setAttribute('role', 'tooltip');
-  const head = el('div', 'source-card-head');
-  if (s.num != null) head.append(el('span', 'source-card-num', `${s.num}`));
-  head.append(el('span', 'source-card-kind', KIND_LABEL[s.kind]));
-  card.append(head);
+  if (s.num != null) {
+    const head = el('div', 'source-card-head');
+    head.append(el('span', 'source-card-num', `${s.num}`));
+    card.append(head);
+  }
   card.append(el('div', 'source-card-title', s.title ?? s.resource ?? s.id ?? ''));
   if (s.title != null && s.resource) card.append(el('div', 'source-card-resource', s.resource));
   const meta: [string, string | null | undefined][] = [
