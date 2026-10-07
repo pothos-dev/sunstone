@@ -210,11 +210,12 @@ Options:
 
 Serve:
   Instead of opening a window, serve the editor to your browser at
-  http://localhost:PORT/ (localhost only, no sign-in). BUNDLE defaults to the
-  current directory. Edits save to disk as in the app.
+  http://localhost:PORT/ (localhost only unless --bind, no sign-in). BUNDLE
+  defaults to the current directory. Edits save to disk as in the app.
   -p, --port PORT     Port to listen on (default {port})
   --bind ADDR         Listen on ADDR instead of 127.0.0.1 (e.g. 0.0.0.0).
                       There is no sign-in: whoever reaches it can edit.
+                      Requests must still name localhost or an --allow-host.
   --allow-host NAME   Also answer requests for host NAME, e.g. the public
                       name of a reverse proxy in front (repeatable)
 ",

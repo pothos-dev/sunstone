@@ -55,7 +55,7 @@ pub type AppShellAssets = Arc<dyn Fn(&str) -> Option<Vec<u8>> + Send + Sync>;
 pub struct LocalServeOptions {
     /// The Bundle root. Canonicalized here; must be a directory.
     pub bundle_root: PathBuf,
-    /// The loopback port to listen on. `0` picks a free one — a library-level
+    /// The port to listen on. `0` picks a free one — a library-level
     /// convenience (the tests use it); the CLI insists on a real port.
     pub port: u16,
     /// The address to listen on; `None` is loopback (127.0.0.1, plus `[::1]`
@@ -88,7 +88,11 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
     // client resolving `localhost` to `::1` still connects.
     let addr = SocketAddr::new(opts.bind.unwrap_or(IpAddr::from([127, 0, 0, 1])), opts.port);
     let main = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
-        format!("cannot listen on {addr}: {e} (pick another port with --port)")
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            format!("cannot listen on {addr}: {e} (pick another port with --port)")
+        } else {
+            format!("cannot listen on {addr}: {e}")
+        }
     })?;
     let port = main.local_addr().map(|a| a.port()).unwrap_or(opts.port);
     let v6 = match opts.bind {
