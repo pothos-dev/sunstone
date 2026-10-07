@@ -53,7 +53,7 @@ use serde::Serialize;
 use crate::bundle;
 use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
-use sunstone_shared::frontmatter::{frontmatter_fields, FrontmatterField};
+use sunstone_shared::frontmatter::{frontmatter_fields, split, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
 use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_location};
 use sunstone_shared::url::{concept_url, percent_decode};
@@ -164,7 +164,8 @@ pub fn render_body(
 
     // 0c. Footnotes (`[^label]` / `[^label]:`) the same way (ov-14), with the
     //     shared scanner instead of comrak's renumbering footnote extension.
-    let (body, footnote_repls) = footnotes_to_sentinels(&body);
+    let source_ids = sunstone_shared::footnotes::source_ids(split(content).yaml);
+    let (body, footnote_repls) = footnotes_to_sentinels(&body, &source_ids);
 
     // 1. Rewrite `[[wikilinks]]` to markdown links carrying a resolution marker
     //    URL, so comrak parses them as ordinary links we finish uniformly below.

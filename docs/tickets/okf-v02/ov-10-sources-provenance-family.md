@@ -52,3 +52,7 @@ Editing `sources` itself is not this ticket's problem — the YAML Frontmatter e
 - No footnote definition in the body. §5.1 makes the label the join key and lets consumers ignore the footnote prose; no sentence requires the definition, and the title already lives in `sources[].title`. The `/llm-wiki` skill writes none and lints against them. Sunstone still tolerates and hides one written by another tool. Cost: renderers that do not know OKF (GitHub, Obsidian) show `[^id]` literally.
 - Editing stays YAML, reached through Edit on an entry. A form would have to rewrite YAML while preserving comments, which ADR 0008 keeps us from doing cheaply.
 - Not comrak's `extension.footnotes`, as originally planned here: it renumbers by its own rules, moves definitions to the end and knows nothing of `sources`. Rendering goes through the shared scanner and sentinel pass from ov-14, extended with the `sources` join.
+
+## Comments
+
+- 2026-10-07: Pulled forward and shipped ahead of this ticket, because real Bundles already cite with string ids: the shared scanner numbers footnotes by first reference (`Footnote.num`, label on hover), and a label matching a `sources[].id` (`footnotes::source_ids`) counts as resolved without a body definition, in the editor and in the native and fake renders. Still open here: the Sources section (and so a jump target for source-only labels), hover with title/resource, hiding body definitions, Edit, the resource kinds, signals, and the legacy/deprecation work.

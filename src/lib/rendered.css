@@ -120,6 +120,8 @@
 .rendered sup.footnote-ref {
   font-size: 0.72em;
   line-height: 0;
+  color: var(--accent, #d9622b);
+  font-weight: 600;
 }
 
 .rendered sup.footnote-ref a {

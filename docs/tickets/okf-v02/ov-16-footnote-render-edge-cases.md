@@ -40,3 +40,7 @@ priority: 1
 - Duplicate definitions → the first one owns the anchor, matching the editor's `footnote_def_pos`. Later ones still show their row head.
 - Definition after a paragraph line → reuse the existing `<br>` mechanism: emit it whenever the previous line is non-blank, not only after another definition.
 - Fake fences → derive per-line markers from the single whole-body `scanFootnotes` result (offsets mapped to lines) instead of re-scanning each line. No general fence support for the fake; out of scope.
+
+## Comments
+
+- 2026-10-07: Footnotes now number by first use and resolve against `sources[].id` (see ov-10 comment). In the fake backend `definedFootnotes` became `footnotesByLabel` (the whole-body `scanFootnotes` result by lowercase label), which is the per-label half of the "derive from the whole-body scan" decision above.
