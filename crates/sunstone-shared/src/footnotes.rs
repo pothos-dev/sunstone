@@ -153,20 +153,7 @@ pub fn scan_footnotes(text: &str, source_ids: &[String]) -> Vec<Footnote> {
 /// fences), in list order. Numeric ids are read as their text. Empty when the
 /// block does not parse or has no `sources` list.
 pub fn source_ids(yaml: &str) -> Vec<String> {
-    let Ok(serde_yaml::Value::Mapping(map)) = serde_yaml::from_str::<serde_yaml::Value>(yaml) else {
-        return Vec::new();
-    };
-    let Some(serde_yaml::Value::Sequence(entries)) = map.get(serde_yaml::Value::from("sources")) else {
-        return Vec::new();
-    };
-    entries
-        .iter()
-        .filter_map(|e| match e.get("id")? {
-            serde_yaml::Value::String(s) => Some(s.clone()),
-            serde_yaml::Value::Number(n) => Some(n.to_string()),
-            _ => None,
-        })
-        .collect()
+    crate::sources::sources(yaml).into_iter().filter_map(|s| s.id).collect()
 }
 
 /// UTF-16 offset of the first definition of `label` (case-insensitive), or

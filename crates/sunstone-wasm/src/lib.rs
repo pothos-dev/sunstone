@@ -19,6 +19,7 @@ use sunstone_shared::citations::{self, CitationRef};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
+use sunstone_shared::sources::{self, Source};
 use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
@@ -236,6 +237,13 @@ pub fn scan_footnotes(text: String, source_ids: Vec<String>) -> Vec<Footnote> {
 #[wasm_bindgen(js_name = sourceIds)]
 pub fn source_ids(yaml: String) -> Vec<String> {
     footnotes::source_ids(&yaml)
+}
+
+/// The Sources section of a Concept (`body` markdown, `yaml` Frontmatter
+/// block): cited entries by footnote number, then uncited ones in list order.
+#[wasm_bindgen(js_name = sourceList)]
+pub fn source_list(body: String, yaml: String) -> Vec<Source> {
+    sources::source_list(&body, &yaml)
 }
 
 /// The offset of footnote `label`'s definition (`[^label]:`), or `null`.

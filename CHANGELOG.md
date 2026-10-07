@@ -4,6 +4,18 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- A Concept with `sources` in its Frontmatter shows them as a Sources list at
+  the end of the document, numbered like the footnotes that cite them; sources
+  not cited in the text follow without a number. The list is only shown, never
+  written to the file.
+- Hovering a footnote that cites a source shows the source's title, resource,
+  author and dates. Clicking it opens the source: another Concept in the app,
+  or a web address in the browser.
+
 ## [0.24.1] - 2026-10-07
 
 ### Changed

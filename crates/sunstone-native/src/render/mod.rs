@@ -62,7 +62,7 @@ use sunstone_shared::wikilink::{self, parse_target};
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
-use footnotes::footnotes_to_sentinels;
+use footnotes::{footnotes_to_sentinels, sources_section_html};
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -163,9 +163,12 @@ pub fn render_body(
     let (body, citation_repls) = citations_to_sentinels(&body);
 
     // 0c. Footnotes (`[^label]` / `[^label]:`) the same way (ov-14), with the
-    //     shared scanner instead of comrak's renumbering footnote extension.
-    let source_ids = sunstone_shared::footnotes::source_ids(split(content).yaml);
-    let (body, footnote_repls) = footnotes_to_sentinels(&body, &source_ids);
+    //     shared scanner instead of comrak's renumbering footnote extension. A
+    //     label that is a `sources[].id` links to that entry's resource (ov-17).
+    let yaml = split(content).yaml;
+    let link = |url: &str| link_attrs(url, source_path, exists);
+    let sources = sunstone_shared::sources::sources(yaml);
+    let (body, footnote_repls) = footnotes_to_sentinels(&body, &sources, &link);
 
     // 1. Rewrite `[[wikilinks]]` to markdown links carrying a resolution marker
     //    URL, so comrak parses them as ordinary links we finish uniformly below.
@@ -217,7 +220,10 @@ pub fn render_body(
     let html = substitute_critic_sentinels(&html, &critic_repls);
     // Substitute the citation sentinels with their superscript-link / anchor HTML.
     let html = substitute_citation_sentinels(&html, &citation_repls);
-    let html = footnote_repls.substitute(&html);
+    let mut html = footnote_repls.substitute(&html);
+    // The virtual Sources section closes the body (ov-17); it is not in the file.
+    let source_list = sunstone_shared::sources::source_list(strip_frontmatter(content), yaml);
+    html.push_str(&sources_section_html(&source_list, &link));
 
     RenderPayload {
         html,
@@ -327,6 +333,38 @@ fn mark_link_url(
     }
 }
 
+/// The attributes of an `<a>` for a link written as `url` in `source_path`,
+/// classified exactly like a markdown link (internal, broken, external). For
+/// links built outside comrak, such as a footnote to its source (ov-17).
+fn link_attrs(url: &str, source_path: &str, exists: &dyn Fn(&str) -> bool) -> String {
+    let marked = mark_link_url(url, source_path, exists);
+    if let Some(path) = marked.strip_prefix(M_INTERNAL) {
+        internal_link_attrs(path, false)
+    } else if let Some(path) = marked.strip_prefix(M_BROKEN) {
+        internal_link_attrs(path, true)
+    } else if let Some(href) = marked.strip_prefix(M_EXTERNAL) {
+        format!(r#"href="{}" target="_blank" rel="noopener noreferrer""#, attr_escape(href))
+    } else {
+        format!(r#"href="{}""#, attr_escape(&marked))
+    }
+}
+
+fn internal_link_attrs(path: &str, broken: bool) -> String {
+    if broken {
+        format!(
+            r#"class="internal-link broken" data-path="{}" data-broken="true" href="{}""#,
+            attr_escape(path),
+            concept_url(path),
+        )
+    } else {
+        format!(
+            r#"class="internal-link" data-path="{}" href="{}""#,
+            attr_escape(path),
+            concept_url(path),
+        )
+    }
+}
+
 /// Rewrite the marker hrefs comrak emitted into the final anchor attributes.
 fn rewrite_marker_hrefs(html: &str) -> String {
     static RE: LazyLock<Regex> =
@@ -335,22 +373,8 @@ fn rewrite_marker_hrefs(html: &str) -> String {
     re.replace_all(html, |caps: &regex::Captures| {
         let payload = caps.get(2).map(|m| m.as_str()).unwrap_or("");
         match &caps[1] {
-            "sapint" => {
-                let path = percent_decode(payload);
-                format!(
-                    r#"class="internal-link" data-path="{}" href="{}""#,
-                    attr_escape(&path),
-                    concept_url(&path),
-                )
-            }
-            "sapbroken" => {
-                let path = percent_decode(payload);
-                format!(
-                    r#"class="internal-link broken" data-path="{}" data-broken="true" href="{}""#,
-                    attr_escape(&path),
-                    concept_url(&path),
-                )
-            }
+            "sapint" => internal_link_attrs(&percent_decode(payload), false),
+            "sapbroken" => internal_link_attrs(&percent_decode(payload), true),
             // External: keep comrak's already-encoded href, just drop the marker
             // scheme and open in a new tab.
             _ => format!(

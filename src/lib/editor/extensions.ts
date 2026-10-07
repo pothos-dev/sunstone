@@ -42,6 +42,7 @@ import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
+import { sourcesSection, sourcesTheme } from './sources';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
@@ -254,9 +255,12 @@ export function modeExtensions(
     // the cursor. Placed after inlinePreview so the replace decoration overrides
     // the stray reference-link syntax colour on the middle number.
     citations(reading),
-    // Footnotes: `[^label]` renders as a superscript that jumps to its
-    // `[^label]:` definition (ov-14). Same modes and placement as citations.
-    footnotes(reading),
+    // Footnotes: `[^label]` renders as a superscript that opens its cited
+    // source or jumps to its `[^label]:` definition (ov-14, ov-17). Same modes
+    // and placement as citations.
+    footnotes(reading, onLinkClick),
+    // The virtual Sources section after the last line (ov-17), in both modes.
+    sourcesSection(onLinkClick),
     // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown
     // keeps the hyphens). `reading` always renders; `editing` reveals the raw
     // run under the cursor.
@@ -383,6 +387,7 @@ export function editorExtensions(
     // are mode-gated in `modeExtensions`).
     citationTheme,
     footnoteTheme,
+    sourcesTheme,
     // Heading-identity tracking for slug-anchor rewriting (slug-anchor-rewrite):
     // baselines the open Concept's heading slugs and follows each heading across
     // edits so the host can rewrite inbound anchors when a heading is renamed.

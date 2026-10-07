@@ -1,14 +1,21 @@
-//! Footnotes (ov-14).
+//! Footnotes (ov-14) and the Sources section (ov-17).
 //!
 //! Detection is `sunstone_shared::footnotes::scan_footnotes`, the same code the
 //! editor's widgets (`src/lib/editor/footnotes.ts`) call through wasm:
-//!   - a `[^label]` reference → a superscript `n` (its number by first use; a comma before one that directly follows another, `1,2`)
-//!     linking to the body definition; without a body definition but with a
-//!     matching `sources[].id`, a resolved superscript with no link yet (the
-//!     Sources section is ov-10); with neither, a non-link `broken` one;
+//!   - a `[^label]` reference → a superscript `n` (its number by first use; a
+//!     comma before one that directly follows another, `1,2`). A label that is
+//!     a `sources[].id` links straight to that entry's `resource` (an in-Bundle
+//!     Concept or an external URL) with the entry's details on hover, and stays
+//!     unlinked when the resource is a scope descriptor. Any other label links
+//!     to its body definition, or is a non-link `broken` one without one;
 //!   - a line-start `[^label]:` definition → an `n` row head carrying
 //!     `id="fn-label"` (the jump target); the footnote text after it stays
 //!     ordinary markdown, rendered where it was written.
+//!
+//! The Sources section (`sources_section_html`) lists the `sources` entries at
+//! the end of the body, numbered like their superscripts
+//! (`sunstone_shared::sources::source_list`). It exists only in the render,
+//! never in the file.
 //!
 //! comrak's own `extension.footnotes` is deliberately not used: it renumbers by
 //! first use and moves definitions to an end section, which would disagree
@@ -19,6 +26,7 @@
 //! keeps this pass independent of the CriticMarkup and citation passes.
 
 use sunstone_shared::footnotes::{scan_footnotes, Footnote};
+use sunstone_shared::sources::{ResourceKind, Source};
 
 use super::attr_escape;
 use super::sentinel::Sentinels;
@@ -26,16 +34,36 @@ use super::sentinel::Sentinels;
 const FN_OPEN: char = '\u{E004}';
 const FN_CLOSE: char = '\u{E005}';
 
+/// Maps a followable `resource` to the attributes of an `<a>` opening it
+/// (`href` plus the internal/external link classes the viewer acts on).
+pub(super) type LinkAttrs<'a> = &'a dyn Fn(&str) -> String;
+
 /// The `fn-…` anchor for `label`. Labels match case-insensitively, so the
 /// anchor is lowercased while the label is shown as written.
 fn footnote_anchor(label: &str) -> String {
     attr_escape(&label.to_lowercase())
 }
 
-fn footnote_ref_html(f: &Footnote) -> String {
+/// The `sources` entry a label cites, if any (first entry with the id).
+fn source_for<'s>(sources: &'s [Source], label: &str) -> Option<&'s Source> {
+    let wanted = label.to_lowercase();
+    sources
+        .iter()
+        .find(|s| s.id.as_deref().is_some_and(|id| id.to_lowercase() == wanted))
+}
+
+fn footnote_ref_html(f: &Footnote, source: Option<&Source>, link: LinkAttrs) -> String {
     let (l, n) = (attr_escape(&f.label), f.num);
     let sep = if f.follows_ref { "," } else { "" };
-    if f.has_def {
+    if let Some(s) = source {
+        let t = attr_escape(&s.hover);
+        if s.kind == ResourceKind::Descriptor {
+            format!(r#"<sup class="footnote-ref source" title="{t}">{sep}{n}</sup>"#)
+        } else {
+            let a = link(&s.resource);
+            format!(r#"<sup class="footnote-ref source" title="{t}">{sep}<a {a}>{n}</a></sup>"#)
+        }
+    } else if f.has_def {
         let a = footnote_anchor(&f.label);
         format!(r##"<sup class="footnote-ref" title="{l}">{sep}<a href="#fn-{a}">{n}</a></sup>"##)
     } else if f.defined {
@@ -53,18 +81,23 @@ fn footnote_def_html(f: &Footnote, after_def: bool) -> String {
 }
 
 /// Rewrite footnote markers in `body` to sentinel tokens, returning the prepared
-/// body plus the sentinel replacements. `source_ids` are the Concept's
-/// `sources[].id`s. Offsets are UTF-16 units, so the body is sliced over its
-/// UTF-16 units.
-pub(super) fn footnotes_to_sentinels(body: &str, source_ids: &[String]) -> (String, Sentinels) {
+/// body plus the sentinel replacements. `sources` are the Concept's `sources`
+/// entries; `link` builds the anchor attributes for a followable resource.
+/// Offsets are UTF-16 units, so the body is sliced over its UTF-16 units.
+pub(super) fn footnotes_to_sentinels(
+    body: &str,
+    sources: &[Source],
+    link: LinkAttrs,
+) -> (String, Sentinels) {
     let units: Vec<u16> = body.encode_utf16().collect();
     let newline = u16::from(b'\n');
+    let ids: Vec<String> = sources.iter().filter_map(|s| s.id.clone()).collect();
     let mut sentinels = Sentinels::new(FN_OPEN, FN_CLOSE);
     let mut out = String::with_capacity(body.len());
     let mut pos = 0usize;
     // UTF-16 offset of the line after the last definition seen.
     let mut next_line_after_def: Option<usize> = None;
-    for f in scan_footnotes(body, source_ids) {
+    for f in scan_footnotes(body, &ids) {
         out.push_str(&String::from_utf16_lossy(&units[pos..f.from]));
         let html = if f.def {
             let line_start = units[..f.from]
@@ -78,7 +111,7 @@ pub(super) fn footnotes_to_sentinels(body: &str, source_ids: &[String]) -> (Stri
                 .map(|p| f.to + p + 1);
             footnote_def_html(&f, after_def)
         } else {
-            footnote_ref_html(&f)
+            footnote_ref_html(&f, source_for(sources, &f.label), link)
         };
         sentinels.push(&mut out, html);
         pos = f.to;
@@ -87,9 +120,47 @@ pub(super) fn footnotes_to_sentinels(body: &str, source_ids: &[String]) -> (Stri
     (out, sentinels)
 }
 
+/// The Sources section for `list` (from `source_list`), or `""` when the
+/// Concept has no `sources`. Each entry shows its number (blank when uncited),
+/// its title (or resource) as a link to the resource when followable, and the
+/// resource below it.
+pub(super) fn sources_section_html(list: &[Source], link: LinkAttrs) -> String {
+    if list.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        r#"<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">"#,
+    );
+    for s in list {
+        let num = s.num.map(|n| n.to_string()).unwrap_or_default();
+        let t = attr_escape(&s.hover);
+        let label = attr_escape(s.title.as_deref().unwrap_or(&s.resource));
+        let title = if s.kind == ResourceKind::Descriptor {
+            format!(r#"<span class="source-title" title="{t}">{label}</span>"#)
+        } else {
+            format!(r#"<a {} title="{t}"><span class="source-title">{label}</span></a>"#, link(&s.resource))
+        };
+        let resource = if s.title.is_some() && !s.resource.is_empty() {
+            format!(r#"<span class="source-resource">{}</span>"#, attr_escape(&s.resource))
+        } else {
+            String::new()
+        };
+        out.push_str(&format!(
+            r#"<li><span class="source-num">{num}</span><span class="source-body">{title}{resource}</span></li>"#
+        ));
+    }
+    out.push_str("</ol></section>");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use crate::render::render_body;
+
+    fn render_in(body: &str, path: &str, all: &[&str]) -> String {
+        let all: Vec<String> = all.iter().map(|s| s.to_string()).collect();
+        render_body(body, path, &all, &|p| all.iter().any(|a| a == p), &[], &|p| p.to_string()).html
+    }
 
     fn render(body: &str) -> String {
         let all = vec!["a.md".to_string()];
@@ -151,8 +222,8 @@ mod tests {
         let body = "---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n---\n\nA[^phase-1] B[^ssi-web] C[^phase-1]\n\n[^phase-1]: Brief\n";
         let html = render(body);
         assert!(html.contains(r##"A<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a></sup>"##), "{html}");
-        // `ssi-web` has no body definition but is a `sources` id: resolved, unlinked.
-        assert!(html.contains(r#"B<sup class="footnote-ref" title="ssi-web">2</sup>"#), "{html}");
+        // `ssi-web` has no body definition but is a `sources` id: it links to the resource.
+        assert!(html.contains(r#"B<sup class="footnote-ref source" title="https://x"><a href="https://x" target="_blank" rel="noopener noreferrer">2</a></sup>"#), "{html}");
         assert!(html.contains(r##"C<sup class="footnote-ref" title="phase-1"><a href="#fn-phase-1">1</a>"##), "{html}");
         assert!(!html.contains("broken"), "{html}");
     }
@@ -175,5 +246,45 @@ mod tests {
         let html = render("a.[6] b[^1]\n\n[6] row\n[^1]: note\n");
         assert!(html.contains(r##"href="#cite-6""##), "{html}");
         assert!(html.contains(r##"href="#fn-1""##), "{html}");
+    }
+
+    const WITH_SOURCES: &str = "---\ntype: N\nsources:\n  - id: spec\n    resource: /docs/spec.md\n    title: The spec\n  - id: web\n    resource: https://x.example/a?b=1&c=2\n  - id: scope\n    resource: all queries in project X\n  - id: unused\n    resource: ../u.md\n---\n\nA[^web] B[^spec][^scope] C[^web].\n";
+
+    #[test]
+    fn source_footnotes_link_to_the_resource() {
+        let html = render_in(WITH_SOURCES, "notes/a.md", &["notes/a.md", "docs/spec.md"]);
+        assert!(
+            html.contains(r#"A<sup class="footnote-ref source" title="https://x.example/a?b=1&amp;c=2"><a href="https://x.example/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">1</a></sup>"#),
+            "{html}"
+        );
+        assert!(
+            html.contains("B<sup class=\"footnote-ref source\" title=\"The spec\n/docs/spec.md\"><a class=\"internal-link\" data-path=\"docs/spec.md\""),
+            "{html}"
+        );
+        // A scope descriptor is resolved but not a link.
+        assert!(
+            html.contains(r#"<sup class="footnote-ref source" title="all queries in project X">,3</sup>"#),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn sources_section_lists_cited_then_uncited() {
+        let html = render_in(WITH_SOURCES, "notes/a.md", &["notes/a.md", "docs/spec.md"]);
+        let section = &html[html.find(r#"<section class="sources">"#).expect("section")..];
+        let order: Vec<usize> = ["x.example", "The spec", "all queries", "../u.md"]
+            .iter()
+            .map(|n| section.find(n).unwrap_or_else(|| panic!("{n} in {section}")))
+            .collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "{section}");
+        assert!(section.contains(r#"<li><span class="source-num">2</span><span class="source-body"><a class="internal-link" data-path="docs/spec.md""#), "{section}");
+        assert!(section.contains(r#"<span class="source-title" title="all queries in project X">all queries in project X</span>"#), "{section}");
+        // `../u.md` from `notes/a.md` is `u.md`, which does not exist.
+        assert!(section.contains(r#"<li><span class="source-num"></span><span class="source-body"><a class="internal-link broken" data-path="u.md""#), "{section}");
+    }
+
+    #[test]
+    fn no_sources_no_section() {
+        assert!(!render("x[^1]\n\n[^1]: one\n").contains("sources"));
     }
 }

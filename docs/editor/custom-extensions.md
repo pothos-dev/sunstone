@@ -19,7 +19,8 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | Wikilinks | `wiki-links.ts` | atomic `wikiLinks` + overlay `ViewPlugin` | `[[name]]` rendering / navigation |
 | Broken links | `broken-links.ts` | `ViewPlugin` + `StateEffect` | Dashed-red styling of unresolved `[](…)` |
 | Citations | `citations.ts` | `ViewPlugin` + `WidgetType` + flash `StateField` | `[n]` superscript → jump to citation row |
-| Footnotes | `footnotes.ts` | `ViewPlugin` + `WidgetType` (shares the citation flash field) | `[^label]` superscript → jump to `[^label]:` definition |
+| Footnotes | `footnotes.ts` | `ViewPlugin` + `WidgetType` (shares the citation flash field) | `[^label]` superscript → open its source, or jump to `[^label]:` definition |
+| Sources section | `sources.ts` | `StateField` + block `WidgetType` | The `sources` list as a bibliography after the last line |
 | CriticMarkup | `criticMarkup.ts`, `criticMarkupView.ts` | `StateField` decorations + `gutter` + `hoverTooltip` | Highlights, comments, track-changes |
 | Anchor tracking | `anchor-tracking.ts` | `StateField` + `StateEffect` | Follow heading slugs across edits for rename-rewrite |
 | Frontmatter | `frontmatter-field.ts` | `StateField` + `invertedEffects` | Structured frontmatter in unified undo |
@@ -63,7 +64,7 @@ Notable techniques:
 
 ## Footnotes
 
-`footnotes(reading)` does the same for markdown footnotes over the shared `scanFootnotes` kernel: a `[^label]` reference becomes a superscript `n` (numbered by first reference, label on hover, `,n` when it directly follows another) that jumps to its `[^label]:` definition through the shared `jumpAndFlash` (installing `jumpFlashField` too, which CodeMirror dedupes), each definition marker becomes an `n` row head, and a reference with no definition renders dashed red and ignores clicks. A label matching a `sources[].id` (read from `frontmatterField` through `sourceIds`) counts as resolved without a body definition; it renders in accent colour but has no jump target yet. In hybrid mode a reference shows raw under the cursor and a definition marker shows raw while the cursor is on its line. See [Linking → Footnotes](/okf/linking.md#footnotes).
+`footnotes(reading)` does the same for markdown footnotes over the shared `scanFootnotes` kernel: a `[^label]` reference becomes a superscript `n` (numbered by first reference, label on hover, `,n` when it directly follows another) that jumps to its `[^label]:` definition through the shared `jumpAndFlash` (installing `jumpFlashField` too, which CodeMirror dedupes), each definition marker becomes an `n` row head, and a reference with no definition renders dashed red and ignores clicks. A label matching a `sources[].id` (read from `frontmatterField` through `sourceList`) counts as resolved without a body definition; it shows the entry on hover and a click hands its `resource` to `onLinkClick`, the same callback rendered links use, so a path opens in the Tile and a URL in the browser. `sourcesSection(onLinkClick)` adds the Sources section as a block widget at the end of the document; a block decoration must come from a `StateField`, not a `ViewPlugin`. In hybrid mode a reference shows raw under the cursor and a definition marker shows raw while the cursor is on its line. See [Linking → Footnotes](/okf/linking.md#footnotes).
 
 ## CriticMarkup
 

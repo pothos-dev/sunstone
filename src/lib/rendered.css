@@ -146,6 +146,53 @@
   text-decoration: none;
 }
 
+/* --- Sources section (ov-17) --------------------------------------------------
+   The `sources` Frontmatter list as a bibliography after the body, numbered
+   like the footnote superscripts (uncited entries unnumbered). Mirrors the
+   editor's `.cm-sources`. */
+.rendered section.sources {
+  margin-top: 2.5em;
+  padding-top: 0.8em;
+  border-top: 1px solid var(--border, #ddd);
+  font-size: 0.9em;
+}
+
+.rendered .sources-heading {
+  font-weight: 600;
+  margin-bottom: 0.5em;
+}
+
+.rendered ol.sources-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rendered ol.sources-list li {
+  display: flex;
+  gap: 0.6em;
+  margin: 0.35em 0;
+}
+
+.rendered .source-num {
+  flex: 0 0 1.6em;
+  text-align: right;
+  color: var(--accent, #d9622b);
+  font-weight: 600;
+}
+
+.rendered .source-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rendered .source-resource {
+  color: var(--text-muted, #777);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
 /* --- CriticMarkup track-changes + annotations -------------------------------
    The shared Rust renderer emits these inline in the Concept body:
      <ins class="critic-add">    addition

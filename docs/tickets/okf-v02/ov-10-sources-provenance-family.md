@@ -1,6 +1,6 @@
 ---
 status: ready
-blocked-by: [ov-1, ov-2, ov-3, ov-4, ov-14, ov-15]
+blocked-by: [ov-1, ov-2, ov-3, ov-4, ov-14, ov-15, ov-17]
 ---
 
 # ov-10: Provenance family — `sources`, credibility signals, and per-claim attribution
@@ -56,3 +56,4 @@ Editing `sources` itself is not this ticket's problem — the YAML Frontmatter e
 ## Comments
 
 - 2026-10-07: Pulled forward and shipped ahead of this ticket, because real Bundles already cite with string ids: the shared scanner numbers footnotes by first reference (`Footnote.num`, label on hover), and a label matching a `sources[].id` (`footnotes::source_ids`) counts as resolved without a body definition, in the editor and in the native and fake renders. Still open here: the Sources section (and so a jump target for source-only labels), hover with title/resource, hiding body definitions, Edit, the resource kinds, signals, and the legacy/deprecation work.
+- 2026-10-07: The Sources section, hover details and source links shipped as [ov-17](ov-17-sources-section-and-source-links.md). One change to the plan above: a click on a citation opens the source itself rather than jumping to its Sources entry. Still open here: Edit on an entry, jumps from an entry back to its claims, hiding body definitions, `usage_window`, the lint rules, and the legacy/deprecation work.

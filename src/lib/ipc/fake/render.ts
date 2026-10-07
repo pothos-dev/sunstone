@@ -22,9 +22,10 @@ import {
   parseCriticMarks,
   findCitationRefs,
   scanFootnotes,
-  sourceIds,
+  sourceList,
   type CriticMark,
   type Footnote,
+  type Source,
 } from '$lib/wasm/exports';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
@@ -44,11 +45,14 @@ export function renderConcept(content: string): RenderPayload {
 
   // Every footnote of the whole body, numbered and resolved (body definitions
   // and `sources[].id`s) by the shared scanner; each line looks its labels up.
+  const sources = sourceList(body, splitFrontmatter(content).yaml ?? '');
+  sourcesById = new Map();
+  for (const s of sources) {
+    const id = s.id?.toLowerCase();
+    if (id && !sourcesById.has(id)) sourcesById.set(id, s);
+  }
   footnotesByLabel = new Map(
-    scanFootnotes(body, sourceIds(splitFrontmatter(content).yaml ?? '')).map((f) => [
-      f.label.toLowerCase(),
-      f,
-    ]),
+    scanFootnotes(body, [...sourcesById.keys()]).map((f) => [f.label.toLowerCase(), f]),
   );
 
   const htmlParts: string[] = [];
@@ -65,6 +69,7 @@ export function renderConcept(content: string): RenderPayload {
     htmlParts.push(`<p>${renderInline(line, true)}</p>`);
   }
 
+  htmlParts.push(renderSourcesSection(sources));
   return { html: htmlParts.join('\n'), frontmatter, outline };
 }
 
@@ -88,6 +93,36 @@ function renderInline(text: string, lineStart = false): string {
 
 /** The body's footnotes by lowercase label (set by `renderConcept`). */
 let footnotesByLabel = new Map<string, Footnote>();
+/** The Concept's `sources` entries by lowercase id (set by `renderConcept`). */
+let sourcesById = new Map<string, Source>();
+
+/**
+ * The anchor attributes for a source's resource. The fake does not resolve
+ * links (see the header), so the resource stays the raw `href`.
+ */
+function sourceLinkAttrs(s: Source): string {
+  return `href="${attr(s.resource)}"`;
+}
+
+/** The Sources section, in the SAME markup as Rust's `sources_section_html`. */
+function renderSourcesSection(list: Source[]): string {
+  if (list.length === 0) return '';
+  let out = `<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">`;
+  for (const s of list) {
+    const t = attr(s.hover);
+    const label = attr(s.title ?? s.resource);
+    const title =
+      s.kind === 'descriptor'
+        ? `<span class="source-title" title="${t}">${label}</span>`
+        : `<a ${sourceLinkAttrs(s)} title="${t}"><span class="source-title">${label}</span></a>`;
+    const resource =
+      s.title != null && s.resource
+        ? `<span class="source-resource">${attr(s.resource)}</span>`
+        : '';
+    out += `<li><span class="source-num">${s.num ?? ''}</span><span class="source-body">${title}${resource}</span></li>`;
+  }
+  return out + '</ol></section>';
+}
 
 /**
  * Render footnotes to the SAME markup the Rust renderer emits
@@ -104,10 +139,17 @@ function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
     // Labels match case-insensitively: one lowercased anchor, label as written.
     const anchor = escapeHtml(f.label.toLowerCase()).replace(/"/g, '&quot;');
     const whole = footnotesByLabel.get(f.label.toLowerCase()) ?? f;
+    const source = sourcesById.get(f.label.toLowerCase());
     const n = whole.num;
     const sep = f.followsRef ? ',' : '';
     if (f.def && atLineStart) {
       out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">${n}</a>`;
+    } else if (source) {
+      const t = attr(source.hover);
+      out +=
+        source.kind === 'descriptor'
+          ? `<sup class="footnote-ref source" title="${t}">${sep}${n}</sup>`
+          : `<sup class="footnote-ref source" title="${t}">${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
     } else if (whole.hasDef) {
       out += `<sup class="footnote-ref" title="${label}">${sep}<a href="#fn-${anchor}">${n}</a></sup>`;
     } else if (whole.defined) {
@@ -182,4 +224,9 @@ function escapeHtml(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/** Escape for a double-quoted attribute value (Rust's `attr_escape`). */
+function attr(s: string): string {
+  return escapeHtml(s).replace(/"/g, '&quot;');
 }

@@ -7,22 +7,25 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import { RangeSetBuilder, type Extension } from '@codemirror/state';
-import type { Footnote } from '$lib/wasm/exports';
-import { scanFootnotes, footnoteDefPos, sourceIds } from '$lib/wasm/exports';
+import type { Footnote, Source } from '$lib/wasm/exports';
+import { scanFootnotes, footnoteDefPos } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
 import { jumpFlashField, jumpAndFlash } from './jumpFlash';
+import { stateSources, sourcesById } from './sources';
 
 // ---------------------------------------------------------------------------
 // Footnotes (ov-14)
 //
 // A `[^label]` reference renders as a superscript `n`, its label's number by
-// first reference (the label shows on hover; `1,2` for adjacent ones). A click scrolls to its
+// first reference (`1,2` for adjacent ones). A label that matches a
+// `sources[].id` in the Frontmatter cites that source (OKF v0.2 §5.1, no body
+// definition needed): hover shows the entry's details and a click opens its
+// resource directly, the way a rendered link opens (`onLinkClick`: a Concept
+// in the app, a URL in the browser); a scope descriptor is not clickable
+// (ov-17). Any other label shows itself on hover, and a click scrolls to its
 // `[^label]:` definition and flashes that line, the same jump the `[n]`
-// citations make (the shared `jumpFlash`). A label that matches a
-// `sources[].id` in the Frontmatter is resolved even without a body definition
-// (OKF v0.2 §5.1); it has no jump target until the Sources section (ov-10). A
-// label with neither renders as broken. A definition's `[^label]:` marker
-// renders as an `n` row head.
+// citations make (the shared `jumpFlash`). A label with neither renders as
+// broken. A definition's `[^label]:` marker renders as an `n` row head.
 //
 // Recognition is the shared Rust `scan_footnotes` (over wasm); this module is
 // the thin CodeMirror layer. Modes follow `citations.ts`: reading always
@@ -32,17 +35,24 @@ import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 
 /** Superscript standing in for a `[^label]` reference. */
 class FootnoteRefWidget extends WidgetType {
-  constructor(readonly f: Footnote) {
+  constructor(
+    readonly f: Footnote,
+    readonly source: Source | undefined,
+  ) {
     super();
   }
   eq(other: FootnoteRefWidget): boolean {
     const [a, b] = [this.f, other.f];
+    const [s, t] = [this.source, other.source];
     return (
       a.label === b.label &&
       a.num === b.num &&
       a.defined === b.defined &&
       a.hasDef === b.hasDef &&
-      a.followsRef === b.followsRef
+      a.followsRef === b.followsRef &&
+      s?.resource === t?.resource &&
+      s?.kind === t?.kind &&
+      s?.hover === t?.hover
     );
   }
   toDOM(): HTMLElement {
@@ -52,12 +62,20 @@ class FootnoteRefWidget extends WidgetType {
     // `1,2` rather than `12` for adjacent references.
     sup.textContent = followsRef ? `,${num}` : `${num}`;
     sup.dataset.footnote = label;
-    if (hasDef) {
+    const source = this.source;
+    if (source) {
+      sup.classList.add('cm-footnote-source');
+      sup.title = source.hover;
+      if (source.kind !== 'descriptor') {
+        sup.dataset.resource = source.resource;
+        sup.setAttribute('role', 'link');
+        sup.setAttribute('aria-label', `Source ${num}: ${source.title ?? source.resource}`);
+      }
+    } else if (hasDef) {
       sup.setAttribute('role', 'link');
       sup.setAttribute('aria-label', `Footnote ${num}: ${label}`);
       sup.title = label;
     } else if (defined) {
-      sup.classList.add('cm-footnote-source');
       sup.title = label;
     } else {
       sup.title = `${label}: no definition and no matching source`;
@@ -94,8 +112,8 @@ function computeFootnotes(view: EditorView, reading: boolean): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const { doc, selection } = view.state;
   const revealCursor = !reading && view.hasFocus;
-  const ids = sourceIds(view.state.field(frontmatterField, false) ?? '');
-  for (const f of scanFootnotes(doc.toString(), ids)) {
+  const sources = sourcesById(stateSources(view.state));
+  for (const f of scanFootnotes(doc.toString(), [...sources.keys()])) {
     if (revealCursor) {
       const touched = f.def
         ? selection.ranges.some((r) => {
@@ -105,29 +123,39 @@ function computeFootnotes(view: EditorView, reading: boolean): DecorationSet {
         : selection.ranges.some((r) => r.from <= f.to && r.to >= f.from);
       if (touched) continue; // show the raw marker for editing.
     }
-    const widget = f.def ? new FootnoteDefWidget(f.label, f.num) : new FootnoteRefWidget(f);
+    const widget = f.def
+      ? new FootnoteDefWidget(f.label, f.num)
+      : new FootnoteRefWidget(f, sources.get(f.label.toLowerCase()));
     builder.add(f.from, f.to, Decoration.replace({ widget }));
   }
   return builder.finish();
 }
 
-/** Route a click on a defined reference to its definition. */
-const footnoteClick = EditorView.domEventHandlers({
-  mousedown(event, view) {
-    const target = event.target as HTMLElement | null;
-    const el = target?.closest?.('.cm-footnote-ref') as HTMLElement | null;
-    if (el && !el.hasAttribute('role')) return true; // nothing in the body to jump to
-    const label = el?.dataset.footnote;
-    if (!label) return false;
-    event.preventDefault();
-    const pos = footnoteDefPos(view.state.doc.toString(), label);
-    if (pos != null) jumpAndFlash(view, pos);
-    return true;
-  },
-});
+/** Route a click on a reference to its source's resource or its definition. */
+function footnoteClick(onLinkClick: (url: string) => void): Extension {
+  return EditorView.domEventHandlers({
+    mousedown(event, view) {
+      const target = event.target as HTMLElement | null;
+      const el = target?.closest?.('.cm-footnote-ref') as HTMLElement | null;
+      if (!el) return false;
+      if (!el.hasAttribute('role')) return true; // nothing to open or jump to
+      event.preventDefault();
+      if (el.dataset.resource != null) {
+        onLinkClick(el.dataset.resource);
+        return true;
+      }
+      const pos = footnoteDefPos(view.state.doc.toString(), el.dataset.footnote ?? '');
+      if (pos != null) jumpAndFlash(view, pos);
+      return true;
+    },
+  });
+}
 
-/** The footnote extension for a render mode (see `citations`). */
-export function footnotes(reading: boolean): Extension {
+/**
+ * The footnote extension for a render mode (see `citations`); `onLinkClick`
+ * opens a cited source's resource.
+ */
+export function footnotes(reading: boolean, onLinkClick: (url: string) => void): Extension {
   return [
     ViewPlugin.fromClass(
       class {
@@ -151,7 +179,7 @@ export function footnotes(reading: boolean): Extension {
       { decorations: (v) => v.decorations },
     ),
     jumpFlashField,
-    footnoteClick,
+    footnoteClick(onLinkClick),
   ];
 }
 
@@ -167,10 +195,10 @@ export const footnoteTheme = EditorView.theme({
   '.cm-footnote-ref:hover': {
     textDecoration: 'underline',
   },
-  '.cm-footnote-ref.cm-footnote-source': {
+  '.cm-footnote-ref:not([role])': {
     cursor: 'default',
   },
-  '.cm-footnote-ref.cm-footnote-source:hover': {
+  '.cm-footnote-ref:not([role]):hover': {
     textDecoration: 'none',
   },
   '.cm-footnote-ref.cm-footnote-broken': {

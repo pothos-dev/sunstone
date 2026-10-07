@@ -39,12 +39,25 @@ describe('renderConcept footnotes', () => {
     expect(html).toContain('<p><a id="fn-2" class="footnote-def" title="2">1</a> The source.</p>');
   });
 
-  test('a sources id resolves a reference with no body definition', () => {
+  test('a sources id links the reference to its resource, with no body definition', () => {
     const { html } = renderConcept(
-      '---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n---\n\nA[^b] B[^ssi-web]\n\n[^b]: B\n',
+      '---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n    title: SSI\n  - id: all\n    resource: all queries in X\n  - id: unused\n    resource: /u.md\n---\n\nA[^b] B[^ssi-web][^all]\n\n[^b]: B\n',
     );
     expect(html).toContain('A<sup class="footnote-ref" title="b"><a href="#fn-b">1</a></sup>');
-    expect(html).toContain('B<sup class="footnote-ref" title="ssi-web">2</sup>');
+    expect(html).toContain('B<sup class="footnote-ref source" title="SSI\nhttps://x"><a href="https://x">2</a></sup>');
+    expect(html).toContain('<sup class="footnote-ref source" title="all queries in X">,3</sup>');
+    // The Sources section closes the body: cited by number, then uncited.
+    expect(html).toContain(
+      '<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">' +
+        '<li><span class="source-num">2</span><span class="source-body"><a href="https://x" title="SSI\nhttps://x"><span class="source-title">SSI</span></a><span class="source-resource">https://x</span></span></li>' +
+        '<li><span class="source-num">3</span><span class="source-body"><span class="source-title" title="all queries in X">all queries in X</span></span></li>' +
+        '<li><span class="source-num"></span><span class="source-body"><a href="/u.md" title="/u.md"><span class="source-title">/u.md</span></a></span></li>' +
+        '</ol></section>',
+    );
+  });
+
+  test('no sources, no Sources section', () => {
+    expect(renderConcept('x[^1]\n\n[^1]: one\n').html).not.toContain('sources');
   });
 
   test('a reference with no definition is broken and unlinked', () => {

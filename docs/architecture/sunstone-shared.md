@@ -39,6 +39,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `critic` | CriticMarkup parse/group — `parse_critic_marks`, `pair_annotations`, `annotation_at` (offset-span structs). |
 | `citations` | Inline citation scanning — `find_citation_refs`, `find_citation_defs`, `citation_def_pos`. |
 | `footnotes` | Markdown footnote scanning — `scan_footnotes` (references + definitions), `footnote_def_pos`. |
+| `sources` | The `sources` Frontmatter list — `sources`, `source_list` (numbered by first citation), `resource_kind`. |
 | `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
 | `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, the move/rename engine (`rewrite::moves`) and the Backlinks markdown-link extraction (`markdown_link_hrefs`, used by the native index) all walk — extraction and rewriting can never disagree on what counts as a link (a fenced link is neither extracted nor rewritten; a markdown link in inline code is both). |
 

@@ -30,6 +30,8 @@ import type {
   Annotation,
   CitationRef,
   Footnote,
+  Source,
+  ResourceKind,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -53,6 +55,8 @@ export type {
   Annotation,
   CitationRef,
   Footnote,
+  Source,
+  ResourceKind,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -170,6 +174,14 @@ export function scanFootnotes(text: string, sourceIds: string[] = []): Footnote[
 /** The `sources[].id`s of a Frontmatter block (inner YAML, no fences). */
 export function sourceIds(yaml: string): string[] {
   return mod ? mod.sourceIds(yaml) : [];
+}
+
+/**
+ * The Sources section of a Concept (`body` markdown, `yaml` Frontmatter block):
+ * cited entries by footnote number, then uncited ones in list order.
+ */
+export function sourceList(body: string, yaml: string): Source[] {
+  return mod ? mod.sourceList(body, yaml) : [];
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */
