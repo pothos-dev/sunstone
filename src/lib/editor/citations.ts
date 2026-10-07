@@ -6,8 +6,9 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
-import { StateEffect, StateField, RangeSetBuilder, type Extension } from '@codemirror/state';
+import { RangeSetBuilder, type Extension } from '@codemirror/state';
 import { findCitationRefs, citationDefPos } from '$lib/wasm/exports';
+import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 
 // ---------------------------------------------------------------------------
 // Citation references (slice: citation-superscripts)
@@ -79,36 +80,6 @@ function computeCitations(view: EditorView, reading: boolean): DecorationSet {
   return builder.finish();
 }
 
-/** Effect carrying the offset of a citation row to flash, or `null` to clear it. */
-const setCitationFlash = StateEffect.define<number | null>();
-
-/**
- * Transient highlight on the citation-table row a reference just jumped to, so
- * the target is obvious in reading mode (where there is no caret). Set by
- * `jumpToCitation` and cleared on a timer.
- */
-export const citationFlashField = StateField.define<DecorationSet>({
-  create() {
-    return Decoration.none;
-  },
-  update(deco, tr) {
-    deco = deco.map(tr.changes);
-    for (const e of tr.effects) {
-      if (!e.is(setCitationFlash)) continue;
-      if (e.value == null) {
-        deco = Decoration.none;
-      } else {
-        const line = tr.state.doc.lineAt(e.value);
-        deco = Decoration.set([
-          Decoration.line({ class: 'cm-citation-target' }).range(line.from),
-        ]);
-      }
-    }
-    return deco;
-  },
-  provide: (f) => EditorView.decorations.from(f),
-});
-
 /**
  * Scroll to citation `num`'s definition row and flash it. No-op when the number
  * has no matching row (a dangling reference).
@@ -116,23 +87,6 @@ export const citationFlashField = StateField.define<DecorationSet>({
 function jumpToCitation(view: EditorView, num: string): void {
   const pos = citationDefPos(view.state.doc.toString(), num);
   if (pos != null) jumpAndFlash(view, pos);
-}
-
-/**
- * Scroll to `pos` and flash its line. Shared with the footnote extension, which
- * must install `citationFlashField` too (CodeMirror dedupes the field).
- */
-export function jumpAndFlash(view: EditorView, pos: number): void {
-  view.dispatch({
-    effects: [EditorView.scrollIntoView(pos, { y: 'center' }), setCitationFlash.of(pos)],
-    // Editable modes: park the caret at the row too. Reading mode has no caret,
-    // so the flash carries the feedback.
-    selection: view.state.readOnly ? undefined : { anchor: pos },
-  });
-  // The flash clears after ~1.2s.
-  setTimeout(() => {
-    view.dispatch({ effects: setCitationFlash.of(null) });
-  }, 1200);
 }
 
 /** Route a click on a superscript reference to `jumpToCitation`. */
@@ -173,7 +127,7 @@ export function citations(reading: boolean): Extension {
       },
       { decorations: (v) => v.decorations },
     ),
-    citationFlashField,
+    jumpFlashField,
     citationClick,
   ];
 }

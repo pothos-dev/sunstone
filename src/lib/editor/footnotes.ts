@@ -8,14 +8,14 @@ import {
 } from '@codemirror/view';
 import { RangeSetBuilder, type Extension } from '@codemirror/state';
 import { scanFootnotes, footnoteDefPos } from '$lib/wasm/exports';
-import { citationFlashField, jumpAndFlash } from './citations';
+import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 
 // ---------------------------------------------------------------------------
 // Footnotes (ov-14)
 //
 // A `[^label]` reference renders as a superscript `[label]` link; a click
 // scrolls to its `[^label]:` definition and flashes that line, the same jump
-// the `[n]` citations make (and the same flash field). A reference with no
+// the `[n]` citations make (the shared `jumpFlash`). A reference with no
 // definition renders as broken and does nothing. A definition's `[^label]:`
 // marker renders as a `[label]` row head. Labels show as written: Sunstone
 // does not renumber footnotes.
@@ -131,7 +131,7 @@ export function footnotes(reading: boolean): Extension {
       },
       { decorations: (v) => v.decorations },
     ),
-    citationFlashField,
+    jumpFlashField,
     footnoteClick,
   ];
 }
