@@ -12,6 +12,7 @@ import { scanFootnotes, footnoteDefPos } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
 import { jumpFlashField, jumpAndFlash } from './jumpFlash';
 import { stateSources, sourcesById } from './sources';
+import { attachSourceCard, detachSourceCard } from './sourceCard';
 
 // ---------------------------------------------------------------------------
 // Footnotes (ov-14)
@@ -19,7 +20,8 @@ import { stateSources, sourcesById } from './sources';
 // A `[^label]` reference renders as a superscript `n`, its label's number by
 // first reference (`1,2` for adjacent ones). A label that matches a
 // `sources[].id` in the Frontmatter cites that source (OKF v0.2 §5.1, no body
-// definition needed): hover shows the entry's details and a click opens its
+// definition needed): hover shows the entry's card at once (`sourceCard.ts`)
+// and a click opens its
 // resource directly, the way a rendered link opens (`onLinkClick`: a Concept
 // in the app, a URL in the browser); a scope descriptor is not clickable
 // (ov-17). Any other label shows itself on hover, and a click scrolls to its
@@ -65,7 +67,7 @@ class FootnoteRefWidget extends WidgetType {
     const source = this.source;
     if (source) {
       sup.classList.add('cm-footnote-source');
-      sup.title = source.hover;
+      attachSourceCard(sup, source);
       if (source.kind !== 'descriptor') {
         sup.dataset.resource = source.resource;
         sup.setAttribute('role', 'link');
@@ -81,6 +83,9 @@ class FootnoteRefWidget extends WidgetType {
       sup.title = `${label}: no definition and no matching source`;
     }
     return sup;
+  }
+  destroy(dom: HTMLElement): void {
+    detachSourceCard(dom);
   }
   // Let clicks reach our DOM handler rather than being swallowed as an atom.
   ignoreEvent(): boolean {

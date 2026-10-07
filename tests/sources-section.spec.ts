@@ -51,18 +51,35 @@ async function openConcept(page: Page) {
   return editor;
 }
 
-test('a source footnote shows the entry on hover; a descriptor is not a link', async ({ page }) => {
+test('a source footnote shows the entry card on hover; a descriptor is not a link', async ({
+  page,
+}) => {
   const editor = await openConcept(page);
   const refs = editor.locator('.cm-footnote-ref');
   await expect(refs).toHaveCount(3);
   await expect(refs.nth(0)).toHaveText('1');
-  await expect(refs.nth(0)).toHaveAttribute('title', 'The spec\nhttps://example.com/spec\nAuthor: human:dan');
   await expect(refs.nth(0)).toHaveAttribute('role', 'link');
+  await expect(refs.nth(0)).not.toHaveAttribute('title');
   await expect(refs.nth(1)).toHaveText(',2');
   await expect(refs.nth(2)).toHaveText('3');
-  await expect(refs.nth(2)).toHaveAttribute('title', 'all queries in project X');
   await expect(refs.nth(2)).not.toHaveAttribute('role', 'link');
   await expect(editor.locator('.cm-footnote-broken')).toHaveCount(0);
+
+  const card = page.getByTestId('source-card');
+  await refs.nth(0).hover();
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('.source-card-title')).toHaveText('The spec');
+  await expect(card.locator('.source-card-resource')).toHaveText('https://example.com/spec');
+  await expect(card.locator('.source-card-meta')).toContainText('Authorhuman:dan');
+  await expect(card.locator('.source-card-num')).toHaveText('1');
+
+  await refs.nth(2).hover();
+  await expect(card).toHaveCount(1);
+  await expect(card.locator('.source-card-title')).toHaveText('all queries in project X');
+  await expect(card.locator('.source-card-hint')).toHaveCount(0);
+
+  await page.mouse.move(5, 5);
+  await expect(card).toHaveCount(0);
 });
 
 test('clicking a source footnote opens a URL externally', async ({ page }) => {

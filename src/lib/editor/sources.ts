@@ -3,6 +3,7 @@ import { StateField, type EditorState, type Extension } from '@codemirror/state'
 import type { Source } from '$lib/wasm/exports';
 import { sourceList } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
+import { attachSourceCard, detachSourceCard } from './sourceCard';
 
 // ---------------------------------------------------------------------------
 // Sources section (ov-17)
@@ -11,9 +12,10 @@ import { frontmatterField } from './frontmatter-field';
 // end of the body: a block widget after the last line, so it is never part of
 // the document and never written to the file. Each entry carries its footnote
 // number (blank when the body does not cite it), its title linking to the
-// resource, and the resource below; hover shows the details. A click opens the
-// resource the way a rendered link does (`onLinkClick`: a Concept in the app,
-// a URL in the browser); a scope descriptor is plain text.
+// resource, and the resource below; hover shows the entry's card
+// (`sourceCard.ts`). A click opens the resource the way a rendered link does
+// (`onLinkClick`: a Concept in the app, a URL in the browser); a scope
+// descriptor is plain text.
 //
 // The list itself (order, numbers, resource kinds, hover text) is the shared
 // Rust `source_list` over wasm; this module only builds the DOM. The native
@@ -64,7 +66,7 @@ class SourcesWidget extends WidgetType {
       const title = document.createElement(s.kind === 'descriptor' ? 'span' : 'a');
       title.className = 'cm-source-title';
       title.textContent = s.title ?? s.resource;
-      title.title = s.hover;
+      attachSourceCard(title, s);
       if (s.kind !== 'descriptor') {
         title.setAttribute('role', 'link');
         title.addEventListener('mousedown', (e) => {
@@ -84,6 +86,9 @@ class SourcesWidget extends WidgetType {
     }
     section.append(heading, ol);
     return section;
+  }
+  destroy(dom: HTMLElement): void {
+    detachSourceCard(dom);
   }
   ignoreEvent(): boolean {
     return true;

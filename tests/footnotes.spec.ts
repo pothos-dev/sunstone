@@ -53,7 +53,7 @@ test('references number by first use, with the label on hover', async ({ page })
   await expect(refs.nth(2)).toHaveClass(/cm-footnote-broken/);
   // `[^ssi-web]` has no body definition but matches a `sources` id.
   await expect(refs.nth(3)).toHaveText('4');
-  await expect(refs.nth(3)).toHaveAttribute('title', 'https://x.example');
+  await expect(refs.nth(3)).toHaveClass(/cm-footnote-source/);
   await expect(refs.nth(3)).not.toHaveClass(/cm-footnote-broken/);
   await expect(editor.locator('.cm-footnote-broken')).toHaveCount(1);
 });

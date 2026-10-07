@@ -18,7 +18,7 @@ status: done
 ## Decisions
 
 - A click on a citation opens the source itself, not the Sources entry. The intermediate jump to the list adds a step and nothing a reader needs; the details are on hover.
-- Hover is the native `title` tooltip: title, resource, then `author`, `last_modified`, `usage_count` when present, one per line.
+- Hover is a custom card (`src/lib/editor/sourceCard.ts`), shown on `mouseenter` without delay, because the native `title` tooltip waits about a second and cannot be styled: number, kind, title, resource, then `author`, `last_modified`, `usage_count` when present. The web viewer still uses the `title` attribute.
 - A label that is a `sources` id takes the source behaviour even when the body also defines it; hiding such a definition stays in ov-10.
 - Resource paths resolve like markdown links (`resolve_location`): a leading `/` from the Bundle root, otherwise relative to the Concept. A value with whitespace and no path prefix is a scope descriptor.
 - Still in ov-10: Edit on an entry, jumps from an entry back to its citing claims, `usage_window`, the `sources` lint rules, hiding body definitions, legacy deprecation work.
