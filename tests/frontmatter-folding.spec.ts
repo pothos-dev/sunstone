@@ -82,3 +82,21 @@ test('opening another Concept folds its lists again', async ({ page }) => {
   await expect(fm.getByTestId('frontmatter-fold')).toHaveCount(2);
   await expect(fm).not.toContainText('https://a.example/two');
 });
+
+test('typing keeps an unfolded block open', async ({ page }) => {
+  const fm = await setup(page);
+  await fm.getByTestId('frontmatter-fold').first().click();
+  await expect(fm).toContainText('https://a.example/one');
+
+  await page.getByTestId('edit-toggle').click();
+  const content = page.getByTestId('editor').locator('.cm-content');
+  await expect(content).toHaveAttribute('contenteditable', 'true');
+  await content.click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('edited');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as FakeWindow).__sunstoneFake.files['one.md']))
+    .toContain('edited');
+  await expect(fm).toContainText('https://a.example/one');
+  await expect(fm.getByTestId('frontmatter-fold')).toHaveCount(1);
+});

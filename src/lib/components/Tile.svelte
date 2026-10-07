@@ -121,9 +121,11 @@
   // frontmatter field (the single source of truth — ADR 0008) so this Tile's
   // Frontmatter Region can render it.
   let frontmatterYaml = $state<string>('');
-  // Bumped each time a Concept is loaded into the editor, so the Frontmatter
-  // Region re-applies its default folds (ov-15) on a switch but not on undo.
+  // Bumped each time another Concept is loaded into the editor, so the
+  // Frontmatter Region re-applies its default folds (ov-15) on a switch but not
+  // on an edit, undo or reload of the same Concept.
   let frontmatterConcept = $state(0);
+  let frontmatterConceptPath: string | null = null;
   let frontmatterRef = $state<ReturnType<typeof Frontmatter> | null>(null);
   let frontmatterHost = $state<HTMLDivElement | null>(null);
   // A pending request to put focus in the YAML: `'yaml'` after an undo/redo
@@ -535,6 +537,7 @@
         },
       });
       frontmatterYaml = yaml;
+      frontmatterConceptPath = tile.activePath;
       frontmatterConcept = untrack(() => frontmatterConcept) + 1;
       viewReady = true;
       view.dom.setAttribute('data-theme', theme.resolved);
@@ -545,7 +548,10 @@
       tile.scrollProbe = () => view?.scrollDOM.scrollTop ?? null;
     } else {
       setEditorConcept(view, body, yaml, fences, tile.activePath);
-      frontmatterConcept = untrack(() => frontmatterConcept) + 1;
+      if (tile.activePath !== frontmatterConceptPath) {
+        frontmatterConceptPath = tile.activePath;
+        frontmatterConcept = untrack(() => frontmatterConcept) + 1;
+      }
     }
 
     if (pendingScrollLine !== null && view) {
