@@ -16,6 +16,12 @@ import type { Extension } from '@codemirror/state';
 // locked cell still leaves a selection there, so reading mode showed the raw
 // markers. The plugin clears those flags again once the widget's own handlers
 // have run.
+//
+// A locked cell is still focusable (`tabindex=-1`). Reading mode makes the
+// editor non-editable, and CodeMirror then re-applies its own selection to the
+// DOM on every transaction unless focus sits inside the editor — collapsing a
+// double-clicked word in a cell to the widget edge a moment later. Focusing the
+// clicked cell keeps the browser's selection there.
 
 const CELL_SOURCE = '.cm-atomic-table-cell-source';
 
@@ -38,6 +44,8 @@ export function setTableCellsEditable(root: ParentNode, editable: boolean): void
   for (const source of root.querySelectorAll<HTMLElement>(CELL_SOURCE)) {
     source.contentEditable = editable ? 'true' : 'false';
     source.spellcheck = editable;
+    if (editable) source.removeAttribute('tabindex');
+    else source.tabIndex = -1;
   }
 }
 

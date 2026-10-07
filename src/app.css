@@ -291,6 +291,16 @@ body {
   white-space: normal;
 }
 
+/* Find matches inside table cells (`src/lib/editor/tableSearch.ts`). The
+   search panel's `.cm-searchMatch` marks cannot reach into the table widget, so
+   those matches are CSS Custom Highlights in the same colours. */
+::highlight(sunstone-table-search) {
+  background-color: var(--atomic-editor-search-bg);
+}
+::highlight(sunstone-table-search-selected) {
+  background-color: var(--atomic-editor-search-bg-active);
+}
+
 /* Source hover card (`src/lib/editor/sourceCard.ts`, ov-17): the details of a
    `sources` entry over a footnote or a Sources section title. Lives in
    `document.body`, outside any editor theme scope, hence global. */

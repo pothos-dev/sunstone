@@ -1,6 +1,7 @@
 import { EditorView, keymap } from '@codemirror/view';
 import { type Extension } from '@codemirror/state';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
+import { tableSearchHighlight } from './tableSearch';
 
 // ---------------------------------------------------------------------------
 // In-Concept Find & Replace (slices: in-concept-find / in-concept-replace)
@@ -80,11 +81,13 @@ export const findPanelTheme = EditorView.theme({
 
 /**
  * The find extension set: the built-in search panel mounted above the editor
- * plus its keymap. Tagging the panel with `data-testid` is done in
- * `openSearch`, since the built-in `SearchPanel` class is not exported.
+ * plus its keymap, and the match highlighting inside table widgets that the
+ * panel's own decorations cannot reach (`tableSearch.ts`). Tagging the panel
+ * with `data-testid` is done in `openSearch`, since the built-in `SearchPanel`
+ * class is not exported.
  */
 export function findExtensions(): Extension[] {
-  return [search({ top: true }), keymap.of(searchKeymap)];
+  return [search({ top: true }), keymap.of(searchKeymap), tableSearchHighlight()];
 }
 
 /**

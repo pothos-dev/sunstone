@@ -68,3 +68,31 @@ test('read mode: clicking formatted text in a table cell keeps its markers hidde
   await editableBold.click();
   await expect(editableBold).toHaveClass(/\bactive\b/);
 });
+
+test('read mode: a double-clicked word in a table cell stays selected', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('tree').locator('[data-path="concepts/editor/live-preview.md"]').click();
+
+  const editor = page.getByTestId('editor');
+  await expect(editor).toContainText('Obsidian-style hybrid editing');
+  await expect(page.getByTestId('edit-toggle')).toHaveAttribute('aria-pressed', 'false');
+
+  // Double-click on the word itself (the cell box is wider than its text).
+  const cell = editor.locator('.cm-atomic-table td .cm-atomic-table-cell-source', {
+    hasText: 'done',
+  });
+  const point = await cell.first().evaluate((el) => {
+    const text = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode()!;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 2);
+    const box = range.getBoundingClientRect();
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  });
+  await page.mouse.dblclick(point.x, point.y);
+
+  // CodeMirror re-applies its own selection on the next transaction when a
+  // non-editable view lacks focus; the word must survive that.
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe('done');
+});

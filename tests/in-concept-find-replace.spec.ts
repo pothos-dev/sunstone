@@ -198,3 +198,37 @@ test('a replace is undoable through CM history', async ({ page }) => {
     .toBe(true);
   expect(await fileContent(page, 'concepts/codemirror.md')).not.toContain('# Sunstone');
 });
+
+test('matches inside a table widget are highlighted', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('tree').locator('[data-path="concepts/editor/live-preview.md"]').click();
+  const editor = page.getByTestId('editor');
+  await expect(editor).toContainText('Obsidian-style hybrid editing');
+
+  await page.keyboard.press('Control+f');
+  const findInput = page.getByTestId('find-input');
+  await expect(findInput).toBeFocused();
+  // "done" only occurs in the table's Status column (three rows).
+  await findInput.pressSequentially('done');
+
+  const highlighted = () =>
+    page.evaluate(() => {
+      const ranges = (name: string) =>
+        [...((CSS.highlights.get(name) as Set<AbstractRange> | undefined) ?? [])].map((r) =>
+          (r as Range).toString(),
+        );
+      return {
+        all: ranges('sunstone-table-search'),
+        selected: ranges('sunstone-table-search-selected'),
+      };
+    });
+  await expect.poll(highlighted).toEqual({ all: ['done', 'done', 'done'], selected: [] });
+
+  // Find next selects the first match; it gets the "current match" highlight.
+  await findInput.press('Enter');
+  await expect.poll(highlighted).toEqual({ all: ['done', 'done'], selected: ['done'] });
+
+  // Closing the panel clears every highlight.
+  await page.keyboard.press('Escape');
+  await expect.poll(highlighted).toEqual({ all: [], selected: [] });
+});
