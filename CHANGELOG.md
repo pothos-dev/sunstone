@@ -4,7 +4,7 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.25.0] - 2026-10-07
 
 ### Added
 
@@ -14,8 +14,10 @@ All notable changes to Sunstone are documented in this file. The format is based
   written to the file.
 - Hovering a footnote that cites a source, or a title in the Sources list,
   shows a card with the source's title, resource, author and dates right away,
-  in the app and in the web viewer. Clicking it opens the source: another Concept in the app,
-  or a web address in the browser.
+  in the app and in the web viewer. Clicking it opens the source: another
+  Concept in the app, or a web address in the browser.
+- The Explorer expands the folders leading to the open Concept while it is
+  open, and folds them back when you move elsewhere.
 
 ## [0.24.1] - 2026-10-07
 
