@@ -20,7 +20,7 @@ status: done
 ## Decisions
 
 - Scope → body detection and rendering only. `sources`, `id` joining and credibility signals stay in ov-10.
-- Labels render as written, not renumbered. Today's sources use numeric labels (`[^2]`); mapping string ids to consecutive numbers belongs to the `sources` work.
+- Labels render as written, not renumbered. Today's sources use numeric labels (`[^2]`); mapping string ids to consecutive numbers belongs to the `sources` work. **Superseded** after real Bundles turned up string ids: numbering by first use and resolving labels against `sources[].id` were pulled forward from ov-10 (see the comment in ov-10).
 - Click → jump to the definition and flash it, same as `[n]` today. No hover popup.
 - Web rendering → the existing sentinel pass, not comrak's `extension.footnotes`. comrak renumbers footnotes by first use and moves the definitions into an end-of-document section, which contradicts "render as written" and would make the web view disagree with the editor. Using the shared scanner keeps one recognition for both shells. ov-10's comrak plan should be revisited when it is picked up.
 - Undefined reference → broken-link styling, so typos show.

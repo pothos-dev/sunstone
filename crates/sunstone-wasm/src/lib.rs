@@ -225,10 +225,17 @@ pub fn citation_def_pos(text: String, num: String) -> Option<usize> {
 }
 
 /// Every footnote reference and definition (`[^label]` / `[^label]:`) in
-/// `text`, in document order.
+/// `text`, in document order, numbered by first reference. `source_ids` are
+/// the Concept's `sources[].id`s (from `sourceIds`).
 #[wasm_bindgen(js_name = scanFootnotes)]
-pub fn scan_footnotes(text: String) -> Vec<Footnote> {
-    footnotes::scan_footnotes(&text)
+pub fn scan_footnotes(text: String, source_ids: Vec<String>) -> Vec<Footnote> {
+    footnotes::scan_footnotes(&text, &source_ids)
+}
+
+/// The `sources[].id`s of a Frontmatter block (inner YAML, no fences).
+#[wasm_bindgen(js_name = sourceIds)]
+pub fn source_ids(yaml: String) -> Vec<String> {
+    footnotes::source_ids(&yaml)
 }
 
 /// The offset of footnote `label`'s definition (`[^label]:`), or `null`.

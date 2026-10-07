@@ -22,7 +22,9 @@ import {
   parseCriticMarks,
   findCitationRefs,
   scanFootnotes,
+  sourceIds,
   type CriticMark,
+  type Footnote,
 } from '$lib/wasm/exports';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
@@ -40,12 +42,13 @@ export function renderConcept(content: string): RenderPayload {
   const byLine = new Map<number, OutlineHeading>();
   for (const h of outline) byLine.set(h.line - offset - 1, h);
 
-  // Footnote labels with a definition anywhere in the body (case-insensitive,
-  // as the shared scanner matches them), so a per-line reference knows it.
-  definedFootnotes = new Set(
-    scanFootnotes(body)
-      .filter((f) => f.def)
-      .map((f) => f.label.toLowerCase()),
+  // Every footnote of the whole body, numbered and resolved (body definitions
+  // and `sources[].id`s) by the shared scanner; each line looks its labels up.
+  footnotesByLabel = new Map(
+    scanFootnotes(body, sourceIds(splitFrontmatter(content).yaml ?? '')).map((f) => [
+      f.label.toLowerCase(),
+      f,
+    ]),
   );
 
   const htmlParts: string[] = [];
@@ -83,8 +86,8 @@ function renderInline(text: string, lineStart = false): string {
   return out;
 }
 
-/** Labels defined in the Concept being rendered (set by `renderConcept`). */
-let definedFootnotes = new Set<string>();
+/** The body's footnotes by lowercase label (set by `renderConcept`). */
+let footnotesByLabel = new Map<string, Footnote>();
 
 /**
  * Render footnotes to the SAME markup the Rust renderer emits
@@ -100,12 +103,16 @@ function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
     const label = escapeHtml(f.label).replace(/"/g, '&quot;');
     // Labels match case-insensitively: one lowercased anchor, label as written.
     const anchor = escapeHtml(f.label.toLowerCase()).replace(/"/g, '&quot;');
+    const whole = footnotesByLabel.get(f.label.toLowerCase()) ?? f;
+    const n = whole.num;
     if (f.def && atLineStart) {
-      out += `<a id="fn-${anchor}" class="footnote-def">[${label}]</a>`;
-    } else if (definedFootnotes.has(f.label.toLowerCase())) {
-      out += `<sup class="footnote-ref"><a href="#fn-${anchor}">[${label}]</a></sup>`;
+      out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">[${n}]</a>`;
+    } else if (whole.hasDef) {
+      out += `<sup class="footnote-ref" title="${label}"><a href="#fn-${anchor}">[${n}]</a></sup>`;
+    } else if (whole.defined) {
+      out += `<sup class="footnote-ref" title="${label}">[${n}]</sup>`;
     } else {
-      out += `<sup class="footnote-ref broken">[${label}]</sup>`;
+      out += `<sup class="footnote-ref broken" title="${label}">[${n}]</sup>`;
     }
     p = f.to;
   }

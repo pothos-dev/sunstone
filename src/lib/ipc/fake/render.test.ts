@@ -31,22 +31,32 @@ describe('renderConcept citations', () => {
 
 // Footnotes must match the Rust `footnotes_to_sentinels` markup (ov-14).
 describe('renderConcept footnotes', () => {
-  test('a reference links to its definition, labels as written', () => {
+  test('a reference links to its definition, numbered by first use', () => {
     const { html } = renderConcept('Claim [^2] here.\n\n[^2]: The source.\n');
-    expect(html).toContain('Claim <sup class="footnote-ref"><a href="#fn-2">[2]</a></sup> here.');
-    expect(html).toContain('<p><a id="fn-2" class="footnote-def">[2]</a> The source.</p>');
+    expect(html).toContain(
+      'Claim <sup class="footnote-ref" title="2"><a href="#fn-2">[1]</a></sup> here.',
+    );
+    expect(html).toContain('<p><a id="fn-2" class="footnote-def" title="2">[1]</a> The source.</p>');
+  });
+
+  test('a sources id resolves a reference with no body definition', () => {
+    const { html } = renderConcept(
+      '---\ntype: N\nsources:\n  - id: ssi-web\n    resource: https://x\n---\n\nA[^b] B[^ssi-web]\n\n[^b]: B\n',
+    );
+    expect(html).toContain('A<sup class="footnote-ref" title="b"><a href="#fn-b">[1]</a></sup>');
+    expect(html).toContain('B<sup class="footnote-ref" title="ssi-web">[2]</sup>');
   });
 
   test('a reference with no definition is broken and unlinked', () => {
     const { html } = renderConcept('Claim[^9].\n');
-    expect(html).toContain('<sup class="footnote-ref broken">[9]</sup>');
+    expect(html).toContain('<sup class="footnote-ref broken" title="9">[1]</sup>');
     expect(html).not.toContain('#fn-9');
   });
 
   test('mixed-case labels share one lowercased anchor', () => {
     const { html } = renderConcept('x[^Src]\n\n[^src]: s\n');
-    expect(html).toContain('<a href="#fn-src">[Src]</a>');
-    expect(html).toContain('<a id="fn-src" class="footnote-def">[src]</a>');
+    expect(html).toContain('<a href="#fn-src">[1]</a>');
+    expect(html).toContain('<a id="fn-src" class="footnote-def" title="src">[1]</a>');
   });
 
   test('citations and footnotes render side by side', () => {

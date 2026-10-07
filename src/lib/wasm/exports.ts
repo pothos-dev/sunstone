@@ -158,9 +158,18 @@ export function citationDefPos(text: string, num: string): number | null {
   return mod ? (mod.citationDefPos(text, num) ?? null) : null;
 }
 
-/** Every footnote reference and definition (`[^label]` / `[^label]:`) in `text`. */
-export function scanFootnotes(text: string): Footnote[] {
-  return mod ? mod.scanFootnotes(text) : [];
+/**
+ * Every footnote reference and definition (`[^label]` / `[^label]:`) in `text`,
+ * numbered by first reference. `sourceIds` (from `sourceIds`) also count as
+ * definitions: OKF v0.2 joins a label to `sources[].id`.
+ */
+export function scanFootnotes(text: string, sourceIds: string[] = []): Footnote[] {
+  return mod ? mod.scanFootnotes(text, sourceIds) : [];
+}
+
+/** The `sources[].id`s of a Frontmatter block (inner YAML, no fences). */
+export function sourceIds(yaml: string): string[] {
+  return mod ? mod.sourceIds(yaml) : [];
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */

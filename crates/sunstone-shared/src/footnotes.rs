@@ -15,7 +15,14 @@
 //! - Both are skipped inside fenced code blocks and inline code spans (the
 //!   shared [`crate::scan`] code contract).
 //!
-//! Labels are reported as written: Sunstone does not renumber footnotes.
+//! Each label gets a display **number**, sequential by first reference (1, 2,
+//! 3, …); labels that are only defined, never referenced, follow in definition
+//! order. The label itself is kept for hover and joining.
+//!
+//! A reference is **defined** when the body has a definition for its label or
+//! its label is a `sources[].id` in the Frontmatter (OKF v0.2 §5.1: the label
+//! is the join key into `sources`, and no body definition is required). Pass
+//! those ids from [`source_ids`].
 //!
 //! **Offsets are UTF-16 code units**, the unit CodeMirror positions count in.
 
@@ -35,17 +42,23 @@ pub struct Footnote {
     /// Offset just past the marker: the `]` for a reference, the `:` for a
     /// definition (exclusive).
     pub to: usize,
-    /// The label as written, without `[^` / `]` (e.g. `"2"`).
+    /// The label as written, without `[^` / `]` (e.g. `"ga4-schema"`).
     pub label: String,
+    /// Display number: sequential by first reference, shared by every
+    /// reference to the label and by its definition.
+    pub num: usize,
     /// `true` for a `[^label]:` definition, `false` for a reference.
     pub def: bool,
-    /// Whether the label has a definition somewhere in the text. Always `true`
-    /// for a definition; `false` marks a dangling reference.
+    /// Whether the label has a body definition or matches a `sources[].id`.
+    /// Always `true` for a definition; `false` marks a dangling reference.
     pub defined: bool,
+    /// Whether the label has a body definition (a jump target in the text).
+    pub has_def: bool,
 }
 
 /// Every footnote reference and definition in `text`, in document order.
-pub fn scan_footnotes(text: &str) -> Vec<Footnote> {
+/// `source_ids` are the Concept's `sources[].id`s (see [`source_ids`]).
+pub fn scan_footnotes(text: &str, source_ids: &[String]) -> Vec<Footnote> {
     let bytes = text.as_bytes();
     let mut in_code = vec![false; bytes.len()];
     walk_code(bytes, |i, class| {
@@ -92,19 +105,58 @@ pub fn scan_footnotes(text: &str) -> Vec<Footnote> {
         i = after;
     }
 
-    let defined: Vec<String> = found
+    let with_def: Vec<String> = found
         .iter()
         .filter(|f| f.3)
         .map(|f| f.2.to_lowercase())
         .collect();
+    let sources: Vec<String> = source_ids.iter().map(|id| id.to_lowercase()).collect();
+
+    // Number labels by first reference, then definition-only labels.
+    let mut order: Vec<String> = Vec::new();
+    for want_def in [false, true] {
+        for f in found.iter().filter(|f| f.3 == want_def) {
+            let key = f.2.to_lowercase();
+            if !order.contains(&key) {
+                order.push(key);
+            }
+        }
+    }
+
     found
         .into_iter()
-        .map(|(from, to, label, def)| Footnote {
-            from: utf16_at[from],
-            to: utf16_at[to],
-            label: label.to_string(),
-            def,
-            defined: def || defined.contains(&label.to_lowercase()),
+        .map(|(from, to, label, def)| {
+            let key = label.to_lowercase();
+            let has_def = with_def.contains(&key);
+            Footnote {
+                from: utf16_at[from],
+                to: utf16_at[to],
+                label: label.to_string(),
+                num: order.iter().position(|k| *k == key).map_or(0, |p| p + 1),
+                def,
+                defined: has_def || sources.contains(&key),
+                has_def,
+            }
+        })
+        .collect()
+}
+
+/// The `sources[].id`s of a Frontmatter block (the inner YAML, without `---`
+/// fences), in list order. Numeric ids are read as their text. Empty when the
+/// block does not parse or has no `sources` list.
+pub fn source_ids(yaml: &str) -> Vec<String> {
+    let Ok(serde_yaml::Value::Mapping(map)) = serde_yaml::from_str::<serde_yaml::Value>(yaml) else {
+        return Vec::new();
+    };
+    let Some(serde_yaml::Value::Sequence(entries)) = map.get(serde_yaml::Value::from("sources")) else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .filter_map(|e| match e.get("id")? {
+            serde_yaml::Value::String(s) => Some(s.clone()),
+            serde_yaml::Value::Number(n) => Some(n.to_string()),
+            _ => None,
         })
         .collect()
 }
@@ -113,7 +165,7 @@ pub fn scan_footnotes(text: &str) -> Vec<Footnote> {
 /// `None`. The editor's jump target.
 pub fn footnote_def_pos(text: &str, label: &str) -> Option<usize> {
     let wanted = label.to_lowercase();
-    scan_footnotes(text)
+    scan_footnotes(text, &[])
         .into_iter()
         .find(|f| f.def && f.label.to_lowercase() == wanted)
         .map(|f| f.from)
@@ -145,7 +197,7 @@ mod tests {
     use super::*;
 
     fn spans(text: &str) -> Vec<(String, bool, bool)> {
-        scan_footnotes(text)
+        scan_footnotes(text, &[])
             .into_iter()
             .map(|f| (f.label, f.def, f.defined))
             .collect()
@@ -158,7 +210,7 @@ mod tests {
     #[test]
     fn reference_and_definition() {
         let text = "Claim [^2] here.\n\n[^2]: The source.\n";
-        let f = scan_footnotes(text);
+        let f = scan_footnotes(text, &[]);
         assert_eq!(f.len(), 2);
         assert_eq!((f[0].from, f[0].to, f[0].def, f[0].defined), (6, 10, false, true));
         assert_eq!(f[0].label, "2");
@@ -224,11 +276,54 @@ mod tests {
 
     #[test]
     fn offsets_are_utf16_units() {
-        let f = scan_footnotes("😀ü[^1]");
+        let f = scan_footnotes("😀ü[^1]", &[]);
         // 😀 = 2 units, ü = 1 → `[` at 3.
         assert_eq!((f[0].from, f[0].to), (3, 7));
-        let f = scan_footnotes("x\n[^ö]: y");
+        let f = scan_footnotes("x\n[^ö]: y", &[]);
         assert_eq!((f[0].from, f[0].to, f[0].label.as_str()), (2, 7, "ö"));
+    }
+
+    fn nums(text: &str, ids: &[&str]) -> Vec<(String, usize, bool)> {
+        let ids: Vec<String> = ids.iter().map(|s| s.to_string()).collect();
+        scan_footnotes(text, &ids)
+            .into_iter()
+            .map(|f| (f.label, f.num, f.defined))
+            .collect()
+    }
+
+    #[test]
+    fn labels_number_by_first_reference() {
+        let text = "a[^zeta] b[^alpha][^zeta] c[^Beta]\n\n[^beta]: B\n[^alpha]: A\n[^only-def]: D\n";
+        let got: Vec<(String, usize)> = nums(text, &[]).into_iter().map(|(l, n, _)| (l, n)).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("zeta".into(), 1),
+                ("alpha".into(), 2),
+                ("zeta".into(), 1),
+                ("Beta".into(), 3),
+                ("beta".into(), 3),
+                ("alpha".into(), 2),
+                ("only-def".into(), 4),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_source_id_defines_a_reference_without_a_body_definition() {
+        let got = nums("x[^ga4] y[^typo]", &["GA4"]);
+        assert_eq!(got, vec![("ga4".into(), 1, true), ("typo".into(), 2, false)]);
+        let f = scan_footnotes("x[^ga4]", &["ga4".to_string()]);
+        assert!(!f[0].has_def);
+    }
+
+    #[test]
+    fn source_ids_reads_the_sources_list() {
+        let yaml = "type: Note\nsources:\n  - id: ga4\n    resource: x\n  - resource: no-id\n  - id: 7\n    resource: y\n";
+        assert_eq!(source_ids(yaml), vec!["ga4".to_string(), "7".to_string()]);
+        assert!(source_ids("sources: nope").is_empty());
+        assert!(source_ids(": : bad yaml [").is_empty());
+        assert!(source_ids("").is_empty());
     }
 
     #[test]
