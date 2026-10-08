@@ -84,7 +84,18 @@ Grouping is done by hand because CodeMirror's history only coalesces events that
 
 **Folding (ov-15).** The YAML editor folds by indentation: `yamlFold.ts` is the pure line logic (a line folds when the lines after it are indented deeper, or when it is a bare `key:` over a same-indent `- ` list), and `frontmatterEditor.ts` wraps it in a `foldService`, a fold gutter and a placeholder that summarises the block (`3 entries`, `2 keys`, `4 lines`). It is loaded with the editor, not with the lazy grammar, because `@codemirror/lang-yaml` only folds flow collections. Top-level `sources` and `verified` start folded: `foldDefaults()` runs when the editor is built and again when the Tile loads a different Concept (it bumps a `concept` counter the Region watches), but not on undo/redo or reload, so a block the author opened stays open. Folds are view state only and never touch the YAML or the history.
 
-The YAML grammar, its highlighting and the well-formedness linter live in `yamlLanguage.ts` behind a dynamic `import()` and are reconfigured into a `Compartment` when they land — a collapsed Region (the default) never fetches them. Diagnostics there are well-formedness **only**; OKF rules are the marker-gated language service ([ADR-0009](/adr/0009-marker-gated-okf-language-service.md)).
+The YAML grammar, its highlighting, the linter and completion live in `yamlLanguage.ts` behind a dynamic `import()` and are reconfigured into a `Compartment` when they land — a collapsed Region (the default) never fetches them.
+
+**Language service (ov-3, [ADR-0009](/adr/0009-marker-gated-okf-language-service.md)).** Both halves are pure TS in `src/lib/okf/`, unit-tested without an editor. `lintFrontmatter(yaml, mode)` (`lint.ts`) parses once and returns findings with offsets: in mode `'yaml'` only parse errors and duplicate keys, in mode `'okf'` also the OKF families. `completeFrontmatter(yaml, pos, mode)` (`complete.ts`) works out the key path at the cursor from indentation (the block is half-typed whenever completion is wanted) and returns what the families offer there; it returns nothing outside `'okf'`. The mode comes from `frontmatterLintMode` (`mode.ts`): `'okf'` only when `indexStore.okfVersion()` is non-null, the file is inside the Bundle root, and it is not a reserved `index.md`/`log.md`. The Tile derives it on every index refresh and the editor holds it in `lintModeField` (`editor/lintModeField.ts`); the linter's `needsRefresh` re-runs on a mode change, so adding or removing the marker re-lints without the YAML changing. The save gate (`isParseable`) never consults the lint.
+
+Rules and completions come from **families**, never from a switch in the engine. Each family is an `OkfFamily` (`okf/family.ts`) in its own module under `okf/families/`, listed once in `okf/families/index.ts`:
+
+- `keys` — top-level keys that opt a Concept into the family; `[]` means always on (the §4.1 `core`). A family whose keys are all absent is skipped, which is how a Concept with no `sources` gets no provenance findings.
+- `required` — `{ path, key, spec }` entries the engine reports as **errors** when missing or empty; `path` uses `'*'` for every list item (`['sources', '*']`).
+- `rules` — `(ctx: RuleContext) => Finding[]` for everything else (warnings or info). `ctx` gives the parsed `root` map, `pair()`, `nodesAt(path)` with anchor ranges, and `at(range, severity, message)`.
+- `completions` — `{ path, keys?, values? }`. `path: []` keys are offered in every OKF Concept; nested paths only match once the family's key is present.
+
+`core`, `provenance`, `trust` and `lifecycle` exist today with only their opt-in keys, the spec's REQUIRED fields and key completions; their own rules and value completions arrive with ov-9, ov-10 and ov-11 in those modules.
 
 ## Find & replace
 

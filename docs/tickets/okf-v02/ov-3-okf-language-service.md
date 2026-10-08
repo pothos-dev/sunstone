@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 blocked-by: [ov-2, ov-5]
 ---
 
@@ -11,14 +11,18 @@ The gate is the `okf_version` marker in the bundle-root `index.md` ([§12](/okf/
 
 Family-specific rules are not all this ticket's job. It builds the service, the gate, and the [§4.1](/okf/spec.md#41-frontmatter) core rules; [ov-9](ov-9-generated-verified-trust-tiers.md), [ov-10](ov-10-sources-provenance-family.md), [ov-11](ov-11-status-stale-after-lifecycle.md) and [ov-12](ov-12-attested-computation-concept-type.md) each add their own rules and completions to it.
 
-- [ ] A pure `lintFrontmatter(yaml, mode)` in plain TypeScript returns findings with source positions, and is unit-tested without a DOM or an editor
-- [ ] Malformed YAML is reported with a position in every Bundle, marker or not
-- [ ] OKF rules and OKF completions are both active only when the bundle-root `index.md` declares `okf_version`, and both go quiet when it does not
-- [ ] In OKF mode, fields the spec marks REQUIRED are errors — `type`, a `sources` entry's `resource`, `generated.by` — and everything else is a warning or info
-- [ ] Diagnostics are scoped to families the author opted into: a Concept with no `sources` key gets no provenance diagnostics
-- [ ] A duplicate key is reported, restoring the rejection the Properties panel used to enforce — the `yaml` parser flags it, but `yamlError` asks with `uniqueKeys: false` so it can never hold a write back ([ov-2](ov-2-frontmatter-yaml-editor.md))
-- [ ] Completion offers OKF's recommended top-level keys and the keys of any family already present, replacing the panel's `OKF_KEYS` autocomplete
-- [ ] An explicit format command preserves comments and quoting
-- [ ] The save gate asks only whether the YAML parses and never consults the lint, so an OKF error never blocks a write
-- [ ] Toggling OKF mode re-runs the lint without the document changing
-- [ ] All four gates green
+- [x] A pure `lintFrontmatter(yaml, mode)` in plain TypeScript returns findings with source positions, and is unit-tested without a DOM or an editor
+- [x] Malformed YAML is reported with a position in every Bundle, marker or not
+- [x] OKF rules and OKF completions are both active only when the bundle-root `index.md` declares `okf_version`, and both go quiet when it does not
+- [x] In OKF mode, fields the spec marks REQUIRED are errors — `type`, a `sources` entry's `resource`, `generated.by` — and everything else is a warning or info
+- [x] Diagnostics are scoped to families the author opted into: a Concept with no `sources` key gets no provenance diagnostics
+- [x] A duplicate key is reported, restoring the rejection the Properties panel used to enforce — the `yaml` parser flags it, but `yamlError` asks with `uniqueKeys: false` so it can never hold a write back ([ov-2](ov-2-frontmatter-yaml-editor.md))
+- [x] Completion offers OKF's recommended top-level keys and the keys of any family already present, replacing the panel's `OKF_KEYS` autocomplete
+- [x] An explicit format command preserves comments and quoting
+- [x] The save gate asks only whether the YAML parses and never consults the lint, so an OKF error never blocks a write
+- [x] Toggling OKF mode re-runs the lint without the document changing
+- [x] All four gates green
+
+## Comments
+
+- 2026-10-08: Shipped. The service is `src/lib/okf/` (`lint.ts`, `complete.ts`, `mode.ts`), wired into the YAML editor through `editor/yamlLanguage.ts` and `editor/lintModeField.ts`; the seam is described in [custom extensions → Frontmatter field and its editor](/editor/custom-extensions.md#frontmatter-field-and-its-editor). **For ov-9, ov-10, ov-11 (and ov-12):** add your rules, required keys and completions to your family's own module in `src/lib/okf/families/` (`trust.ts`, `provenance.ts`, `lifecycle.ts`; ov-12 writes `computation.ts` and appends it to `families/index.ts`). Those modules already declare their opt-in keys, the spec's REQUIRED fields (`generated.by`, `sources[].resource`) and key completions, including the top-level `sources`, `generated`, `verified`, `status` and `stale_after`. They have no rules and no value completions yet. Choices made here: duplicate keys are errors in every Bundle (YAML 1.2 requires unique keys); reserved `index.md`/`log.md` files and files outside the Bundle root get `yaml` mode; OKF rules are skipped while the block does not parse.

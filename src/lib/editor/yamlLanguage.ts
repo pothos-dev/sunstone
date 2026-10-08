@@ -1,5 +1,5 @@
 // The Frontmatter editor's LAZY slice: the YAML grammar, its highlighting, and
-// the well-formedness linter (ADR 0008).
+// the language service — lint and OKF completion (ADR 0008, ADR 0009).
 //
 // Everything in this module is behind a dynamic `import()` in
 // `frontmatterEditor.ts`, so none of it — grammar, parser tables, lint panel —
@@ -12,7 +12,10 @@ import { linter, type Diagnostic } from '@codemirror/lint';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import type { Extension } from '@codemirror/state';
-import { yamlError } from '$lib/frontmatter';
+import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+import { lintFrontmatter } from '$lib/okf/lint';
+import { completeFrontmatter } from '$lib/okf/complete';
+import { lintModeField } from './lintModeField';
 import { PARSE_ERROR_DELAY_MS } from './parseErrorDelay';
 
 // The debounce is shared with the Region's own indicator; it lives in
@@ -39,36 +42,66 @@ const yamlHighlight = HighlightStyle.define([
 ]);
 
 /**
- * Diagnostics for the Frontmatter editor: WELL-FORMEDNESS ONLY.
+ * Diagnostics for the Frontmatter editor: the language service's
+ * `lintFrontmatter` (ADR 0009) in whatever mode the editor is in. Well-formedness
+ * in every Bundle; OKF rules only in `'okf'` mode, i.e. when the Bundle root
+ * declares `okf_version`.
  *
- * OKF rules (required keys, enum values, duplicate keys) are the marker-gated
- * language service — they belong to a bundle that declares `okf_version`
- * (ADR 0009) and are layered on top of this, never folded into it. Keeping the
- * split here is what lets the save gate ask the SAME question this asks
- * (`yamlError`) without lint policy ever being able to hold a write back.
+ * The save gate asks `isParseable`, never this, so lint policy can never hold a
+ * write back. `needsRefresh` re-runs the lint when the mode flips (the marker
+ * was added or removed) even though the YAML itself did not change.
  */
-function wellFormednessLinter(): Extension {
+function frontmatterLinter(): Extension {
   return linter(
     (view) => {
       const doc = view.state.doc;
-      const err = yamlError(doc.toString());
-      if (err === null) return [];
-      const from = Math.min(err.from, doc.length);
-      const to = Math.min(Math.max(err.to, from), doc.length);
-      const diagnostic: Diagnostic = {
-        from,
-        to,
-        severity: 'error',
-        source: 'yaml',
-        message: err.message,
-      };
-      return [diagnostic];
+      return lintFrontmatter(doc.toString(), view.state.field(lintModeField)).map(
+        (f): Diagnostic => ({
+          from: Math.min(f.from, doc.length),
+          to: Math.min(Math.max(f.to, f.from), doc.length),
+          severity: f.severity,
+          source: f.source,
+          message: f.message,
+        }),
+      );
     },
-    { delay: PARSE_ERROR_DELAY_MS },
+    {
+      delay: PARSE_ERROR_DELAY_MS,
+      needsRefresh: (update) => update.startState.field(lintModeField) !== update.state.field(lintModeField),
+    },
   );
 }
 
-/** The lazily-loaded language slice: grammar, highlighting, well-formedness lint. */
+/**
+ * OKF key/value completion (ADR 0009), replacing the Properties panel's
+ * `OKF_KEYS` suggestions. Silent outside `'okf'` mode. An empty key prefix only
+ * completes on explicit request (Ctrl+Space) so a new line does not pop a list;
+ * a value position (`status: `) completes as soon as there is something to offer.
+ */
+function okfCompletionSource(context: CompletionContext): CompletionResult | null {
+  const mode = context.state.field(lintModeField);
+  const found = completeFrontmatter(context.state.doc.toString(), context.pos, mode);
+  if (!found) return null;
+  if (found.kind === 'key' && found.prefix === '' && !context.explicit) return null;
+  return {
+    from: found.from,
+    options: found.options.map((o) => ({
+      label: o.label,
+      detail: o.detail,
+      info: o.info,
+      apply: o.apply,
+      type: found.kind === 'key' ? 'property' : 'constant',
+    })),
+    validFor: /^[\w.-]*$/,
+  };
+}
+
+/** The lazily-loaded language slice: grammar, highlighting, lint, completion. */
 export function yamlSupport(): Extension[] {
-  return [yamlLanguage(), syntaxHighlighting(yamlHighlight), wellFormednessLinter()];
+  return [
+    yamlLanguage(),
+    syntaxHighlighting(yamlHighlight),
+    frontmatterLinter(),
+    autocompletion({ override: [okfCompletionSource], icons: false }),
+  ];
 }

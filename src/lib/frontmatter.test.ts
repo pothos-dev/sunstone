@@ -106,6 +106,11 @@ describe('formatYaml', () => {
     expect(out).toContain('type: Concept');
   });
 
+  test('preserves quoting style and inline comments while reflowing', () => {
+    const out = formatYaml(`type:    Concept\ntitle: 'Single'   # why\nokf: "0.2"\n`);
+    expect(out).toBe(`type: Concept\ntitle: 'Single' # why\nokf: "0.2"`);
+  });
+
   test('returns null when the block is already formatted or does not parse', () => {
     expect(formatYaml('type: Concept')).toBeNull();
     expect(formatYaml('type: Concept\n  bad: [1, 2')).toBeNull();

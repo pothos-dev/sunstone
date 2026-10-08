@@ -13,6 +13,8 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { blockForHost, formatYaml, trimBlock } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
 import { defaultYamlFolds, yamlFoldAt } from './yamlFold';
+import { lintModeField, setLintMode } from './lintModeField';
+import type { LintMode } from '$lib/okf/lint';
 
 import {
   commitFrontmatterGroup,
@@ -55,6 +57,8 @@ export interface FrontmatterEditorOptions {
   doc: string;
   /** Read mode shows the same YAML, verbatim and highlighted, but not editable. */
   readOnly: boolean;
+  /** `'okf'` turns on OKF lint + completion (ADR 0009); `'yaml'` is well-formedness only. */
+  mode: LintMode;
   /**
    * Escape from YAML editing — the INNER layer of the unified peel: the Region
    * keeps focus, a second press homes to the body editor (see `appHotkeys`).
@@ -71,6 +75,8 @@ export interface FrontmatterEditor {
   syncFromHost(yaml: string): void;
   /** Switch between editable and read-only without rebuilding. */
   setReadOnly(readOnly: boolean): void;
+  /** Switch the lint mode; the lint re-runs without the YAML changing. */
+  setMode(mode: LintMode): void;
   /** Close any open typing group NOW (blur, save, Concept switch). */
   commitGroup(): void;
   /** Drop every fold and fold the default keys again (a Concept opened). */
@@ -84,7 +90,7 @@ export interface FrontmatterEditor {
 /**
  * Build the Frontmatter Region's YAML editor over `host`'s frontmatter field.
  *
- * The YAML grammar, its highlighting and the well-formedness linter are
+ * The YAML grammar, its highlighting, the linter and OKF completion are
  * LAZY-LOADED (`./yamlLanguage`) and reconfigured into `languageSlice` when they
  * arrive, so a collapsed Region costs nothing — the editor is only built when
  * the Region is expanded, and the grammar chunk is only fetched then.
@@ -144,6 +150,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
     doc: trimBlock(doc),
     extensions: [
       languageSlice.of([]),
+      lintModeField.init(() => options.mode),
       readOnlySlice.of(readOnlyExtension(options.readOnly)),
       // NO `history()`: the body editor owns the single undo stack (ADR 0008).
       keymap.of(historyForwarding),
@@ -183,7 +190,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
   }
   foldDefaults();
 
-  // Fetch the grammar + linter and slot them in. The editor is usable (and
+  // Fetch the grammar, linter and completion and slot them in. The editor is usable (and
   // typed into) while this is in flight; the reconfigure only adds decoration.
   void import('./yamlLanguage').then(({ yamlSupport }) => {
     if (view.dom.isConnected) view.dispatch({ effects: languageSlice.reconfigure(yamlSupport()) });
@@ -206,6 +213,9 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
     },
     setReadOnly(readOnly: boolean): void {
       view.dispatch({ effects: readOnlySlice.reconfigure(readOnlyExtension(readOnly)) });
+    },
+    setMode(mode: LintMode): void {
+      if (view.state.field(lintModeField) !== mode) view.dispatch({ effects: setLintMode.of(mode) });
     },
     commitGroup,
     foldDefaults,

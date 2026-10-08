@@ -22,6 +22,7 @@
   import { undo, redo, undoDepth, redoDepth } from '@codemirror/commands';
   import { backend } from '$lib/ipc';
   import { indexStore } from '$lib/state/index.svelte';
+  import { frontmatterLintMode } from '$lib/okf/mode';
   import { session } from '$lib/state/session.svelte';
   import { theme } from '$lib/state/theme.svelte';
   import { focus } from '$lib/state/focus.svelte';
@@ -232,6 +233,14 @@
   // Edits do NOT come back through a callback: the YAML editor dispatches them
   // straight into this view's frontmatter field, which fires the CM change
   // listener (→ tile.edit → Document.edit) exactly like a body edit.
+
+  // The language service's mode (ADR 0009): OKF lint + completion only when the
+  // Bundle root declares `okf_version`. Re-derived on every index refresh, so
+  // adding or removing the marker flips it live.
+  const lintMode = $derived.by(() => {
+    void indexStore.version;
+    return frontmatterLintMode(tile.activePath, indexStore.okfVersion(), indexStore.bundleRoot());
+  });
 
   /** Inner Escape layer: leave the YAML, land on the Region container. */
   function escapeFrontmatter(): void {
@@ -753,6 +762,7 @@
         yaml={frontmatterYaml}
         concept={frontmatterConcept}
         readOnly={!editing}
+        mode={lintMode}
         onEscape={escapeFrontmatter}
         onBlur={() => {
           if (!__SUNSTONE_WEB__) void tile.flush();

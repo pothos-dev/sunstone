@@ -96,11 +96,12 @@ function tryParseYaml(yaml: string): { ok: true; doc: Document } | { ok: false; 
  * `isParseable` — the save gate, so the two can never disagree about whether a
  * block is writable.
  *
- * Deliberately narrow: this is well-formedness only. OKF rules (required keys,
- * enum values, duplicate keys) are the marker-gated language service, ADR 0009 —
- * lint policy must never be able to hold a write back. `uniqueKeys: false` is
- * part of that narrowing: a duplicate key still yields a document (last wins),
- * so it is a LINT finding, not a reason to refuse the write.
+ * Deliberately narrow: this is well-formedness only. Duplicate keys and the OKF
+ * rules (required keys, enum values) are the language service's
+ * `lintFrontmatter` (`$lib/okf/lint`, ADR 0009) — lint policy must never be able
+ * to hold a write back. `uniqueKeys: false` is part of that narrowing: a
+ * duplicate key still yields a document (last wins), so it is a LINT finding,
+ * not a reason to refuse the write.
  */
 export function yamlError(yaml: string): YamlError | null {
   const parsed = tryParseYaml(yaml);

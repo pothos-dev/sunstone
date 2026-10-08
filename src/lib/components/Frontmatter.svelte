@@ -24,6 +24,7 @@
   } from '$lib/editor/cm';
   import { yamlError } from '$lib/frontmatter';
   import { PARSE_ERROR_DELAY_MS } from '$lib/editor/parseErrorDelay';
+  import type { LintMode } from '$lib/okf/lint';
 
   interface Props {
     /** The body editor: owner of the frontmatter field and the undo history. */
@@ -34,13 +35,15 @@
     concept: number;
     /** Read mode: same YAML, verbatim and highlighted, but not editable. */
     readOnly: boolean;
+    /** `'okf'` in a Bundle declaring `okf_version` (ADR 0009): OKF lint + completion. */
+    mode: LintMode;
     /** Inner Escape layer: leave YAML editing, keep the Region focused. */
     onEscape: () => void;
     /** Focus left the YAML (desktop flushes the pending write here). */
     onBlur?: () => void;
   }
 
-  let { host, yaml, concept, readOnly, onEscape, onBlur }: Props = $props();
+  let { host, yaml, concept, readOnly, mode, onEscape, onBlur }: Props = $props();
 
   let editorParent = $state<HTMLDivElement | null>(null);
   let editor: FrontmatterEditor | null = null;
@@ -63,6 +66,7 @@
       host: hostView,
       doc: initial,
       readOnly,
+      mode: untrack(() => mode),
       onEscape,
       onBlur,
     });
@@ -80,6 +84,13 @@
   $effect(() => {
     void editorBuilt;
     editor?.setReadOnly(readOnly);
+  });
+
+  // The marker came or went (or another Concept opened): the lint re-runs in
+  // the new mode without the YAML changing.
+  $effect(() => {
+    void editorBuilt;
+    editor?.setMode(mode);
   });
 
   // A different Concept: fold `sources` / `verified` again (ov-15). The editor
