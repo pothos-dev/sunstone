@@ -6,12 +6,12 @@
 //! the wasm handle — whether the target `exists` in the concept set (§4). The
 //! path-only core lives in [`crate::paths::resolve_location`]; this adds the
 //! `kind` classification, anchor extraction, the nested-bundle-root redirect,
-//! and the folder → `index.md` fallback. `find_bundle_root` locates the OKF root within the opened tree.
+//! and the folder → `index.md` fallback. The root itself comes from
+//! [`crate::bundle_root::find_bundle_root`].
 
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{dir_of, folder_index_fallback, index_of, is_external, resolve_location};
-use crate::wikilink::basename;
+use crate::paths::{folder_index_fallback, index_of, is_external, resolve_location};
 
 /// The classified result of resolving a markdown link `href` (ADR 0006 §3).
 /// Internally-tagged on `kind` (camelCase). The `internal` variant carries
@@ -140,64 +140,6 @@ pub fn resolve_link(
         path,
         anchor: extract_anchor(raw),
         exists: ex,
-    }
-}
-
-/// Best-effort location of the OKF bundle root WITHIN the opened tree, as a
-/// bundle-relative prefix (`''` = the opened folder is itself the bundle root).
-/// Mirrors the former `findBundleRoot` in `src/lib/links.ts` exactly.
-pub fn find_bundle_root(all_paths: &[String]) -> String {
-    let mds: Vec<&String> = all_paths
-        .iter()
-        .filter(|p| p.to_lowercase().ends_with(".md"))
-        .collect();
-    if mds.is_empty() {
-        return String::new();
-    }
-
-    // 1. A top-level markdown file means the opened folder is the bundle root.
-    if mds.iter().any(|p| !p.contains('/')) {
-        return String::new();
-    }
-
-    // 2. Shallowest directory carrying an index.md.
-    let mut index_dirs: Vec<String> = Vec::new();
-    for p in &mds {
-        if basename(p) == "index.md" {
-            let d = dir_of(p).to_string();
-            if !index_dirs.contains(&d) {
-                index_dirs.push(d);
-            }
-        }
-    }
-    if !index_dirs.is_empty() {
-        let depth = |d: &str| d.split('/').count();
-        let min_depth = index_dirs.iter().map(|d| depth(d)).min().unwrap();
-        let shallow: Vec<&String> = index_dirs
-            .iter()
-            .filter(|d| depth(d) == min_depth)
-            .collect();
-        if shallow.iter().any(|d| d.as_str() == "docs") {
-            return "docs".to_string();
-        }
-        if shallow.len() == 1 {
-            return shallow[0].clone();
-        }
-        return String::new(); // ambiguous — several sibling bundles at the same depth
-    }
-
-    // 3. No index.md anywhere: the sole shared top-level segment, if any.
-    let mut top_segs: Vec<&str> = Vec::new();
-    for p in &mds {
-        let seg = p.split('/').next().unwrap_or("");
-        if !top_segs.contains(&seg) {
-            top_segs.push(seg);
-        }
-    }
-    if top_segs.len() == 1 {
-        top_segs[0].to_string()
-    } else {
-        String::new()
     }
 }
 
@@ -463,59 +405,5 @@ mod tests {
         for (cur, href, root, want) in cases {
             assert_eq!(&resolve_link(cur, href, root, no_exists), want, "{cur} {href}");
         }
-    }
-
-    // --- find_bundle_root (mirrors links.test.ts::findBundleRoot) ------------
-
-    #[test]
-    fn empty_bundle_is_root() {
-        assert_eq!(find_bundle_root(&[]), "");
-    }
-
-    #[test]
-    fn top_level_markdown_means_opened_folder_is_root() {
-        assert_eq!(find_bundle_root(&paths(&["index.md", "tables/orders.md"])), "");
-        assert_eq!(find_bundle_root(&paths(&["README.md", "docs/index.md"])), "");
-    }
-
-    #[test]
-    fn nested_under_docs_found_via_index() {
-        assert_eq!(
-            find_bundle_root(&paths(&["docs/index.md", "docs/tables/orders.md"])),
-            "docs"
-        );
-    }
-
-    #[test]
-    fn shallowest_index_wins() {
-        assert_eq!(
-            find_bundle_root(&paths(&["wiki/index.md", "wiki/a/index.md", "wiki/a/b.md"])),
-            "wiki"
-        );
-    }
-
-    #[test]
-    fn docs_preferred_on_same_depth_tie() {
-        assert_eq!(
-            find_bundle_root(&paths(&["docs/index.md", "notes/index.md"])),
-            "docs"
-        );
-    }
-
-    #[test]
-    fn ambiguous_same_depth_siblings_is_root() {
-        assert_eq!(
-            find_bundle_root(&paths(&["notes/index.md", "wiki/index.md"])),
-            ""
-        );
-    }
-
-    #[test]
-    fn no_index_uses_sole_shared_top_segment() {
-        assert_eq!(
-            find_bundle_root(&paths(&["docs/a.md", "docs/sub/b.md"])),
-            "docs"
-        );
-        assert_eq!(find_bundle_root(&paths(&["docs/a.md", "other/b.md"])), "");
     }
 }

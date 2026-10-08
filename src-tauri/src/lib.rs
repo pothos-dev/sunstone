@@ -145,6 +145,7 @@ pub fn run() {
             commands::rewrite_anchors,
             commands::list_concept_paths,
             commands::list_attachment_paths,
+            commands::list_okf_markers,
             commands::backlinks,
             commands::all_tags,
             commands::concepts_by_tag,

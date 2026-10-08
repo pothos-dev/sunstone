@@ -6,6 +6,7 @@ import type {
   SearchHit,
   RewriteSummary,
   AnchorRename,
+  OkfMarker,
   FileHistory,
   FileAtRev,
   RenderPayload,
@@ -364,6 +365,20 @@ export interface Backend {
    * `simulateCloseRequest` test hook, which models the desktop close.
    */
   onBeforeClose(flush: () => Promise<void>): () => void;
+
+  /**
+   * Every `index.md` in the Bundle whose Frontmatter declares `okf_version`
+   * (OKF v0.2 §12), at any depth, sorted by path. The Bundle-root finder
+   * (`sunstone-shared/src/bundle_root.rs`) is pure, so the marker reaches it as
+   * data: `indexStore` hands this list to the wasm `BundleIndex` beside
+   * `listConceptPaths`, and the handle picks the root (outermost declaration
+   * wins) and reports the declared version (`okfVersion()`).
+   *
+   * All three impls answer from the same shared parse (`okf_version_of`):
+   * `tauri.ts` / `http.ts` from the Rust index (`Index::okf_markers`), `fake.ts`
+   * over its in-memory store through wasm `okfVersionOf`.
+   */
+  listOkfMarkers(): Promise<OkfMarker[]>;
 
   // --- Attachments (slice: attachment-files) ---
 

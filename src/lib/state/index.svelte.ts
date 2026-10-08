@@ -41,9 +41,22 @@ class IndexStore {
    */
   #attachments: string[] = [];
 
-  /** Best-effort OKF bundle root within the opened tree (`''` = opened root). */
+  /**
+   * The OKF bundle root within the opened tree (`''` = opened root): the
+   * outermost `index.md` declaring `okf_version` when there is one, else the
+   * structural best effort (`sunstone-shared/src/bundle_root.rs`).
+   */
   bundleRoot(): string {
     return this.#handle?.bundleRoot() ?? '';
+  }
+
+  /**
+   * The `okf_version` the Bundle root declares, or `null` when the root was
+   * inferred structurally (the Bundle does not declare itself). The gate for
+   * OKF-only behaviour (README: "OKF behaviour is gated on the marker").
+   */
+  okfVersion(): string | null {
+    return this.#handle?.okfVersion() ?? null;
   }
 
   /** Synchronous existence check used by the broken-link decoration. */
@@ -105,15 +118,18 @@ class IndexStore {
       // backs the handle, and the Attachment set held beside it (they are two
       // separate seam methods because they are two separate indexes — see
       // `Backend.listAttachmentPaths`).
-      const [paths, attachments] = await Promise.all([
+      // The `okf_version` markers ride beside the paths: the root finder is
+      // pure, so the marker reaches it as data (OKF v0.2 §12).
+      const [paths, attachments, markers] = await Promise.all([
         backend.listConceptPaths(),
         backend.listAttachmentPaths(),
+        backend.listOkfMarkers(),
       ]);
       // Swap the handle: free the OLD one before building the new (ADR 0006
       // §4), only once we have a fresh set — so a backend error leaves the
       // previous handle AND the previous Attachment corpus untouched.
       this.#handle?.free();
-      this.#handle = wasm ? new wasm.BundleIndex(paths) : null;
+      this.#handle = wasm ? new wasm.BundleIndex(paths, markers) : null;
       this.#attachments = attachments;
       this.version += 1;
     } catch {

@@ -28,7 +28,15 @@ A Bundle is [conformant](/okf/spec.md#11-conformance) if every non-reserved `.md
 
 ### Finding the bundle root (Sunstone extension)
 
-The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `find_bundle_root(all_paths)` in [`sunstone-shared`](/architecture/sunstone-shared.md) (`crates/sunstone-shared/src/links.rs`) infers the root **structurally, from paths only** (never frontmatter). The frontend runs that same code through the wasm seam rather than a TS twin ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)):
+The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `find_bundle_root(all_paths, okf_markers)` in [`sunstone-shared`](/architecture/sunstone-shared.md) (`crates/sunstone-shared/src/bundle_root.rs`) finds it in rungs, first match wins. The frontend runs that same code through the wasm seam rather than a TS twin ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)).
+
+**Rung 1: the `okf_version` marker.** v0.2 [§12](/okf/spec.md#12-versioning) lets a bundle-root `index.md` declare `okf_version`, the only Frontmatter a Reserved file may carry. So an `index.md` that declares it is a positive root declaration, and it outranks every structural rule below (a top-level `README.md` included). When several declare it along one ancestor chain, the **outermost** wins; an inner declaration is a nested Bundle, not the root. Declarations in unrelated sibling directories are ambiguous, so the finder does not guess between them and falls through to rung 2. The value must be a non-empty string (`"0.2"`) or an unquoted number (`0.2`). Anything else (an empty value, a list, unparseable YAML, no Frontmatter) counts as no marker.
+
+The finder stays pure: it never reads a file. The markers reach it as data. `Index::okf_markers()` (desktop and server) and the fake's store each parse every `index.md` with the shared `frontmatter::okf_version_of` and hand the list out as `Backend.listOkfMarkers()`. The frontend's `indexStore` passes it to the wasm `BundleIndex` beside the path list, and the handle reports the root (`bundleRoot()`) and the version it declares (`okfVersion()`, `null` when the root was inferred).
+
+A missing marker proves nothing. Upstream issue #26 reports the reference agent's index regeneration silently dropping `okf_version`, so absence falls through to rung 2 rather than meaning "no Bundle".
+
+**Rung 2: structural inference**, from the path list alone:
 
 1. Any top-level `.md` (a root `index.md` or root-level Concept) ⇒ the opened folder **is** the root. A Bundle at the opened root is the common case; never redirect down.
 2. Otherwise, the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
@@ -65,11 +73,11 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 
 | Topic | Pure OKF | Sunstone |
 | --- | --- | --- |
-| Bundle root | Known a priori; absolute links resolve from it | **Inferred** via `find_bundle_root`, with a safe existence-gated fallback ([Linking](/okf/linking.md#nested-bundle-root)) |
+| Bundle root | Known a priori; absolute links resolve from it | Taken from the outermost `index.md` declaring `okf_version` ([§12](/okf/spec.md#12-versioning)); without one, **inferred** structurally. Either way, the rewrite is existence-gated ([Linking](/okf/linking.md#nested-bundle-root)) |
 | Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
 | Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git/`) |
-| `okf_version` | May be declared in root `index.md` | Recognised on the root `index.md` only; not required |
+| `okf_version` | May be declared in root `index.md` | Read from **any** `index.md` as a root declaration (the outermost wins, so an inner one marks a nested Bundle); not required, and its absence is no evidence there is no Bundle |
 
 ## Related
 

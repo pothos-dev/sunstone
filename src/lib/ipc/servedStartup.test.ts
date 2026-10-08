@@ -6,7 +6,7 @@ const PATHS = ['index.md', 'guide/setup.md', 'providers.md', 'providers/index.md
 
 // The shipped wasm handle, as `http.ts` uses it.
 function resolve(pathname: string, hash = '') {
-  const index = new wasm.BundleIndex(PATHS);
+  const index = new wasm.BundleIndex(PATHS, []);
   try {
     return startupFromUrl(pathname, hash, PATHS, (p) => index.urlToConcept(p) ?? null);
   } finally {

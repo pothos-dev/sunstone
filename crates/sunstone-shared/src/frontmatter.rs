@@ -96,6 +96,10 @@ pub struct ParsedFrontmatter {
     /// `title` scalar, trimmed, if present and non-empty: the Concept's
     /// human-authored display name (the frontend's `titleFromYaml` rule).
     pub title: Option<String>,
+    /// `okf_version`, per [`okf_version_of`]: the OKF v0.2 §12 Bundle-root
+    /// marker. Parsed for every Concept; only a reserved `index.md` carrying it
+    /// counts as a marker (`Index::okf_markers`).
+    pub okf_version: Option<String>,
 }
 
 /// Strip one trailing `\r?\n` then any trailing whitespace from `line` — the
@@ -246,12 +250,35 @@ pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
+    let okf_version = okf_version_in(&map);
+
     ParsedFrontmatter {
         concept_type,
         tags,
         keys,
         title,
+        okf_version,
     }
+}
+
+/// The `okf_version` a Concept's frontmatter declares (OKF v0.2 §12), or `None`.
+///
+/// The spec writes it as a string (`okf_version: "0.2"`), but an unquoted
+/// `okf_version: 0.2` is a YAML number and is taken too (as `"0.2"`). Anything
+/// else — no / unterminated / unparseable frontmatter, an empty string, a bool,
+/// null, a sequence or a mapping — is `None`: a malformed marker is no marker,
+/// so Bundle-root detection falls through to its structural rules.
+pub fn okf_version_of(content: &str) -> Option<String> {
+    okf_version_in(&parse_mapping(content)?)
+}
+
+fn okf_version_in(map: &serde_yaml::Mapping) -> Option<String> {
+    let version = match map.get(serde_yaml::Value::from("okf_version"))? {
+        serde_yaml::Value::String(s) => s.trim().to_string(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        _ => return None,
+    };
+    (!version.is_empty()).then_some(version)
 }
 
 /// Every top-level frontmatter entry as `key` + value(s), in document order (a
@@ -317,6 +344,28 @@ mod tests {
         assert_eq!(title("---\ntitle: 42\n---\n"), None);
         assert_eq!(title("---\ntype: x\n---\n"), None);
         assert_eq!(title("title: not frontmatter\n"), None);
+    }
+
+    #[test]
+    fn okf_version_is_a_non_empty_string_or_number_scalar() {
+        let v = okf_version_of;
+        assert_eq!(v("---\nokf_version: \"0.2\"\n---\n# Index\n").as_deref(), Some("0.2"));
+        assert_eq!(v("---\nokf_version: ' 0.2 '\ntitle: x\n---\n").as_deref(), Some("0.2"));
+        // Unquoted, YAML reads a number; still a declaration.
+        assert_eq!(v("---\nokf_version: 0.2\n---\n").as_deref(), Some("0.2"));
+        assert_eq!(v("---\nokf_version: 1\n---\n").as_deref(), Some("1"));
+        // Malformed or absent: no marker.
+        assert_eq!(v("---\nokf_version: ''\n---\n"), None);
+        assert_eq!(v("---\nokf_version:\n---\n"), None);
+        assert_eq!(v("---\nokf_version: true\n---\n"), None);
+        assert_eq!(v("---\nokf_version: [0.2]\n---\n"), None);
+        assert_eq!(v("---\nokf_version: {v: 0.2}\n---\n"), None);
+        assert_eq!(v("---\nokf_version: \"0.2\n---\n"), None, "unparseable YAML");
+        assert_eq!(v("---\nokf_version: 0.2\nno close\n"), None, "unterminated block");
+        assert_eq!(v("okf_version: 0.2\n"), None, "not frontmatter");
+        assert_eq!(v("---\ntitle: x\n---\n"), None);
+        let parsed = parse_frontmatter("---\nokf_version: '0.2'\n---\n");
+        assert_eq!(parsed.okf_version.as_deref(), Some("0.2"));
     }
 
     #[test]

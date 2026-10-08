@@ -25,7 +25,7 @@ describe('urlToConceptInline', () => {
 
   /** The shipped wasm resolver over the same set. */
   const viaWasm = (urlPath: string, set: string[]): string | null => {
-    const index = new wasm.BundleIndex(set);
+    const index = new wasm.BundleIndex(set, []);
     try {
       return index.urlToConcept(urlPath) ?? null;
     } finally {

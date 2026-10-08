@@ -12,8 +12,9 @@
 // so the bare names below (`codemirror`, `bundle`, …) match the seeded fixture.
 // The rewrite tests mutate `FILES` and restore it afterwards.
 import { afterEach, describe, expect, test } from 'bun:test';
-import { outboundLinks, planRewrites } from './links';
-import { FILES } from './store';
+import * as wasm from '$lib/wasm/pkg';
+import { okfMarkers, outboundLinks, planRewrites } from './links';
+import { FILES, conceptPaths } from './store';
 
 const concept = (body: string) => `---\ntype: concept\ntitle: T\n---\n\n${body}\n`;
 
@@ -346,5 +347,66 @@ describe('planRewrites — markdown links (through the shared wasm engine)', () 
     const { summary, writes } = planRewrites('nope.md', 'z/nope.md');
     expect(writes.size).toBe(0);
     expect(summary).toEqual({ linksChanged: 0, filesChanged: 0 });
+  });
+});
+
+describe('okfMarkers — the Bundle-root marker (OKF v0.2 §12)', () => {
+  let snapshot: Record<string, string> | undefined;
+  const setFiles = (files: Record<string, string>) => {
+    snapshot ??= { ...FILES };
+    for (const k of Object.keys(FILES)) delete FILES[k];
+    Object.assign(FILES, files);
+  };
+  afterEach(() => {
+    if (snapshot) {
+      for (const k of Object.keys(FILES)) delete FILES[k];
+      Object.assign(FILES, snapshot);
+      snapshot = undefined;
+    }
+  });
+
+  /** The root the shipped wasm handle finds over the store — what `indexStore` builds. */
+  const handleRoot = () => {
+    const index = new wasm.BundleIndex(conceptPaths(), okfMarkers());
+    try {
+      return { dir: index.bundleRoot(), okfVersion: index.okfVersion() ?? null };
+    } finally {
+      index.free();
+    }
+  };
+
+  test('lists every declaring index.md, at any depth, and nothing else', () => {
+    setFiles({
+      'README.md': '# Repo\n',
+      'docs/index.md': '---\nokf_version: "0.2"\n---\n# Docs\n',
+      'docs/kb/index.md': '---\nokf_version: 0.2\n---\n',
+      'docs/a.md': '---\ntype: x\nokf_version: "0.2"\n---\n',
+      'notes/index.md': '---\nokf_version: [0.2]\n---\n',
+      'wiki/index.md': '---\nokf_version: "0.2"\nno close\n',
+    });
+    expect(okfMarkers()).toEqual([
+      { indexPath: 'docs/index.md', okfVersion: '0.2' },
+      { indexPath: 'docs/kb/index.md', okfVersion: '0.2' },
+    ]);
+  });
+
+  test('a declared root outranks the structural rules; the outermost wins', () => {
+    // A top-level README would root at the opened folder structurally.
+    setFiles({
+      'README.md': '# Repo\n',
+      'docs/index.md': '---\nokf_version: "0.2"\n---\n',
+      'docs/kb/index.md': '---\nokf_version: "0.2"\n---\n',
+      'docs/x.md': '# X\n',
+    });
+    expect(handleRoot()).toEqual({ dir: 'docs', okfVersion: '0.2' });
+    // A bundle-absolute link resolves from that root, in Backlinks too.
+    expect(outboundLinks('docs/kb/index.md', concept('[x](/x.md)'))).toEqual(['docs/x.md']);
+  });
+
+  test('no or malformed marker falls through to the structural rules', () => {
+    setFiles({ 'README.md': '# Repo\n', 'docs/index.md': '---\nokf_version: true\n---\n' });
+    expect(handleRoot()).toEqual({ dir: '', okfVersion: null });
+    setFiles({ 'docs/index.md': '# Docs\n', 'docs/x.md': '# X\n' });
+    expect(handleRoot()).toEqual({ dir: 'docs', okfVersion: null });
   });
 });

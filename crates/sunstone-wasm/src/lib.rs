@@ -30,8 +30,8 @@ use sunstone_shared::scan;
 use sunstone_shared::url;
 use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
-    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, ResolvedLink,
-    RewriteBody, WikilinkTarget,
+    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, OkfMarker,
+    ResolvedLink, RewriteBody, WikilinkTarget,
 };
 
 /// The in-wasm Bundle index handle (ADR 0006 §3/§4). It OWNS the saved concept
@@ -46,21 +46,34 @@ pub struct BundleIndex {
     set: HashSet<String>,
     /// Best-effort OKF bundle root within the opened tree (`''` = opened root).
     root: String,
+    /// The `okf_version` the root declares, when it was found by its marker.
+    okf_version: Option<String>,
 }
 
 #[wasm_bindgen]
 impl BundleIndex {
     /// Construct a handle owning the saved concept-path set. Computes and holds
-    /// the OKF bundle root once (retiring the TS `#rootCache` memo).
+    /// the OKF bundle root once (retiring the TS `#rootCache` memo), from the
+    /// paths plus the `okf_version` markers (`Backend.listOkfMarkers`; `[]` when
+    /// the root is irrelevant, e.g. a one-shot URL lookup).
     #[wasm_bindgen(constructor)]
-    pub fn new(concept_paths: Vec<String>) -> BundleIndex {
+    pub fn new(concept_paths: Vec<String>, okf_markers: Vec<OkfMarker>) -> BundleIndex {
         let set: HashSet<String> = concept_paths.iter().cloned().collect();
-        let root = find_bundle_root(&concept_paths);
+        let root = find_bundle_root(&concept_paths, &okf_markers);
         BundleIndex {
             concept_paths,
             set,
-            root,
+            root: root.dir,
+            okf_version: root.okf_version,
         }
+    }
+
+    /// The `okf_version` the Bundle root declares, or `null` when the root was
+    /// inferred structurally (the Bundle does not declare itself). The gate for
+    /// OKF-only behaviour such as linting.
+    #[wasm_bindgen(js_name = okfVersion)]
+    pub fn okf_version(&self) -> Option<String> {
+        self.okf_version.clone()
     }
 
     /// Resolve a clicked markdown link `href` inside the Concept at
@@ -295,13 +308,25 @@ pub fn wikilink_raws(body: String) -> Vec<String> {
 
 /// Resolve a markdown link `href` from `current_path` against an explicit
 /// concept path-set (the fake's corpus). The bundle root + membership are
-/// derived from `paths`, so this is the real [`resolve_link`] — for a corpus
-/// with a top-level `.md` the root is `''`, matching the former fake fork.
+/// derived from `paths` + `okf_markers`, so this is the real [`resolve_link`]
+/// over the same root the handle would find.
 #[wasm_bindgen(js_name = resolveLinkIn)]
-pub fn resolve_link_in(current_path: String, href: String, paths: Vec<String>) -> ResolvedLink {
+pub fn resolve_link_in(
+    current_path: String,
+    href: String,
+    paths: Vec<String>,
+    okf_markers: Vec<OkfMarker>,
+) -> ResolvedLink {
     let set: HashSet<String> = paths.iter().cloned().collect();
-    let root = find_bundle_root(&paths);
+    let root = find_bundle_root(&paths, &okf_markers).dir;
     resolve_link(&current_path, &href, &root, |p| set.contains(p))
+}
+
+/// The `okf_version` a Concept's frontmatter declares (OKF v0.2 §12), or `null`
+/// when absent or malformed — the fake builds its `OkfMarker`s with this.
+#[wasm_bindgen(js_name = okfVersionOf)]
+pub fn okf_version_of(content: String) -> Option<String> {
+    frontmatter::okf_version_of(&content)
 }
 
 /// Resolve a raw `[[target]]` inner text against an explicit concept path-set

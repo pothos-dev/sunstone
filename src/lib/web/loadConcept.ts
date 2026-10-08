@@ -20,7 +20,7 @@ async function resolveUrlPath(urlPath: string, tree: TreeNode): Promise<string |
   const paths = filePaths(tree);
   const wasm = await ensureWasm();
   if (!wasm) return urlToConceptInline(urlPath, paths);
-  const index = new wasm.BundleIndex(paths);
+  const index = new wasm.BundleIndex(paths, []); // URL lookup only: no root needed
   try {
     return index.urlToConcept(urlPath) ?? null;
   } finally {

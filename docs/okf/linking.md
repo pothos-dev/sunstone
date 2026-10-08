@@ -24,7 +24,7 @@ All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-test
 | Concern | `sunstone-shared` | Frontend entry point (`src/lib/wasm/exports.ts`) |
 |---------|-------------------|--------------------------------------------------|
 | Markdown link resolution | `links.rs` (`resolve_link`), `paths.rs` (`is_external`, `normalize_segments`) | `resolveLinkIn` |
-| Bundle root detection | `links.rs` (`find_bundle_root`) | via the index store |
+| Bundle root detection | `bundle_root.rs` (`find_bundle_root`, over paths + `okf_version` markers); `frontmatter.rs` (`okf_version_of`) | via the index store (`BundleIndex(paths, markers)`); `okfVersionOf` |
 | Wikilink parse + resolve | `wikilink.rs` (`resolve_wikilink`, `parse_target`, `parse_target_parts`) | `resolveWikilinkIn`, `splitWikilinkTarget` |
 | Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
 | Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
@@ -76,11 +76,15 @@ Path math is done by `paths::normalize_segments`, which collapses `.`/`..` and r
 
 ### Nested bundle root
 
-The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths)` identifies the root **structurally** (paths only, never frontmatter):
+The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths, okf_markers)` (`sunstone-shared/src/bundle_root.rs`) identifies the root in rungs:
 
-1. Any top-level `.md` (a root `index.md` or a root-level Concept) → the opened folder **is** the root (`''`). Never redirect down; a Bundle at the opened root is the common case.
-2. Otherwise the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
-3. No `index.md` anywhere → the sole shared top-level segment if every Concept has one, else `''` (don't guess).
+1. **Marker.** The outermost `index.md` whose Frontmatter declares `okf_version` (OKF v0.2 §12) is the root, overriding every structural rule. Unrelated sibling declarations are ambiguous and fall through. The markers arrive as data (`Backend.listOkfMarkers()`); the finder never reads a file.
+2. **Structure** (paths only):
+   1. Any top-level `.md` (a root `index.md` or a root-level Concept) → the opened folder **is** the root (`''`). Never redirect down; a Bundle at the opened root is the common case.
+   2. Otherwise the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
+   3. No `index.md` anywhere → the sole shared top-level segment if every Concept has one, else `''` (don't guess).
+
+See [Bundle → Finding the bundle root](/okf/bundle.md#finding-the-bundle-root-sunstone-extension) for the marker rules in full.
 
 `applyBundleRoot` then prepends the identified root to a bundle-absolute target **only when the rewritten path actually exists** (`opts.exists`). This safe fallback means a mis-identified root can never mis-navigate a link that would otherwise have worked — a wrong guess simply leaves the link unrooted.
 

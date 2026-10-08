@@ -225,6 +225,18 @@ pub(crate) fn list_attachment_paths(
     Ok(index.attachment_paths())
 }
 
+/// Every `index.md` declaring `okf_version` (OKF v0.2 §12) — the marker input
+/// the frontend's wasm `BundleIndex` finds the Bundle root from, beside
+/// `list_concept_paths`.
+#[tauri::command]
+pub(crate) fn list_okf_markers(
+    session: State<'_, Arc<Session>>,
+) -> Result<Vec<sunstone_shared::OkfMarker>, String> {
+    let state = session.current()?;
+    let index = state.read_index()?;
+    Ok(index.okf_markers())
+}
+
 /// Sources linking TO `path` (backlinks). Used by the backlinks panel (slice 7).
 #[tauri::command]
 pub(crate) fn backlinks(session: State<'_, Arc<Session>>, path: String) -> Result<Vec<String>, String> {

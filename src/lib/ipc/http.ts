@@ -20,6 +20,7 @@ import type {
   SearchHit,
   RewriteSummary,
   AnchorRename,
+  OkfMarker,
   FileHistory,
   FileAtRev,
   RenderPayload,
@@ -328,7 +329,7 @@ export const httpBackend: Backend = {
       getJson<string[]>('/_api/concept-paths'),
       import('$lib/wasm').then((m) => m.ensureWasm()),
     ]);
-    const index = wasm ? new wasm.BundleIndex(paths) : null;
+    const index = wasm ? new wasm.BundleIndex(paths, []) : null; // URL lookup only: no root needed
     let link;
     try {
       link = startupFromUrl(pathname, hash, paths, (p) =>
@@ -466,6 +467,10 @@ export const httpBackend: Backend = {
   // `Backend.listAttachmentPaths`). Unauthenticated like every other read.
   listAttachmentPaths(): Promise<string[]> {
     return getJson<string[]>('/_api/attachment-paths');
+  },
+  // The `okf_version` markers the Bundle-root finder reads (OKF v0.2 §12).
+  listOkfMarkers(): Promise<OkfMarker[]> {
+    return getJson<OkfMarker[]>('/_api/okf-markers');
   },
   backlinks(path: string): Promise<string[]> {
     return getJson<string[]>(`/_api/backlinks?path=${encodeURIComponent(path)}`);

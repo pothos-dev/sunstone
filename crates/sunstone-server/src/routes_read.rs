@@ -187,6 +187,17 @@ pub(crate) async fn attachment_paths_handler(
     Ok(Json(index.attachment_paths()))
 }
 
+/// Every `index.md` declaring `okf_version` (OKF v0.2 §12): the marker input
+/// the frontend's wasm `BundleIndex` finds the Bundle root from, beside
+/// `/_api/concept-paths`. Takes no path, so there is nothing to guard; and it is
+/// unauthenticated like the concept list, since those files are served too.
+pub(crate) async fn okf_markers_handler(
+    State(state): State<Arc<ServerState>>,
+) -> Result<Json<Vec<sunstone_shared::OkfMarker>>, ApiError> {
+    let index = read_index(&state)?;
+    Ok(Json(index.okf_markers()))
+}
+
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.
 pub(crate) fn read_index(
     state: &ServerState,
@@ -368,6 +379,23 @@ mod tests {
             let err = render_handler(State(state.clone()), q()).await.unwrap_err();
             assert_eq!(err.0, StatusCode::BAD_REQUEST, "{path}");
         }
+    }
+
+    /// `/_api/okf-markers` serves the index's declaring `index.md` files, in
+    /// the camelCase shape the wasm `BundleIndex` constructor takes.
+    #[tokio::test]
+    async fn okf_markers_route_serves_the_declaring_index_files() {
+        use crate::config::Config;
+        let root = temp_bundle(); // note.md + sub/deep.md
+        std::fs::write(root.join("sub/index.md"), "---\nokf_version: \"0.2\"\n---\n# Sub\n").unwrap();
+        let state = server_state(Config::plain(root));
+        let Ok(Json(markers)) = okf_markers_handler(State(state)).await else {
+            panic!("okf-markers route failed");
+        };
+        assert_eq!(
+            serde_json::to_value(&markers).unwrap(),
+            serde_json::json!([{ "indexPath": "sub/index.md", "okfVersion": "0.2" }])
+        );
     }
 
     #[tokio::test]

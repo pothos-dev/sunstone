@@ -15,7 +15,7 @@
 //
 // Reads the shared `FILES` state (imported live from `store`, never copied).
 
-import type { RewriteSummary } from '$lib/types';
+import type { OkfMarker, RewriteSummary } from '$lib/types';
 import {
   splitFrontmatter,
   markdownLinkHrefs,
@@ -23,8 +23,24 @@ import {
   resolveLinkIn,
   resolveWikilinkIn,
   planMoveRewrites,
+  okfVersionOf,
 } from '$lib/wasm/exports';
 import { FILES, conceptPaths } from './store';
+
+/**
+ * Every `index.md` in the store declaring `okf_version` (OKF v0.2 §12), sorted
+ * — the fake's `Backend.listOkfMarkers`, parsed by the same shared kernel the
+ * native index runs (`frontmatter::okf_version_of`, via wasm `okfVersionOf`).
+ */
+export function okfMarkers(): OkfMarker[] {
+  const markers: OkfMarker[] = [];
+  for (const indexPath of conceptPaths()) {
+    if (indexPath !== 'index.md' && !indexPath.endsWith('/index.md')) continue;
+    const okfVersion = okfVersionOf(FILES[indexPath]);
+    if (okfVersion) markers.push({ indexPath, okfVersion });
+  }
+  return markers;
+}
 
 /**
  * Extract outbound internal link targets from a Concept's body, resolved.
@@ -42,9 +58,10 @@ import { FILES, conceptPaths } from './store';
 export function outboundLinks(path: string, content: string): string[] {
   const { body } = splitFrontmatter(content);
   const paths = conceptPaths();
+  const markers = okfMarkers();
   const targets = new Set<string>();
   for (const href of markdownLinkHrefs(body)) {
-    const resolved = resolveLinkIn(path, href, paths);
+    const resolved = resolveLinkIn(path, href, paths, markers);
     if (resolved.kind === 'internal') targets.add(resolved.path);
   }
   // Wikilinks ([[name]]) resolve by name (§1) and also feed backlinks.

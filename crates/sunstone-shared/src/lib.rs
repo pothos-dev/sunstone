@@ -12,6 +12,7 @@
 //! for the browser frontend.
 
 pub mod actor;
+pub mod bundle_root;
 pub mod citations;
 pub mod critic;
 pub mod embed;
@@ -27,5 +28,6 @@ pub mod sources;
 pub mod url;
 pub mod wikilink;
 
-pub use links::{find_bundle_root, resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};
+pub use bundle_root::{find_bundle_root, BundleRoot, OkfMarker};
+pub use links::{resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};
 pub use rewrite::{rewrite_anchors_in, AnchorRename, AnchorRewrite};

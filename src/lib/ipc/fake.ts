@@ -7,6 +7,7 @@ import type {
   SearchHit,
   RewriteSummary,
   AnchorRename,
+  OkfMarker,
   FileHistory,
   FileAtRev,
   RenderPayload,
@@ -37,7 +38,7 @@ import {
   openExternalTab,
 } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
-import { outboundLinks, planRewrites } from './fake/links';
+import { outboundLinks, planRewrites, okfMarkers } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
 import { FAKE_COMMITS, committedContentAt } from './fake/git';
 import { searchFiles } from './fake/search';
@@ -457,6 +458,11 @@ export const fakeBackend: Backend = {
   // which is the Concept working tree (see `./fake/attachments`).
   async listAttachmentPaths(): Promise<string[]> {
     return attachmentPaths();
+  },
+
+  async listOkfMarkers(): Promise<OkfMarker[]> {
+    await ensureIndexReady();
+    return okfMarkers();
   },
 
   async backlinks(path: string): Promise<string[]> {

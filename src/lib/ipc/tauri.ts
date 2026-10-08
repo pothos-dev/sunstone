@@ -12,6 +12,7 @@ import type {
   SearchHit,
   RewriteSummary,
   AnchorRename,
+  OkfMarker,
   FileHistory,
   FileAtRev,
   RenderPayload,
@@ -183,6 +184,10 @@ export const tauriBackend: Backend = {
   // command over the index's separate Attachment corpus (see `Backend`).
   listAttachmentPaths(): Promise<string[]> {
     return invoke<string[]>('list_attachment_paths');
+  },
+
+  listOkfMarkers(): Promise<OkfMarker[]> {
+    return invoke<OkfMarker[]>('list_okf_markers');
   },
 
   backlinks(path: string): Promise<string[]> {

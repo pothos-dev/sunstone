@@ -39,6 +39,7 @@ import type {
   WikilinkParts,
   AnchorRewrite,
   AnchorRename,
+  OkfMarker,
   ConceptContent,
   MovePlan,
   Embed,
@@ -120,6 +121,14 @@ export function parseFrontmatterKeys(content: string): string[] {
 /** Every top-level frontmatter entry as `key` + value(s), in document order. */
 export function parseFrontmatterFields(content: string): FrontmatterField[] {
   return mod ? mod.parseFrontmatterFields(content) : [];
+}
+
+/**
+ * The `okf_version` a Concept's frontmatter declares (OKF v0.2 §12), or `null`
+ * when absent or malformed (`frontmatter::okf_version_of`). Degrades to `null`.
+ */
+export function okfVersionOf(content: string): string | null {
+  return mod ? (mod.okfVersionOf(content) ?? null) : null;
 }
 
 // --- Render-derived free exports (ADR 0006 §3, family 13) -------------------
@@ -246,10 +255,16 @@ export function wikilinkRaws(body: string): string[] {
 
 /**
  * Resolve a markdown link `href` from `currentPath` against an explicit concept
- * path-set (the fake's corpus). Degrades to `none`.
+ * path-set (the fake's corpus), rooted by `markers` exactly as the
+ * `BundleIndex` handle would be. Degrades to `none`.
  */
-export function resolveLinkIn(currentPath: string, href: string, paths: string[]): ResolvedLink {
-  return mod ? mod.resolveLinkIn(currentPath, href, paths) : { kind: 'none' };
+export function resolveLinkIn(
+  currentPath: string,
+  href: string,
+  paths: string[],
+  markers: OkfMarker[],
+): ResolvedLink {
+  return mod ? mod.resolveLinkIn(currentPath, href, paths, markers) : { kind: 'none' };
 }
 
 /**

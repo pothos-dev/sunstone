@@ -264,6 +264,19 @@ export type RewriteSummary = {
 };
 
 /**
+ * A reserved `index.md` whose Frontmatter declares `okf_version` (OKF v0.2 §12),
+ * as returned by `Backend.listOkfMarkers()`. The Bundle-root finder
+ * (`sunstone-shared/src/bundle_root.rs`, reached through the wasm `BundleIndex`)
+ * reads these beside the path list. Matches the Rust `OkfMarker`.
+ */
+export type OkfMarker = {
+  /** bundle-relative path of the declaring `index.md` */
+  indexPath: string;
+  /** the declared version, verbatim (e.g. `"0.2"`); never empty */
+  okfVersion: string;
+};
+
+/**
  * One heading-slug rename, sent to `Backend.rewriteAnchors()` when a heading's
  * GitHub-style slug changes in the editor. Inbound `[[target#from]]` /
  * `[text](/target.md#from)` anchors are rewritten to `#to`. Matches the Rust

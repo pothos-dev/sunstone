@@ -23,6 +23,7 @@ use serde::Serialize;
 use crate::paths::{bundle_walker, md_files};
 use sunstone_shared::paths::{folder_index_fallback, to_rel_string};
 use sunstone_shared::wikilink;
+use sunstone_shared::OkfMarker;
 
 pub mod frontmatter;
 mod links;
@@ -50,6 +51,9 @@ pub struct ConceptEntry {
     /// name-based resolution needs to see every concept, unlike the path-based
     /// markdown links above which resolve from this concept's location alone.
     pub wikilinks: Vec<String>,
+    /// `okf_version` from the frontmatter (OKF v0.2 §12), if declared. Only an
+    /// `index.md` carrying it is a Bundle-root marker ([`Index::okf_markers`]).
+    pub okf_version: Option<String>,
 }
 
 /// A tag and how many Concepts carry it. Matches the TS `{ tag, count }`.
@@ -99,6 +103,7 @@ impl Index {
             concept_type,
             tags,
             keys,
+            okf_version,
             ..
         } = parse_frontmatter(content);
         let links = extract_links(rel, content);
@@ -113,6 +118,7 @@ impl Index {
                 keys,
                 links,
                 wikilinks,
+                okf_version,
             },
         );
     }
@@ -201,6 +207,27 @@ impl Index {
     /// True if a Concept exists at `path` (an exact bundle-relative key).
     pub fn concept_exists(&self, path: &str) -> bool {
         self.concepts.contains_key(path)
+    }
+
+    /// Every `index.md` whose frontmatter declares `okf_version` (OKF v0.2 §12),
+    /// sorted by path — the marker half of the Bundle-root finder's input
+    /// (`sunstone_shared::find_bundle_root`), handed to it beside
+    /// [`Index::concept_paths`]. Any depth is listed: choosing among them
+    /// (outermost wins) is the finder's job, not the index's.
+    pub fn okf_markers(&self) -> Vec<OkfMarker> {
+        let mut v: Vec<OkfMarker> = self
+            .concepts
+            .iter()
+            .filter(|(path, _)| wikilink::basename(path) == "index.md")
+            .filter_map(|(path, entry)| {
+                entry.okf_version.as_ref().map(|version| OkfMarker {
+                    index_path: path.clone(),
+                    okf_version: version.clone(),
+                })
+            })
+            .collect();
+        v.sort_by(|a, b| a.index_path.cmp(&b.index_path));
+        v
     }
 
     /// Every Concept path in the index, sorted. The broken-link decoration seeds
@@ -629,7 +656,7 @@ mod tests {
         // segment beside `docs`, which is the "ambiguous -> root is ''" case.
         let idx = indexed_with_attachments();
         let concept_paths = idx.concept_paths();
-        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths), "docs");
+        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths, &[]).dir, "docs");
 
         // Belt and braces: even handed the union, `find_bundle_root` filters to
         // `.md` itself today, so the result is identical. The separate index is
@@ -638,9 +665,33 @@ mod tests {
         union.extend(idx.attachment_paths());
         union.sort();
         assert_eq!(
-            sunstone_shared::find_bundle_root(&union),
-            sunstone_shared::find_bundle_root(&concept_paths)
+            sunstone_shared::find_bundle_root(&union, &[]),
+            sunstone_shared::find_bundle_root(&concept_paths, &[])
         );
+    }
+
+    #[test]
+    fn okf_markers_lists_declaring_index_files_and_tracks_edits() {
+        let mut idx = Index::default();
+        idx.insert_concept("README.md", "# Repo\n");
+        idx.insert_concept("docs/index.md", "---\nokf_version: \"0.2\"\n---\n# Docs\n");
+        idx.insert_concept("docs/kb/index.md", "---\nokf_version: 0.2\n---\n");
+        // Not an index: `okf_version` on a Concept is no root declaration.
+        idx.insert_concept("docs/a.md", "---\ntype: x\nokf_version: '0.2'\n---\n");
+        // Malformed: no marker.
+        idx.insert_concept("notes/index.md", "---\nokf_version: [0.2]\n---\n");
+        let marker = |p: &str| OkfMarker {
+            index_path: p.to_string(),
+            okf_version: "0.2".to_string(),
+        };
+        assert_eq!(idx.okf_markers(), vec![marker("docs/index.md"), marker("docs/kb/index.md")]);
+        let root = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers());
+        assert_eq!(root.dir, "docs");
+
+        // The index regenerated without the key (upstream #26): the marker goes.
+        idx.reindex_concept("docs/index.md", "# Docs\n");
+        idx.remove_concept("docs/kb/index.md");
+        assert!(idx.okf_markers().is_empty());
     }
 
     #[test]
