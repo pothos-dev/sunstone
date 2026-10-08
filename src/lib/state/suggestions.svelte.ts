@@ -6,7 +6,7 @@ import { backend } from '$lib/ipc';
  * autocomplete (even on an empty Bundle) and merged with the keys actually used
  * across the Bundle.
  */
-const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'generated'];
+const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'sources', 'generated'];
 
 /**
  * Index-derived autocomplete sources (`type`/key/tag
