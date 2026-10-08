@@ -485,6 +485,7 @@ deployments that exist today. Everywhere, an **empty value means unset**.
 | `SUNSTONE_BUNDLE` | `/bundle` (baked into the image) | lenient | Bundle root for the **plain** shape. In a git shape it is **logged and ignored** — the one log-and-ignore case in the whole surface, because a baked image default cannot be told apart from an operator's override. |
 | `SUNSTONE_BUNDLE_SEED_FROM` | unset | strict | Optional one-time file copy into the resolved Bundle root, before any git step. **Plus an origin ⇒ boot error** (you cannot seed a clone, and `git clone` requires an empty target). Strict rather than log-and-ignored because — unlike `SUNSTONE_BUNDLE` — it has no baked image default, so its presence is always an explicit operator act. |
 | `SUNSTONE_API_PORT` | `8787` | lenient | Internal Rust API port; garbage falls back to the default. |
+| `SUNSTONE_CONFIG` | unset ⇒ default look | lenient | Path of a `config.json` with `colors` and `fonts` ([Colours and fonts](#colours-and-fonts)). Read per request; missing or invalid ⇒ defaults. |
 | `SUNSTONE_API_INTERNAL` | `http://localhost:8787` | lenient | Where the SSR process reaches the API, over container loopback. |
 | `SUNSTONE_JWT_SECRET` | unset | lenient | Unset ⇒ **read-only**: every write route `401`s **and** history is unavailable (the history gate *is* the write gate). |
 | `HOST` / `PORT` | `0.0.0.0` / `3000` | lenient | SSR web bind. |
@@ -510,16 +511,45 @@ There is deliberately **no healthcheck** on `/_api/sync-status`: an unreachable
 remote must not mark the container unhealthy, because offline tolerance is
 intentional and a restart fixes nothing.
 
-## Theme colours: not configurable on the web
+## Colours and fonts
 
-Sunstone Web always serves the **default palette**. The per-scheme colour
-overrides the desktop app reads from `~/.config/sunstone/config.json`
-([Theme colours](../docs/interface/theme-colors.md))
-have no counterpart here: the server has no config store, no environment
-variable carries colours, and the web backend's `loadThemeColors` always
-returns none (`src/lib/ipc/http.ts`). Mounting a `config.json` into the
-container does nothing. Viewers still get light or dark from their OS
-preference.
+Point `SUNSTONE_CONFIG` at a `config.json` to give the wiki your own colours and
+fonts. It is the same format the desktop app reads from
+`~/.config/sunstone/config.json`: `colors` per scheme
+([Theme colours](../docs/interface/theme-colors.md)) and `fonts` per role
+([Fonts](../docs/interface/fonts.md)). Font files go next to it and are listed
+relative to it:
+
+```json
+{
+  "colors": { "light": { "accent": "#2b7fd9" } },
+  "fonts": {
+    "ui": { "family": "Inter, system-ui, sans-serif", "size": 15, "files": ["fonts/Inter.woff2"] },
+    "content": { "family": "Charter, Georgia, serif", "size": 16 }
+  }
+}
+```
+
+```yaml
+services:
+  sunstone:
+    environment:
+      SUNSTONE_CONFIG: /config/config.json
+    volumes:
+      - ./appearance:/config:ro   # config.json + fonts/
+```
+
+- The server reads the file on every request, so an edit shows on the next
+  page load with no restart.
+- A missing file, a missing variable or invalid JSON all mean the default look.
+  The container still boots.
+- The SSR process inlines the result into every page, so even the first paint
+  uses your fonts and colours.
+- Only the font files the config lists are served
+  (`/_api/appearance/font?file=…`), and only from the config's directory.
+  Nothing else in the mounted directory is reachable.
+- Without `files`, a `family` only applies if the reader's machine has that
+  font installed, so give a fallback list or ship the files.
 
 ---
 

@@ -5,7 +5,7 @@
   import { bindSourceCards } from '$lib/sourceCard';
   import { goto, invalidateAll } from '$app/navigation';
   import { backend } from '$lib/ipc';
-  import { applyTheme, theme } from '$lib/state/theme.svelte';
+  import { applyTheme, loadAppearance, theme } from '$lib/state/theme.svelte';
   import { explorerTitle, folderNameClick, ordinaryChildren, reservedChildren } from '$lib/treeNav';
   import { RESERVED_FILES } from '$lib/reserved';
   import ReservedGlyph from '$lib/components/ReservedGlyph.svelte';
@@ -209,6 +209,8 @@
     // wasm free-export holder, so load it once on mount; until it settles the
     // holder's degrade fallback keeps navigation working (ADR 0006 §5).
     void ensureWasm();
+    // Swap the SSR-inlined colour/font overrides for the browser-validated copy.
+    void loadAppearance(backend);
 
     // Restore persisted UI state before tracking the OS scheme.
     const {
@@ -942,6 +944,7 @@
        (`ExplorerPane.svelte` `.tree-tile`). Both tree components reset with
        `font: inherit`. */
     font-size: var(--rendered-body-size, 14px);
+    font-family: var(--font-content, inherit);
   }
 
   .reader {

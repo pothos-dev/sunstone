@@ -184,6 +184,10 @@ pub struct Config {
     pub jwt_secret: Option<Vec<u8>>,
     /// `SUNSTONE_API_PORT`, lenient: unparseable ⇒ [`crate::DEFAULT_PORT`].
     pub api_port: u16,
+    /// The `config.json` whose `colors` and `fonts` the frontend applies
+    /// (`SUNSTONE_CONFIG`; the user's desktop config under `sunstone serve`).
+    /// Read on every request, so `None` or a missing file just means defaults.
+    pub appearance_config: Option<PathBuf>,
     /// Non-fatal observations to print at boot (§2.4's log-and-ignore case).
     pub warnings: Vec<super::ConfigWarning>,
 }
@@ -204,6 +208,7 @@ impl Config {
             seed_from: None,
             jwt_secret: None,
             api_port: crate::DEFAULT_PORT,
+            appearance_config: None,
             warnings: Vec::new(),
         }
     }
@@ -219,6 +224,7 @@ impl Config {
             seed_from: None,
             jwt_secret: None,
             api_port: port,
+            appearance_config: None,
             warnings: Vec::new(),
         }
     }

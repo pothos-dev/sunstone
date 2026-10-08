@@ -7,12 +7,12 @@
  * reads the inherited `data-theme`) are themed consistently.
  *
  * `mode: 'system'` follows `prefers-color-scheme` and tracks live changes; an
- * explicit `'light'`/`'dark'` forces a scheme. The user's colour overrides from
- * the config store are applied separately by `loadThemeColors` below.
+ * explicit `'light'`/`'dark'` forces a scheme. The user's colour and font
+ * overrides from the config file are applied separately by `loadAppearance` below.
  */
 
 import type { Backend } from '$lib/ipc/backend';
-import { parseThemeColors, themeColorsCss } from './themeColors';
+import { APPEARANCE_STYLE_ID, appearanceCss } from './appearance';
 
 /** Theme mode. `'system'` follows the OS; explicit values force a scheme. */
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -80,32 +80,33 @@ export function applyTheme(root: HTMLElement | null, resolved: ResolvedTheme): v
   }
 }
 
-/** Id of the `<style>` element carrying the user's colour overrides. */
-const THEME_COLORS_STYLE_ID = 'sunstone-theme-colors';
-
 /**
- * Fetch the user's colour overrides and install them as a `<style>` appended to
- * `<head>` — after `app.css`, so its same-specificity rules win, and the tokens
- * derived from the base colours follow. Called once from each desktop shell's
- * `onMount`; a failed load keeps the default palette.
+ * Fetch the user's colour and font overrides and install them as a `<style>` in
+ * `<head>` after `app.css`, so its same-specificity rules win and the derived
+ * tokens follow. On the web the SSR hook already inlined one under the same id;
+ * this replaces it with the browser-validated version. Called once from each
+ * shell's `onMount`; a failed load keeps whatever is there.
  */
-export async function loadThemeColors(backend: Backend): Promise<void> {
+export async function loadAppearance(backend: Backend): Promise<void> {
   if (typeof document === 'undefined') return;
   let raw: unknown = null;
   try {
-    raw = await backend.loadThemeColors();
+    raw = await backend.loadAppearance();
   } catch {
     return;
   }
-  const css = themeColorsCss(parseThemeColors(raw, (v) => CSS.supports('color', v)));
-  let style = document.getElementById(THEME_COLORS_STYLE_ID);
+  const css = appearanceCss(raw, {
+    isColor: (v) => CSS.supports('color', v),
+    fontUrl: (src) => backend.fontUrl(src),
+  });
+  let style = document.getElementById(APPEARANCE_STYLE_ID);
   if (css === '') {
     style?.remove();
     return;
   }
   if (!style) {
     style = document.createElement('style');
-    style.id = THEME_COLORS_STYLE_ID;
+    style.id = APPEARANCE_STYLE_ID;
     document.head.append(style);
   }
   style.textContent = css;

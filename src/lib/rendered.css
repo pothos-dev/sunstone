@@ -24,9 +24,10 @@
    The Export-as-PDF print container overrides this with its own inline
    `font-size` (PrintView), so this only pins the web viewer. */
 .rendered {
-  /* `--rendered-body-size` is set on <html> by the UI-zoom store (Ctrl +/-);
-     the 14px literal is the un-zoomed default. */
+  /* `--rendered-body-size` is the content size (`app.css`), scaled on <html>
+     by the UI-zoom store (Ctrl +/-); the 14px literal is a last fallback. */
   font-size: var(--rendered-body-size, 14px);
+  font-family: var(--font-content, inherit);
 }
 
 .rendered h1,
@@ -54,7 +55,7 @@
 
 .rendered code {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.9em;
+  font-size: calc(var(--font-code-scale, 0.9) * 1em);
 }
 
 .rendered table {

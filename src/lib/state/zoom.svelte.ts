@@ -1,9 +1,9 @@
 /**
  * UI zoom store (Ctrl/Cmd +/-/0 and Ctrl/Cmd+wheel).
  *
- * Holds ONE multiplier and applies it to `<html>`: the pinned root font-size
- * (`app.css`) so every `rem`-based chrome dimension scales, plus the two
- * content sizes that are hard-coded in px because they must NOT track the root
+ * Holds ONE multiplier and applies it to `<html>`: the root font-size
+ * (`app.css`'s `--font-ui-size`) so every `rem`-based chrome dimension scales,
+ * plus the two content sizes (from `--font-content-size`) that must NOT track the root
  * (`--atomic-editor-body-size` for the CodeMirror body, `--rendered-body-size`
  * for the server-rendered article). Scaling those alongside the root keeps the
  * editor and the web viewer in step with the chrome.
@@ -16,11 +16,6 @@
 import { clampZoom, DEFAULT_ZOOM, zoomIn, zoomOut } from "$lib/zoom";
 
 const KEY = "sunstone:zoom";
-
-/** Root font-size at 100% — mirrors the `html { font-size }` rule in app.css. */
-const BASE_ROOT_PX = 16;
-/** Editor/rendered prose size at 100% — mirrors the app.css/rendered.css vars. */
-const BASE_BODY_PX = 14;
 
 function readStored(): number {
   if (typeof localStorage === "undefined") return DEFAULT_ZOOM;
@@ -74,10 +69,11 @@ export const zoom = new ZoomStore();
 export function applyZoom(scale: number): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.style.fontSize = `${BASE_ROOT_PX * scale}px`;
-  root.style.setProperty(
-    "--atomic-editor-body-size",
-    `${BASE_BODY_PX * scale}px`,
-  );
-  root.style.setProperty("--rendered-body-size", `${BASE_BODY_PX * scale}px`);
+  // Scale the base sizes `app.css` declares (`--font-ui-size`,
+  // `--font-content-size`, which the user's config may override) rather than
+  // literals, so zoom multiplies whatever the configured 100% is.
+  root.style.fontSize = `calc(var(--font-ui-size) * ${scale})`;
+  const body = `calc(var(--font-content-size) * ${scale})`;
+  root.style.setProperty("--atomic-editor-body-size", body);
+  root.style.setProperty("--rendered-body-size", body);
 }

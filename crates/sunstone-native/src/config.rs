@@ -5,8 +5,8 @@
 //! OS config directory, `dirs::config_dir()/sunstone/` (e.g. `~/.config/sunstone/`
 //! on Linux):
 //!
-//!   - `config.json` — the USER's configuration (colour overrides). Written by
-//!     hand; Sunstone only ever reads it (see [`load_theme_colors`]).
+//!   - `config.json` — the USER's configuration (colour and font overrides).
+//!     Written by hand; Sunstone only ever reads it (see [`load_appearance`]).
 //!   - `state.json` — Sunstone's own state store, rewritten on every change:
 //!     the theme preference (only the OS-driven default ships now) and
 //!     PER-BUNDLE session state keyed by the Bundle's ABSOLUTE path (the
@@ -132,9 +132,9 @@ struct Store {
     pub bundles: HashMap<String, BundleState>,
 }
 
-/// App-level configuration (not per-Bundle). Only the OS-driven theme default
-/// ships now; the field exists so future custom theme/font config can live here
-/// and be read from the config folder without a schema migration.
+/// App-level state (not per-Bundle). Only the OS-driven theme default ships
+/// now. User colours and fonts are NOT here: they live in the hand-written
+/// `config.json` ([`load_appearance`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
@@ -162,8 +162,9 @@ fn config_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-/// Path of the user-owned config file (read-only to Sunstone).
-fn user_config_path() -> Option<PathBuf> {
+/// Path of the user-owned config file (read-only to Sunstone). Also what
+/// `sunstone serve` and the desktop's `sunstone-font://` scheme read fonts from.
+pub fn user_config_file() -> Option<PathBuf> {
     Some(config_dir()?.join("config.json"))
 }
 
@@ -229,25 +230,11 @@ fn with_store(update: impl FnOnce(&mut Store) -> bool) -> Result<(), String> {
     Ok(())
 }
 
-/// The user's colour overrides — the `colors` value of `config.json`
-/// (`{ "light": { "accent": "#d9622b", ... }, "dark": { ... } }`), verbatim, or
-/// `None` when the file is missing, sets no colours, or is not valid JSON (a
-/// warning is logged; the file is left untouched). The frontend owns the key list
-/// and validates the values (`src/lib/state/themeColors.ts`).
-pub fn load_theme_colors() -> Option<serde_json::Value> {
-    let path = user_config_path()?;
-    let text = std::fs::read_to_string(&path).ok()?;
-    let colors = colors_from_config(&text);
-    if colors.is_err() {
-        eprintln!("sunstone: ignoring {}: not valid JSON", path.display());
-    }
-    colors.ok().flatten()
-}
-
-/// The `colors` value of a `config.json` document; `Err` when it does not parse.
-fn colors_from_config(text: &str) -> Result<Option<serde_json::Value>, serde_json::Error> {
-    let mut config: serde_json::Value = serde_json::from_str(text)?;
-    Ok(config.get_mut("colors").map(serde_json::Value::take).filter(|c| !c.is_null()))
+/// The user's appearance overrides — the `colors` and `fonts` values of
+/// `config.json`, verbatim (see [`crate::appearance::load`]), or `None` when
+/// the file is missing, sets neither, or is not valid JSON.
+pub fn load_appearance() -> Option<serde_json::Value> {
+    crate::appearance::load(&user_config_file()?)
 }
 
 /// Normalise a Bundle root path to the string key used in the store. We use the
@@ -491,17 +478,6 @@ mod tests {
         let store: Store = serde_json::from_str("{ not valid json").unwrap_or_default();
         assert!(store.bundles.is_empty());
         assert_eq!(store.config.theme, "system");
-    }
-
-    #[test]
-    fn colors_come_verbatim_from_the_user_config() {
-        let text = r##"{ "colors": { "light": { "accent": "#123456", "typo": 1 }, "dark": {} } }"##;
-        let colors = colors_from_config(text).unwrap().unwrap();
-        assert_eq!(colors["light"]["accent"], "#123456");
-        assert_eq!(colors["light"]["typo"], 1);
-        assert!(colors_from_config("{}").unwrap().is_none());
-        assert!(colors_from_config(r#"{ "colors": null }"#).unwrap().is_none());
-        assert!(colors_from_config("{ \"colors\": ").is_err());
     }
 
     #[test]

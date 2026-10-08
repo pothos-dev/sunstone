@@ -28,6 +28,9 @@ const FILE_CHANGED_EVENT = 'file-changed';
  */
 const ASSET_SCHEME = 'sunstone-asset';
 
+/** The custom URI scheme for the config's font files (`src-tauri/src/font.rs`). */
+const FONT_SCHEME = 'sunstone-font';
+
 /**
  * Real Backend implementation, talking to Rust over Tauri IPC.
  * Command names match the `#[tauri::command]` functions registered in lib.rs.
@@ -49,8 +52,12 @@ export const tauriBackend: Backend = {
     return invoke<KnownBundle[]>('list_known_bundles');
   },
 
-  loadThemeColors(): Promise<unknown> {
-    return invoke<unknown>('load_theme_colors');
+  loadAppearance(): Promise<unknown> {
+    return invoke<unknown>('load_appearance');
+  },
+
+  fontUrl(src: string): string {
+    return `${FONT_SCHEME}://localhost/${encodeURIComponent(src)}`;
   },
 
   forgetBundle(path: string): Promise<void> {

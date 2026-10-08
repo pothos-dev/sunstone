@@ -68,12 +68,19 @@ export interface Backend {
   forgetBundle(path: string): Promise<void>;
 
   /**
-   * The user's colour overrides (the `colors` value of the desktop `config.json`),
-   * as the raw JSON the user wrote — `parseThemeColors` validates it. `null`
-   * when none are set, and always on the web, which has no config store.
-   * Never rejects for a missing/corrupt store.
+   * The user's colour and font overrides — `{ colors?, fonts? }` from the
+   * desktop `config.json` (or, on the web, the file `SUNSTONE_CONFIG` names), as
+   * the raw JSON the user wrote; `appearanceCss` validates it. `null` when none
+   * are set. Never rejects for a missing/corrupt config.
    */
-  loadThemeColors(): Promise<unknown>;
+  loadAppearance(): Promise<unknown>;
+
+  /**
+   * The URL a font file listed in the config (`fonts.<role>.files`, relative to
+   * the config's directory) is served at. Synchronous, like `attachmentUrl`:
+   * it only builds a string for an `@font-face` `src`.
+   */
+  fontUrl(src: string): string;
 
   /**
    * Open `path` as the current Bundle in-process (build index, start watcher,

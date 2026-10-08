@@ -40,6 +40,12 @@ export const WEB_BUNDLE_DIR = join(tmpdir(), 'sunstone-web-bundle');
 export const WEB_BUNDLE_BRANCH = 'main';
 
 /**
+ * The `SUNSTONE_CONFIG` the web server is started with. Absent by default (the
+ * default look); `web-appearance.spec.ts` writes it for its own tests.
+ */
+export const WEB_APPEARANCE_CONFIG = join(tmpdir(), 'sunstone-web-appearance', 'config.json');
+
+/**
  * Shared HS256 secret for the write JWT: the SvelteKit hook mints with it
  * (`SUNSTONE_JWT_SECRET`), axum verifies with it. Must be identical on both
  * servers or every authed write 401s.

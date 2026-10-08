@@ -4,6 +4,18 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Fonts are configurable in `config.json`, separately for the interface, the
+  Concept text and code: a family, a default size, and optionally font files
+  placed next to the config. Zoom scales the configured sizes. See
+  `docs/interface/fonts.md`.
+- Sunstone Web reads the same `config.json` format, colours included, from the
+  file `SUNSTONE_CONFIG` points at. The settings are already in the first
+  rendered page, and changes show on the next page load.
+
 ## [0.25.0] - 2026-10-07
 
 ### Added

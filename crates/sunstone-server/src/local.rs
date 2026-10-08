@@ -105,7 +105,10 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
         Some(_) => None,
     };
 
-    let (state, _watcher) = crate::start(Config::local(root.clone(), port), root.clone());
+    let mut cfg = Config::local(root.clone(), port);
+    // The desktop's own config, so the served app looks like the desktop one.
+    cfg.appearance_config = sunstone_native::config::user_config_file();
+    let (state, _watcher) = crate::start(cfg, root.clone());
     let app = app(crate::router(state), opts.assets, opts.allowed_hosts.clone());
 
     match opts.bind {

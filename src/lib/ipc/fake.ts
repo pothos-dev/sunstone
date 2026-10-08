@@ -256,14 +256,19 @@ export const fakeBackend: Backend = {
     return loadKnownBundles();
   },
 
-  // Colour overrides: whatever a spec seeded under THEME_COLORS_KEY, standing in
-  // for the `colors` value of the user's `config.json`. Corrupt JSON -> none.
-  async loadThemeColors(): Promise<unknown> {
+  // Colour and font overrides: whatever a spec seeded under APPEARANCE_KEY,
+  // standing in for the user's `config.json`. Corrupt JSON -> none.
+  async loadAppearance(): Promise<unknown> {
     try {
-      return JSON.parse(localStorage.getItem(THEME_COLORS_KEY) ?? 'null');
+      return JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? 'null');
     } catch {
       return null;
     }
+  },
+
+  // No config dir to serve from: a spec intercepts this path with `page.route`.
+  fontUrl(src: string): string {
+    return `/__fake-font/${encodeURIComponent(src)}`;
   },
 
   async forgetBundle(path: string): Promise<void> {
@@ -543,8 +548,8 @@ export const fakeBackend: Backend = {
   openExternal: openExternalTab,
 };
 
-/** localStorage key a spec seeds with `config.json` `colors`-shaped overrides. */
-const THEME_COLORS_KEY = 'sunstone:fakeThemeColors';
+/** localStorage key a spec seeds with a `config.json`-shaped `{ colors, fonts }`. */
+const APPEARANCE_KEY = 'sunstone:fakeAppearance';
 
 /** localStorage key for the fake Bundle's session state. */
 const BUNDLE_STATE_KEY = `sunstone:bundleState:${FAKE_BUNDLE_ROOT}`;

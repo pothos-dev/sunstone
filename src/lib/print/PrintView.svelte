@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { backend } from '$lib/ipc';
+  import { loadAppearance } from '$lib/state/theme.svelte';
   import { createLatestGuard } from '$lib/asyncGuard';
   import type { RenderPayload } from '$lib/types';
   import { hydrateMermaid } from '$lib/web/webMermaid';
@@ -73,6 +74,10 @@
     pageStyleEl.textContent = `@page { margin: ${m}; }`;
   });
 
+  // The user's fonts and colours: the printed body uses the content font, so
+  // the sheet only counts as ready once they (and the font files) have loaded.
+  const appearanceLoaded = loadAppearance(backend);
+
   // Render `currentPath` into the body. Re-runs whenever an in-Bundle link
   // re-points `currentPath` (the whole point: links open IN the preview). A
   // per-run token means a superseded render never writes its stale HTML.
@@ -93,6 +98,8 @@
       bodyEl.innerHTML = payload.html;
       // Force light Mermaid — dark diagrams read wrong / waste ink on paper.
       await hydrateMermaid(bodyEl, 'light');
+      await appearanceLoaded;
+      await document.fonts?.ready;
       if (!renderGuard.isLatest(token)) return;
       if (surfaceEl) surfaceEl.scrollTop = 0; // a followed link starts at the top
       // Name the window/tab after the Concept so the saved PDF is sensibly named.

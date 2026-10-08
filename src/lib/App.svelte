@@ -9,7 +9,7 @@
   import { indexStore } from '$lib/state/index.svelte';
   import { session } from '$lib/state/session.svelte';
   import { suggestions } from '$lib/state/suggestions.svelte';
-  import { applyTheme, loadThemeColors, theme } from '$lib/state/theme.svelte';
+  import { applyTheme, loadAppearance, theme } from '$lib/state/theme.svelte';
   import { applyZoom, zoom } from '$lib/state/zoom.svelte';
   import { wheelZoomStep } from '$lib/zoom';
   import ExplorerPane from '$lib/components/ExplorerPane.svelte';
@@ -126,7 +126,7 @@
     };
 
     const stopTheme = theme.start();
-    void loadThemeColors(backend);
+    void loadAppearance(backend);
     // Seed the persisted UI zoom before the first paint of the mounted app.
     zoom.load();
     const stopFocus = focus.start();

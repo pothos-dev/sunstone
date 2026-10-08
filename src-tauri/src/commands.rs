@@ -51,12 +51,12 @@ pub(crate) fn list_known_bundles() -> Vec<KnownBundle> {
     config::list_known_bundles()
 }
 
-/// The user's colour overrides from `config.json` (its `colors` value), as
-/// opaque JSON the frontend validates. No open Bundle required (the launcher
-/// is themed too).
+/// The user's colour and font overrides from `config.json` (its `colors` and
+/// `fonts` values), as opaque JSON the frontend validates. No open Bundle
+/// required (the launcher is themed too).
 #[tauri::command]
-pub(crate) fn load_theme_colors() -> Option<serde_json::Value> {
-    config::load_theme_colors()
+pub(crate) fn load_appearance() -> Option<serde_json::Value> {
+    config::load_appearance()
 }
 
 /// Forget a known folder: drop its persisted per-Bundle config so the launcher

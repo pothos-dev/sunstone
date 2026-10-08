@@ -3,7 +3,7 @@ import { test, expect, type Page } from './fixtures';
 /**
  * User colour overrides (`config.json` `colors`, state/themeColors.ts).
  *
- * The fake backend reads the overrides from `sunstone:fakeThemeColors`, standing
+ * The fake backend reads the overrides from `sunstone:fakeAppearance`, standing
  * in for the user's `config.json`. Verifies, per scheme, that an overridden base
  * colour wins over `app.css`, that a token derived from it follows, and that a
  * key overridden for ONE scheme leaves the other scheme's default alone.
@@ -17,10 +17,10 @@ const COLORS = {
 async function seed(page: Page): Promise<void> {
   await page.goto('/');
   await page.evaluate((colors) => {
-    window.localStorage.setItem('sunstone:fakeThemeColors', JSON.stringify(colors));
+    window.localStorage.setItem('sunstone:fakeAppearance', JSON.stringify({ colors }));
   }, COLORS);
   await page.reload();
-  await expect(page.locator('#sunstone-theme-colors')).toBeAttached();
+  await expect(page.locator('#sunstone-appearance')).toBeAttached();
 }
 
 /** A token as the app root and <html> see it, plus a colour resolved in the app root. */

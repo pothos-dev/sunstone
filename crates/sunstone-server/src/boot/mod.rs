@@ -515,6 +515,7 @@ pub(super) mod tests {
             seed_from: None,
             jwt_secret: None,
             api_port: 8787,
+            appearance_config: None,
             warnings: Vec::new(),
         }
     }

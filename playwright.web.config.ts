@@ -22,6 +22,7 @@ import { defineConfig, devices } from '@playwright/test';
 import {
   WEB_BUNDLE_DIR,
   WEB_BUNDLE_BRANCH,
+  WEB_APPEARANCE_CONFIG,
   TEST_JWT_SECRET,
   TEST_AUTH_SECRET,
   TEST_AUTH_NAME,
@@ -85,7 +86,7 @@ export default defineConfig({
       // real commit (and history is served). A git shape's repo is the constant
       // `/srv/repo` in every shipped binary; the `e2e` feature compiles in the
       // `SUNSTONE_E2E_REPO_DIR` override that points it here instead.
-      command: `SUNSTONE_E2E_REPO_DIR=${WEB_BUNDLE_DIR} SUNSTONE_GIT_BRANCH=${WEB_BUNDLE_BRANCH} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} cargo run -q -p sunstone-server --features e2e`,
+      command: `SUNSTONE_E2E_REPO_DIR=${WEB_BUNDLE_DIR} SUNSTONE_GIT_BRANCH=${WEB_BUNDLE_BRANCH} SUNSTONE_API_PORT=${RUST_PORT} SUNSTONE_JWT_SECRET=${TEST_JWT_SECRET} SUNSTONE_CONFIG=${WEB_APPEARANCE_CONFIG} cargo run -q -p sunstone-server --features e2e`,
       url: `http://localhost:${RUST_PORT}/_api/bundle-root`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

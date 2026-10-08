@@ -19,7 +19,7 @@ timestamp: 2026-07-23T00:00:00Z
 - Run the filesystem watcher and emit change events to the frontend.
 - Persist window geometry (Rust-owned) and per-Bundle [view state](/interface/view-state.md).
 - Manage the separate print window and perform platform-native direct PDF export.
-- Serve [Attachment](/okf/bundle.md) bytes to the webview over the `sunstone-asset://` URI scheme.
+- Serve [Attachment](/okf/bundle.md) bytes to the webview over the `sunstone-asset://` URI scheme, and the user's [font files](/interface/fonts.md) over `sunstone-font://`.
 - Update itself silently from the GitHub release feed (see [Self-update](#self-update)).
 
 ## Files
@@ -29,6 +29,7 @@ timestamp: 2026-07-23T00:00:00Z
 | `src/main.rs` | 4-line binary entry point; sets the Windows subsystem in release and calls `sunstone_lib::run()`. |
 | `src/lib.rs` | The `tauri::Builder` setup (`run()`), CLI dispatch, and the `generate_handler!` command list. |
 | `src/commands.rs` | All non-PDF `#[tauri::command]` IPC wrappers — thin forwards into `sunstone-native`. |
+| `src/font.rs` | The `sunstone-font://localhost/<encoded file>` scheme handler: serves a font file listed in the user's `config.json` from its directory, through `appearance::font_file` (403 on escape, 404 for anything unlisted or missing). Works without an open Bundle. |
 | `src/asset.rs` | The `sunstone-asset://localhost/<encoded path>` scheme handler: decodes the path once, confines it with `bundle::resolve` against the **live** Bundle (403 on escape, 404 when missing), and serves the bytes with `mime`'s Content-Type. Also builds those URLs (`url_for`) for the render's Embed mapper. |
 | `src/pdf.rs` | Print-window and PDF-export machinery (per-platform `export_webview_pdf` impls). |
 | `src/startup.rs` | Startup-bundle resolution, `--detached` re-spawn, window-geometry capture/persistence. |

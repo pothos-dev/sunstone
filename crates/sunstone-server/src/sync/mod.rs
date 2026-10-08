@@ -542,6 +542,7 @@ mod tests {
             seed_from: None,
             jwt_secret: None,
             api_port: crate::DEFAULT_PORT,
+            appearance_config: None,
             warnings: Vec::new(),
         }
     }

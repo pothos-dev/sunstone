@@ -158,6 +158,11 @@ pub(crate) const KNOWN_HOSTS_ENV: &str = "SUNSTONE_GIT_KNOWN_HOSTS";
 /// `SUNSTONE_API_PORT` — lenient (§2.3): unparseable ⇒ [`crate::DEFAULT_PORT`].
 const API_PORT_ENV: &str = "SUNSTONE_API_PORT";
 
+/// `SUNSTONE_CONFIG` — the path of a `config.json` carrying `colors` and
+/// `fonts` (the desktop's format). Lenient: the file is read per request, and a
+/// missing or invalid one only means the default look.
+const APPEARANCE_CONFIG_ENV: &str = "SUNSTONE_CONFIG";
+
 /// base64 for `SUNSTONE_GIT_SSH_KEY`: the standard alphabet, **indifferent** to
 /// padding so both `base64 -w0` output and an unpadded paste decode. Strict
 /// about the alphabet itself — that is what [`ConfigError::SshKeyNotBase64`]
@@ -238,6 +243,7 @@ pub fn parse_env(
         api_port: get(API_PORT_ENV)
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(crate::DEFAULT_PORT),
+        appearance_config: non_empty(&get, APPEARANCE_CONFIG_ENV).map(PathBuf::from),
         warnings,
     })
 }
@@ -1127,6 +1133,16 @@ mod tests {
         assert_eq!(
             ok(&[(crate::auth::SECRET_ENV, " s3cret ")]).jwt_secret,
             Some(b" s3cret ".to_vec())
+        );
+    }
+
+    #[test]
+    fn the_appearance_config_is_optional() {
+        assert_eq!(ok(&[]).appearance_config, None);
+        assert_eq!(ok(&[(APPEARANCE_CONFIG_ENV, "")]).appearance_config, None);
+        assert_eq!(
+            ok(&[(APPEARANCE_CONFIG_ENV, "/config/config.json")]).appearance_config,
+            Some(PathBuf::from("/config/config.json"))
         );
     }
 

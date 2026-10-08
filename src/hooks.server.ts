@@ -2,6 +2,12 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { handle as authHandle } from './auth';
 import { needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
+import {
+  APPEARANCE_STYLE_ID,
+  appearanceCss,
+  httpFontUrl,
+  isSafeColorSyntax,
+} from '$lib/state/appearance';
 
 /**
  * Same-origin `/_api/*` proxy (WEB build only, adapter-node), now with the
@@ -69,6 +75,32 @@ const apiProxy: Handle = async ({ event, resolve }) => {
   });
 };
 
+/**
+ * The user's colours and fonts (`SUNSTONE_CONFIG`, served at `/_api/appearance`)
+ * inlined into every HTML page's `<head>`, after the stylesheets — so even the
+ * anonymous reader's first paint already has them, with no flash of the default
+ * look. The client replaces this `<style>` (same id) with a browser-validated
+ * copy once it mounts (`loadAppearance`). Fetched only for a chunk that closes
+ * `<head>`, i.e. only for HTML; a failed fetch just leaves the defaults.
+ */
+const appearanceStyle: Handle = ({ event, resolve }) =>
+  resolve(event, {
+    transformPageChunk: async ({ html }) => {
+      if (!html.includes('</head>')) return html;
+      let raw: unknown = null;
+      try {
+        const res = await fetch(`${API_INTERNAL}/_api/appearance`, { signal: AbortSignal.timeout(2000) });
+        if (res.ok) raw = await res.json();
+      } catch {
+        return html;
+      }
+      const css = appearanceCss(raw, { isColor: isSafeColorSyntax, fontUrl: httpFontUrl });
+      if (css === '') return html;
+      return html.replace('</head>', `<style id="${APPEARANCE_STYLE_ID}">\n${css}</style>\n</head>`);
+    },
+  });
+
 // Auth.js first (populates `event.locals.auth()` + serves `/auth/*`), then the
-// `/_api` proxy which depends on the resolved session for writes.
-export const handle = sequence(authHandle, apiProxy);
+// `/_api` proxy which depends on the resolved session for writes. The appearance
+// hook only touches HTML responses, which the proxy never produces.
+export const handle = sequence(authHandle, apiProxy, appearanceStyle);

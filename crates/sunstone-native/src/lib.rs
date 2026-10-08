@@ -8,6 +8,7 @@
 //! caller-supplied sink (see `watcher::start`) rather than emitting directly.
 
 pub mod app_state;
+pub mod appearance;
 pub mod bundle;
 pub mod config;
 pub mod git;

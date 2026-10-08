@@ -1,9 +1,9 @@
 ---
 type: Concept
 title: Theme colours — the palette and user overrides
-description: The twelve base colours each scheme is built from, the tokens derived from them, and how a user overrides any base colour per scheme in the desktop config store.
+description: The twelve base colours each scheme is built from, the tokens derived from them, and how a user overrides any base colour per scheme in config.json, on the desktop and on Sunstone Web.
 tags: [interface, theme, colours, config]
-timestamp: 2026-09-30
+timestamp: 2026-10-08
 ---
 
 # Theme colours
@@ -29,7 +29,7 @@ The `--atomic-editor-*` tokens the editor reads are aliases of these. What stays
 
 ## Overriding colours
 
-On desktop, set any base colour, per scheme, under `colors` in `~/.config/sunstone/config.json` (the OS config dir). This file is yours: Sunstone reads it and never writes it. Its session data lives separately in `state.json` ([View state](view-state.md)).
+Set any base colour, per scheme, under `colors` in `config.json`. On the desktop (and under `sunstone serve`) that is `~/.config/sunstone/config.json` in the OS config dir; on Sunstone Web it is the file named by `SUNSTONE_CONFIG` ([deployment guide](../../docker/README.md#colours-and-fonts)). The same file sets the [fonts](fonts.md). It is yours: Sunstone reads it and never writes it. Its session data lives separately in `state.json` ([View state](view-state.md)).
 
 ```json
 {
@@ -42,11 +42,9 @@ On desktop, set any base colour, per scheme, under `colors` in `~/.config/sunsto
 
 - Every key is optional. A key left out keeps the default for that scheme, and an override for one scheme never touches the other.
 - Values are any CSS colour (`#hex`, `rgb()`, `oklch()`, a colour name, …). Unknown keys and invalid values are ignored.
-- Changes are read at startup, so restart Sunstone (or reopen a Bundle) to see them.
+- The desktop reads the file when a window opens, so restart Sunstone (or reopen a Bundle) to see changes. Sunstone Web reads it on every page load.
 - If the file is not valid JSON, Sunstone logs a warning and uses the default palette.
-
-The web build has no config store and always uses the default palette (see the [deployment guide](../../docker/README.md#theme-colours-not-configurable-on-the-web)).
 
 ## How it is applied
 
-Rust returns the `colors` value of `config.json` as opaque JSON (`load_theme_colors`, `crates/sunstone-native/src/config.rs`). The frontend fetches it through `Backend.loadThemeColors`, validates it (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`), and `loadThemeColors` in `state/theme.svelte.ts` appends a `<style id="sunstone-theme-colors">` after `app.css` that re-declares the overridden tokens for each scheme.
+Rust returns the `colors` and `fonts` values of `config.json` as opaque JSON (`sunstone_native::appearance::load`; the `load_appearance` command on the desktop, `GET /_api/appearance` on the web). The frontend fetches them through `Backend.loadAppearance`, and `appearanceCss` (`src/lib/state/appearance.ts`) validates the colours (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`). `loadAppearance` in `state/theme.svelte.ts` then appends a `<style id="sunstone-appearance">` after `app.css` that re-declares the overridden tokens for each scheme. On the web the SSR hook inlines the same stylesheet into the page first, with a syntax-only colour check (`isSafeColorSyntax`), and the client replaces it after mounting. See [Fonts](fonts.md#how-it-is-applied) for the shared pipeline.

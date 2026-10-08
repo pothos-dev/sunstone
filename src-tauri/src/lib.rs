@@ -1,6 +1,7 @@
 mod asset;
 mod cli;
 mod commands;
+mod font;
 mod pdf;
 mod serve;
 mod session;
@@ -80,6 +81,8 @@ pub fn run() {
         // asset protocol — its scope is static configuration, and Sunstone picks
         // its Bundle root at runtime and swaps it mid-process.
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, asset::handle)
+        // The font files `config.json` lists, from the config dir — see font.rs.
+        .register_asynchronous_uri_scheme_protocol(font::SCHEME, font::handle)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -124,7 +127,7 @@ pub fn run() {
             commands::take_startup_document,
             commands::list_known_bundles,
             commands::forget_bundle,
-            commands::load_theme_colors,
+            commands::load_appearance,
             commands::open_bundle,
             commands::pick_folder,
             commands::list_tree,

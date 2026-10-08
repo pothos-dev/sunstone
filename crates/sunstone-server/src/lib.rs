@@ -21,6 +21,7 @@ mod conflict;
 mod config;
 mod history;
 mod local;
+mod routes_appearance;
 mod routes_asset;
 mod routes_read;
 mod routes_write;
@@ -304,6 +305,10 @@ fn router(state: Arc<ServerState>) -> Router {
         .route("/_api/sync-status", get(sync::sync_status_handler))
         // Build identification, unauthenticated for the same reason.
         .route("/_api/version", get(routes_read::version_handler))
+        // The user's colours and fonts (`SUNSTONE_CONFIG`), and the font files
+        // it lists — unauthenticated: a wiki's look is as public as its pages.
+        .route("/_api/appearance", get(routes_appearance::appearance_handler))
+        .route("/_api/appearance/font", get(routes_appearance::font_handler))
         .with_state(state)
 }
 

@@ -13,7 +13,8 @@
  * `color-mix()`. The user can override any base colour per scheme in
  * `config.json` (`colors`, see state/themeColors.ts), and the derived tokens follow. The atomic-editor inside
  * CodeMirror reads `--atomic-editor-font*` from here too, so the note prose
- * shares the app's typeface.
+ * uses the content typeface (`--font-content`, on `html` below with the other
+ * type tokens).
  *
  * Palette identity: a warm amber-orange accent over a sunlit peach-cream
  * "paper", washed with a soft paper-toned gradient (--bg-gradient). Warm
@@ -80,16 +81,12 @@
   --shadow-md: 0 4px 16px rgba(90, 45, 20, 0.12);
   --shadow-lg: 0 14px 44px rgba(90, 45, 20, 0.2);
 
-  /* Type */
-  --font-ui: 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, monospace;
-
   /* Wire the atomic-editor (CodeMirror live preview) to the app typeface AND
      palette. The editor ships as a dark-only theme with near-white defaults and
      exposes these `--atomic-editor-*` vars for consumers to override; mapping
      them to our tokens here (in :root) means the editor tracks light/dark for
      free — `var(--text)` etc. re-resolve in the editor's themed context. */
-  --atomic-editor-font: var(--font-ui);
+  --atomic-editor-font: var(--font-content);
   --atomic-editor-font-mono: var(--font-mono);
   --atomic-editor-fg: var(--text);
   --atomic-editor-fg-muted: var(--text-muted);
@@ -229,12 +226,32 @@ body {
    text-scaling + DPI, so desktop and web would diverge by the monitor's scale
    factor. Pinning it decouples our UI from that. */
 html {
-  font-size: 16px;
-  /* Base prose size for the editor (headings scale off this via `em`). Set on
-     <html> rather than in the theme blocks: those also match the app root, and
-     a re-declaration there would shadow the UI-zoom value the zoom store writes
-     onto <html>. */
-  --atomic-editor-body-size: 14px;
+  /* Type. Three roles — UI chrome, Concept content, code — each a family and a
+     base size the user can override in `config.json` (`fonts`, see
+     state/fonts.ts): the override stylesheet re-declares these on `:root`. They
+     live on <html>, not in the theme blocks, because those also match the app
+     root and would shadow an override. Each stack starts with the role's private
+     `@font-face` family, which exists only when the config lists font files. */
+  --font-ui: 'Sunstone UI', 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
+  --font-content: 'Sunstone Content', 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Sunstone Code', ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas,
+    monospace;
+  --font-ui-size: 16px;
+  --font-content-size: 14px;
+
+  font-size: var(--font-ui-size);
+  /* Base prose size for the editor (headings scale off this via `em`) and the
+     rendered article. Set on <html> for the same reason; the UI-zoom store
+     re-declares all three inline, scaled. */
+  --atomic-editor-body-size: var(--font-content-size);
+  --rendered-body-size: var(--font-content-size);
+}
+
+/* Code size relative to the surrounding text in the editor (`fonts.code.size`;
+   unset keeps code at the prose size here, and at 0.9em in rendered.css). */
+.cm-editor .cm-atomic-fenced-code,
+.cm-editor .cm-atomic-inline-code {
+  font-size: calc(var(--font-code-scale, 1) * 1em);
 }
 
 body {

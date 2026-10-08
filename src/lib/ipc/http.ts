@@ -2,6 +2,7 @@ import type { Backend } from './backend';
 import { isOwnEcho } from '$lib/web/concurrency';
 import { loadBundleState, saveBundleState } from './bundleState';
 import { servedDesktop } from './served';
+import { httpFontUrl } from '$lib/state/appearance';
 import { startupFromUrl } from './servedStartup';
 import { urlToConceptInline } from '$lib/web/conceptUrl';
 import {
@@ -342,10 +343,11 @@ export const httpBackend: Backend = {
   listKnownBundles(): Promise<KnownBundle[]> {
     return Promise.resolve([]);
   },
-  // No config store on the web: the default palette only.
-  loadThemeColors(): Promise<unknown> {
-    return Promise.resolve(null);
+  // `SUNSTONE_CONFIG` on the web, the desktop config under `sunstone serve`.
+  loadAppearance(): Promise<unknown> {
+    return getJson<unknown>('/_api/appearance');
   },
+  fontUrl: httpFontUrl,
   forgetBundle(_path: string): Promise<void> {
     return Promise.reject(new Error(NO_LAUNCHER));
   },
