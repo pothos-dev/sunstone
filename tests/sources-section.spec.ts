@@ -70,7 +70,11 @@ test('a source footnote shows the entry card on hover; a descriptor is not a lin
   await expect(card).toHaveCount(1);
   await expect(card.locator('.source-card-title')).toHaveText('The spec');
   await expect(card.locator('.source-card-resource')).toHaveText('https://example.com/spec');
-  await expect(card.locator('.source-card-meta')).toContainText('Authorhuman:dan');
+  // `author` is an actor (§7): a person chip, then the id without its prefix.
+  const author = card.locator('.source-card-meta .actor-human');
+  await expect(author.locator('.actor-kind')).toHaveText('person');
+  await expect(author.locator('.actor-id')).toHaveText('dan');
+  await expect(author).toHaveAttribute('title', 'Person: dan');
   await expect(card.locator('.source-card-num')).toHaveText('1');
 
   await refs.nth(2).hover();

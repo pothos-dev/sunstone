@@ -16,6 +16,7 @@ use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
 use sunstone_shared::citations::{self, CitationRef};
+use sunstone_shared::actor::{self, Actor};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
@@ -244,6 +245,13 @@ pub fn source_ids(yaml: String) -> Vec<String> {
 #[wasm_bindgen(js_name = sourceList)]
 pub fn source_list(body: String, yaml: String) -> Vec<Source> {
     sources::source_list(&body, &yaml)
+}
+
+/// Parse an OKF actor string (§7) into its kind and id. Never fails: an empty,
+/// malformed or unknown-prefix actor comes back as `unknown` with `raw` intact.
+#[wasm_bindgen(js_name = parseActor)]
+pub fn parse_actor(raw: String) -> Actor {
+    actor::parse_actor(&raw)
 }
 
 /// The offset of footnote `label`'s definition (`[^label]:`), or `null`.

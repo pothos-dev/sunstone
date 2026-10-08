@@ -40,6 +40,14 @@ _Avoid_: "internal link" (ambiguous — could mean any in-Bundle link; say **Wik
 A file with OKF-defined special meaning: `index.md` (progressive-disclosure listing) and
 `log.md` (dated change history). Not ordinary Concepts.
 
+**Actor**:
+Who produced or confirmed something, as written in an identity-valued Frontmatter field
+(`generated.by`, `verified[].by`, a source's `author`): `human:<id>` (a person),
+`process:<id>` (an automated process) or `<producer>/<version>` (an agent or tool), per OKF
+[§7](/okf/spec.md#7-actor-convention). Anything else is an unknown actor, shown as written. See
+[Concept → actors](/okf/concept.md#actors).
+_Avoid_: "user", "owner", "identity" for these values.
+
 **Attachment**:
 A non-`.md` file stored in the Bundle and shown inside a Concept that **Embeds** it — images
 today, other file types later. Not a **Concept**: it carries no frontmatter, never appears in the

@@ -48,6 +48,15 @@ flowchart TD
   BODY --> GATE
 ```
 
+### Actors
+
+Every identity-valued Frontmatter field — `generated.by`, `verified[].by`, a source's `author` — uses the [§7](/okf/spec.md#7-actor-convention) actor convention: `human:<id>` for a person, `process:<id>` for an automated process, `<producer>/<version>` for an agent or tool. Sunstone reads one with `sunstone_shared::actor::parse_actor` (Rust, and over wasm as `parseActor`), and shows one with `src/lib/actor.ts`: a kind chip (*person*, *process*, *agent*) before the id, an agent's version muted after it. The source hover card's **Author** row is the first surface; the trust and provenance families render through the same helper.
+
+- **Never an error.** An empty string, a prefix the spec does not model (the spec's own example uses `team:`), a prefix with no id, or free text parses as `unknown` and displays as the raw string. No consumer rejects a Concept over an actor.
+- **Round-trips unchanged.** The parse keeps the raw string; nothing rewrites an actor.
+- **Prefixes are case-sensitive**, as written: `Human:dan` is `unknown`, so it does not count toward the human-reviewed trust tier ([§5.3](/okf/spec.md#53-trust-tiers)), which keys off `human:` alone (`Actor::is_human` / `isHumanActor`).
+- **An agent splits at the last `/`**, so a producer may itself contain slashes (`acme/llm-wiki/1.2` → `acme/llm-wiki`, version `1.2`). A string with whitespace or a `:` is not an agent.
+
 ### Body
 
 The body is where Sunstone's viewer/editor adds the most beyond plain markdown — all of it layered _over_ standard markdown so a non-Sunstone consumer still reads the file fine:
@@ -69,6 +78,7 @@ The `# Schema` / `# Examples` conventional headings ([§4.2](/okf/spec.md#42-bod
 | Editing frontmatter | Edit the YAML text | YAML **stripped from the body document**; edited as text in the **Frontmatter** Region's own editor |
 | Conformance nagging | Consumers must not reject | OKF lint + completion only in a Bundle declaring `okf_version` ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md)) |
 | Required `type` | REQUIRED | Tolerated, **not enforced** — no conformance nag |
+| Actors ([§7](/okf/spec.md#7-actor-convention)) | Three forms; prefixes outside them unspecified | Unknown prefixes and malformed actors are **tolerated** and shown raw; prefixes match case-sensitively |
 | Mermaid | Just fenced code | **Rendered** as diagrams ([ADR 0005](/adr/0005-mermaid-block-rendering.md)) |
 | Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list, **plus** inline `[n]` superscript refs and `[^label]` footnotes |
 | Links in body | Path-based markdown links ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |

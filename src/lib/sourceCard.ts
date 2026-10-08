@@ -1,4 +1,5 @@
 import type { Source } from '$lib/wasm/exports';
+import { actorElement } from '$lib/actor';
 
 // ---------------------------------------------------------------------------
 // Source hover card (ov-17)
@@ -55,15 +56,20 @@ function buildCard(s: Source): HTMLElement {
   }
   card.append(el('div', 'source-card-title', s.title ?? s.resource ?? s.id ?? ''));
   if (s.title != null && s.resource) card.append(el('div', 'source-card-resource', s.resource));
-  const meta: [string, string | null | undefined][] = [
-    ['Author', s.author],
+  // `author` is an actor (§7): shown with its kind, like every actor.
+  const meta: [string, string | null | undefined, ((v: string) => Node)?][] = [
+    ['Author', s.author, actorElement],
     ['Last modified', s.lastModified],
     ['Usage count', s.usageCount],
   ];
   const rows = meta.filter(([, v]) => v != null && v !== '');
   if (rows.length > 0) {
     const dl = el('dl', 'source-card-meta');
-    for (const [k, v] of rows) dl.append(el('dt', '', k), el('dd', '', v!));
+    for (const [k, v, render] of rows) {
+      const dd = el('dd', '');
+      dd.append(render ? render(v!) : v!);
+      dl.append(el('dt', '', k), dd);
+    }
     card.append(dl);
   }
   if (s.kind !== 'descriptor') card.append(el('div', 'source-card-hint', 'Click to open'));

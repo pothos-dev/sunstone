@@ -32,6 +32,8 @@ import type {
   Footnote,
   Source,
   ResourceKind,
+  Actor,
+  ActorKind,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -57,6 +59,8 @@ export type {
   Footnote,
   Source,
   ResourceKind,
+  Actor,
+  ActorKind,
   ResolvedLink,
   WikilinkTarget,
   WikilinkParts,
@@ -182,6 +186,14 @@ export function sourceIds(yaml: string): string[] {
  */
 export function sourceList(body: string, yaml: string): Source[] {
   return mod ? mod.sourceList(body, yaml) : [];
+}
+
+/**
+ * Parse an OKF actor string (§7). Before wasm is registered it degrades to the
+ * `unknown` kind with the raw string — the same answer a malformed actor gets.
+ */
+export function parseActor(raw: string): Actor {
+  return mod ? mod.parseActor(raw) : { kind: 'unknown', id: raw, version: null, raw };
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */
