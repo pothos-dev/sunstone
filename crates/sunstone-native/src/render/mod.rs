@@ -37,6 +37,7 @@
 //! via `sentinel::Sentinels`.
 
 mod citations;
+mod computation;
 mod critic;
 mod embeds;
 mod footnotes;
@@ -61,6 +62,7 @@ use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
+use computation::contract_card_html;
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
 use footnotes::{footnotes_to_sentinels, sources_section_html};
@@ -225,6 +227,8 @@ pub fn render_body(
     let body_html = footnote_repls.substitute(&html);
     // The virtual trust line opens the body (ov-9); it is not in the file.
     let mut html = trust_line_html(yaml);
+    // An Attested Computation's contract card follows it (ov-12): display only.
+    html.push_str(&contract_card_html(yaml, &link));
     html.push_str(&body_html);
     // The virtual Sources section closes the body (ov-17); it is not in the file.
     html.push_str(&sources_section_html(&source_list, &link));
@@ -452,6 +456,30 @@ mod tests {
             &attachments,
             &|p| format!("/_api/asset?path={}", sunstone_shared::url::query_encode(p)),
         )
+    }
+
+    /// ov-12: an Attested Computation's contract card sits between the trust
+    /// line and the body, and its path-valued fields resolve like markdown
+    /// links written in the Concept (relative, bundle-absolute, URL).
+    #[test]
+    fn attested_computation_contract_card_links_like_markdown_links() {
+        let content = "---\ntype: Attested Computation\nverified: { by: human:a }\nruntime: bigquery\n\
+                       computation: /lib/revenue.md\nexecutor: { resource: references/run.md }\n\
+                       attester: { resource: 'https://x.example/a.py' }\n---\n# Computation\n";
+        let all = ["computations/revenue.md", "computations/references/run.md", "lib/revenue.md"];
+        let p = render(content, "computations/revenue.md", &all);
+        let trust = p.html.find(r#"data-testid="trust""#).expect("trust line");
+        let card = p.html.find(r#"data-testid="computation""#).expect("contract card");
+        let body = p.html.find("<h1").expect("body");
+        assert!(trust < card && card < body);
+        assert!(p.html.contains(r#"<a data-resource="/lib/revenue.md" class="internal-link" data-path="lib/revenue.md""#));
+        assert!(p.html.contains(
+            r#"<a data-resource="references/run.md" class="internal-link" data-path="computations/references/run.md""#
+        ));
+        assert!(p.html.contains(r#"<a data-resource="https://x.example/a.py" href="https://x.example/a.py" target="_blank""#));
+        // Another type: no card, even with the same keys.
+        let other = content.replace("Attested Computation", "Metric");
+        assert!(!render(&other, "computations/revenue.md", &all).html.contains("computation-fields"));
     }
 
     #[test]

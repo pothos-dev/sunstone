@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 blocked-by: [ov-1, ov-2, ov-3, ov-10]
 ---
 
@@ -11,11 +11,24 @@ The contract is five keys: `runtime` names the execution environment, `parameter
 
 Scope note: v0.2 explicitly defers the runtime protocol, receipt and verdict wire formats, and the attester ABI. Sunstone models and displays the contract; it does not execute or verify anything.
 
-- [ ] `Attested Computation` is recognised as a Concept type, and its contract keys parse, render and edit
-- [ ] `parameters` is authorable as a list of maps, with `name` and `type` present and `required` optional per entry
-- [ ] `executor.resource`, `attester.resource` and a path-valued `computation` resolve through the same link resolution as any in-Bundle link, including bundle-absolute form under the detected root
-- [ ] `executor.receipt` edits as a list of names
-- [ ] A Concept of this type missing optional contract keys renders without warning, per permissive conformance
-- [ ] Nothing is executed, run or verified — the contract is displayed only
-- [ ] Unit tests cover contract parsing and path-valued field resolution
-- [ ] All four gates green
+- [x] `Attested Computation` is recognised as a Concept type, and its contract keys parse, render and edit
+- [x] `parameters` is authorable as a list of maps, with `name` and `type` present and `required` optional per entry
+- [x] `executor.resource`, `attester.resource` and a path-valued `computation` resolve through the same link resolution as any in-Bundle link, including bundle-absolute form under the detected root
+- [x] `executor.receipt` edits as a list of names
+- [x] A Concept of this type missing optional contract keys renders without warning, per permissive conformance
+- [x] Nothing is executed, run or verified — the contract is displayed only
+- [x] Unit tests cover contract parsing and path-valued field resolution
+- [x] All four gates green
+
+## Resolution
+
+`sunstone_shared::computation` reads the contract (over wasm as `contractOf` /
+`isAttestedComputation`); a **contract card** after the trust line shows it in
+the editor, the native render and the fake (shared goldens), display only. The
+path-valued fields are links resolved like body links (`onLinkClick` →
+`resolveLink` in the editor, `link_attrs` in the native render). The
+`okf-computation` language-service family (`src/lib/okf/families/computation.ts`)
+opts in on `type`, so only an Attested Computation is checked: missing
+`runtime` is an error (§10.2 REQUIRED for the type), shape problems are
+warnings, and it completes the type, the contract keys, `runtime` values and
+parameter keys. See [Concept → Attested Computation](/okf/concept.md#attested-computation).

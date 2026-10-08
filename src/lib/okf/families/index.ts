@@ -7,9 +7,10 @@
 // the completion engine changes.
 
 import type { OkfFamily } from '../family';
+import { computation } from './computation';
 import { core } from './core';
 import { lifecycle } from './lifecycle';
 import { provenance } from './provenance';
 import { trust } from './trust';
 
-export const OKF_FAMILIES: readonly OkfFamily[] = [core, provenance, trust, lifecycle];
+export const OKF_FAMILIES: readonly OkfFamily[] = [core, provenance, trust, lifecycle, computation];

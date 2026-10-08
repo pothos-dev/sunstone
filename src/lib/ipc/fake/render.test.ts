@@ -14,6 +14,25 @@ describe('renderConcept trust line', () => {
   });
 });
 
+// ov-12: an Attested Computation's contract card follows the trust line.
+describe('renderConcept contract card', () => {
+  test('sits between the trust line and the body', () => {
+    const { html } = renderConcept(
+      '---\ntype: Attested Computation\nverified: { by: human:a }\nruntime: bigquery\n---\n\n# T\n',
+    );
+    const trust = html.indexOf('data-testid="trust"');
+    const card = html.indexOf('data-testid="computation"');
+    expect(trust).toBeGreaterThanOrEqual(0);
+    expect(card).toBeGreaterThan(trust);
+    expect(html.indexOf('<h1')).toBeGreaterThan(card);
+  });
+
+  test('no card on another type', () => {
+    const { html } = renderConcept('---\ntype: Metric\nruntime: bigquery\n---\n\n# T\n');
+    expect(html).not.toContain('data-testid="computation"');
+  });
+});
+
 // The fake renderer is a minimal stand-in for the Rust core, but it must emit
 // the SAME citation markup so the web viewer / Playwright path matches export.
 describe('renderConcept citations', () => {

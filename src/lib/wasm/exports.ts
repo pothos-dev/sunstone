@@ -35,6 +35,12 @@ import type {
   Trust,
   TrustTier,
   Stamp,
+  Contract,
+  Parameter,
+  PathField,
+  PathKind,
+  Executor,
+  Attester,
   UsageWindow,
   Actor,
   ActorKind,
@@ -67,6 +73,12 @@ export type {
   Trust,
   TrustTier,
   Stamp,
+  Contract,
+  Parameter,
+  PathField,
+  PathKind,
+  Executor,
+  Attester,
   UsageWindow,
   Actor,
   ActorKind,
@@ -229,6 +241,20 @@ export function parseActor(raw: string): Actor {
  */
 export function trustOf(yaml: string): Trust | null {
   return mod ? (mod.trustOf(yaml) ?? null) : null;
+}
+
+/**
+ * An Attested Computation's contract (OKF §10.2): `runtime`, `parameters`,
+ * `computation`, `executor`, `attester`, read permissively. `null` when the
+ * `type` is not `Attested Computation`, and before wasm is registered.
+ */
+export function contractOf(yaml: string): Contract | null {
+  return mod ? (mod.contractOf(yaml) ?? null) : null;
+}
+
+/** Whether a Frontmatter block's `type` is `Attested Computation` (OKF §10). */
+export function isAttestedComputation(yaml: string): boolean {
+  return mod ? mod.isAttestedComputation(yaml) : false;
 }
 
 /**

@@ -28,6 +28,7 @@ import {
   type Source,
 } from '$lib/wasm/exports';
 import { trustLineHtml } from '$lib/trust';
+import { contractCardHtml } from '$lib/computation';
 import { actorView } from '$lib/actor';
 import { usageText } from '$lib/sourceCard';
 
@@ -69,6 +70,9 @@ export function renderConcept(content: string): RenderPayload {
   const htmlParts: string[] = [];
   const trust = trustLineHtml(splitFrontmatter(content).yaml ?? '');
   if (trust) htmlParts.push(trust);
+  // An Attested Computation's contract card follows it (ov-12), as in Rust.
+  const card = contractCardHtml(splitFrontmatter(content).yaml ?? '');
+  if (card) htmlParts.push(card);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (hidden.has(i)) continue;

@@ -44,6 +44,7 @@ import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
 import { hiddenSourceDefs, sourcesSection, sourcesTheme } from './sources';
 import { trustLine } from './trust';
+import { contractCard } from './computation';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
@@ -274,6 +275,8 @@ export function modeExtensions(
     hiddenSourceDefs(reading),
     // The virtual trust line above the first line (ov-9), in both modes.
     trustLine(),
+    // An Attested Computation's contract card after it (ov-12), in both modes.
+    contractCard(onLinkClick),
     // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown
     // keeps the hyphens). `reading` always renders; `editing` reveals the raw
     // run under the cursor.

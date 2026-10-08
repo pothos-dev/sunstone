@@ -17,6 +17,7 @@ use wasm_bindgen::prelude::*;
 
 use sunstone_shared::citations::{self, CitationRef};
 use sunstone_shared::actor::{self, Actor};
+use sunstone_shared::computation::{self, Contract};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
@@ -303,6 +304,20 @@ pub fn parse_actor(raw: String) -> Actor {
 #[wasm_bindgen(js_name = trustOf)]
 pub fn trust_of(yaml: String) -> Option<Trust> {
     trust::trust(&yaml)
+}
+
+/// An Attested Computation's contract (OKF §10.2, ov-12): `runtime`,
+/// `parameters`, `computation`, `executor`, `attester`. `null` when the
+/// Concept's `type` is not `Attested Computation`.
+#[wasm_bindgen(js_name = contractOf)]
+pub fn contract_of(yaml: String) -> Option<Contract> {
+    computation::contract(&yaml)
+}
+
+/// Whether a Frontmatter block's `type` is `Attested Computation` (OKF §10).
+#[wasm_bindgen(js_name = isAttestedComputation)]
+pub fn is_attested_computation(yaml: String) -> bool {
+    computation::is_attested_computation(&yaml)
 }
 
 /// Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).

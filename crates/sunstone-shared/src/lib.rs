@@ -14,6 +14,7 @@
 pub mod actor;
 pub mod bundle_root;
 pub mod citations;
+pub mod computation;
 pub mod critic;
 pub mod embed;
 pub mod footnotes;
