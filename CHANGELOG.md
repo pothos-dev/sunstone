@@ -4,7 +4,7 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.25.1] - 2026-10-08
 
 ### Added
 
@@ -15,6 +15,17 @@ All notable changes to Sunstone are documented in this file. The format is based
 - Sunstone Web reads the same `config.json` format, colours included, from the
   file `SUNSTONE_CONFIG` points at. The settings are already in the first
   rendered page, and changes show on the next page load.
+- Every item in the editor, Explorer and table context menus has an icon, and
+  the table menu's delete items are styled as destructive, like Delete in the
+  Explorer.
+
+### Fixed
+
+- The Frontmatter Region shows for `index.md` and `log.md` again.
+- Selecting text inside a table cell keeps the selection, and Find highlights
+  its matches inside table cells.
+- Sunstone Web keeps the open Concept open when the repository behind it
+  changes (a git swap), instead of jumping back to the start page.
 
 ## [0.25.0] - 2026-10-07
 

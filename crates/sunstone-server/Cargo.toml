@@ -1,6 +1,6 @@
 [package]
 name = "sunstone-server"
-version = "0.25.0"
+version = "0.25.1"
 description = "HTTP server exposing a Sunstone Bundle over sunstone-native (Sunstone Web, and the desktop's `sunstone serve`)"
 authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
