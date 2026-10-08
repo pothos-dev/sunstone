@@ -92,6 +92,8 @@ The body is where Sunstone's viewer/editor adds the most beyond plain markdown �
 
 The `# Schema` / `# Examples` conventional headings ([§4.2](/okf/spec.md#42-body)) get no special treatment — they are plain headings that flow into the Outline like any other.
 
+The `# Computation` conventional heading ([§4.2](/okf/spec.md#42-body), [§10.3](/okf/spec.md#103-the-computation)) is set apart **in an Attested Computation only**: its section — the heading through the last non-blank line before the next heading of the same or a higher level — gets an accent bar and a sunken ground, in the editor (live preview and reading alike, as line classes, so editing inside it is editing any section) and in the native render (a `<section class="computation-section">` wrapper, with a *sanctioned computation* chip on the heading). `sunstone_shared::computation::computation_section` finds it (over wasm as `computationSection`): ATX at any level (`## Computation` under a `#` title counts), text `Computation` case aside, the first one only, never inside a fence. It stays an ordinary heading in the Outline. On a Concept of any other type it is a plain heading, and an Attested Computation without it renders as any Concept does.
+
 ## Where Sunstone deviates from the pure spec
 
 | Topic | Pure OKF | Sunstone |
@@ -105,6 +107,7 @@ The `# Schema` / `# Examples` conventional headings ([§4.2](/okf/spec.md#42-bod
 | Timestamps ([§5](/okf/spec.md#5-provenance-trust-and-lifecycle)) | ISO 8601 with an explicit offset | A value without one is **shown as written** and linted as a warning, never rejected |
 | `timestamp` ([§13.1](/okf/spec.md#131-breaking-changes)) | Superseded by `generated.at`; consumers MAY fall back | Falls back: a `timestamp`-only Concept shows it as the generation time, in every Bundle |
 | Attested Computation ([§10](/okf/spec.md#10-attested-computations-concept)) | Consumers execute and attest; display unspecified | **Displayed only** as a contract card above the body (never written); nothing is run or verified. A path-valued field to a non-Concept file is marked broken, like any markdown link to it |
+| `# Computation` ([§4.2](/okf/spec.md#42-body)) | Conventional heading; level unspecified | Set apart at **any** ATX level, first occurrence only, and only in an Attested Computation |
 | Mermaid | Just fenced code | **Rendered** as diagrams ([ADR 0005](/adr/0005-mermaid-block-rendering.md)) |
 | Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list and inline `[n]` superscript refs, both **deprecated** ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |
 | Per-claim attribution ([§5.1](/okf/spec.md#51-provenance-sources)) | A footnote whose label is a `sources[].id`; consumers resolve through the entry | Shows a **sequential number** by first use, not the label; renders `sources` as a virtual **Sources** section after the body; hides a body definition for a `sources` id and shows its text on the entry ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |

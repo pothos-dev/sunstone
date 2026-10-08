@@ -62,7 +62,7 @@ use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
-use computation::contract_card_html;
+use computation::{contract_card_html, wrap_computation_section};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
 use footnotes::{footnotes_to_sentinels, sources_section_html};
@@ -225,6 +225,8 @@ pub fn render_body(
     // Substitute the citation sentinels with their superscript-link / anchor HTML.
     let html = substitute_citation_sentinels(&html, &citation_repls);
     let body_html = footnote_repls.substitute(&html);
+    // An Attested Computation's `# Computation` section is set apart (ov-13).
+    let body_html = wrap_computation_section(&body_html, yaml, strip_frontmatter(content), &outline);
     // The virtual trust line opens the body (ov-9); it is not in the file.
     let mut html = trust_line_html(yaml);
     // An Attested Computation's contract card follows it (ov-12): display only.
@@ -480,6 +482,33 @@ mod tests {
         // Another type: no card, even with the same keys.
         let other = content.replace("Attested Computation", "Metric");
         assert!(!render(&other, "computations/revenue.md", &all).html.contains("computation-fields"));
+    }
+
+    /// ov-13: an Attested Computation's `# Computation` section is wrapped,
+    /// up to the next peer heading; the heading keeps its id (Outline target).
+    #[test]
+    fn computation_section_is_wrapped_on_an_attested_computation_only() {
+        let content = "---\ntype: Attested Computation\nruntime: bigquery\n---\n# Revenue\n\n## Computation\n\n\
+                       ```sql\nSELECT 1\n```\n\n### Binding\n\nOnly `year`.\n\n## Notes\n\nAfter.\n";
+        let p = render(content, "c.md", &["c.md"]);
+        let open = p
+            .html
+            .find(r#"<section class="computation-section" data-testid="computation-section"><h2 id="computation">"#)
+            .expect("wrapped section");
+        let close = p.html[open..].find("</section>").map(|i| open + i).unwrap();
+        let section = &p.html[open..close];
+        assert!(section.contains("SELECT 1") && section.contains(r#"<h3 id="binding">"#));
+        assert!(!section.contains("After."));
+        assert!(p.html[close..].starts_with(r#"</section><h2 id="notes">"#));
+        assert!(p.html.find("<h1").unwrap() < open);
+        assert!(p.outline.iter().any(|h| h.text == "Computation" && h.slug == "computation"));
+        // To the end of the body when nothing follows.
+        let tail = render("---\ntype: Attested Computation\n---\n# Computation\n\nx\n", "c.md", &["c.md"]);
+        assert!(tail.html.contains(r#"<section class="computation-section""#));
+        // Another type: a plain heading.
+        let other = render(&content.replace("Attested Computation", "Metric"), "c.md", &["c.md"]);
+        assert!(!other.html.contains("computation-section"));
+        assert!(other.html.contains(r#"<h2 id="computation">"#));
     }
 
     #[test]

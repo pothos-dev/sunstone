@@ -17,7 +17,7 @@ use wasm_bindgen::prelude::*;
 
 use sunstone_shared::citations::{self, CitationRef};
 use sunstone_shared::actor::{self, Actor};
-use sunstone_shared::computation::{self, Contract};
+use sunstone_shared::computation::{self, ComputationSection, Contract};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
@@ -318,6 +318,14 @@ pub fn contract_of(yaml: String) -> Option<Contract> {
 #[wasm_bindgen(js_name = isAttestedComputation)]
 pub fn is_attested_computation(yaml: String) -> bool {
     computation::is_attested_computation(&yaml)
+}
+
+/// The `# Computation` section of an Attested Computation's `body` (OKF §4.2,
+/// ov-13), lines 1-based in the body; `null` on any other type or without the
+/// heading. `yaml` is the Frontmatter block (inner YAML).
+#[wasm_bindgen(js_name = computationSection)]
+pub fn computation_section(yaml: String, body: String) -> Option<ComputationSection> {
+    computation::computation_section(&yaml, &body)
 }
 
 /// Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).

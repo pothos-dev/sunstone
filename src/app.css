@@ -436,6 +436,13 @@ body {
 /* The contract card of an Attested Computation (`src/lib/computation.ts` +
    native `render/computation.rs`, ov-12): runtime, parameters, computation,
    executor + receipt, attester, after the trust line. Display only. */
+/* The editor's block-widget wrappers contain their child's margin (flow-root),
+   so CodeMirror's measured widget height includes it; otherwise clicks below a
+   widget map one line too low. */
+.cm-trust,
+.cm-computation {
+  display: flow-root;
+}
 .computation {
   margin: 0 0 1.2em;
   padding: 8px 12px;
@@ -509,6 +516,44 @@ body {
 }
 .computation-receipt code + code::before {
   content: ' ';
+}
+
+/* The `# Computation` section of an Attested Computation (ov-13): an accent bar
+   and a sunken ground from the heading to the section's last line, so the
+   computation reads as the thing the Concept attests to. Editor line classes
+   (`src/lib/editor/computation.ts`) and the rendered `<section>` wrapper
+   (`render/computation.rs`, the fake). Inset shadow, not border/padding, so the
+   editor's text and caret geometry are untouched. */
+.cm-line.cm-computation-section,
+section.computation-section {
+  background: var(--bg-sunken);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.cm-line.cm-computation-section-head {
+  border-top-right-radius: var(--radius-md);
+}
+.cm-line.cm-computation-section-last {
+  border-bottom-right-radius: var(--radius-md);
+}
+section.computation-section {
+  margin: 1em 0;
+  padding: 0.2em 1em 0.6em 1.2em;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+section.computation-section > :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0.4em;
+}
+section.computation-section > :is(h1, h2, h3, h4, h5, h6):first-child::after {
+  content: 'sanctioned computation';
+  margin-left: 0.6em;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  vertical-align: middle;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* Source hover card (`src/lib/editor/sourceCard.ts`, ov-17): the details of a

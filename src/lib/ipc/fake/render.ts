@@ -23,6 +23,7 @@ import {
   findCitationRefs,
   scanFootnotes,
   sourceList,
+  computationSection,
   type CriticMark,
   type Footnote,
   type Source,
@@ -73,8 +74,14 @@ export function renderConcept(content: string): RenderPayload {
   // An Attested Computation's contract card follows it (ov-12), as in Rust.
   const card = contractCardHtml(splitFrontmatter(content).yaml ?? '');
   if (card) htmlParts.push(card);
+  // An Attested Computation's `# Computation` section is set apart (ov-13), as
+  // in Rust's `wrap_computation_section` (lines are 1-based in the body).
+  const section = computationSection(splitFrontmatter(content).yaml ?? '', body);
+  const SECTION_OPEN = '<section class="computation-section" data-testid="computation-section">';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (section && i === section.line - 1) htmlParts.push(SECTION_OPEN);
+    if (section && i === section.endLine) htmlParts.push('</section>');
     if (hidden.has(i)) continue;
     const h = byLine.get(i);
     if (h) {
@@ -90,6 +97,7 @@ export function renderConcept(content: string): RenderPayload {
     htmlParts.push(`<p>${renderInline(line, lineNotes[i], true)}</p>`);
   }
 
+  if (section && section.endLine >= lines.length) htmlParts.push('</section>');
   htmlParts.push(renderSourcesSection(sources));
   return { html: htmlParts.join('\n'), frontmatter, outline };
 }

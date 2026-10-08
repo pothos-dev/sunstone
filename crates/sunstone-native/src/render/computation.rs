@@ -9,7 +9,8 @@
 //! field's `<a>` gets the attributes of a markdown link to the same value
 //! (`link`, i.e. `link_attrs`): the same resolution as any in-Bundle link.
 
-use sunstone_shared::computation::{contract, Contract, Parameter, PathField};
+use sunstone_shared::computation::{computation_section, contract, Contract, Parameter, PathField};
+use sunstone_shared::outline::OutlineHeading;
 
 use super::attr_escape;
 
@@ -19,6 +20,35 @@ const HEADING_HINT: &str =
 /// The contract card for a Frontmatter block (inner YAML), or `""` without one.
 pub(super) fn contract_card_html(yaml: &str, link: &dyn Fn(&str) -> String) -> String {
     contract(yaml).map(|c| contract_html(&c, link)).unwrap_or_default()
+}
+
+/// Wrap an Attested Computation's `# Computation` section of the rendered
+/// `html` body (ov-13) in `<section class="computation-section">`, from its
+/// heading to the next heading of the same or a higher level (or the end).
+/// `outline` is the document's outline, whose slugs are the heading ids;
+/// unchanged on any other type or without the heading.
+pub(super) fn wrap_computation_section(html: &str, yaml: &str, body: &str, outline: &[OutlineHeading]) -> String {
+    let Some(sec) = computation_section(yaml, body) else {
+        return html.to_string();
+    };
+    let tag = |h: &OutlineHeading| format!(r#"<h{} id="{}">"#, h.level, attr_escape(&h.slug));
+    let Some(at) = outline.iter().position(|h| h.slug == sec.slug) else {
+        return html.to_string();
+    };
+    let Some(start) = html.find(&tag(&outline[at])) else {
+        return html.to_string();
+    };
+    let end = outline[at + 1..]
+        .iter()
+        .find(|h| h.level <= sec.level)
+        .and_then(|h| html[start..].find(&tag(h)).map(|i| start + i))
+        .unwrap_or(html.len());
+    format!(
+        r#"{}<section class="computation-section" data-testid="computation-section">{}</section>{}"#,
+        &html[..start],
+        &html[start..end],
+        &html[end..]
+    )
 }
 
 fn contract_html(c: &Contract, link: &dyn Fn(&str) -> String) -> String {

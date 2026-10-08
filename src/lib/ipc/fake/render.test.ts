@@ -33,6 +33,27 @@ describe('renderConcept contract card', () => {
   });
 });
 
+// ov-13: an Attested Computation's `# Computation` section is set apart.
+describe('renderConcept computation section', () => {
+  const AC = '---\ntype: Attested Computation\nruntime: bigquery\n---\n';
+  const OPEN = '<section class="computation-section" data-testid="computation-section">';
+
+  test('wraps the section up to the next peer heading', () => {
+    const { html } = renderConcept(`${AC}# Computation\n\nSELECT 1\n\n# Notes\n\nAfter.\n`);
+    expect(html).toContain(`${OPEN}\n<h1 id="computation">Computation</h1>\n<p>SELECT 1</p>\n</section>\n<h1 id="notes">`);
+  });
+
+  test('to the end of the body when nothing follows', () => {
+    const { html } = renderConcept(`${AC}# Computation\n\nSELECT 1\n`);
+    expect(html).toContain(`${OPEN}\n<h1 id="computation">Computation</h1>\n<p>SELECT 1</p>\n</section>`);
+  });
+
+  test('a plain heading on another type', () => {
+    const { html } = renderConcept('---\ntype: Metric\n---\n# Computation\n\nSELECT 1\n');
+    expect(html).not.toContain('computation-section');
+  });
+});
+
 // The fake renderer is a minimal stand-in for the Rust core, but it must emit
 // the SAME citation markup so the web viewer / Playwright path matches export.
 describe('renderConcept citations', () => {

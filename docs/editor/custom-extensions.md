@@ -22,6 +22,7 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | Footnotes | `footnotes.ts` | `ViewPlugin` + `WidgetType` (shares the citation flash field) | `[^label]` superscript → open its source, or jump to `[^label]:` definition |
 | Trust line | `trust.ts` | `StateField` + block `WidgetType` | `generated` / `verified` and the derived trust tier, above the first line |
 | Contract card | `computation.ts` | `StateField` + block `WidgetType` | An Attested Computation's contract after the trust line; path fields open via `onLinkClick` |
+| Computation section | `computation.ts` | `StateField` line decorations | An Attested Computation's `# Computation` section, set apart (ov-13) |
 | Sources section | `sources.ts` | `StateField` + block `WidgetType`; block-replace `StateField` | The `sources` list as a bibliography after the last line; hides body definitions for `sources` ids |
 | CriticMarkup | `criticMarkup.ts`, `criticMarkupView.ts` | `StateField` decorations + `gutter` + `hoverTooltip` | Highlights, comments, track-changes |
 | Anchor tracking | `anchor-tracking.ts` | `StateField` + `StateEffect` | Follow heading slugs across edits for rename-rewrite |

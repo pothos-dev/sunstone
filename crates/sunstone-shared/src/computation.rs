@@ -230,10 +230,96 @@ fn scalar(v: &Value) -> Option<String> {
     (!s.is_empty()).then_some(s)
 }
 
+/// The `# Computation` section of an Attested Computation's body (§4.2, §10.3,
+/// ov-13): the conventional heading for the computation the Concept attests
+/// to. Lines are 1-based in the BODY (frontmatter excluded), which is the
+/// editor's document.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComputationSection {
+    /// The heading's line.
+    pub line: usize,
+    /// The section's last non-blank line (inclusive): the line before the next
+    /// heading of the same or a higher level, else the end of the body.
+    pub end_line: usize,
+    /// The heading's level (`#` is 1).
+    pub level: u8,
+    /// The heading's anchor slug (as in the Outline).
+    pub slug: String,
+}
+
+/// The heading text that names the section, case aside.
+pub const COMPUTATION_HEADING: &str = "Computation";
+
+/// The `# Computation` section of a Concept's `body`, given its Frontmatter
+/// block `yaml` (inner YAML), or `None` when the Concept is not an Attested
+/// Computation or has no such heading. The heading is ATX at any level (a
+/// Concept that opens with a `#` title may nest it as `## Computation`), its
+/// text `Computation` case aside; the first one wins. Fenced code is skipped,
+/// so a `# Computation` inside a fence is not a heading. On a Concept of any
+/// other type the heading is an ordinary one: `None`.
+pub fn computation_section(yaml: &str, body: &str) -> Option<ComputationSection> {
+    if !is_attested_computation(yaml) {
+        return None;
+    }
+    // `scan_headings` takes a whole document: shield a body that opens with
+    // `---` (a thematic break) from being read as frontmatter.
+    let (doc, shift) = if body.starts_with("---") { (format!("\n{body}"), 1) } else { (body.to_string(), 0) };
+    let headings = crate::outline::scan_headings(&doc);
+    let at = headings.iter().position(|h| h.text.trim().eq_ignore_ascii_case(COMPUTATION_HEADING))?;
+    let h = &headings[at];
+    let lines: Vec<&str> = doc.split('\n').collect();
+    let mut end = headings[at + 1..]
+        .iter()
+        .find(|n| n.level <= h.level)
+        .map(|n| n.line - 1)
+        .unwrap_or(lines.len());
+    while end > h.line && lines[end - 1].trim().is_empty() {
+        end -= 1;
+    }
+    Some(ComputationSection { line: h.line - shift, end_line: end - shift, level: h.level, slug: h.slug.clone() })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::bundle_root::find_bundle_root;
+
+    const AC: &str = "type: Attested Computation\nruntime: bigquery\n";
+
+    fn section(body: &str) -> Option<(usize, usize, u8, String)> {
+        computation_section(AC, body).map(|s| (s.line, s.end_line, s.level, s.slug))
+    }
+
+    #[test]
+    fn computation_section_runs_to_the_next_peer_heading() {
+        let body = "# Computation\n\n    SELECT 1\n\nBinds `year`.\n\n# Notes\n\nx\n";
+        assert_eq!(section(body), Some((1, 5, 1, "computation".into())));
+        // Nested headings stay inside; the section ends at the body's end.
+        let body = "# Revenue\n\nIntro.\n\n## Computation\n\n```sql\nSELECT 1\n```\n\n### Binding\n\ny\n\n\n";
+        assert_eq!(section(body), Some((5, 13, 2, "computation".into())));
+        // A higher-level heading ends it too.
+        assert_eq!(section("## computation\nA\n# Next\n"), Some((1, 2, 2, "computation".into())));
+    }
+
+    #[test]
+    fn computation_section_only_on_an_attested_computation() {
+        let body = "# Computation\n\nSELECT 1\n";
+        assert_eq!(computation_section("type: Metric\n", body), None);
+        assert_eq!(computation_section("", body), None);
+        assert_eq!(section("# Definition\n\nNo computation heading.\n"), None);
+        assert_eq!(section("# Computations\n"), None);
+        // Inside a fence it is not a heading.
+        assert_eq!(section("```\n# Computation\n```\n"), None);
+    }
+
+    #[test]
+    fn computation_section_the_first_wins_and_a_leading_rule_is_body() {
+        assert_eq!(section("# Computation\na\n# Computation\nb\n"), Some((1, 2, 1, "computation".into())));
+        assert_eq!(section("---\n\n# Computation\nx\n"), Some((3, 4, 1, "computation".into())));
+    }
     use crate::links::{resolve_link, ResolvedLink};
 
     /// The §10.2 example contract.

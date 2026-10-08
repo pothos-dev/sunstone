@@ -59,7 +59,7 @@ _Avoid_: "verified" as an adjective for the tier, "trust score", "status" (that 
 A **Concept** whose `type` is `Attested Computation` (OKF [§10](/okf/spec.md#10-attested-computations-concept)):
 a sanctioned way to compute a value, described by a **contract** in its **Frontmatter** — `runtime`,
 `parameters`, `computation`, `executor` (with its `receipt`) and `attester`. Sunstone shows the contract
-as a card above the body and never runs or verifies it. See
+as a card above the body, sets its `# Computation` body section apart, and never runs or verifies it. See
 [Concept → Attested Computation](/okf/concept.md#attested-computation).
 _Avoid_: "query concept", "attested metric" (the Metric links to the computation), "attestation" for the
 contract itself (attestation is a run being checked, which Sunstone does not do).

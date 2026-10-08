@@ -36,6 +36,7 @@ import type {
   TrustTier,
   Stamp,
   Contract,
+  ComputationSection,
   Parameter,
   PathField,
   PathKind,
@@ -74,6 +75,7 @@ export type {
   TrustTier,
   Stamp,
   Contract,
+  ComputationSection,
   Parameter,
   PathField,
   PathKind,
@@ -255,6 +257,15 @@ export function contractOf(yaml: string): Contract | null {
 /** Whether a Frontmatter block's `type` is `Attested Computation` (OKF §10). */
 export function isAttestedComputation(yaml: string): boolean {
   return mod ? mod.isAttestedComputation(yaml) : false;
+}
+
+/**
+ * The `# Computation` section of an Attested Computation's `body` (OKF §4.2):
+ * heading line to last non-blank line, 1-based in the body. `null` on any other
+ * type, without the heading, and before wasm is registered.
+ */
+export function computationSection(yaml: string, body: string): ComputationSection | null {
+  return mod ? (mod.computationSection(yaml, body) ?? null) : null;
 }
 
 /**
