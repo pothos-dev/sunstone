@@ -280,9 +280,6 @@ export function parseSyncNotice(data: string): SyncNotice | null {
 // Handlers are attached with `addEventListener` (not `onmessage =`) precisely
 // because the source is shared: assignment would let a second subscriber clobber
 // the first's handler, and an unsubscribe could not detach just its own.
-/** `takeStartupDocument` hands the URL's Concept out once per page load. */
-let startupTaken = false;
-
 let eventSource: EventSource | null = null;
 let eventRefs = 0;
 
@@ -302,6 +299,9 @@ function releaseEvents(): void {
     eventSource = null;
   }
 }
+
+/** `takeStartupDocument` hands the URL's Concept out once per page load. */
+let startupTaken = false;
 
 export const httpBackend: Backend = {
   bundleRoot(): Promise<string> {
