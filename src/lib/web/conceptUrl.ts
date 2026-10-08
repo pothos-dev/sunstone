@@ -7,7 +7,7 @@
 // `BundleIndex.urlToConcept` handle method (resolving against the concept set the
 // handle owns, retiring `collectFilePaths`). What stays TS is the title
 // derivation, which reads the `RenderPayload` — no Rust twin (ADR 0006 §3) —
-// and `urlToConceptInline`, the SSR-only mirror of `urlToConcept` (see below).
+// and `urlToConceptInline`, the no-wasm mirror of `urlToConcept` (see below).
 
 import type { RenderPayload } from '$lib/types';
 import { stripMd } from '$lib/path';
@@ -38,8 +38,10 @@ function nameFromPath(path: string): string {
  * `index.md` wins over a same-named leaf; empty segments are ignored, so `/`
  * and `''` address the root `index.md`). The TS mirror of Rust
  * `sunstone_shared::url::url_to_concept` (the wasm `BundleIndex.urlToConcept`),
- * used only by the SSR `load`, where wasm is browser-only (ADR 0006 §1/§5) —
- * the ONLY place this rule is duplicated. `conceptUrl.test.ts` pins parity
+ * used only where wasm is missing: the SSR `load` (wasm is browser-only, ADR
+ * 0006 §1/§5) and, after a failed wasm load, the same `load` in the browser
+ * and the `sunstone serve` deep link (`ipc/http.ts` `takeStartupDocument`).
+ * The ONLY place this rule is duplicated. `conceptUrl.test.ts` pins parity
  * against the shipped wasm.
  */
 export function urlToConceptInline(urlPath: string, paths: readonly string[]): string | null {
