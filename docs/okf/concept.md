@@ -32,7 +32,7 @@ Consequences that matter for spec conformance:
 - **Formatting is explicit.** The format command reflows the block (preserving comments), but nothing reformats on save — otherwise every file would reflow merely on being edited.
 - **The write is gated on parsing.** The debounced autosave writes only while the block parses; while it does not the write is held, the Concept stays dirty, and an error indicator plus a Save button appear. An explicit save writes regardless — losing the author's text is worse than a momentarily broken file. Because the write is whole-file, a held frontmatter write holds body edits with it.
 - **`type` is not enforced.** The spec _requires_ `type`, but Sunstone deliberately **does not nag**: the required-`type` warning was removed so files in directories that don't follow OKF aren't pushed toward conformance. Sunstone applies the spec's permissive **consumer** stance to itself even as an **editor** — a missing `type` is tolerated, not flagged. OKF-specific linting and completion exist, but only in a Bundle that declares `okf_version` ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md)).
-- **Reserved files are exempt.** `index.md`/`log.md` carry no frontmatter and show no Frontmatter Region (see [Bundle → reserved files](/okf/bundle.md#reserved-files)).
+- **Reserved files get the Region too.** The spec says `index.md`/`log.md` carry no frontmatter, but real Bundles often give an index a `title` (which Sunstone reads for Explorer and Tile labels), so the Frontmatter Region shows for them like for any Concept (see [Bundle → reserved files](/okf/bundle.md#reserved-files)).
 
 ```mermaid
 flowchart TD

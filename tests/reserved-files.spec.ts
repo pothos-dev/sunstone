@@ -9,7 +9,7 @@ import { type Page } from '@playwright/test';
  *  - a folder containing them shows affordances (icons) that open them directly,
  *  - this applies at EVERY level (Bundle root included),
  *  - right-clicking a folder offers to create whichever reserved file is missing,
- *  - they open + edit as normal markdown and are EXEMPT from the missing-`type` flag.
+ *  - they open + edit as normal markdown, Frontmatter Region included.
  *
  * The fixture has: root `index.md` + `log.md`; `concepts/index.md` (no log.md);
  * `concepts/editor/` with neither.
@@ -29,8 +29,8 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  // Turn Frontmatter ON globally, so "reserved files hide Frontmatter" is a real
-  // assertion (a reserved file must hide it even when it would otherwise show).
+  // Turn Frontmatter ON globally: reserved files show it like any Concept (an
+  // index's `title` names its folder, so it must stay visible and editable).
   await page.getByTestId('frontmatter-toggle').click();
 
   // --- Reserved files are NOT ordinary leaves anywhere ---
@@ -47,9 +47,8 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   const explorerTitle = page.getByTestId('explorer-section-title');
   await expect(explorerTitle).toHaveText('Knowledge Base');
   await explorerTitle.click();
-  // It opens body-only — reserved files hide the Frontmatter Region entirely
-  // (slice: hide-frontmatter-for-reserved-files). The body still renders.
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  // It opens with its Frontmatter Region, like any Concept.
+  await expect(page.getByTestId('frontmatter')).toContainText('title: Knowledge Base');
   await expect(page.getByTestId('editor')).toContainText('Knowledge Base');
   // A second header click, with the root index already open, collapses the
   // Explorer; a third (index still open) expands it again.
@@ -63,7 +62,7 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   // body-only, exactly like the root affordance. ---
   await expect(tree.locator('[data-reserved-path="concepts/index.md"]')).toHaveCount(0);
   await tree.locator('[data-row-path="concepts"] .name-toggle').click();
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toContainText('title: Concepts');
   await expect(page.getByTestId('editor')).toContainText('Concepts');
 
   await page.screenshot({ path: 'tests/screenshots/reserved-files.png', fullPage: true });
@@ -110,19 +109,17 @@ test('reserved files: folder name opens index, then toggles; the twisty always t
   await expect(page.getByTestId('editor')).toContainText('Concepts');
 });
 
-test('reserved files: no Frontmatter Region, body editing still works', async ({ page }) => {
+test('reserved files: Frontmatter Region shows, body editing works', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
-  // Frontmatter ON globally so the reserved-file hide + the normal-Concept show
-  // at the end are both real assertions.
+  // Frontmatter ON globally: a reserved file shows the Region like any Concept.
   await page.getByTestId('frontmatter-toggle').click();
 
-  // Open the root log.md via its affordance — body only, no Frontmatter Region
-  // (slice: hide-frontmatter-for-reserved-files).
+  // Open the root log.md via its affordance — its Frontmatter Region shows.
   await page.getByTestId('root-reserved').locator('[data-reserved-path="log.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Read is the default; enter editing so the body becomes editable.
   await page.getByTestId('edit-toggle').click();
@@ -145,7 +142,7 @@ test('reserved files: no Frontmatter Region, body editing still works', async ({
     )
     .toBe(true);
 
-  // Stripping the frontmatter entirely keeps the panel hidden (no crash).
+  // Stripping the frontmatter entirely leaves an empty Region (no crash).
   await page.evaluate(() => {
     const fake = (window as unknown as {
       __sunstoneFake: { simulateExternalChange: (k: string, p: string, c?: string) => void };
@@ -153,9 +150,9 @@ test('reserved files: no Frontmatter Region, body editing still works', async ({
     fake.simulateExternalChange('modified', 'log.md', '# Just a heading\n');
   });
   await expect(editor).toContainText('Just a heading');
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
-  // A normal Concept STILL shows the Frontmatter Region.
+  // A normal Concept shows the Frontmatter Region too.
   await page.getByTestId('tree').locator('[data-path="concepts/bundle.md"]').click();
   await expect(page.getByTestId('frontmatter')).toBeVisible();
 });
@@ -167,7 +164,7 @@ test('reserved files: right-click a folder offers to create the missing one', as
 
   const tree = page.getByTestId('tree');
   await expect(tree).toBeVisible();
-  // Frontmatter ON globally so the created reserved file's "no Frontmatter" is real.
+  // Frontmatter ON globally: the created reserved file shows the Region.
   await page.getByTestId('frontmatter-toggle').click();
 
   // concepts/ has index.md but NOT log.md -> only "Create log.md" is offered.
@@ -185,9 +182,9 @@ test('reserved files: right-click a folder offers to create the missing one', as
     tree.locator('[data-reserved-path="concepts/log.md"]'),
   ).toHaveCount(1);
 
-  // Created reserved file opened body-only — no Frontmatter Region.
+  // Created reserved file opens with its (empty) Frontmatter Region.
   await expect(page.getByTestId('editor')).toBeVisible();
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // The created log.md has a minimal stub (a heading), no `type` field.
   const content = await page.evaluate(

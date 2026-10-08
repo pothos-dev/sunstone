@@ -51,7 +51,7 @@ The link/backlink logic is implemented **once**, in [sunstone-shared](/architect
 
 ### Reserved files
 
-`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and show **no Frontmatter Region** (they carry no frontmatter — the sole exception is a bundle-root `index.md`, which may declare `okf_version`). See [Concept → frontmatter](/okf/concept.md#frontmatter) for the Region that this exemption turns off.
+`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and are kept out of the Explorer's ordinary leaves. **Deviation:** the spec says index files carry no frontmatter (the sole exception being a bundle-root `index.md`'s `okf_version`), but Sunstone tolerates and uses it — a folder's `index.md` `title` names that folder in the Explorer and Tile header — so the [Frontmatter Region](/okf/concept.md#frontmatter) shows for reserved files as for any Concept. Hiding it would leave that `title` in effect but invisible.
 
 ### The Bundle is git-committed content
 

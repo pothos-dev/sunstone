@@ -54,7 +54,6 @@
   import { DEFAULT_FENCES } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
-  import { isReservedFile } from '$lib/reserved';
   import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
   import { bundle } from '$lib/state/bundle.svelte';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
@@ -724,7 +723,7 @@
     <p class="placeholder" data-testid="placeholder">Select a Concept from the tree.</p>
   {/if}
 
-  {#if session.frontmatterShown && tile.activePath && !isReservedFile(tile.activePath)}
+  {#if session.frontmatterShown && tile.activePath}
     <!-- ONE container per visible tile, but only the ACTIVE tile's is the
          'frontmatter' Region: `enabled` gates the registration and `data-region`
          the DOM marker. Deliberately NOT an `{#if active}` branch — clicking into
@@ -744,14 +743,8 @@
       use:region={{
         id: 'frontmatter',
         enabled: active,
-        isPresent: () =>
-          session.frontmatterShown &&
-          tile.activePath !== null &&
-          !isReservedFile(tile.activePath),
-        isVisible: () =>
-          session.frontmatterShown &&
-          tile.activePath !== null &&
-          !isReservedFile(tile.activePath),
+        isPresent: () => session.frontmatterShown && tile.activePath !== null,
+        isVisible: () => session.frontmatterShown && tile.activePath !== null,
       }}
     >
       <Frontmatter
