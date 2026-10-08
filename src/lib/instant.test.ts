@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { hasUtcOffset, isoUtc, parseInstant } from './instant';
+import { isoUtc, parseInstant } from './instant';
 
 describe('parseInstant', () => {
   test('Z and numeric offsets name the same instant', () => {
@@ -25,16 +25,6 @@ describe('parseInstant', () => {
     for (const bad of ['', 'soon', '2026', '2026-13-01', '2026-02-30', '2026-09-23T25:00Z', '23.09.2026', '2026-09-23T00:00:00+2']) {
       expect(parseInstant(bad)).toBeNull();
     }
-  });
-});
-
-describe('hasUtcOffset', () => {
-  test('Z or ±hh:mm present', () => {
-    expect(hasUtcOffset('2026-09-23T00:00:00Z')).toBe(true);
-    expect(hasUtcOffset('2026-09-23T00:00:00+02:00')).toBe(true);
-    expect(hasUtcOffset('2026-09-23T00:00:00')).toBe(false);
-    expect(hasUtcOffset('2026-09-23')).toBe(false);
-    expect(hasUtcOffset('nonsense')).toBe(false);
   });
 });
 

@@ -32,12 +32,6 @@ export function parseInstant(raw: string): number | null {
   return utc - offset;
 }
 
-/** Whether `raw` is an ISO 8601 datetime carrying an explicit UTC offset (`Z` or `±hh:mm`). */
-export function hasUtcOffset(raw: string): boolean {
-  const m = ISO.exec(raw.trim());
-  return !!m && (m[8] !== undefined || m[9] !== undefined) && parseInstant(raw) !== null;
-}
-
 /** The canonical write form: whole seconds, UTC, `Z` offset (`2026-09-23T00:00:00Z`). */
 export function isoUtc(at: Date | number): string {
   return new Date(at).toISOString().replace(/\.\d{3}Z$/, 'Z');
