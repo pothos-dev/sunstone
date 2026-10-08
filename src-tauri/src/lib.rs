@@ -133,6 +133,7 @@ pub fn run() {
             commands::forget_bundle,
             commands::load_appearance,
             commands::open_bundle,
+            commands::create_bundle,
             commands::pick_folder,
             commands::list_tree,
             commands::read_concept,

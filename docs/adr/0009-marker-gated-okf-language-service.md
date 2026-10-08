@@ -52,7 +52,7 @@ and the split would make the marker mean two different things.
 
 - A Bundle that is plainly OKF but predates the marker gets no OKF lint until someone adds one
   line to its root `index.md`. This is accepted: the fix is trivial, discoverable, and makes the
-  Bundle self-describing for every other consumer too. Ticket 07 writes the marker into Bundles
+  Bundle self-describing for every other consumer too. Ticket ov-8 writes the marker into Bundles
   Sunstone creates.
 - Sunstone's own `docs/` Bundle was in exactly that position and now carries
   `okf_version: "0.2"`, which also makes it the test bed for the linter.

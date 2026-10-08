@@ -329,6 +329,14 @@ pub fn okf_version_of(content: String) -> Option<String> {
     frontmatter::okf_version_of(&content)
 }
 
+/// The root `index.md` content declaring Sunstone's OKF version, or `null` to
+/// leave the file alone (ov-8) — the fake's `createBundle` writes with this.
+/// `existing` is `null` when there is no root `index.md` yet.
+#[wasm_bindgen(js_name = declareOkfVersion)]
+pub fn declare_okf_version(existing: Option<String>, title: String) -> Option<String> {
+    sunstone_shared::okf_marker::declare_okf_version(existing.as_deref(), &title)
+}
+
 /// Resolve a raw `[[target]]` inner text against an explicit concept path-set
 /// (the fake's old/new corpus), or `null` (broken) — the handle-less twin of the
 /// handle's `resolveWikilink`, over a set the handle does not own.

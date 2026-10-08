@@ -36,6 +36,14 @@ The finder stays pure: it never reads a file. The markers reach it as data. `Ind
 
 A missing marker proves nothing. Upstream issue #26 reports the reference agent's index regeneration silently dropping `okf_version`, so absence falls through to rung 2 rather than meaning "no Bundle".
 
+**Sunstone writes the marker too.** Sunstone is a producer as well as a consumer, so a Bundle it creates declares itself. **New Bundle…** (in the launcher and the Bundle switcher, beside **Open folder…**) picks a folder, makes its root `index.md` declare `okf_version: "0.2"`, and opens it, so the Bundle roots on rung 1 from then on. The writer is `okf_marker::declare_okf_version` in `sunstone-shared` (natively via `bundle::declare_okf_bundle`, in the fake via wasm):
+
+- no root `index.md`: one is written with the marker and a `# <folder>` heading;
+- a root `index.md` without the key: `okf_version` becomes the first Frontmatter line (a block is prepended when there is none); every other key and the body stay byte-for-byte;
+- a root `index.md` that already has an `okf_version` key, whatever version it names, or whose Frontmatter does not parse: left alone, never upgraded.
+
+Only the root `index.md` is written; no other `index.md` ever gains Frontmatter. Merely opening a folder (**Open folder…**, `sunstone ./notes`) writes nothing: OKF behaviour is gated on the marker ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md)), so writing it on open would turn every folder of notes into an OKF Bundle. Sunstone Web has no launcher, so `createBundle` is desktop-only.
+
 **Rung 2: structural inference**, from the path list alone:
 
 1. Any top-level `.md` (a root `index.md` or root-level Concept) ⇒ the opened folder **is** the root. A Bundle at the opened root is the common case; never redirect down.
@@ -59,7 +67,7 @@ The link/backlink logic is implemented **once**, in [sunstone-shared](/architect
 
 ### Reserved files
 
-`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and are kept out of the Explorer's ordinary leaves. **Deviation:** the spec says index files carry no frontmatter (the sole exception being a bundle-root `index.md`'s `okf_version`), but Sunstone tolerates and uses it — a folder's `index.md` `title` names that folder in the Explorer and Tile header — so the [Frontmatter Region](/okf/concept.md#frontmatter) shows for reserved files as for any Concept. Hiding it would leave that `title` in effect but invisible.
+`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and are kept out of the Explorer's ordinary leaves. **Deviation:** the spec says index files carry no frontmatter (the sole exception being a bundle-root `index.md`'s `okf_version`), but Sunstone tolerates and uses it — a folder's `index.md` `title` names that folder in the Explorer and Tile header — so the [Frontmatter Region](/okf/concept.md#frontmatter) shows for reserved files as for any Concept. Hiding it would leave that `title` in effect but invisible. The one Frontmatter key the spec does sanction there, the root `index.md`'s `okf_version`, shows in that same Region and is the only key Sunstone itself ever writes into an `index.md` (see "Sunstone writes the marker too" above).
 
 ### The Bundle is git-committed content
 
@@ -77,7 +85,7 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 | Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
 | Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git/`) |
-| `okf_version` | May be declared in root `index.md` | Read from **any** `index.md` as a root declaration (the outermost wins, so an inner one marks a nested Bundle); not required, and its absence is no evidence there is no Bundle |
+| `okf_version` | May be declared in root `index.md` | Read from **any** `index.md` as a root declaration (the outermost wins, so an inner one marks a nested Bundle); not required, and its absence is no evidence there is no Bundle. **New Bundle…** writes it into the root `index.md` (`"0.2"`), never over an existing declaration |
 
 ## Related
 

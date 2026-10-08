@@ -101,6 +101,10 @@ export const tauriBackend: Backend = {
     return invoke<void>('open_bundle', { path });
   },
 
+  createBundle(path: string): Promise<void> {
+    return invoke<void>('create_bundle', { path });
+  },
+
   pickFolder(): Promise<string | null> {
     return invoke<string | null>('pick_folder');
   },

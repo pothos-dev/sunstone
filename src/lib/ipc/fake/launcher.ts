@@ -33,6 +33,19 @@ export function setFakeOpenBundle(path: string): void {
   sessionStorage.setItem(FAKE_OPEN_KEY, path);
 }
 
+/** sessionStorage key marking which Bundle `createBundle` created this session. */
+const FAKE_CREATED_KEY = 'sunstone:fakeCreatedBundle';
+
+export function getFakeCreatedBundle(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  return sessionStorage.getItem(FAKE_CREATED_KEY);
+}
+
+export function setFakeCreatedBundle(path: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(FAKE_CREATED_KEY, path);
+}
+
 /** Display basename of a folder path (mirrors the Rust `display_name`). */
 export function bundleName(path: string): string {
   return path.split('/').filter(Boolean).pop() ?? path;

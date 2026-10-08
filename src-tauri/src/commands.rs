@@ -98,6 +98,20 @@ pub(crate) fn open_bundle(session: State<'_, Arc<Session>>, path: String) -> Res
     session.open(root)
 }
 
+/// Create a Bundle at `path` (ov-8): declare it OKF by writing `okf_version`
+/// into its root `index.md` (created when absent, the key added when missing,
+/// an existing declaration left alone), then open it like `open_bundle`.
+#[tauri::command]
+pub(crate) fn create_bundle(session: State<'_, Arc<Session>>, path: String) -> Result<(), String> {
+    let root = PathBuf::from(&path);
+    let root = root.canonicalize().unwrap_or(root);
+    if !root.is_dir() {
+        return Err(format!("not a folder: {}", root.to_string_lossy()));
+    }
+    bundle::declare_okf_bundle(&root)?;
+    session.open(root)
+}
+
 /// Native "open folder" chooser for the launcher's "Open folder…" button. Returns
 /// the chosen absolute path, or `None` if the user cancelled.
 #[tauri::command]

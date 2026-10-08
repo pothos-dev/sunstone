@@ -176,6 +176,31 @@ pub fn create_concept(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 
+/// Declare `root` an OKF Bundle (ov-8): make its root `index.md` carry
+/// `okf_version` ([`sunstone_shared::okf_marker::declare_okf_version`]) —
+/// creating it when absent, adding the key when missing, and leaving a file that
+/// already declares a version (any version) untouched. Only the root
+/// `index.md` is ever written. Returns whether the file was written.
+pub fn declare_okf_bundle(root: &Path) -> Result<bool, String> {
+    let index = root.join("index.md");
+    let existing = match std::fs::read_to_string(&index) {
+        Ok(s) => Some(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.to_string()),
+    };
+    let title = root
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Bundle".to_string());
+    match sunstone_shared::okf_marker::declare_okf_version(existing.as_deref(), &title) {
+        Some(content) => {
+            std::fs::write(&index, content).map_err(|e| e.to_string())?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
 /// Create a new folder at `rel_path` (and any missing parents). Rejects an
 /// escaping path or an existing target. Returns the resolved absolute path.
 pub fn create_folder(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
@@ -350,6 +375,40 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir.canonicalize().unwrap()
+    }
+
+    #[test]
+    fn declare_okf_bundle_creates_a_root_index_that_roots_the_bundle() {
+        let root = temp_root();
+        // Structurally, `docs/` would be the root: no top-level `.md`.
+        std::fs::create_dir_all(root.join("docs")).unwrap();
+        std::fs::write(root.join("docs/index.md"), "# Docs\n").unwrap();
+        assert!(declare_okf_bundle(&root).unwrap());
+        let written = std::fs::read_to_string(root.join("index.md")).unwrap();
+        assert!(written.starts_with("---\nokf_version: \"0.2\"\n---\n"));
+        assert_eq!(std::fs::read_to_string(root.join("docs/index.md")).unwrap(), "# Docs\n");
+
+        let idx = crate::index::Index::build(&root);
+        let found = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers());
+        assert_eq!(found.dir, "");
+        assert_eq!(found.okf_version.as_deref(), Some("0.2"));
+    }
+
+    #[test]
+    fn declare_okf_bundle_adds_to_an_existing_index_and_then_leaves_it() {
+        let root = temp_root();
+        std::fs::write(root.join("index.md"), "---\ntitle: Kunden\n---\n# Kunden\n").unwrap();
+        assert!(declare_okf_bundle(&root).unwrap());
+        let once = std::fs::read_to_string(root.join("index.md")).unwrap();
+        assert_eq!(once, "---\nokf_version: \"0.2\"\ntitle: Kunden\n---\n# Kunden\n");
+        assert!(!declare_okf_bundle(&root).unwrap());
+
+        std::fs::write(root.join("index.md"), "---\nokf_version: \"0.1\"\n---\n").unwrap();
+        assert!(!declare_okf_bundle(&root).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(root.join("index.md")).unwrap(),
+            "---\nokf_version: \"0.1\"\n---\n"
+        );
     }
 
     #[test]

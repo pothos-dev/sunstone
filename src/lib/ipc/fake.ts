@@ -42,11 +42,15 @@ import { outboundLinks, planRewrites, okfMarkers } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
 import { FAKE_COMMITS, committedContentAt } from './fake/git';
 import { searchFiles } from './fake/search';
+import { declareRootIndex } from './fake/createBundle';
 import {
   isLauncherForced,
   fakeStartupDocument,
   getFakeOpenBundle,
   setFakeOpenBundle,
+  getFakeCreatedBundle,
+  setFakeCreatedBundle,
+  bundleName,
   loadKnownBundles,
   saveKnownBundles,
   touchKnownBundle,
@@ -115,6 +119,11 @@ async function ensureIndexReady(): Promise<void> {
   if (typeof window === 'undefined') return; // bun test: the preload registered it.
   const { ensureWasm } = await import('$lib/wasm');
   await ensureWasm();
+  // A Bundle "created" before the reload declares itself now that the shared
+  // writer is loaded: the in-memory store does not survive the reload, so the
+  // declaration is replayed onto the fresh fixture (idempotent).
+  const created = getFakeCreatedBundle();
+  if (created !== null && created === getFakeOpenBundle()) declareRootIndex(bundleName(created));
 }
 
 /**
@@ -310,6 +319,14 @@ export const fakeBackend: Backend = {
     setFakeOpenBundle(path);
   },
 
+  // The declaration itself lands after the caller's reload, on the next wasm
+  // init (`ensureIndexReady`): the in-memory store is rebuilt by the reload.
+  async createBundle(path: string): Promise<void> {
+    touchKnownBundle(path);
+    setFakeOpenBundle(path);
+    setFakeCreatedBundle(path);
+  },
+
   async pickFolder(): Promise<string | null> {
     // No native chooser in plain Chromium: return a deterministic new path so the
     // "Open folder…" flow is still exercisable end-to-end under Playwright.
@@ -325,6 +342,7 @@ export const fakeBackend: Backend = {
   },
 
   async readConcept(path: string): Promise<string> {
+    await ensureIndexReady(); // a created Bundle's root index is declared there.
     return readFileOrThrow(path);
   },
 

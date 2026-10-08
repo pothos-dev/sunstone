@@ -144,3 +144,41 @@ test('a Concept whose write is held refuses the switch, losing nothing', async (
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('save-concept')).toBeVisible();
 });
+
+test('"New Bundle…" declares the picked folder OKF, rooting it on its own marker', async ({
+  page,
+}) => {
+  // ov-8. The fake serves its fixture whatever folder is open, so "creating" a
+  // Bundle declares the fixture's root index.md (which carries other keys).
+  await load(page);
+  await page.getByTestId('rail-bundle-switcher').click();
+  await page.getByTestId('bundle-switcher-new-bundle').click();
+  await expect.poll(() => opened(page)).toBe('/home/user/New Bundle');
+  await expect(page.getByTestId('tree')).toBeVisible();
+
+  const files = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __sunstoneFake: { files: Record<string, string> } }).__sunstoneFake
+          .files,
+    );
+  await expect.poll(async () => (await files())['index.md']).toContain('okf_version: "0.2"');
+  const after = await files();
+  // The rest of the root index survives; no other index.md gains Frontmatter.
+  expect(after['index.md']).toContain('title: Knowledge Base');
+  expect(after['index.md']).toContain('# Knowledge Base');
+  expect(after['concepts/index.md']).not.toContain('okf_version');
+
+  // The marker is what the root finder reads: the Bundle roots on it.
+  const markers = await page.evaluate(() =>
+    (
+      window as unknown as { __sunstoneBackend: { listOkfMarkers(): Promise<unknown> } }
+    ).__sunstoneBackend.listOkfMarkers(),
+  );
+  expect(markers).toEqual([{ indexPath: 'index.md', okfVersion: '0.2' }]);
+
+  // The root index shows its marker in the Frontmatter Region.
+  await page.getByTestId('frontmatter-toggle').click();
+  await page.getByTestId('explorer-section-title').click();
+  await expect(page.getByTestId('frontmatter')).toContainText('okf_version');
+});

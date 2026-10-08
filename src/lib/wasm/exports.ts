@@ -131,6 +131,15 @@ export function okfVersionOf(content: string): string | null {
   return mod ? (mod.okfVersionOf(content) ?? null) : null;
 }
 
+/**
+ * The root `index.md` content that declares Sunstone's OKF version, or `null`
+ * to leave the file alone (`okf_marker::declare_okf_version`, ov-8). `existing`
+ * is `null` when there is no root `index.md`. Degrades to `null` (no write).
+ */
+export function declareOkfVersion(existing: string | null, title: string): string | null {
+  return mod ? (mod.declareOkfVersion(existing ?? undefined, title) ?? null) : null;
+}
+
 // --- Render-derived free exports (ADR 0006 §3, family 13) -------------------
 //
 // The pure kernels behind the editor's Outline, CriticMarkup decorations and

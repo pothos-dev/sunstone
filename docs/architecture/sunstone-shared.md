@@ -31,6 +31,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | --- | --- |
 | `links` | Markdown link resolution — `resolve_link` (→ `ResolvedLink`, `internal` carries `exists`), `RewriteBody`, `WikilinkTarget`. |
 | `bundle_root` | Bundle-root detection — `find_bundle_root(paths, markers)` (→ `BundleRoot { dir, okf_version }`): the `okf_version` marker rung (`marker_root`, over `OkfMarker` data) and then the structural rung (`structural_root`). Pure: the markers are parsed by the caller (`frontmatter::okf_version_of`). |
+| `okf_marker` | The producer side of that marker — `declare_okf_version(existing, title)` maps a root `index.md`'s content to the content declaring `OKF_VERSION` (`"0.2"`), or `None` to leave it alone (it already declares a version, or its Frontmatter does not parse). Backs "New Bundle…" (`bundle::declare_okf_bundle` natively, `declareOkfVersion` in the fake). |
 | `wikilink` | `[[name]]` parsing (`parse_target`, `parse_target_parts`) and **name-based** resolution (`resolve_wikilink`) — case-insensitive, basename or path-suffix, shortest-path tie-break. |
 | `slug` | GitHub-style heading `slugify` for anchor links (no de-duplication). |
 | `rewrite` | Same-file and corpus-wide anchor rewriting (`anchors`: `rewrite_anchors_in`, `AnchorRename`, `AnchorRewrite`) and the move/rename engine (`moves`: `plan_rewrites`, `build_move_map`, `RewriteSummary`, `MovePlan`) with its path math (`relpath`: `relative_path`, `shortest_resolving_suffix`). |

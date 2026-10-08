@@ -69,13 +69,14 @@
   }
 
   // Open a folder and reload into the editor. `busy` guards against a second
-  // click during the brief window before the reload takes over.
-  async function open(path: string) {
+  // click during the brief window before the reload takes over. `create` makes
+  // the folder a Bundle first: its root `index.md` declares `okf_version` (ov-8).
+  async function open(path: string, create = false) {
     if (busy) return;
     error = null;
     busy = true;
     try {
-      await backend.openBundle(path);
+      await (create ? backend.createBundle(path) : backend.openBundle(path));
       location.reload();
     } catch (e) {
       error = errMessage(e);
@@ -83,11 +84,11 @@
     }
   }
 
-  async function openNew() {
+  async function openNew(create = false) {
     if (busy) return;
     try {
       const picked = await backend.pickFolder();
-      if (picked !== null) await open(picked);
+      if (picked !== null) await open(picked, create);
     } catch (e) {
       error = errMessage(e);
     }
@@ -218,8 +219,16 @@
         class="open-new"
         data-testid="launcher-open-folder"
         disabled={busy}
-        onclick={openNew}
+        onclick={() => openNew()}
       >Open folder…</button>
+      <button
+        type="button"
+        class="create-new"
+        data-testid="launcher-new-bundle"
+        title="Pick a folder and make it an OKF Bundle: its index.md declares okf_version"
+        disabled={busy}
+        onclick={() => openNew(true)}
+      >New Bundle…</button>
     </div>
   </div>
 </div>
@@ -389,6 +398,7 @@
   .actions {
     display: flex;
     justify-content: center;
+    gap: 0.5rem;
     padding-top: 0.25rem;
   }
 
@@ -408,7 +418,22 @@
     filter: brightness(1.06);
   }
 
-  .open-new:disabled {
+  .create-new {
+    padding: 0.5rem 1.1rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .create-new:hover:not(:disabled) {
+    background: var(--hover);
+  }
+
+  .open-new:disabled,
+  .create-new:disabled {
     opacity: 0.6;
     cursor: default;
   }

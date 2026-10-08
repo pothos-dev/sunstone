@@ -84,9 +84,9 @@
     focus.cancelTopOverlay();
   }
 
-  async function choose(path: string) {
+  async function choose(path: string, create = false) {
     if (busy) return;
-    if (path === current) {
+    if (path === current && !create) {
       cancel();
       return;
     }
@@ -99,7 +99,7 @@
         busy = false;
         return;
       }
-      await backend.openBundle(path);
+      await (create ? backend.createBundle(path) : backend.openBundle(path));
       location.reload();
     } catch (e) {
       error = errMessage(e);
@@ -107,10 +107,12 @@
     }
   }
 
-  async function openNew() {
+  // `create` makes the picked folder a Bundle: its root `index.md` declares
+  // `okf_version` (ov-8).
+  async function openNew(create = false) {
     try {
       const picked = await backend.pickFolder();
-      if (picked !== null) await choose(picked);
+      if (picked !== null) await choose(picked, create);
     } catch (e) {
       error = errMessage(e);
     }
@@ -216,7 +218,15 @@
       class="open-folder"
       data-testid="bundle-switcher-open-folder"
       disabled={busy}
-      onclick={openNew}>Open folder…</button
+      onclick={() => openNew()}>Open folder…</button
+    >
+    <button
+      type="button"
+      class="open-folder"
+      data-testid="bundle-switcher-new-bundle"
+      title="Pick a folder and make it an OKF Bundle: its index.md declares okf_version"
+      disabled={busy}
+      onclick={() => openNew(true)}>New Bundle…</button
     >
   </div>
 {/if}
@@ -351,6 +361,10 @@
     color: var(--text-muted);
     font: inherit;
     cursor: pointer;
+  }
+
+  .open-folder + .open-folder {
+    margin-top: 0.3rem;
   }
 
   .open-folder:hover:not(:disabled) {

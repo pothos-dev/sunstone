@@ -355,6 +355,9 @@ export const httpBackend: Backend = {
   openBundle(_path: string): Promise<void> {
     return Promise.reject(new Error(NO_LAUNCHER));
   },
+  createBundle(_path: string): Promise<void> {
+    return Promise.reject(new Error(NO_LAUNCHER));
+  },
   pickFolder(): Promise<string | null> {
     return Promise.resolve(null);
   },

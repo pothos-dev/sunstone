@@ -93,6 +93,15 @@ export interface Backend {
   openBundle(path: string): Promise<void>;
 
   /**
+   * Create a Bundle at the existing folder `path`, then open it as `openBundle`
+   * does. Creating declares the folder OKF (ov-8): its root `index.md` gains
+   * `okf_version` (written fresh when absent, the key added when missing, the
+   * rest of the file kept) unless it already declares a version, which is left
+   * alone. No other `index.md` is touched. The caller reloads afterwards.
+   */
+  createBundle(path: string): Promise<void>;
+
+  /**
    * Native "open folder" chooser for the launcher's "Open folder…" button.
    * Resolves to the chosen absolute path, or `null` if the user cancelled.
    */
