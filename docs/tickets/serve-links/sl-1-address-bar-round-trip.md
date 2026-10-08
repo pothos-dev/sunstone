@@ -1,5 +1,5 @@
 ---
-status: decide
+status: ready
 priority: 2
 ---
 
@@ -50,20 +50,12 @@ nightly review of 59ccaa5 found three cases that break:
   but its SvelteKit route catches every path, so dotted names work there. Out
   of scope per the effort README.
 
-## Open questions
-
-1. **Dotted names: fix on the server or in the URL?**
-   (a) The effect writes the Bundle path form (`/release-1.2.md`) whenever the
-   last segment of the pretty URL contains a dot. No server change; the URL is
-   less pretty for those Concepts only.
-   (b) `app_shell` also serves the SPA for a dotted path when `<rel>.md` or
-   `<rel>/index.md` is a Concept in the Bundle. Keeps pretty URLs, but the
-   app-shell router has to reach the Bundle index.
-   Recommendation: (a). It reuses the shadowing fix below, keeps the
-   asset-404 rule untouched and stays client-side.
-
 ## Decisions
 
+- Dotted names → (a), decided by Daniel 2026-10-08: the effect writes the
+  Bundle path form (`/release-1.2.md`) whenever the last segment of the pretty
+  URL contains a dot. No server change; `is_spa_route` keeps 404ing missing
+  assets.
 - Shadowed leaf → write the Bundle path form (`/guide.md`) when the pretty URL
   resolves to a different Concept. It is the only spelling that names the leaf.
 - Anchor → when the effect rewrites the URL for the Concept the page URL

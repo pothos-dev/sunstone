@@ -1,5 +1,5 @@
 ---
-status: decide
+status: ready
 priority: 1
 ---
 
@@ -19,7 +19,7 @@ The 2026-10-08 nightly review of b5d2bfc found:
 - ~~`footnotes::source_ids` reads YAML numbers as numbers, so `id: 007` becomes
   `"7"`~~ Not a bug: checked while grounding, see below.
 
-- [ ] Numeric labels render as decided in open question 1, and ov-10's bullet says the same
+- [ ] ov-10's bullet on numeric `[^n]` says they are renumbered by first use, like every other label
 - [ ] A `[^label]` inside an Embed's alt text neither renders nor counts toward numbering, in the editor and the native and fake renders
 - [ ] Shared-scanner tests (`cargo test`) and a `src/lib/ipc/fake/render.test.ts` case; all four gates green
 
@@ -46,20 +46,11 @@ The 2026-10-08 nightly review of b5d2bfc found:
   non-number id (`true`) is dropped, which is fine.
 - Footnotes inside Embed alt text are rare in practice; this is priority 1.
 
-## Open questions
-
-1. **Numeric labels in Bundles without `sources`.** Shipped behaviour renumbers
-   them (`A[^21] B[^2]` → `[1] [2]`); ov-10 says they keep the label as written.
-   (a) Keep renumbering everywhere and correct ov-10's bullet. One rule; matches
-   GFM, pandoc and Obsidian, which also number by first use.
-   (b) Show the label for purely numeric labels when the Concept has no
-   `sources`, as ov-10 says. Migrated v0.1 documents keep their printed numbers
-   (which may match prose that cites "note 21").
-   Recommendation: (a). It is what Daniel shipped on 2026-10-07 after seeing
-   real Bundles, and it needs only a doc edit.
-
 ## Decisions
 
+- Numeric labels → renumbered by first use, like every other label, decided
+  by Daniel 2026-10-08. The shipped behaviour stays; ov-10's bullet ("label as
+  written") is corrected to say so.
 - Embed alt text → `scan_footnotes` skips Embed spans, like code. Fixes all
   three surfaces at once through the shared scanner instead of teaching the
   editor about render-side markers.
