@@ -1,5 +1,5 @@
 ---
-status: decide
+status: ready
 priority: 1
 ---
 
@@ -15,7 +15,7 @@ priority: 1
 - [ ] Only the first definition of a label (case-insensitive) carries `id="fn-…"`; later duplicates render the `[label]` row head without an id
 - [ ] A definition line directly under a non-blank, non-definition line renders on its own line in the native render (leading `<br>`)
 - [ ] The fake backend leaves `[^label]` inside a fenced block alone, the same as the native render
-- [ ] An indented-code `[^1]` is handled as decided below
+- [ ] The indented-code `[^1]` case is documented as a deviation in `docs/okf/linking.md`
 - [ ] Rust render tests and `src/lib/ipc/fake/render.test.ts` cases for each; all four gates green
 
 ## Grounding
@@ -27,16 +27,9 @@ priority: 1
 - Fake backend: `src/lib/ipc/fake/render.ts` renders line by line and has never tracked fences for any construct. `definedFootnotes` is collected from a whole-body `scanFootnotes(body)` (fence-aware), but `renderTextWithFootnotes` re-scans each line on its own.
 - Anchors were lowercased on 2026-10-07 (nightly commit "lowercase the fn- anchor"), so duplicates across case collide on the same id.
 
-## Open questions
-
-1. **Indented code blocks.** Options:
-   (a) Teach `scan::walk_code` about indented code blocks. That changes the contract for every consumer, including wikilink extraction and move/rename rewrites, which today *do* touch `[[links]]` in indented blocks.
-   (b) Footnotes-only: have `scan_footnotes` skip lines indented 4+ spaces (or a tab) that are not continuation lines. Cheap, but it is a second notion of "code" next to the shared one.
-   (c) Leave it as a documented deviation in `docs/okf/linking.md`.
-   Recommendation: (c) now. Indented code is rare in OKF bundles, and (a) is a separate cross-cutting change that should get its own ticket if anyone hits it.
-
 ## Decisions
 
+- Indented code blocks → (c): no code change; record it as a documented deviation in `docs/okf/linking.md`. Indented code is rare in OKF bundles; teaching `scan::walk_code` about it is a cross-cutting change for its own ticket if anyone hits it. (Daniel, 2026-10-08)
 - Duplicate definitions → the first one owns the anchor, matching the editor's `footnote_def_pos`. Later ones still show their row head.
 - Definition after a paragraph line → reuse the existing `<br>` mechanism: emit it whenever the previous line is non-blank, not only after another definition.
 - Fake fences → derive per-line markers from the single whole-body `scanFootnotes` result (offsets mapped to lines) instead of re-scanning each line. No general fence support for the fake; out of scope.
