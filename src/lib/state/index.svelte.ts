@@ -1,6 +1,6 @@
 import { backend } from '$lib/ipc';
 import { ensureWasm, type BundleIndex, type ResolvedLink } from '$lib/wasm';
-import type { AnchorRename } from '$lib/types';
+import type { AnchorRename, RootRung } from '$lib/types';
 
 /**
  * The frontend's link-resolution engine (ADR 0006 §3/§4): a thin store over the
@@ -42,12 +42,42 @@ class IndexStore {
   #attachments: string[] = [];
 
   /**
+   * The user's explicit Bundle root (ov-7), handed to the wasm root finder as
+   * rung 0: a bundle-relative folder that skips the detection ladder, or
+   * `null` for automatic detection. Set through `setRootOverride`, which App
+   * drives from the persisted View state (`session.bundleRootOverride`).
+   */
+  #rootOverride: string | null = null;
+
+  /**
    * The OKF bundle root within the opened tree (`''` = opened root): the first
    * rung of the root ladder that matches — `okf_version` marker, outermost
-   * `index.md`, git toplevel, opened folder (`sunstone-shared/src/bundle_root.rs`).
+   * `index.md`, git toplevel, opened folder (`sunstone-shared/src/bundle_root.rs`)
+   * — or the user's override (ov-7), which outranks them all.
    */
   bundleRoot(): string {
     return this.#handle?.bundleRoot() ?? '';
+  }
+
+  /**
+   * Which rung found the root (`override` when the user set it; else
+   * `marker` / `indexChain` / `gitToplevel` / `openedFolder`), or `null` on a
+   * null handle. Lets the UI tell an override from a detected root.
+   */
+  rootRung(): RootRung | null {
+    return (this.#handle?.rootRung() as RootRung | undefined) ?? null;
+  }
+
+  /**
+   * Set (folder path, `''` = the opened folder) or clear (`null`) the user's
+   * Bundle-root override and rebuild the handle, so every bundle-absolute link
+   * re-resolves from the new root without a reload (the `version` bump re-runs
+   * the editor's decorations). A no-op when unchanged.
+   */
+  async setRootOverride(dir: string | null): Promise<void> {
+    if (dir === this.#rootOverride) return;
+    this.#rootOverride = dir;
+    await this.refresh();
   }
 
   /**
@@ -131,7 +161,7 @@ class IndexStore {
       // §4), only once we have a fresh set — so a backend error leaves the
       // previous handle AND the previous Attachment corpus untouched.
       this.#handle?.free();
-      this.#handle = wasm ? new wasm.BundleIndex(paths, markers, gitPrefix) : null;
+      this.#handle = wasm ? new wasm.BundleIndex(paths, markers, gitPrefix, this.#rootOverride) : null;
       this.#attachments = attachments;
       this.version += 1;
     } catch {

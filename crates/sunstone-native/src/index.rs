@@ -656,7 +656,7 @@ mod tests {
         // `docs`.
         let idx = indexed_with_attachments();
         let concept_paths = idx.concept_paths();
-        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths, &[], None).dir, "docs");
+        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths, &[], None, None).dir, "docs");
 
         // Belt and braces: even handed the union, `find_bundle_root` filters to
         // `.md` itself today, so the result is identical. The separate index is
@@ -665,8 +665,8 @@ mod tests {
         union.extend(idx.attachment_paths());
         union.sort();
         assert_eq!(
-            sunstone_shared::find_bundle_root(&union, &[], None),
-            sunstone_shared::find_bundle_root(&concept_paths, &[], None)
+            sunstone_shared::find_bundle_root(&union, &[], None, None),
+            sunstone_shared::find_bundle_root(&concept_paths, &[], None, None)
         );
     }
 
@@ -685,7 +685,7 @@ mod tests {
             okf_version: "0.2".to_string(),
         };
         assert_eq!(idx.okf_markers(), vec![marker("docs/index.md"), marker("docs/kb/index.md")]);
-        let root = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers(), None);
+        let root = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers(), None, None);
         assert_eq!(root.dir, "docs");
 
         // The index regenerated without the key (upstream #26): the marker goes.

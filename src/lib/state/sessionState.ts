@@ -25,6 +25,11 @@ export interface SessionFields {
   titlesShown: boolean;
   editorMode: EditorMode;
   layout: StoredLayout | null;
+  /**
+   * The user's explicit Bundle root (ov-7): a bundle-relative directory (`''`
+   * = the opened folder), or `null` for automatic detection.
+   */
+  bundleRootOverride: string | null;
   /** Opaque window geometry owned by Rust; carried through untouched. */
   window: unknown;
 }
@@ -42,6 +47,8 @@ export interface SessionFields {
  *   'editing'/'read', and an absent one defaults to 'read';
  * - sidebar widths default to the shared default and are clamped, so a
  *   corrupt/out-of-range width cannot wedge the layout;
+ * - `bundleRootOverride` defaults to `null` (automatic detection); `''` is a
+ *   real choice (the opened folder), not an absence;
  * - `layout` is carried raw (`null` when absent) — validation happens at
  *   restore, in `resolveStoredLayout`.
  */
@@ -62,6 +69,7 @@ export function sessionFromBundleState(state: BundleState): SessionFields {
     titlesShown: state.titlesShown ?? true,
     editorMode: migrateEditorMode(state.editorMode),
     layout: state.layout ?? null,
+    bundleRootOverride: state.bundleRootOverride ?? null,
     window: state.window,
   };
 }
@@ -88,6 +96,7 @@ export function bundleStateFromSession(fields: SessionFields): BundleState {
     titlesShown: fields.titlesShown,
     editorMode: fields.editorMode,
     layout: fields.layout,
+    bundleRootOverride: fields.bundleRootOverride,
     window: fields.window,
   };
 }

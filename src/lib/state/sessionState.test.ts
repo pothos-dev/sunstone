@@ -22,6 +22,7 @@ describe('sessionFromBundleState', () => {
       titlesShown: true,
       editorMode: 'read',
       layout: null,
+      bundleRootOverride: null,
       window: undefined,
     });
   });
@@ -85,6 +86,15 @@ describe('sessionFromBundleState', () => {
     expect(s.rightSidebarWidth).toBe(MAX_SIDEBAR_WIDTH);
   });
 
+  test('a Bundle-root override is carried, and the opened folder is a real choice', () => {
+    const base = { lastOpenConcept: null, expandedFolders: [] };
+    expect(sessionFromBundleState({ ...base, bundleRootOverride: 'docs/kb' }).bundleRootOverride).toBe(
+      'docs/kb',
+    );
+    expect(sessionFromBundleState({ ...base, bundleRootOverride: '' }).bundleRootOverride).toBe('');
+    expect(sessionFromBundleState({ ...base, bundleRootOverride: null }).bundleRootOverride).toBeNull();
+  });
+
   test('window is passed through by reference', () => {
     const geometry = { x: 1, y: 2 };
     const s = sessionFromBundleState({ lastOpenConcept: null, expandedFolders: [], window: geometry });
@@ -116,6 +126,7 @@ describe('bundleStateFromSession', () => {
       titlesShown: false,
       editorMode: 'editing' as const,
       layout,
+      bundleRootOverride: 'kb',
       window: geometry,
     };
     const out = bundleStateFromSession(

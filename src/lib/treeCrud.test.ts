@@ -150,4 +150,50 @@ describe('menuItemsFor', () => {
     expect(del.separated).toBe(true);
     expect(del.danger).toBe(true);
   });
+
+  describe('the Bundle-root override (ov-7)', () => {
+    const full = dir('kb', [file('kb/index.md'), file('kb/log.md')]);
+    const ids = (node: TreeNode, override: string | null) =>
+      menuItemsFor(node, { override }).map((i) => i.id);
+
+    test('a folder offers to become the root, in its own group before rename', () => {
+      const items = menuItemsFor(full, { override: null });
+      expect(items.map((i) => i.id)).toEqual([
+        'newConcept',
+        'newFolder',
+        'setBundleRoot',
+        'rename',
+        'move',
+        'delete',
+        'deleteReserved:index',
+        'deleteReserved:log',
+      ]);
+      const set = items[2];
+      expect(set.label).toBe('Set as Bundle Root');
+      expect(set.separated).toBe(true);
+      expect(set.icon).toBe('bundleRoot');
+    });
+
+    test('with an override active, every folder can clear it', () => {
+      expect(ids(full, 'other')).toContain('setBundleRoot');
+      expect(ids(full, 'other')).toContain('clearBundleRoot');
+      // The override folder itself only offers to clear.
+      expect(ids(full, 'kb')).not.toContain('setBundleRoot');
+      expect(ids(full, 'kb')).toContain('clearBundleRoot');
+      const clear = menuItemsFor(full, { override: 'kb' }).find((i) => i.id === 'clearBundleRoot')!;
+      expect(clear.label).toBe('Use Detected Bundle Root');
+      expect(clear.separated).toBe(true);
+    });
+
+    test('the opened folder is a folder too; `""` is an override, not none', () => {
+      const root = dir('', [full]);
+      expect(ids(root, null)).toContain('setBundleRoot');
+      expect(ids(root, '')).not.toContain('setBundleRoot');
+      expect(ids(root, '')).toContain('clearBundleRoot');
+    });
+
+    test('a file never offers a root command', () => {
+      expect(ids(file('a.md'), 'kb')).toEqual(['newConcept', 'newFolder', 'rename', 'move', 'delete']);
+    });
+  });
 });

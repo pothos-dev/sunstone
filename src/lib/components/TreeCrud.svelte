@@ -26,6 +26,7 @@
   } from '$lib/treeCrud';
   import { bundle } from '$lib/state/bundle.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
+  import { session } from '$lib/state/session.svelte';
   import { useOverlay } from '$lib/state/overlay.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
 
@@ -127,7 +128,9 @@
     if (node) dialog = { kind: 'move', node, value: dirname(node.path), viaKeyboard: true };
   }
 
-  const menuItems = $derived(menu ? menuItemsFor(menu.node) : []);
+  const menuItems = $derived(
+    menu ? menuItemsFor(menu.node, { override: session.bundleRootOverride }) : [],
+  );
 
   function onMenuSelect(id: string) {
     const node = menu?.node;
@@ -150,6 +153,10 @@
       dialog = { kind: 'rename', node, value: renameSeed(node), viaKeyboard: false };
     else if (id === 'move') dialog = { kind: 'move', node, value: dirname(node.path), viaKeyboard: false };
     else if (id === 'delete') dialog = { kind: 'delete', node, viaKeyboard: false };
+    // The Bundle-root override (ov-7) is View state, not a file operation: the
+    // session persists it and App hands it on to the index, which re-resolves.
+    else if (id === 'setBundleRoot') session.setBundleRootOverride(node.path);
+    else if (id === 'clearBundleRoot') session.setBundleRootOverride(null);
   }
 
   /**

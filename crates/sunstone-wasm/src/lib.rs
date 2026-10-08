@@ -32,7 +32,7 @@ use sunstone_shared::url;
 use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
     find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, BundleRoot,
-    OkfMarker, ResolvedLink, RewriteBody, WikilinkTarget,
+    OkfMarker, ResolvedLink, RewriteBody, RootRung, WikilinkTarget,
 };
 
 /// The in-wasm Bundle index handle (ADR 0006 §3/§4). It OWNS the saved concept
@@ -58,14 +58,23 @@ impl BundleIndex {
     /// `okf_version` markers (`Backend.listOkfMarkers`) and the opened folder's
     /// git prefix (`Backend.gitPrefix`; `null` outside a repository). `[]` /
     /// `null` when the root is irrelevant, e.g. a one-shot URL lookup.
+    /// `root_override` is the user's explicit Bundle root (ov-7, per-Bundle View
+    /// state): a bundle-relative directory that skips the ladder, or
+    /// `null`/`undefined` for automatic detection.
     #[wasm_bindgen(constructor)]
     pub fn new(
         concept_paths: Vec<String>,
         okf_markers: Vec<OkfMarker>,
         git_prefix: Option<String>,
+        root_override: Option<String>,
     ) -> BundleIndex {
         let set: HashSet<String> = concept_paths.iter().cloned().collect();
-        let root = find_bundle_root(&concept_paths, &okf_markers, git_prefix.as_deref());
+        let root = find_bundle_root(
+            &concept_paths,
+            &okf_markers,
+            git_prefix.as_deref(),
+            root_override.as_deref(),
+        );
         BundleIndex {
             concept_paths,
             set,
@@ -105,6 +114,21 @@ impl BundleIndex {
     #[wasm_bindgen(js_name = bundleRoot)]
     pub fn bundle_root(&self) -> String {
         self.root.dir.clone()
+    }
+
+    /// Which rung of the root ladder found the root: `override` (the user set
+    /// it), `marker`, `indexChain`, `gitToplevel` or `openedFolder` — so the UI
+    /// can tell an active override from a detected root.
+    #[wasm_bindgen(js_name = rootRung)]
+    pub fn root_rung(&self) -> String {
+        match self.root.rung {
+            RootRung::Override => "override",
+            RootRung::Marker => "marker",
+            RootRung::IndexChain => "indexChain",
+            RootRung::GitToplevel { .. } => "gitToplevel",
+            RootRung::OpenedFolder => "openedFolder",
+        }
+        .to_string()
     }
 
     /// Whether a Concept exists at `path` (concept-set membership).
@@ -339,7 +363,7 @@ pub fn resolve_link_in(
     git_prefix: Option<String>,
 ) -> ResolvedLink {
     let set: HashSet<String> = paths.iter().cloned().collect();
-    let root = find_bundle_root(&paths, &okf_markers, git_prefix.as_deref());
+    let root = find_bundle_root(&paths, &okf_markers, git_prefix.as_deref(), None);
     resolve_link(&current_path, &href, &root, |p| set.contains(p))
 }
 

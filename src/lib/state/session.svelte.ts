@@ -119,6 +119,13 @@ class SessionStore {
    */
   layout = $state<StoredLayout | null>(null);
   /**
+   * The user's explicit Bundle root (ov-7): a bundle-relative directory (`''` =
+   * the opened folder) that outranks the detected root, or `null` for automatic
+   * detection. View state keyed by opened folder, like everything here; App
+   * hands it to `indexStore`, which passes it to the shared root finder.
+   */
+  bundleRootOverride = $state<string | null>(null);
+  /**
    * EPHEMERAL transient-reveal flags (slice: transient-region-auto-reveal).
    * NEVER persisted — kept out of `#snapshot()`/`load()` deliberately. When
    * directional focus moves INTO a Region hidden only by a collapse (a folded
@@ -184,6 +191,7 @@ class SessionStore {
       // The full tiling layout (null on a fresh/old Bundle — App migrates from
       // `lastOpenConcept` then).
       this.layout = s.layout;
+      this.bundleRootOverride = s.bundleRootOverride;
       this.#lastLayoutJson = JSON.stringify(this.layout);
       this.rightSidebarOpen = s.rightSidebarOpen;
       this.leftSidebarWidth = s.leftSidebarWidth;
@@ -256,13 +264,32 @@ class SessionStore {
     const nextFolders = remapPaths(folders, from, to);
     const nextRecents = remapPaths(this.recentFiles, from, to);
 
+    // A renamed override folder stays the root (the user's choice follows it);
+    // `''` (the opened folder) never moves.
+    const root = this.bundleRootOverride;
+    const nextRoot = root ? (remapPaths([root], from, to)[0] ?? root) : root;
+
     const foldersChanged = nextFolders.some((p, i) => p !== folders[i]);
     const recentsChanged = nextRecents.some((p, i) => p !== this.recentFiles[i]);
-    if (!foldersChanged && !recentsChanged) return;
+    const rootChanged = nextRoot !== root;
+    if (!foldersChanged && !recentsChanged && !rootChanged) return;
 
     if (foldersChanged) this.expandedFolders = new Set(nextFolders);
     if (recentsChanged) this.recentFiles = nextRecents;
+    if (rootChanged) this.bundleRootOverride = nextRoot;
     this.#scheduleSave();
+  }
+
+  /**
+   * Set (a bundle-relative folder, `''` = the opened folder) or clear (`null`)
+   * the explicit Bundle root (ov-7) and persist it at once — it is a deliberate
+   * correction, so it must not wait on the debounce to survive a quit.
+   */
+  setBundleRootOverride(dir: string | null): void {
+    if (dir === this.bundleRootOverride) return;
+    this.bundleRootOverride = dir;
+    this.#scheduleSave();
+    void this.flushPending();
   }
 
   /**
@@ -461,6 +488,7 @@ class SessionStore {
       titlesShown: this.titlesShown,
       editorMode: this.editorMode,
       layout: this.layout,
+      bundleRootOverride: this.bundleRootOverride,
       window: this.#window,
     });
   }

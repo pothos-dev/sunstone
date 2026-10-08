@@ -142,6 +142,13 @@ export type KnownBundle = {
 };
 
 /**
+ * The rung of the Bundle-root ladder that found the root
+ * (`sunstone-shared/src/bundle_root.rs`, read through the wasm
+ * `BundleIndex.rootRung()`): `override` when the user set it (ov-7).
+ */
+export type RootRung = 'override' | 'marker' | 'indexChain' | 'gitToplevel' | 'openedFolder';
+
+/**
  * Per-Bundle session state persisted in the OS config folder (NEVER in the
  * Bundle). Matches the Rust `BundleState` (`serde rename_all = "camelCase"`).
  *
@@ -233,6 +240,13 @@ export type BundleState = {
    * as opaque JSON (see `config.rs`); the frontend owns the `StoredLayout` shape.
    */
   layout?: StoredLayout | null;
+  /**
+   * The user's explicit Bundle root (ov-7): a bundle-relative directory (`''` =
+   * the opened folder) that outranks every rung of the detected-root ladder
+   * (`sunstone-shared/src/bundle_root.rs`), or `null`/absent for automatic
+   * detection. View state keyed by opened folder — never written into the Bundle.
+   */
+  bundleRootOverride?: string | null;
 };
 
 /**

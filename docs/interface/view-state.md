@@ -36,6 +36,7 @@ The desktop `BundleState` (session store `src/lib/state/session.svelte.ts`) carr
   choice survives the rename; nothing writes it any more.)
 - `editorMode` — the boolean view mode, `editing` vs `read` (the shared default for a Tile; each Tile also remembers its own mode inside `layout`).
 - `layout` — the full tiling workspace ([Columns of Tiles](/editor/editor-layout.md), each with its per-Tile view mode), round-tripped as opaque JSON.
+- `bundleRootOverride` — the user's explicit Bundle root, a bundle-relative folder (`''` = the opened folder); absent or `null` means automatic detection. Set from an Explorer folder's context menu and written at once rather than debounced; follows a rename of its folder. See [Bundle → Finding the bundle root](/okf/bundle.md#finding-the-bundle-root-sunstone-extension).
 - `window` — window size/position, owned by Rust.
 
 ## How it round-trips

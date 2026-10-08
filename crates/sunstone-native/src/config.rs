@@ -104,6 +104,12 @@ pub struct BundleState {
     /// the tiled workspace survives a relaunch. Optional/`None` on older files and
     /// on a fresh Bundle (the frontend migrates from `last_open_concept` then).
     pub layout: Option<serde_json::Value>,
+    /// The user's explicit Bundle root (ov-7): a bundle-relative directory
+    /// (`""` = the opened folder) that outranks the detected root, or `None`
+    /// for automatic detection. View state keyed by opened folder like the rest
+    /// of this struct — never written into the Bundle. Rust only round-trips
+    /// it; the frontend hands it to the root finder.
+    pub bundle_root_override: Option<String>,
     /// Wall-clock instant (Unix milliseconds) this Bundle was last opened. Set by
     /// `touch_bundle` when a Bundle is opened; drives the launcher's "known
     /// folders, most-recent first" ordering. `None` for entries that predate this
@@ -615,6 +621,19 @@ mod tests {
         let st: BundleState = serde_json::from_str(r#"{ "titlesShown": false }"#).unwrap();
         let json = serde_json::to_value(&st).unwrap();
         assert_eq!(json["titlesShown"], serde_json::json!(false));
+    }
+
+    #[test]
+    fn bundle_root_override_round_trips_and_defaults_to_none() {
+        let st: BundleState = serde_json::from_str(r#"{ "bundleRootOverride": "docs/kb" }"#).unwrap();
+        assert_eq!(st.bundle_root_override.as_deref(), Some("docs/kb"));
+        let json = serde_json::to_value(&st).unwrap();
+        assert_eq!(json["bundleRootOverride"], serde_json::json!("docs/kb"));
+        // `""` (the opened folder) is a real choice, distinct from "automatic".
+        let st: BundleState = serde_json::from_str(r#"{ "bundleRootOverride": "" }"#).unwrap();
+        assert_eq!(st.bundle_root_override.as_deref(), Some(""));
+        let st: BundleState = serde_json::from_str("{}").unwrap();
+        assert_eq!(st.bundle_root_override, None);
     }
 
     #[test]

@@ -24,7 +24,7 @@ All link resolution is **pure, DOM-free, IPC-free logic** so it can be unit-test
 | Concern | `sunstone-shared` | Frontend entry point (`src/lib/wasm/exports.ts`) |
 |---------|-------------------|--------------------------------------------------|
 | Markdown link resolution | `links.rs` (`resolve_link`), `paths.rs` (`is_external`, `normalize_segments`) | `resolveLinkIn` |
-| Bundle root detection | `bundle_root.rs` (`find_bundle_root`, over paths + `okf_version` markers); `frontmatter.rs` (`okf_version_of`) | via the index store (`BundleIndex(paths, markers)`); `okfVersionOf` |
+| Bundle root detection | `bundle_root.rs` (`find_bundle_root`, over paths + `okf_version` markers); `frontmatter.rs` (`okf_version_of`) | via the index store (`BundleIndex(paths, markers, gitPrefix, rootOverride)`); `okfVersionOf` |
 | Wikilink parse + resolve | `wikilink.rs` (`resolve_wikilink`, `parse_target`, `parse_target_parts`) | `resolveWikilinkIn`, `splitWikilinkTarget` |
 | Heading slugs | `slug.rs` (`slugify`, `slugify_headings`) | via `scanHeadings` / `rewriteAnchors` |
 | Anchor rewrite | `rewrite/anchors.rs` (`rewrite_anchors_in`) | `rewriteAnchors` |
@@ -76,7 +76,7 @@ Path math is done by `paths::normalize_segments`, which collapses `.`/`..` and r
 
 ### Nested bundle root
 
-The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths, okf_markers, git_prefix)` (`sunstone-shared/src/bundle_root.rs`) identifies the root with an ordered ladder, first match wins:
+The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths, okf_markers, git_prefix, root_override)` (`sunstone-shared/src/bundle_root.rs`) identifies the root with an ordered ladder, first match wins. A user-set override ([Bundle → rung 0](/okf/bundle.md#finding-the-bundle-root-sunstone-extension)) outranks all of it:
 
 1. **Marker.** The outermost `index.md` whose Frontmatter declares `okf_version` (OKF v0.2 §12). Unrelated sibling declarations are ambiguous and fall through.
 2. **`index.md` chain.** The outermost directory carrying an `index.md`, gaps in the chain tolerated; the shallowest across unrelated trees, `docs/` on a depth tie, and no guess between other same-depth siblings.

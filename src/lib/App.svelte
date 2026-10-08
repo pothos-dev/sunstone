@@ -39,6 +39,8 @@
   import { parseFrontmatter, splitFrontmatter } from '$lib/wasm/exports';
   import { windowTitle, foldersToExpand } from '$lib/tileTitle';
   import { dirname } from '$lib/path';
+  import { bundleRootLabel } from '$lib/bundleRootLabel';
+  import { menuIconSvg } from '$lib/menuIcons';
 
   interface Props {
     /**
@@ -556,6 +558,19 @@
   let treeCrud = $state<ReturnType<typeof TreeCrud> | null>(null);
   // The root index.md is reached by clicking the Explorer header title (like a
   // folder name), so only the other reserved files keep a header icon.
+  // The Bundle root, as the Explorer header shows it (ov-7): which folder, and
+  // whether the user set it. Re-read whenever the index rebuilds.
+  const rootLabel = $derived.by(() => {
+    void indexStore.version;
+    return bundleRootLabel(indexStore.bundleRoot(), indexStore.rootRung());
+  });
+
+  // The user's Bundle-root override lives in the persisted View state; the
+  // index takes it as rung 0 of the root finder and re-resolves on change.
+  $effect(() => {
+    void indexStore.setRootOverride(session.bundleRootOverride);
+  });
+
   const rootReservedSorted = $derived(
     bundle.tree ? reservedChildren(bundle.tree).filter((r) => r.kind !== 'index') : [],
   );
@@ -617,6 +632,19 @@
       }}
     >
       {#snippet actions()}
+        {#if rootLabel}
+          <span
+            class="bundle-root"
+            class:overridden={rootLabel.overridden}
+            data-testid="bundle-root"
+            data-overridden={rootLabel.overridden}
+            title={rootLabel.title}
+            aria-label={rootLabel.title}
+          >
+            {#if rootLabel.overridden}<span class="bundle-root-pin" aria-hidden="true">{@html menuIconSvg('bundleRoot', 11)}</span>{/if}
+            <span class="bundle-root-text">{rootLabel.text}</span>
+          </span>
+        {/if}
         {#if rootReservedSorted.length > 0}
           <div class="root-reserved" data-testid="root-reserved">
             {#each rootReservedSorted as r (r.path)}
@@ -869,6 +897,35 @@
     font-weight: 600;
     box-shadow: var(--shadow-md);
     pointer-events: none;
+  }
+
+  .bundle-root {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    max-width: 9rem;
+    padding: 0 0.35rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 0.7rem;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  .bundle-root.overridden {
+    background: var(--accent-soft);
+    color: var(--tag-text);
+    box-shadow: inset 0 0 0 1px var(--accent-ring);
+  }
+
+  .bundle-root-pin {
+    display: inline-flex;
+  }
+
+  .bundle-root-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .root-reserved {
