@@ -1,11 +1,12 @@
 import { backend } from '$lib/ipc';
 
 /**
- * OKF recommended frontmatter keys (okf-spec §4.1). Always offered for key
+ * OKF recommended frontmatter keys (okf-spec §4.1), with v0.2's `generated`
+ * in place of the superseded `timestamp` (§13.1, ov-9). Always offered for key
  * autocomplete (even on an empty Bundle) and merged with the keys actually used
  * across the Bundle.
  */
-const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'timestamp'];
+const OKF_KEYS = ['type', 'title', 'description', 'resource', 'tags', 'generated'];
 
 /**
  * Index-derived autocomplete sources (`type`/key/tag

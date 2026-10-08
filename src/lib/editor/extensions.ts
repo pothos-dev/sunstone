@@ -43,6 +43,7 @@ import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-
 import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
 import { sourcesSection, sourcesTheme } from './sources';
+import { trustLine } from './trust';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
 import { anchorTracking } from './anchor-tracking';
@@ -263,6 +264,8 @@ export function modeExtensions(
     footnotes(reading, onLinkClick),
     // The virtual Sources section after the last line (ov-17), in both modes.
     sourcesSection(onLinkClick),
+    // The virtual trust line above the first line (ov-9), in both modes.
+    trustLine(),
     // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown
     // keeps the hyphens). `reading` always renders; `editing` reveals the raw
     // run under the cursor.

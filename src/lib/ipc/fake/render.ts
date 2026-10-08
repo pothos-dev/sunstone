@@ -27,6 +27,7 @@ import {
   type Footnote,
   type Source,
 } from '$lib/wasm/exports';
+import { trustLineHtml } from '$lib/trust';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
 export function renderConcept(content: string): RenderPayload {
@@ -55,7 +56,10 @@ export function renderConcept(content: string): RenderPayload {
   const lineNotes = footnotesByLine(scanFootnotes(body, [...sourcesById.keys()]), lines);
   anchored = new Set();
 
+  // The trust line opens the body (ov-9), as in the native render.
   const htmlParts: string[] = [];
+  const trust = trustLineHtml(splitFrontmatter(content).yaml ?? '');
+  if (trust) htmlParts.push(trust);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const h = byLine.get(i);

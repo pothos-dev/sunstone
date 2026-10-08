@@ -41,6 +41,7 @@ mod critic;
 mod embeds;
 mod footnotes;
 mod sentinel;
+mod trust;
 
 use std::path::Path;
 use std::sync::LazyLock;
@@ -63,6 +64,7 @@ use citations::{citations_to_sentinels, substitute_citation_sentinels};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
 use footnotes::{footnotes_to_sentinels, sources_section_html};
+use trust::trust_line_html;
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -220,7 +222,10 @@ pub fn render_body(
     let html = substitute_critic_sentinels(&html, &critic_repls);
     // Substitute the citation sentinels with their superscript-link / anchor HTML.
     let html = substitute_citation_sentinels(&html, &citation_repls);
-    let mut html = footnote_repls.substitute(&html);
+    let body_html = footnote_repls.substitute(&html);
+    // The virtual trust line opens the body (ov-9); it is not in the file.
+    let mut html = trust_line_html(yaml);
+    html.push_str(&body_html);
     // The virtual Sources section closes the body (ov-17); it is not in the file.
     html.push_str(&sources_section_html(&source_list, &link));
 

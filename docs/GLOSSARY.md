@@ -48,6 +48,13 @@ Who produced or confirmed something, as written in an identity-valued Frontmatte
 [Concept → actors](/okf/concept.md#actors).
 _Avoid_: "user", "owner", "identity" for these values.
 
+**Trust tier**:
+How confirmed a Concept is, derived from its `verified` events alone and never stored
+(OKF [§5.3](/okf/spec.md#53-trust-tiers)): **unverified** (no events), **machine-confirmed**
+(only non-`human:` **Actors**) or **human-reviewed** (any `human:` Actor). Shown first in the
+trust line above the body. See [Concept → trust](/okf/concept.md#trust).
+_Avoid_: "verified" as an adjective for the tier, "trust score", "status" (that is lifecycle).
+
 **Attachment**:
 A non-`.md` file stored in the Bundle and shown inside a Concept that **Embeds** it — images
 today, other file types later. Not a **Concept**: it carries no frontmatter, never appears in the
@@ -64,7 +71,8 @@ _Avoid_: "transclusion", "inline image", "image link".
 
 **Frontmatter**:
 The leading YAML block (delimited by `---`) on a Concept. Only `type` is required;
-`title`, `description`, `resource`, `tags`, `timestamp` are recommended; unknown keys must
+`title`, `description`, `resource`, `tags` are recommended (v0.1's `timestamp` is superseded by
+`generated.at`); unknown keys must
 be preserved. Sunstone edits it as YAML **text**, in the **Frontmatter** Region — the
 collapsible surface above the body, named after this term
 ([ADR-0008](/adr/0008-raw-yaml-frontmatter-editing.md)). See

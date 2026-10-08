@@ -32,6 +32,9 @@ import type {
   Footnote,
   Source,
   ResourceKind,
+  Trust,
+  TrustTier,
+  Stamp,
   Actor,
   ActorKind,
   ResolvedLink,
@@ -60,6 +63,9 @@ export type {
   Footnote,
   Source,
   ResourceKind,
+  Trust,
+  TrustTier,
+  Stamp,
   Actor,
   ActorKind,
   ResolvedLink,
@@ -212,6 +218,23 @@ export function sourceList(body: string, yaml: string): Source[] {
  */
 export function parseActor(raw: string): Actor {
   return mod ? mod.parseActor(raw) : { kind: 'unknown', id: raw, version: null, raw };
+}
+
+/**
+ * A Concept's trust Frontmatter (OKF §5.2, §5.3): `generated` (or a legacy
+ * `timestamp`), the `verified` events with a bare mapping as one, and the
+ * derived tier. `null` without those keys, and before wasm is registered.
+ */
+export function trustOf(yaml: string): Trust | null {
+  return mod ? (mod.trustOf(yaml) ?? null) : null;
+}
+
+/**
+ * Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).
+ * Before wasm is registered it answers `true`: no warning beats a false one.
+ */
+export function isIsoDatetime(s: string): boolean {
+  return mod ? mod.isIsoDatetime(s) : true;
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */

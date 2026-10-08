@@ -183,7 +183,7 @@ describe('lintFrontmatter: family scoping and registration', () => {
   });
 
   test('findings come back sorted by position', () => {
-    const yaml = 'generated: { at: x }\nsources:\n  - id: a\ntitle: 5\n';
+    const yaml = 'generated: { at: 2026-01-01T00:00:00Z }\nsources:\n  - id: a\ntitle: 5\n';
     const froms = lintFrontmatter(yaml, 'okf').map((f) => f.from);
     expect(froms).toEqual([...froms].sort((a, b) => a - b));
     expect(froms.length).toBe(4); // type missing, generated.by, sources[].resource, title

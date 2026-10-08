@@ -21,6 +21,7 @@ use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
 use sunstone_shared::sources::{self, Source};
+use sunstone_shared::trust::{self, Trust};
 use sunstone_shared::frontmatter::{
     self, FrontmatterField, IndexFrontmatter, SplitConcept,
 };
@@ -270,6 +271,20 @@ pub fn source_list(body: String, yaml: String) -> Vec<Source> {
 #[wasm_bindgen(js_name = parseActor)]
 pub fn parse_actor(raw: String) -> Actor {
     actor::parse_actor(&raw)
+}
+
+/// A Concept's trust Frontmatter (OKF §5.2, §5.3) from its block: `generated`
+/// (or a legacy `timestamp`), the `verified` events (a bare mapping as one) and
+/// the derived tier. `null` when it carries none of those keys.
+#[wasm_bindgen(js_name = trustOf)]
+pub fn trust_of(yaml: String) -> Option<Trust> {
+    trust::trust(&yaml)
+}
+
+/// Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).
+#[wasm_bindgen(js_name = isIsoDatetime)]
+pub fn is_iso_datetime(s: String) -> bool {
+    trust::is_iso_datetime(&s)
 }
 
 /// The offset of footnote `label`'s definition (`[^label]:`), or `null`.

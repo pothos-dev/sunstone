@@ -385,6 +385,7 @@ export type Frontmatter = {
   description?: string;
   resource?: string;
   tags?: string[];
+  /** OKF v0.1; superseded by `generated.at` (v0.2 §13.1), still read as its fallback. */
   timestamp?: string;
   /** unknown keys are preserved verbatim */
   [key: string]: unknown;

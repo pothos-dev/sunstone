@@ -26,6 +26,7 @@ pub mod rewrite;
 pub mod scan;
 pub mod slug;
 pub mod sources;
+pub mod trust;
 pub mod url;
 pub mod wikilink;
 

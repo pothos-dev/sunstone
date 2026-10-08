@@ -1,6 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import { renderConcept } from './render';
 
+// ov-9: the trust line opens the body, like the native render.
+describe('renderConcept trust line', () => {
+  test('a Concept with trust keys starts with the trust line', () => {
+    const { html } = renderConcept('---\ntype: x\nverified: { by: human:a }\n---\n\n# T\n');
+    expect(html.startsWith('<div class="trust trust-human-reviewed" data-testid="trust">')).toBe(true);
+  });
+
+  test('a Concept without them renders as before', () => {
+    const { html } = renderConcept('---\ntype: x\n---\n\n# T\n');
+    expect(html).not.toContain('class="trust');
+  });
+});
+
 // The fake renderer is a minimal stand-in for the Rust core, but it must emit
 // the SAME citation markup so the web viewer / Playwright path matches export.
 describe('renderConcept citations', () => {
