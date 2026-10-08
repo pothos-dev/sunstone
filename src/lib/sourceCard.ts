@@ -44,14 +44,27 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 }
 
+/**
+ * `usage_count` with the window it covers (§5.1): `5000 (2026-06-01 – 2026-06-30)`,
+ * an open bound as `…`, the bare count without a window. As written: no score
+ * is computed. The native render's `window_text` writes the same.
+ */
+export function usageText(s: Pick<Source, 'usageCount' | 'usageWindow'>): string | null {
+  if (s.usageCount == null || s.usageCount === '') return null;
+  const w = s.usageWindow;
+  return w ? `${s.usageCount} (${w.from ?? '…'} – ${w.to ?? '…'})` : s.usageCount;
+}
+
 /** The card's DOM for `s`. */
 function buildCard(s: Source): HTMLElement {
   const card = el('div', 'source-card');
   card.dataset.testid = 'source-card';
   card.setAttribute('role', 'tooltip');
-  if (s.num != null) {
+  // The number the superscript shows, then the id the body cites it by.
+  if (s.num != null || s.id) {
     const head = el('div', 'source-card-head');
-    head.append(el('span', 'source-card-num', `${s.num}`));
+    if (s.num != null) head.append(el('span', 'source-card-num', `${s.num}`));
+    if (s.id) head.append(el('code', 'source-card-id', s.id));
     card.append(head);
   }
   card.append(el('div', 'source-card-title', s.title ?? s.resource ?? s.id ?? ''));
@@ -60,7 +73,7 @@ function buildCard(s: Source): HTMLElement {
   const meta: [string, string | null | undefined, ((v: string) => Node)?][] = [
     ['Author', s.author, actorElement],
     ['Last modified', s.lastModified],
-    ['Usage count', s.usageCount],
+    ['Usage count', usageText(s)],
   ];
   const rows = meta.filter(([, v]) => v != null && v !== '');
   if (rows.length > 0) {
@@ -72,6 +85,8 @@ function buildCard(s: Source): HTMLElement {
     }
     card.append(dl);
   }
+  // A body `[^id]: …` definition's text (ov-10): the line is hidden, its text shown here.
+  if (s.note) card.append(el('div', 'source-card-note', s.note));
   if (s.kind !== 'descriptor') card.append(el('div', 'source-card-hint', 'Click to open'));
   return card;
 }

@@ -12,7 +12,12 @@
 //!   (`all queries in BigQuery project X`) that cannot be followed (§6.2).
 //! - [`source_list`] numbers each entry by the first `[^id]` citing it, the
 //!   number the footnote superscript shows; uncited entries follow, unnumbered,
-//!   in list order.
+//!   in list order. It also records where the body cites each entry (`refs`,
+//!   the jumps back to the claims) and the text of a body `[^id]: …`
+//!   definition, if one was written (`note`; the renderers hide that line and
+//!   show the text on the entry instead, ov-10).
+//! - `usage_window` (`{ from, to }`) is read as a sibling of `sources` and
+//!   framing every `usage_count`; an entry's own `usage_window` overrides it.
 
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
@@ -34,6 +39,17 @@ pub enum ResourceKind {
     Descriptor,
 }
 
+/// The `{ from, to }` range a `usage_count` was counted over (§5.1). Either
+/// bound may be missing; the values are kept as written.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageWindow {
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
 /// One `sources` entry, with its citation number.
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
 #[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
@@ -47,6 +63,18 @@ pub struct Source {
     pub author: Option<String>,
     pub usage_count: Option<String>,
     pub last_modified: Option<String>,
+    /// The window `usage_count` covers: the entry's own `usage_window`, else
+    /// the one written beside `sources`.
+    pub usage_window: Option<UsageWindow>,
+    /// The entry's position in the `sources` list as written (counting every
+    /// item), so an editor can find it in the YAML.
+    pub index: usize,
+    /// The text of a body `[^id]: …` definition for this entry's id, if the
+    /// body has one (its first). Shown on the entry; the line itself is hidden.
+    pub note: Option<String>,
+    /// Where the body cites this entry: the UTF-16 offset of each `[^id]`
+    /// reference, in document order. Empty when uncited.
+    pub refs: Vec<usize>,
     /// The footnote number of the first `[^id]` citing this entry, or `None`
     /// when the body does not cite it.
     pub num: Option<usize>,
@@ -78,10 +106,12 @@ pub fn sources(yaml: &str) -> Vec<Source> {
     let Some(Value::Sequence(entries)) = map.get(Value::from("sources")) else {
         return Vec::new();
     };
+    let shared = map.get(Value::from("usage_window")).and_then(usage_window);
     entries
         .iter()
-        .filter(|e| e.is_mapping())
-        .map(|e| {
+        .enumerate()
+        .filter(|(_, e)| e.is_mapping())
+        .map(|(index, e)| {
             let field = |k: &str| e.get(k).and_then(scalar);
             let resource = field("resource").unwrap_or_default();
             Source {
@@ -92,10 +122,29 @@ pub fn sources(yaml: &str) -> Vec<Source> {
                 author: field("author"),
                 usage_count: field("usage_count"),
                 last_modified: field("last_modified"),
+                usage_window: e
+                    .get("usage_window")
+                    .and_then(usage_window)
+                    .or_else(|| shared.clone()),
+                index,
+                note: None,
+                refs: Vec::new(),
                 num: None,
             }
         })
         .collect()
+}
+
+/// A `{ from, to }` map; `None` when it is not a map or has neither bound.
+fn usage_window(v: &Value) -> Option<UsageWindow> {
+    if !v.is_mapping() {
+        return None;
+    }
+    let w = UsageWindow {
+        from: v.get("from").and_then(scalar),
+        to: v.get("to").and_then(scalar),
+    };
+    (w.from.is_some() || w.to.is_some()).then_some(w)
 }
 
 /// The Sources section of a Concept: `body` is the markdown body, `yaml` the
@@ -104,17 +153,28 @@ pub fn sources(yaml: &str) -> Vec<Source> {
 pub fn source_list(body: &str, yaml: &str) -> Vec<Source> {
     let mut list = sources(yaml);
     let ids: Vec<String> = list.iter().filter_map(|s| s.id.clone()).collect();
+    let units: Vec<u16> = body.encode_utf16().collect();
     for f in scan_footnotes(body, &ids) {
-        if f.def {
-            continue;
-        }
         let label = f.label.to_lowercase();
         // The first entry with the id owns it; a duplicate stays uncited.
-        if let Some(s) = list
+        let Some(s) = list
             .iter_mut()
             .find(|s| s.id.as_deref().map(str::to_lowercase).as_deref() == Some(label.as_str()))
-        {
+        else {
+            continue;
+        };
+        if f.def {
+            if s.note.is_none() {
+                let end = units[f.to..]
+                    .iter()
+                    .position(|&u| u == u16::from(b'\n'))
+                    .map_or(units.len(), |p| f.to + p);
+                let text = String::from_utf16_lossy(&units[f.to..end]).trim().to_string();
+                s.note = (!text.is_empty()).then_some(text);
+            }
+        } else {
             s.num.get_or_insert(f.num);
+            s.refs.push(f.from);
         }
     }
     // Stable: uncited entries keep list order.
@@ -176,6 +236,55 @@ mod tests {
         assert_eq!(list[0].id.as_deref(), Some("a"));
         assert_eq!(list[0].num, Some(1));
         assert_eq!(list[1].num, Some(2));
+    }
+
+    #[test]
+    fn usage_window_is_shared_and_overridable() {
+        let yaml = "sources:\n  - id: a\n    resource: /a.md\n    usage_count: 5\n  - id: b\n    resource: /b.md\n    usage_window: { from: 2026-01-01T00:00:00Z, to: 2026-02-01T00:00:00Z }\nusage_window: { from: 2026-06-01T00:00:00Z, to: 2026-06-30T00:00:00Z }\n";
+        let s = sources(yaml);
+        let w = |f: &str, t: &str| Some(UsageWindow { from: Some(f.into()), to: Some(t.into()) });
+        assert_eq!(s[0].usage_window, w("2026-06-01T00:00:00Z", "2026-06-30T00:00:00Z"));
+        assert_eq!(s[1].usage_window, w("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"));
+        // No window anywhere, or one that is not a map: none.
+        assert_eq!(sources("sources:\n  - resource: x\n")[0].usage_window, None);
+        assert_eq!(sources("sources:\n  - resource: x\nusage_window: 3\n")[0].usage_window, None);
+        // A half-open window keeps the bound it has.
+        let half = sources("sources:\n  - resource: x\n    usage_window: { from: 2026-01-01 }\n");
+        assert_eq!(half[0].usage_window, Some(UsageWindow { from: Some("2026-01-01".into()), to: None }));
+    }
+
+    #[test]
+    fn index_counts_every_list_item() {
+        let s = sources("sources:\n  - just text\n  - resource: /a.md\n  - resource: /b.md\n");
+        assert_eq!(s.iter().map(|s| s.index).collect::<Vec<_>>(), vec![1, 2]);
+    }
+
+    #[test]
+    fn list_records_citing_places_and_a_body_definition() {
+        let body = "One[^a] two[^b] three[^A].\n\n[^a]: Written by hand  \n[^zz]: not a source\n";
+        let list = source_list(body, YAML);
+        let a = list.iter().find(|s| s.id.as_deref() == Some("a")).unwrap();
+        assert_eq!(a.refs, vec![3, 21]);
+        assert_eq!(a.note.as_deref(), Some("Written by hand"));
+        let b = list.iter().find(|s| s.id.as_deref() == Some("b")).unwrap();
+        assert_eq!(b.refs, vec![11]);
+        assert_eq!(b.note, None);
+        let c = list.iter().find(|s| s.id.as_deref() == Some("c")).unwrap();
+        assert!(c.refs.is_empty());
+    }
+
+    #[test]
+    fn an_empty_body_definition_has_no_note() {
+        let list = source_list("x[^a]\n\n[^a]:\n", YAML);
+        assert_eq!(list[0].note, None);
+    }
+
+    #[test]
+    fn a_source_needs_no_body_definition() {
+        let list = source_list("Claim.[^c]\n", YAML);
+        assert_eq!(list[0].id.as_deref(), Some("c"));
+        assert_eq!(list[0].num, Some(1));
+        assert!(scan_footnotes("Claim.[^c]\n", &["c".into()])[0].defined);
     }
 
     #[test]

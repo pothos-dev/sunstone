@@ -28,6 +28,8 @@ import {
   type Source,
 } from '$lib/wasm/exports';
 import { trustLineHtml } from '$lib/trust';
+import { actorView } from '$lib/actor';
+import { usageText } from '$lib/sourceCard';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
 export function renderConcept(content: string): RenderPayload {
@@ -53,8 +55,15 @@ export function renderConcept(content: string): RenderPayload {
     const id = s.id?.toLowerCase();
     if (id && !sourcesById.has(id)) sourcesById.set(id, s);
   }
-  const lineNotes = footnotesByLine(scanFootnotes(body, [...sourcesById.keys()]), lines);
+  const notes = scanFootnotes(body, [...sourcesById.keys()]);
+  const lineNotes = footnotesByLine(notes, lines);
   anchored = new Set();
+  cited = new Map();
+  // A body definition for a `sources` id is dropped: its text shows on the
+  // Sources entry (ov-10), as in Rust's `footnotes_to_sentinels`.
+  const hidden = new Set(
+    lineNotes.flatMap((ns, i) => (ns.some((f) => f.def && sourcesById.has(f.label.toLowerCase())) ? [i] : [])),
+  );
 
   // The trust line opens the body (ov-9), as in the native render.
   const htmlParts: string[] = [];
@@ -62,6 +71,7 @@ export function renderConcept(content: string): RenderPayload {
   if (trust) htmlParts.push(trust);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    if (hidden.has(i)) continue;
     const h = byLine.get(i);
     if (h) {
       // The heading text sits inside its line; shift the line's footnotes to it.
@@ -130,6 +140,8 @@ function renderInline(text: string, notes: Footnote[], lineStart = false): strin
 let anchored = new Set<string>();
 /** The Concept's `sources` entries by lowercase id (set by `renderConcept`). */
 let sourcesById = new Map<string, Source>();
+/** Source references rendered so far per lowercase label (reset per render). */
+let cited = new Map<string, number>();
 
 /**
  * The anchor attributes for a source's resource. The fake does not resolve
@@ -159,9 +171,43 @@ function renderSourcesSection(list: Source[]): string {
       s.title != null && s.resource
         ? `<span class="source-resource">${attr(s.resource)}</span>`
         : '';
-    out += `<li><span class="source-num">${s.num ?? ''}</span><span class="source-body">${title}${resource}</span></li>`;
+    const note = s.note ? `<span class="source-note">${attr(s.note)}</span>` : '';
+    out += `<li><span class="source-num">${s.num ?? ''}</span><span class="source-body">${title}${resource}${renderSignals(s)}${note}${renderBackrefs(s)}</span></li>`;
   }
   return out + '</ol></section>';
+}
+
+/** Rust's `signals_html`: the credibility signals as written. */
+function renderSignals(s: Source): string {
+  const items: string[] = [];
+  const push = (key: string, value: string) =>
+    items.push(`<span class="source-signal"><span class="source-signal-key">${key}</span> ${value}</span>`);
+  if (s.author) push('Author', renderActor(s.author));
+  if (s.lastModified) push('Last modified', attr(s.lastModified));
+  const usage = usageText(s);
+  if (usage) push('Usage count', attr(usage));
+  return items.length ? `<span class="source-signals">${items.join('')}</span>` : '';
+}
+
+/** Rust's `actor_html`: the markup of `actorElement`. */
+function renderActor(raw: string): string {
+  const v = actorView(raw);
+  const chip = v.kindLabel ? `<span class="actor-kind">${v.kindLabel}</span>` : '';
+  const version = v.version ? `<span class="actor-version">${attr(v.version)}</span>` : '';
+  return `<span class="actor actor-${v.kind}" title="${attr(v.title)}">${chip}<span class="actor-id">${attr(v.text)}</span>${version}</span>`;
+}
+
+/** Rust's `backrefs_html`: a jump back to each citing claim. */
+function renderBackrefs(s: Source): string {
+  const n = s.refs.length;
+  if (!s.id || n === 0) return '';
+  const anchor = attr(s.id.toLowerCase());
+  const links = s.refs.map((_, i) => {
+    const k = i + 1;
+    const text = n === 1 ? '↑' : k <= 26 ? String.fromCharCode(96 + k) : `${k}`;
+    return `<a class="source-backref" href="#fnref-${anchor}-${k}" title="Jump to citation ${k}">${text}</a>`;
+  });
+  return `<span class="source-backrefs">${n === 1 ? '' : '↑ '}${links.join(' ')}</span>`;
 }
 
 /**
@@ -188,10 +234,13 @@ function renderTextWithFootnotes(seg: string, notes: Footnote[], atLineStart: bo
       out += `<a ${id}class="footnote-def" title="${label}">${n}</a>`;
     } else if (source) {
       const d = sourceData(source);
+      const k = (cited.get(f.label.toLowerCase()) ?? 0) + 1;
+      cited.set(f.label.toLowerCase(), k);
+      const id = `id="fnref-${anchor}-${k}"`;
       out +=
         source.kind === 'descriptor'
-          ? `<sup class="footnote-ref source" ${d}>${sep}${n}</sup>`
-          : `<sup class="footnote-ref source" ${d}>${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
+          ? `<sup ${id} class="footnote-ref source" ${d}>${sep}${n}</sup>`
+          : `<sup ${id} class="footnote-ref source" ${d}>${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
     } else if (f.hasDef) {
       out += `<sup class="footnote-ref" title="${label}">${sep}<a href="#fn-${anchor}">${n}</a></sup>`;
     } else if (f.defined) {

@@ -469,6 +469,11 @@ body {
   font-weight: 600;
 }
 
+.source-card-id {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .source-card-num {
   min-width: 18px;
   padding: 0 5px;
@@ -508,6 +513,11 @@ body {
 .source-card-meta dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.source-card-note {
+  margin-top: 6px;
+  font-size: 12px;
 }
 
 .source-card-hint {

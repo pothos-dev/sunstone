@@ -139,6 +139,17 @@
     editor.focus();
   }
 
+  /**
+   * Focus the YAML on `sources[index]`: that entry unfolded, its siblings
+   * folded, the caret on it (the Sources section's Edit, ov-10). Falls back to
+   * a plain focus when there is no such entry.
+   */
+  export function focusSource(index: number): void {
+    if (!editor) return;
+    editor.revealSource(index);
+    editor.focus();
+  }
+
   /** Close any open typing group into its undo step (before an explicit save). */
   export function commitGroup(): void {
     editor?.commitGroup();

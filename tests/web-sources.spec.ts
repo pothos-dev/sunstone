@@ -24,7 +24,7 @@ test('source footnotes show their card and open the source', async ({ page }) =>
   await expect(card).toHaveCount(1);
   await expect(card.locator('.source-card-title')).toHaveText('The good Concept');
   await expect(card.locator('.source-card-resource')).toHaveText('/good.md');
-  await expect(card.locator('.source-card-meta')).toContainText('Authorhuman:dan');
+  await expect(card.locator('.source-card-meta')).toContainText('Authorpersondan');
 
   await refs.nth(1).hover();
   await expect(card.locator('.source-card-title')).toHaveText('all queries in project X');
@@ -42,4 +42,20 @@ test('source footnotes show their card and open the source', async ({ page }) =>
   await expect(page).toHaveURL(/\/good$/);
   await expect(rendered.locator('h1')).toContainText('Good Concept');
   await expect(card).toHaveCount(0);
+});
+
+test('Sources entries show their signals and jump back to the citing claim', async ({ page }) => {
+  await page.goto('/cited');
+  const rendered = page.getByTestId('rendered');
+  await expect(rendered.locator('h1')).toContainText('Cited Concept');
+  const section = rendered.locator('section.sources');
+  const good = section.locator('li').nth(0);
+  // `author` as an actor, the same markup as the editor's.
+  await expect(good.locator('.source-signals .actor-human .actor-id')).toHaveText('dan');
+  // The jump back targets the citing superscript.
+  const back = good.locator('a.source-backref');
+  await expect(back).toHaveAttribute('href', '#fnref-good-1');
+  await expect(rendered.locator('sup#fnref-good-1')).toHaveCount(1);
+  await back.click();
+  await expect(page).toHaveURL(/#fnref-good-1$/);
 });

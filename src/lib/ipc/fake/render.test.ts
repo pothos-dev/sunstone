@@ -58,25 +58,76 @@ describe('renderConcept footnotes', () => {
     );
     expect(html).toContain('A<sup class="footnote-ref" title="b"><a href="#fn-b">1</a></sup>');
     // Each source element carries its entry as JSON for the hover card.
-    const d = (id: string | null, resource: string, kind: string, title: string | null, num: number | null) =>
+    const d = (
+      id: string | null,
+      resource: string,
+      kind: string,
+      title: string | null,
+      index: number,
+      refs: number[],
+      num: number | null,
+    ) =>
       'data-source="' +
-      JSON.stringify({ id, resource, kind, title, author: null, usageCount: null, lastModified: null, num })
+      JSON.stringify({
+        id,
+        resource,
+        kind,
+        title,
+        author: null,
+        usageCount: null,
+        lastModified: null,
+        usageWindow: null,
+        index,
+        note: null,
+        refs,
+        num,
+      })
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;') +
       '"';
-    const ssi = d('ssi-web', 'https://x', 'url', 'SSI', 2);
-    const all = d('all', 'all queries in X', 'descriptor', null, 3);
-    const unused = d('unused', '/u.md', 'path', null, null);
-    expect(html).toContain(`B<sup class="footnote-ref source" ${ssi}><a href="https://x">2</a></sup>`);
-    expect(html).toContain(`<sup class="footnote-ref source" ${all}>,3</sup>`);
+    const ssi = d('ssi-web', 'https://x', 'url', 'SSI', 0, [8], 2);
+    const all = d('all', 'all queries in X', 'descriptor', null, 1, [18], 3);
+    const unused = d('unused', '/u.md', 'path', null, 2, [], null);
+    expect(html).toContain(
+      `B<sup id="fnref-ssi-web-1" class="footnote-ref source" ${ssi}><a href="https://x">2</a></sup>`,
+    );
+    expect(html).toContain(`<sup id="fnref-all-1" class="footnote-ref source" ${all}>,3</sup>`);
+    const back = (id: string) =>
+      `<span class="source-backrefs"><a class="source-backref" href="#fnref-${id}-1" title="Jump to citation 1">↑</a></span>`;
     // The Sources section closes the body: cited by number, then uncited.
     expect(html).toContain(
       '<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">' +
-        `<li><span class="source-num">2</span><span class="source-body"><a href="https://x" ${ssi}><span class="source-title">SSI</span></a><span class="source-resource">https://x</span></span></li>` +
-        `<li><span class="source-num">3</span><span class="source-body"><span class="source-title" ${all}>all queries in X</span></span></li>` +
+        `<li><span class="source-num">2</span><span class="source-body"><a href="https://x" ${ssi}><span class="source-title">SSI</span></a><span class="source-resource">https://x</span>${back('ssi-web')}</span></li>` +
+        `<li><span class="source-num">3</span><span class="source-body"><span class="source-title" ${all}>all queries in X</span>${back('all')}</span></li>` +
         `<li><span class="source-num"></span><span class="source-body"><a href="/u.md" ${unused}><span class="source-title">/u.md</span></a></span></li>` +
         '</ol></section>',
     );
+  });
+
+  test('entries show signals, a body definition and every citing place (Rust markup)', () => {
+    const { html } = renderConcept(
+      '---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n    author: human:dan\n    usage_count: 7\n    last_modified: 2026-05-30\nusage_window: { from: 2026-06-01, to: 2026-06-30 }\n---\n\nA[^s] B[^s]\n\n[^s]: Written by hand\n',
+    );
+    const [text, section] = html.split('<section class="sources">');
+    // The definition line is gone from the body; its text sits on the entry.
+    expect(text).not.toContain('hand</p>');
+    expect(text).not.toContain('footnote-def');
+    expect(text).toContain('B<sup id="fnref-s-2" class="footnote-ref source"');
+    expect(section).toContain(
+      '<span class="source-signals">' +
+        '<span class="source-signal"><span class="source-signal-key">Author</span> <span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>' +
+        '<span class="source-signal"><span class="source-signal-key">Last modified</span> 2026-05-30</span>' +
+        '<span class="source-signal"><span class="source-signal-key">Usage count</span> 7 (2026-06-01 – 2026-06-30)</span>' +
+        '</span><span class="source-note">Written by hand</span>' +
+        '<span class="source-backrefs">↑ <a class="source-backref" href="#fnref-s-1" title="Jump to citation 1">a</a> <a class="source-backref" href="#fnref-s-2" title="Jump to citation 2">b</a></span>',
+    );
+  });
+
+  test('a v0.1 `# Citations` list and its `[n]` references still render', () => {
+    const { html } = renderConcept('Revenue grew.[1]\n\n# Citations\n\n[1] Annual report\n');
+    expect(html).toContain('<sup class="citation-ref"><a href="#cite-1">[1]</a></sup>');
+    expect(html).toContain('<a id="cite-1" class="citation-def">[1]</a> Annual report');
+    expect(html).not.toContain('class="sources"');
   });
 
   test('no sources, no Sources section', () => {

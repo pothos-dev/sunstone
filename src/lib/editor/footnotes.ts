@@ -117,6 +117,9 @@ function computeFootnotes(view: EditorView, reading: boolean): DecorationSet {
   const revealCursor = !reading && view.hasFocus;
   const sources = sourcesById(stateSources(view.state));
   for (const f of scanFootnotes(doc.toString(), [...sources.keys()])) {
+    // A definition for a `sources` id is hidden whole, or shown raw while the
+    // selection is on it (`hiddenSourceDefs`, ov-10): no row head either way.
+    if (f.def && sources.has(f.label.toLowerCase())) continue;
     if (revealCursor) {
       const touched = f.def
         ? selection.ranges.some((r) => {

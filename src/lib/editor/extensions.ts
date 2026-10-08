@@ -42,7 +42,7 @@ import type { ResolvedTheme } from './mermaidBlocks';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
-import { sourcesSection, sourcesTheme } from './sources';
+import { hiddenSourceDefs, sourcesSection, sourcesTheme } from './sources';
 import { trustLine } from './trust';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
@@ -144,6 +144,12 @@ export interface BuildEditorOptions {
    * the caret in the raw note.
    */
   onCommentEdit?: OnCommentEdit;
+  /**
+   * Called with a `sources` entry's list index when its Edit action in the
+   * Sources section is clicked, so the host can open the Frontmatter Region on
+   * that entry (ov-10). When omitted, entries have no Edit action.
+   */
+  onEditSource?: (index: number) => void;
 }
 
 /**
@@ -203,7 +209,7 @@ function livePreviewBase(): Extension[] {
 /** The build options the mode-dependent slice reads (see `modeExtensions`). */
 export type ModeOptions = Pick<
   BuildEditorOptions,
-  'onLinkClick' | 'onCommentEdit' | 'brokenLinkContext'
+  'onLinkClick' | 'onCommentEdit' | 'onEditSource' | 'brokenLinkContext'
 >;
 
 /**
@@ -262,8 +268,10 @@ export function modeExtensions(
     // source or jumps to its `[^label]:` definition (ov-14, ov-17). Same modes
     // and placement as citations.
     footnotes(reading, onLinkClick),
-    // The virtual Sources section after the last line (ov-17), in both modes.
-    sourcesSection(onLinkClick),
+    // The virtual Sources section after the last line (ov-17), in both modes,
+    // and the hiding of body definitions whose text it shows (ov-10).
+    sourcesSection(onLinkClick, opts?.onEditSource),
+    hiddenSourceDefs(reading),
     // The virtual trust line above the first line (ov-9), in both modes.
     trustLine(),
     // Typographic dashes: `--`/`---` render as –/— (visual-only; the markdown

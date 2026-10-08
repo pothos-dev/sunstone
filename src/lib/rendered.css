@@ -194,6 +194,37 @@
   overflow-wrap: anywhere;
 }
 
+/* Credibility signals, a body definition's text, and the jumps back to the
+   citing claims (ov-10). Mirrors the editor's `.cm-source-*`. */
+.rendered .source-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em 1em;
+  font-size: 0.85em;
+}
+
+.rendered .source-signal-key {
+  color: var(--text-muted, #777);
+}
+
+.rendered .source-note {
+  font-size: 0.9em;
+}
+
+.rendered .source-backrefs {
+  font-size: 0.85em;
+  color: var(--text-muted, #777);
+}
+
+.rendered a.source-backref {
+  color: var(--accent, #d9622b);
+  text-decoration: none;
+}
+
+.rendered a.source-backref:hover {
+  text-decoration: underline;
+}
+
 /* --- CriticMarkup track-changes + annotations -------------------------------
    The shared Rust renderer emits these inline in the Concept body:
      <ins class="critic-add">    addition

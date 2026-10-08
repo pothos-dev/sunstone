@@ -131,8 +131,9 @@
   // A pending request to put focus in the YAML: `'yaml'` after an undo/redo
   // reverted the FRONTMATTER (the step is invisible otherwise), or a key name
   // after a Concept is scaffolded (land the author on `type`). Deferred because
-  // expanding the Region has to render the editor first.
-  let focusFrontmatterPending = $state<string | null>(null);
+  // expanding the Region has to render the editor first. `{ source }` is the
+  // Sources section's Edit (ov-10): land on that `sources` entry.
+  let focusFrontmatterPending = $state<string | { source: number } | null>(null);
 
   // The editing/read view mode is GLOBAL (session.editorMode), driven by the Edit
   // toggle in this tile's header and applied to EVERY tile at once — it is not a
@@ -284,9 +285,21 @@
   $effect(() => {
     const pending = focusFrontmatterPending;
     if (pending === null || !frontmatterRef) return;
-    frontmatterRef.focus(pending === 'yaml' ? undefined : pending);
+    if (typeof pending === 'object') frontmatterRef.focusSource(pending.source);
+    else frontmatterRef.focus(pending === 'yaml' ? undefined : pending);
     focusFrontmatterPending = null;
   });
+
+  /**
+   * Edit on a Sources section entry (ov-10): show the Frontmatter, switch to
+   * editing (the YAML is read-only in read mode; editing `sources` is YAML
+   * only), and land on that entry once the Region's editor exists.
+   */
+  function editSource(index: number): void {
+    session.setFrontmatterShown(true);
+    session.setEditorMode('editing');
+    focusFrontmatterPending = { source: index };
+  }
 
   // --- Editor formatting context menu ------------------------------------------
   let editorMenu = $state<{
@@ -536,6 +549,7 @@
         onHistoryStep,
         onLinkClick: handleLinkClick,
         onCommentEdit: openCommentPopup,
+        onEditSource: editSource,
         brokenLinkContext: {
           currentPath: () => tile.activePath ?? '',
         },

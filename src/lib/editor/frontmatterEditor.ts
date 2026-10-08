@@ -13,6 +13,7 @@ import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { blockForHost, formatYaml, trimBlock } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
 import { defaultYamlFolds, yamlFoldAt } from './yamlFold';
+import { sourceEntrySpan } from './sourceEntry';
 import { lintModeField, setLintMode } from './lintModeField';
 import type { LintMode } from '$lib/okf/lint';
 
@@ -81,6 +82,12 @@ export interface FrontmatterEditor {
   commitGroup(): void;
   /** Drop every fold and fold the default keys again (a Concept opened). */
   foldDefaults(): void;
+  /**
+   * Show `sources[index]` (the Sources section's Edit, ov-10): unfold it and
+   * whatever hides it, fold its sibling entries, put the caret on it. Returns
+   * false when there is no such entry.
+   */
+  revealSource(index: number): boolean;
   /** Move DOM focus into the YAML. */
   focus(): void;
   /** Tear down: cancels the pending group timer after committing it. */
@@ -190,6 +197,33 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
   }
   foldDefaults();
 
+  function revealSource(index: number): boolean {
+    const text = view.state.doc.toString();
+    const span = sourceEntrySpan(text, index);
+    if (!span) return false;
+    const doc = view.state.doc;
+    const lines = text.split('\n');
+    const start = doc.line(span.header + 1).from;
+    const effects = [];
+    const already = new Set<number>();
+    const folded = foldedRanges(view.state).iter();
+    for (; folded.value; folded.next()) {
+      if (folded.from <= span.to && folded.to >= start) {
+        effects.push(unfoldEffect.of({ from: folded.from, to: folded.to }));
+      } else {
+        already.add(folded.from);
+      }
+    }
+    for (const header of span.siblings) {
+      const f = yamlFoldAt(lines, header);
+      if (!f) continue;
+      const from = doc.line(f.header + 1).to;
+      if (!already.has(from)) effects.push(foldEffect.of({ from, to: doc.line(f.last + 1).to }));
+    }
+    view.dispatch({ effects, selection: { anchor: span.from }, scrollIntoView: true });
+    return true;
+  }
+
   // Fetch the grammar, linter and completion and slot them in. The editor is usable (and
   // typed into) while this is in flight; the reconfigure only adds decoration.
   void import('./yamlLanguage').then(({ yamlSupport }) => {
@@ -219,6 +253,7 @@ export function buildFrontmatterEditor(options: FrontmatterEditorOptions): Front
     },
     commitGroup,
     foldDefaults,
+    revealSource,
     focus(): void {
       view.focus();
     },
