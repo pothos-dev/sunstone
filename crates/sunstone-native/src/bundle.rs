@@ -25,6 +25,14 @@ pub struct TreeNode {
     /// Concepts without one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// A Concept's raw lifecycle keys (OKF v0.2 §5.4 `status`, §5.5
+    /// `stale_after`), so an Explorer row can mark a draft, deprecated or stale
+    /// Concept. Raw: the frontend compares `stale_after` to now at display
+    /// time. Omitted when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_after: Option<String>,
     /// dirs only; `None` for files so the JSON omits an empty array
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<TreeNode>>,
@@ -40,6 +48,8 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
         path: String,
         is_dir: bool,
         title: Option<String>,
+        status: Option<String>,
+        stale_after: Option<String>,
         children: Vec<String>, // child relative paths, dirs+files
     }
 
@@ -54,6 +64,8 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
             path: String::new(),
             is_dir: true,
             title: None,
+            status: None,
+            stale_after: None,
             children: Vec::new(),
         },
     );
@@ -77,12 +89,13 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
             .unwrap_or(false);
         let name = entry.file_name().to_string_lossy().into_owned();
         // An unreadable Concept just keeps its filename label.
-        let title = if !is_dir && name.ends_with(".md") {
+        let fm = if !is_dir && name.ends_with(".md") {
             std::fs::read_to_string(entry.path())
                 .ok()
-                .and_then(|content| parse_frontmatter(&content).title)
+                .map(|content| parse_frontmatter(&content))
+                .unwrap_or_default()
         } else {
-            None
+            Default::default()
         };
 
         let parent = rel
@@ -100,7 +113,9 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 name,
                 path: rel_path,
                 is_dir,
-                title,
+                title: fm.title,
+                status: fm.status,
+                stale_after: fm.stale_after,
                 children: Vec::new(),
             },
         );
@@ -125,6 +140,8 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 path: node.path.clone(),
                 is_dir: true,
                 title: None,
+                status: None,
+                stale_after: None,
                 children: Some(children),
             }
         } else {
@@ -133,6 +150,8 @@ pub fn list_tree(root: &Path) -> Result<TreeNode, String> {
                 path: node.path.clone(),
                 is_dir: false,
                 title: node.title.clone(),
+                status: node.status.clone(),
+                stale_after: node.stale_after.clone(),
                 children: None,
             }
         }
@@ -647,5 +666,27 @@ mod tests {
         assert_eq!(title("titled.md").as_deref(), Some("A Title"));
         assert_eq!(title("plain.md"), None);
         assert_eq!(title("notes.txt"), None);
+    }
+
+    #[test]
+    fn list_tree_carries_a_concepts_raw_lifecycle_keys() {
+        let root = temp_root();
+        std::fs::write(
+            root.join("old.md"),
+            "---\ntype: x\nstatus: deprecated\nstale_after: 2020-01-01T00:00:00Z\n---\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("plain.md"), "---\ntype: x\n---\nbody\n").unwrap();
+
+        let tree = list_tree(&root).unwrap();
+        let children = tree.children.unwrap();
+        let node = |name: &str| children.iter().find(|c| c.name == name).unwrap();
+        assert_eq!(node("old.md").status.as_deref(), Some("deprecated"));
+        assert_eq!(node("old.md").stale_after.as_deref(), Some("2020-01-01T00:00:00Z"));
+        // Absent keys are omitted from the JSON, so a plain Concept's row is unchanged.
+        let json = serde_json::to_string(node("plain.md")).unwrap();
+        assert!(!json.contains("status") && !json.contains("staleAfter"), "{json}");
+        let json = serde_json::to_string(node("old.md")).unwrap();
+        assert!(json.contains("\"staleAfter\":\"2020-01-01T00:00:00Z\""), "{json}");
     }
 }

@@ -10,6 +10,8 @@
   import { folderNameClick, holdsPath, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
   import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
+  import LifecycleBadge from './LifecycleBadge.svelte';
+  import { lifecycleOfNode } from '$lib/lifecycle';
 
   interface Props {
     node: TreeNode;
@@ -263,7 +265,7 @@
         if (isMarkdown) onopen(node.path);
       }}
     >
-      <span class="name">{displayName}</span>
+      <span class="name">{displayName}</span><LifecycleBadge lifecycle={lifecycleOfNode(node)} compact />
     </button>
   </div>
 {/if}

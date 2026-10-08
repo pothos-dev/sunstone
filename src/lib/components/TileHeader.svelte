@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { IndexedCrumb } from '$lib/tileTitle';
+  import type { Lifecycle } from '$lib/lifecycle';
+  import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
 
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
@@ -18,6 +20,12 @@
   interface Props {
     /** The active Concept's derived header label ('' when the Tile is empty). */
     title: string;
+    /**
+     * The open Concept's OKF lifecycle keys (§5.4/§5.5), shown as a status /
+     * stale chip after the label; `null` (neither key, or an empty Tile) shows
+     * nothing.
+     */
+    lifecycle?: Lifecycle | null;
     /**
      * The Concept's ancestor folders, outermost first, shown dimmed ahead of the
      * label as clickable breadcrumbs (`concepts/editor/`) so the header says
@@ -80,6 +88,7 @@
 
   let {
     title,
+    lifecycle = null,
     crumbs = [],
     onCrumb,
     titlePath = null,
@@ -152,7 +161,7 @@
               onclick={() => onCrumb?.(crumb)}>{crumb.name}</button
             >/{/each}</span
         >{/if}{title}</span
-    >
+    ><LifecycleBadge {lifecycle} />
   </div>
 
   <div class="tile-controls">

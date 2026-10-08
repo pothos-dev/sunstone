@@ -318,6 +318,32 @@ export function setNodeTitle(root: TreeNode, path: string, title: string | null)
 }
 
 /**
+ * Set (or clear, with `null`) the raw lifecycle keys (OKF §5.4 `status`, §5.5
+ * `stale_after`) of the file node at `path` in place, so a saved edit shows in
+ * the Explorer's stale / status marker without re-walking the Bundle. Returns
+ * whether a node was found.
+ */
+export function setNodeLifecycle(
+  root: TreeNode,
+  path: string,
+  status: string | null,
+  staleAfter: string | null,
+): boolean {
+  const walk = (node: TreeNode): boolean => {
+    if (!node.isDir) {
+      if (node.path !== path) return false;
+      if (status === null) delete node.status;
+      else node.status = status;
+      if (staleAfter === null) delete node.staleAfter;
+      else node.staleAfter = staleAfter;
+      return true;
+    }
+    return (node.children ?? []).some(walk);
+  };
+  return walk(root);
+}
+
+/**
  * The Explorer Section header label: the Bundle root `index.md`'s title (with
  * `useTitles`), else `Explorer`.
  */

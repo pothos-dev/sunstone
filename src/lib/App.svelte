@@ -121,10 +121,13 @@
     // Slug-anchor rewriting: after each autosave, reconcile heading-slug changes
     // by rewriting inbound anchors. The edit happened in the focused (active)
     // Tile, so route the save hook to it (its view holds the anchor baseline).
-    // The save may also have changed the frontmatter `title` the Explorer shows.
+    // The save may also have changed the frontmatter `title` (or the lifecycle
+    // keys) the Explorer shows.
     editor.onSaved = (path, content) => {
       activeTileRef?.handleSaved(path);
-      bundle.retitle(path, parseFrontmatter(content).title);
+      const fm = parseFrontmatter(content);
+      bundle.retitle(path, fm.title);
+      bundle.relifecycle(path, fm.status, fm.staleAfter);
     };
 
     const stopTheme = theme.start();

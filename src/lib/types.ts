@@ -15,6 +15,10 @@ export type TreeNode = {
   isDir: boolean;
   /** a Concept's frontmatter `title` (trimmed, non-empty); absent otherwise */
   title?: string;
+  /** a Concept's raw OKF `status` (§5.4), as written; absent otherwise */
+  status?: string;
+  /** a Concept's raw OKF `stale_after` (§5.5), as written; staleness is derived at display time */
+  staleAfter?: string;
   children?: TreeNode[]; // dirs only
 };
 

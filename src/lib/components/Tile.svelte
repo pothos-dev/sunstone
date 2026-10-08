@@ -56,6 +56,7 @@
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
+  import { lifecycleFromYaml } from '$lib/lifecycle';
   import { bundle } from '$lib/state/bundle.svelte';
   import { ACTIVE_HEADING_PROBE_PX } from '$lib/outlineActive';
   import { fileLineToBody, bodyLineToFile } from '$lib/editor/lineSpace';
@@ -707,6 +708,7 @@
 >
   <TileHeader
     title={headerLabel.name}
+    lifecycle={tile.activePath === null ? null : lifecycleFromYaml(frontmatterYaml)}
     crumbs={headerCrumbs}
     onCrumb={openCrumb}
     titlePath={tile.activePath}

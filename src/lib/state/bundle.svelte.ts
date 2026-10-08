@@ -1,6 +1,6 @@
 import { backend } from '$lib/ipc';
 import { errMessage } from '$lib/errors';
-import { setNodeTitle } from '$lib/treeNav';
+import { setNodeLifecycle, setNodeTitle } from '$lib/treeNav';
 import type { TreeNode } from '$lib/types';
 
 /**
@@ -31,6 +31,11 @@ class BundleStore {
   /** Update one Concept's Explorer title after a save (no Bundle re-walk). */
   retitle(path: string, title: string | null): void {
     if (this.tree) setNodeTitle(this.tree, path, title);
+  }
+
+  /** Update one Concept's Explorer lifecycle keys after a save (no Bundle re-walk). */
+  relifecycle(path: string, status: string | null, staleAfter: string | null): void {
+    if (this.tree) setNodeLifecycle(this.tree, path, status, staleAfter);
   }
 }
 

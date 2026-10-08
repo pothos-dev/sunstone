@@ -25,6 +25,8 @@
   import { snapshotWebViewerUiState, restoreWebViewerUiState } from './webViewerUiState';
   import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptTitle } from './conceptUrl';
+  import { lifecycleFromFields } from '$lib/lifecycle';
+  import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
   import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
@@ -411,6 +413,7 @@
         </button>
         {#if data.selected}
           <span class="tile-title" data-testid="tile-title" title={data.selected}>{pageTitle}</span>
+          <LifecycleBadge lifecycle={data.rendered ? lifecycleFromFields(data.rendered.frontmatter) : null} />
         {/if}
       </div>
 

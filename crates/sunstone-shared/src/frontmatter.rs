@@ -80,6 +80,11 @@ pub struct IndexFrontmatter {
     pub concept_type: Option<String>,
     pub tags: Vec<String>,
     pub title: Option<String>,
+    /// `status` (OKF v0.2 §5.4) as written: a trimmed, non-empty scalar.
+    pub status: Option<String>,
+    /// `stale_after` (§5.5) as written: a trimmed, non-empty scalar. Staleness
+    /// is derived from it at display time by the frontend, never here.
+    pub stale_after: Option<String>,
 }
 
 /// The frontmatter aggregates the native Bundle index needs from a Concept's
@@ -100,6 +105,10 @@ pub struct ParsedFrontmatter {
     /// marker. Parsed for every Concept; only a reserved `index.md` carrying it
     /// counts as a marker (`Index::okf_markers`).
     pub okf_version: Option<String>,
+    /// The lifecycle keys (OKF v0.2 §5.4/§5.5), raw — see [`lifecycle_scalar`].
+    /// The Explorer tree carries them so a row can mark a stale Concept.
+    pub status: Option<String>,
+    pub stale_after: Option<String>,
 }
 
 /// Strip one trailing `\r?\n` then any trailing whitespace from `line` — the
@@ -258,7 +267,23 @@ pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
         keys,
         title,
         okf_version,
+        status: lifecycle_scalar(&map, "status"),
+        stale_after: lifecycle_scalar(&map, "stale_after"),
     }
+}
+
+/// A lifecycle key's value as written, trimmed: a string, number or bool
+/// scalar (the frontend validates and interprets it), else `None`. Raw on
+/// purpose — `stale_after` is compared to *now* at display time, so nothing
+/// derived from the clock is ever cached in the index.
+fn lifecycle_scalar(map: &serde_yaml::Mapping, key: &str) -> Option<String> {
+    let s = match map.get(serde_yaml::Value::from(key))? {
+        serde_yaml::Value::String(s) => s.trim().to_string(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_yaml::Value::Bool(b) => b.to_string(),
+        _ => return None,
+    };
+    (!s.is_empty()).then_some(s)
 }
 
 /// The `okf_version` a Concept's frontmatter declares (OKF v0.2 §12), or `None`.
@@ -333,6 +358,23 @@ mod tests {
         let s = split("just a body\n");
         assert!(!s.has_frontmatter);
         assert_eq!(s.body, "just a body\n");
+    }
+
+    #[test]
+    fn lifecycle_keys_are_raw_trimmed_scalars() {
+        let p = parse_frontmatter(
+            "---\ntype: x\nstatus: ' draft '\nstale_after: 2026-09-23T00:00:00Z\n---\n",
+        );
+        assert_eq!(p.status.as_deref(), Some("draft"));
+        assert_eq!(p.stale_after.as_deref(), Some("2026-09-23T00:00:00Z"));
+        // Kept as written, valid or not: the frontend decides what it means.
+        let p = parse_frontmatter("---\nstatus: wip\nstale_after: soon\n---\n");
+        assert_eq!(p.status.as_deref(), Some("wip"));
+        assert_eq!(p.stale_after.as_deref(), Some("soon"));
+        let p = parse_frontmatter("---\nstatus: ''\nstale_after: [a]\n---\n");
+        assert_eq!((p.status, p.stale_after), (None, None));
+        let p = parse_frontmatter("---\ntype: x\n---\n");
+        assert_eq!((p.status, p.stale_after), (None, None));
     }
 
     #[test]

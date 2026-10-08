@@ -3,6 +3,8 @@
   import { isMarkdownName } from '$lib/path';
   import { indexChild, ordinaryChildren as ordinaryChildrenOf, treeLabel } from '$lib/treeNav';
   import Self from './WebTree.svelte';
+  import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
+  import { lifecycleOfNode } from '$lib/lifecycle';
 
   interface Props {
     node: TreeNode;
@@ -84,7 +86,7 @@
       data-path={node.path}
       onclick={() => onopen(node.path)}
     >
-      <span class="name">{displayName}</span>
+      <span class="name">{displayName}</span><LifecycleBadge lifecycle={lifecycleOfNode(node)} compact />
     </button>
   </div>
 {/if}

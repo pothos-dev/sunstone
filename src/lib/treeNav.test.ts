@@ -13,6 +13,7 @@ import {
   linearMove,
   explorerKeyIntent,
   setNodeTitle,
+  setNodeLifecycle,
   explorerTitle,
   folderNameClick,
   holdsPath,
@@ -459,6 +460,35 @@ describe('setNodeTitle', () => {
     const root = make();
     expect(setNodeTitle(root, 'missing.md', 'X')).toBe(false);
     expect(leaf(root).title).toBe('Old');
+  });
+});
+
+describe('setNodeLifecycle', () => {
+  const make = (): TreeNode => ({
+    name: 'bundle',
+    path: '',
+    isDir: true,
+    children: [{ name: 'b.md', path: 'b.md', isDir: false, status: 'draft' }],
+  });
+  const leaf = (root: TreeNode) => root.children![0];
+
+  test('sets both raw keys in place', () => {
+    const root = make();
+    expect(setNodeLifecycle(root, 'b.md', 'deprecated', '2026-01-01T00:00:00Z')).toBe(true);
+    expect(leaf(root)).toMatchObject({ status: 'deprecated', staleAfter: '2026-01-01T00:00:00Z' });
+  });
+
+  test('null clears a key', () => {
+    const root = make();
+    setNodeLifecycle(root, 'b.md', null, null);
+    expect('status' in leaf(root)).toBe(false);
+    expect('staleAfter' in leaf(root)).toBe(false);
+  });
+
+  test('an unknown path changes nothing', () => {
+    const root = make();
+    expect(setNodeLifecycle(root, 'missing.md', null, null)).toBe(false);
+    expect(leaf(root).status).toBe('draft');
   });
 });
 
