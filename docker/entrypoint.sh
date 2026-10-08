@@ -11,7 +11,7 @@
 #      resolve — ${SUNSTONE_BUNDLE} in the plain shape, /srv/repo/<subdir> in a
 #      git shape.)
 #   2. node build      — the SvelteKit adapter-node SSR server (binds
-#      ${HOST}:${PORT}); its `/api/*` proxy + SSR loads reach the API at
+#      ${HOST}:${PORT}); its `/_api/*` proxy + SSR loads reach the API at
 #      ${SUNSTONE_API_INTERNAL} (http://localhost:${SUNSTONE_API_PORT}).
 #
 # The script is PID 1. It forwards SIGTERM/SIGINT to both children and, via
@@ -29,7 +29,7 @@ set -euo pipefail
 
 API_PORT="${SUNSTONE_API_PORT:-8787}"
 export SUNSTONE_API_PORT="${API_PORT}"
-# The SSR server and its /api proxy always talk to the API on loopback inside
+# The SSR server and its /_api proxy always talk to the API on loopback inside
 # the container; default it here so a bare `docker run` still wires up.
 export SUNSTONE_API_INTERNAL="${SUNSTONE_API_INTERNAL:-http://localhost:${API_PORT}}"
 export HOST="${HOST:-0.0.0.0}"

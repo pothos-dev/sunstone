@@ -77,7 +77,7 @@ volume classed as a disposable cache.
 > effect:
 >
 > ```bash
-> curl -s localhost:3000/api/sync-status
+> curl -s localhost:3000/_api/sync-status
 > # {"shape":"git-synced","lastFetchOk":true,"lastPushOk":true,
 > #  "pendingCommits":0,"lastSyncAgeSecs":3}
 > ```
@@ -96,7 +96,7 @@ volume classed as a disposable cache.
 > `github.sha`), the commit; otherwise `commit` is `null`:
 >
 > ```bash
-> curl -s localhost:3000/api/version
+> curl -s localhost:3000/_api/version
 > # {"version":"0.20.0","commit":"47820fa…"}
 > ```
 
@@ -313,7 +313,7 @@ env-file template [`wiki.env.example`](wiki.env.example):
 ```bash
 cp docker/wiki.env.example ./wiki.env    # then fill it in — see the runbook below
 docker compose -f docker-compose.wiki.yml up -d
-curl -s localhost:3000/api/sync-status   # confirm shape: "git-synced"
+curl -s localhost:3000/_api/sync-status   # confirm shape: "git-synced"
 ```
 
 It uses `env_file:` (the repo's first) rather than inline `environment:` because
@@ -442,7 +442,7 @@ host-side git surgery.
 2. Bring up `docker-compose.wiki.yml`. The server clones origin into the **fresh**
    `repo` volume; a fresh volume is empty, so clone-on-boot is safe by construction
    rather than by guard.
-3. Verify: `curl -s localhost:3000/api/sync-status` reports `shape: "git-synced"`,
+3. Verify: `curl -s localhost:3000/_api/sync-status` reports `shape: "git-synced"`,
    `lastFetchOk: true`, `pendingCommits: 0`. Sign in, edit, and confirm the commit
    lands in the bare repo with **the OIDC user as author** and `Sunstone Sync` as
    committer. Then push to the bare repo from elsewhere and confirm the change

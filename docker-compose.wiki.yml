@@ -13,7 +13,7 @@
 #
 # Confirm the shape took effect (an empty SUNSTONE_GIT_ORIGIN silently
 # downgrades to git-local — commits that never leave the container):
-#   curl -s localhost:3000/api/sync-status
+#   curl -s localhost:3000/_api/sync-status
 
 services:
   sunstone-wiki:
