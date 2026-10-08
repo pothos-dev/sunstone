@@ -30,8 +30,8 @@ use sunstone_shared::scan;
 use sunstone_shared::url;
 use sunstone_shared::wikilink::{self, resolve_wikilink, WikilinkParts};
 use sunstone_shared::{
-    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, OkfMarker,
-    ResolvedLink, RewriteBody, WikilinkTarget,
+    find_bundle_root, resolve_link, rewrite_anchors_in, AnchorRename, AnchorRewrite, BundleRoot,
+    OkfMarker, ResolvedLink, RewriteBody, WikilinkTarget,
 };
 
 /// The in-wasm Bundle index handle (ADR 0006 §3/§4). It OWNS the saved concept
@@ -44,27 +44,31 @@ pub struct BundleIndex {
     concept_paths: Vec<String>,
     /// Membership set over `concept_paths` for O(1) `exists` / broken-link.
     set: HashSet<String>,
-    /// Best-effort OKF bundle root within the opened tree (`''` = opened root).
-    root: String,
-    /// The `okf_version` the root declares, when it was found by its marker.
-    okf_version: Option<String>,
+    /// The Bundle root the ladder found (`sunstone_shared::bundle_root`): its
+    /// directory, the rung that found it, and any declared `okf_version`.
+    root: BundleRoot,
 }
 
 #[wasm_bindgen]
 impl BundleIndex {
     /// Construct a handle owning the saved concept-path set. Computes and holds
-    /// the OKF bundle root once (retiring the TS `#rootCache` memo), from the
-    /// paths plus the `okf_version` markers (`Backend.listOkfMarkers`; `[]` when
-    /// the root is irrelevant, e.g. a one-shot URL lookup).
+    /// the OKF bundle root once (retiring the TS `#rootCache` memo) by running
+    /// the root ladder over the paths plus its filesystem facts: the
+    /// `okf_version` markers (`Backend.listOkfMarkers`) and the opened folder's
+    /// git prefix (`Backend.gitPrefix`; `null` outside a repository). `[]` /
+    /// `null` when the root is irrelevant, e.g. a one-shot URL lookup.
     #[wasm_bindgen(constructor)]
-    pub fn new(concept_paths: Vec<String>, okf_markers: Vec<OkfMarker>) -> BundleIndex {
+    pub fn new(
+        concept_paths: Vec<String>,
+        okf_markers: Vec<OkfMarker>,
+        git_prefix: Option<String>,
+    ) -> BundleIndex {
         let set: HashSet<String> = concept_paths.iter().cloned().collect();
-        let root = find_bundle_root(&concept_paths, &okf_markers);
+        let root = find_bundle_root(&concept_paths, &okf_markers, git_prefix.as_deref());
         BundleIndex {
             concept_paths,
             set,
-            root: root.dir,
-            okf_version: root.okf_version,
+            root,
         }
     }
 
@@ -73,7 +77,7 @@ impl BundleIndex {
     /// OKF-only behaviour such as linting.
     #[wasm_bindgen(js_name = okfVersion)]
     pub fn okf_version(&self) -> Option<String> {
-        self.okf_version.clone()
+        self.root.okf_version.clone()
     }
 
     /// Resolve a clicked markdown link `href` inside the Concept at
@@ -95,10 +99,11 @@ impl BundleIndex {
             .map(|path| WikilinkTarget { path })
     }
 
-    /// The best-effort OKF bundle root (replaces the TS `#rootCache`).
+    /// The detected Bundle root's directory within the opened tree (`''` = the
+    /// opened folder, or a git toplevel above it). Replaces the TS `#rootCache`.
     #[wasm_bindgen(js_name = bundleRoot)]
     pub fn bundle_root(&self) -> String {
-        self.root.clone()
+        self.root.dir.clone()
     }
 
     /// Whether a Concept exists at `path` (concept-set membership).
@@ -308,17 +313,18 @@ pub fn wikilink_raws(body: String) -> Vec<String> {
 
 /// Resolve a markdown link `href` from `current_path` against an explicit
 /// concept path-set (the fake's corpus). The bundle root + membership are
-/// derived from `paths` + `okf_markers`, so this is the real [`resolve_link`]
-/// over the same root the handle would find.
+/// derived from `paths` + `okf_markers` + `git_prefix`, so this is the real
+/// [`resolve_link`] over the same root the handle would find.
 #[wasm_bindgen(js_name = resolveLinkIn)]
 pub fn resolve_link_in(
     current_path: String,
     href: String,
     paths: Vec<String>,
     okf_markers: Vec<OkfMarker>,
+    git_prefix: Option<String>,
 ) -> ResolvedLink {
     let set: HashSet<String> = paths.iter().cloned().collect();
-    let root = find_bundle_root(&paths, &okf_markers).dir;
+    let root = find_bundle_root(&paths, &okf_markers, git_prefix.as_deref());
     resolve_link(&current_path, &href, &root, |p| set.contains(p))
 }
 

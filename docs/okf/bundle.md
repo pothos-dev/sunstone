@@ -28,11 +28,16 @@ A Bundle is [conformant](/okf/spec.md#11-conformance) if every non-reserved `.md
 
 ### Finding the bundle root (Sunstone extension)
 
-The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `find_bundle_root(all_paths, okf_markers)` in [`sunstone-shared`](/architecture/sunstone-shared.md) (`crates/sunstone-shared/src/bundle_root.rs`) finds it in rungs, first match wins. The frontend runs that same code through the wasm seam rather than a TS twin ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)).
+The spec assumes you already know the bundle root; Sunstone often does **not**, because the folder it is pointed at is frequently a repository whose Bundle lives under `docs/`, while bundle-absolute links (`/x.md`) were authored relative to _that_ inner root. `find_bundle_root(all_paths, okf_markers, git_prefix)` in [`sunstone-shared`](/architecture/sunstone-shared.md) (`crates/sunstone-shared/src/bundle_root.rs`) finds it with an ordered **ladder** of four named rungs, first match wins. Each rung is its own public function with its own tests, and the result (`BundleRoot { dir, okf_version, rung }`) records which rung found it. The frontend runs that same code through the wasm seam rather than a TS twin ([ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md)).
 
-**Rung 1: the `okf_version` marker.** v0.2 [§12](/okf/spec.md#12-versioning) lets a bundle-root `index.md` declare `okf_version`, the only Frontmatter a Reserved file may carry. So an `index.md` that declares it is a positive root declaration, and it outranks every structural rule below (a top-level `README.md` included). When several declare it along one ancestor chain, the **outermost** wins; an inner declaration is a nested Bundle, not the root. Declarations in unrelated sibling directories are ambiguous, so the finder does not guess between them and falls through to rung 2. The value must be a non-empty string (`"0.2"`) or an unquoted number (`0.2`). Anything else (an empty value, a list, unparseable YAML, no Frontmatter) counts as no marker.
+| # | Rung | Matches when | Root | A bundle-absolute `/p` tries |
+| --- | --- | --- | --- | --- |
+| 1 | `marker_root` | an `index.md` declares `okf_version` | the outermost declaring directory | `<dir>/p` |
+| 2 | `index_chain_root` | some directory carries an `index.md` | the outermost such directory | `<dir>/p` |
+| 3 | `git_toplevel_root` | the opened folder is inside a git repository | the repository toplevel, possibly **above** the opened folder | `p` with the opened folder's own path stripped off the front |
+| 4 | `opened_folder_root` | always | the opened folder | `<the linking Concept's directory>/p` |
 
-The finder stays pure: it never reads a file. The markers reach it as data. `Index::okf_markers()` (desktop and server) and the fake's store each parse every `index.md` with the shared `frontmatter::okf_version_of` and hand the list out as `Backend.listOkfMarkers()`. The frontend's `indexStore` passes it to the wasm `BundleIndex` beside the path list, and the handle reports the root (`bundleRoot()`) and the version it declares (`okfVersion()`, `null` when the root was inferred).
+**Rung 1: the `okf_version` marker.** v0.2 [§12](/okf/spec.md#12-versioning) lets a bundle-root `index.md` declare `okf_version`, the only Frontmatter a Reserved file may carry. So an `index.md` that declares it is a positive root declaration, and it outranks every rung below. When several declare it along one ancestor chain, the **outermost** wins; an inner declaration is a nested Bundle, not the root. Declarations in unrelated sibling directories are ambiguous, so the finder does not guess between them and falls through to rung 2. The value must be a non-empty string (`"0.2"`) or an unquoted number (`0.2`). Anything else (an empty value, a list, unparseable YAML, no Frontmatter) counts as no marker.
 
 A missing marker proves nothing. Upstream issue #26 reports the reference agent's index regeneration silently dropping `okf_version`, so absence falls through to rung 2 rather than meaning "no Bundle".
 
@@ -44,13 +49,20 @@ A missing marker proves nothing. Upstream issue #26 reports the reference agent'
 
 Only the root `index.md` is written; no other `index.md` ever gains Frontmatter. Merely opening a folder (**Open folder…**, `sunstone ./notes`) writes nothing: OKF behaviour is gated on the marker ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md)), so writing it on open would turn every folder of notes into an OKF Bundle. Sunstone Web has no launcher, so `createBundle` is desktop-only.
 
-**Rung 2: structural inference**, from the path list alone:
+**Rung 2: the `index.md` chain.** Without a marker, the outermost directory carrying an `index.md` is the root (a root `index.md` makes it the opened folder). Since [§3](/okf/spec.md#3-bundle-structure) makes an `index.md` optional at every level, a gap in the chain does not stop it: `kb/index.md` roots `kb/a/b/index.md` even though `kb/a/` has none. Directories nested under another candidate never compete. Among unrelated candidates the shallowest wins; on a depth tie the canonical `docs/` wins, and any other tie (`notes/index.md` beside `wiki/index.md`) is **ambiguous**, so the rung declines rather than guessing. Top-level Concepts do not pin the root at the opened folder, so a repository's `README.md` beside `docs/index.md` still roots at `docs/`.
 
-1. Any top-level `.md` (a root `index.md` or root-level Concept) ⇒ the opened folder **is** the root. A Bundle at the opened root is the common case; never redirect down.
-2. Otherwise, the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
-3. No `index.md` anywhere ⇒ the sole shared top-level segment if every Concept has one, else `''` (don't guess).
+**Rung 3: the git toplevel.** OKF names a git repository as the recommended distribution unit ([§3](/okf/spec.md#3-bundle-structure)), so with no `index.md` to go on, the repository containing the opened folder is the Bundle. When the opened folder is the toplevel this changes nothing. When it is a subdirectory (`sunstone ./handbook`, or the server's `SUNSTONE_GIT_BUNDLE_SUBDIR`), bundle-absolute links were authored against the repository root, so `/handbook/guide.md` resolves to the opened folder's `guide.md`.
 
-`apply_bundle_root` then prepends that root to a bundle-absolute target **only when the rewritten path actually exists**, so a mis-identified root can never mis-navigate a link that would otherwise have worked. This is the one bundle-level rule Sunstone _adds_ to the spec — see [Linking → Nested bundle root](/okf/linking.md#nested-bundle-root).
+**Rung 4: the opened folder.** With every rung exhausted, the opened folder is the root, and a bundle-absolute link degrades to resolving against the linking Concept's own directory, as if it were relative.
+
+The finder stays pure: it never reads a file or runs git. Its filesystem facts reach it as data:
+
+- **Markers.** `Index::okf_markers()` (desktop and server) and the fake's store each parse every `index.md` with the shared `frontmatter::okf_version_of` and hand the list out as `Backend.listOkfMarkers()`.
+- **Git prefix.** The opened folder's path within its repository (`git rev-parse --show-prefix`; `''` at the toplevel, `null` outside one), asked of git once per opened Bundle (`AppState::git_prefix`) and served as `Backend.gitPrefix()`. The fake answers `''`, a Bundle at its repository toplevel.
+
+The frontend's `indexStore` passes both to the wasm `BundleIndex` beside the path list. The handle reports the root (`bundleRoot()`) and the version it declares (`okfVersion()`, `null` when the root was inferred).
+
+**Every rung is existence-gated.** A rung only proposes where `/p` lands (`BundleRoot::anchor`); `apply_bundle_root` takes that candidate **only when it actually exists** and otherwise keeps `p` as written, against the opened folder. So a mis-identified root, at any rung, can never break a link that would otherwise have worked, and a link is styled broken only when its target is absent both ways. This ladder is the bundle-level rule Sunstone _adds_ to the spec. See [Linking → Nested bundle root](/okf/linking.md#nested-bundle-root).
 
 ### Indexes Sunstone synthesizes
 
@@ -81,7 +93,7 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 
 | Topic | Pure OKF | Sunstone |
 | --- | --- | --- |
-| Bundle root | Known a priori; absolute links resolve from it | Taken from the outermost `index.md` declaring `okf_version` ([§12](/okf/spec.md#12-versioning)); without one, **inferred** structurally. Either way, the rewrite is existence-gated ([Linking](/okf/linking.md#nested-bundle-root)) |
+| Bundle root | Known a priori; absolute links resolve from it | Taken from the outermost `index.md` declaring `okf_version` ([§12](/okf/spec.md#12-versioning)); without one, **inferred** down a [ladder](#finding-the-bundle-root-sunstone-extension): outermost `index.md`, then the git toplevel, then the opened folder with bundle-absolute links resolved against the Concept's own directory. Every rung's rewrite is existence-gated ([Linking](/okf/linking.md#nested-bundle-root)) |
 | Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
 | Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git/`) |

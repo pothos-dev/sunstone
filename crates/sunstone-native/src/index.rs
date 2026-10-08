@@ -650,13 +650,13 @@ mod tests {
     #[test]
     fn find_bundle_root_input_is_unchanged_by_attachments() {
         // THE reason the Attachment index is separate (af-1 "Attachment index"):
-        // `find_bundle_root` infers the root structurally, and `concept_paths()`
-        // is what feeds it. A top-level `assets/` folder is the hazard shape —
-        // with the Attachments folded in, `assets` would be a second top-level
-        // segment beside `docs`, which is the "ambiguous -> root is ''" case.
+        // `find_bundle_root` infers the root from the path set, and
+        // `concept_paths()` is what feeds it. A top-level `assets/` folder is
+        // the hazard shape: any rule over the tree's shape would see it beside
+        // `docs`.
         let idx = indexed_with_attachments();
         let concept_paths = idx.concept_paths();
-        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths, &[]).dir, "docs");
+        assert_eq!(sunstone_shared::find_bundle_root(&concept_paths, &[], None).dir, "docs");
 
         // Belt and braces: even handed the union, `find_bundle_root` filters to
         // `.md` itself today, so the result is identical. The separate index is
@@ -665,8 +665,8 @@ mod tests {
         union.extend(idx.attachment_paths());
         union.sort();
         assert_eq!(
-            sunstone_shared::find_bundle_root(&union, &[]),
-            sunstone_shared::find_bundle_root(&concept_paths, &[])
+            sunstone_shared::find_bundle_root(&union, &[], None),
+            sunstone_shared::find_bundle_root(&concept_paths, &[], None)
         );
     }
 
@@ -685,7 +685,7 @@ mod tests {
             okf_version: "0.2".to_string(),
         };
         assert_eq!(idx.okf_markers(), vec![marker("docs/index.md"), marker("docs/kb/index.md")]);
-        let root = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers());
+        let root = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers(), None);
         assert_eq!(root.dir, "docs");
 
         // The index regenerated without the key (upstream #26): the marker goes.

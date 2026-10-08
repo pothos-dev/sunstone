@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, RwLock, RwLockReadGuard};
+use std::sync::{Mutex, OnceLock, RwLock, RwLockReadGuard};
 use std::time::{Duration, Instant};
 
 use crate::index::Index;
@@ -27,6 +27,9 @@ pub struct AppState {
     pub index: RwLock<Index>,
     /// Absolute path -> instant of Sunstone's last write to it.
     self_writes: Mutex<HashMap<PathBuf, Instant>>,
+    /// The Bundle root's path within its git repository, asked of git once on
+    /// first use (see [`AppState::git_prefix`]).
+    git_prefix: OnceLock<Option<String>>,
 }
 
 impl AppState {
@@ -36,7 +39,19 @@ impl AppState {
             bundle_root,
             index: RwLock::new(index),
             self_writes: Mutex::new(HashMap::new()),
+            git_prefix: OnceLock::new(),
         }
+    }
+
+    /// The opened folder's path within the git repository containing it (`''`
+    /// = it is the toplevel), `None` outside one: the git-toplevel rung's input
+    /// to the Bundle-root ladder (`sunstone_shared::bundle_root`). Asked of git
+    /// lazily, once — after any boot-time `git init`/clone has run — and kept
+    /// for the session, since a Bundle does not move between repositories.
+    pub fn git_prefix(&self) -> Option<String> {
+        self.git_prefix
+            .get_or_init(|| crate::git::repo_prefix(&self.bundle_root))
+            .clone()
     }
 
     /// Acquire a shared read lock on the Bundle index, mapping a poisoned lock to

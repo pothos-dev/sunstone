@@ -43,6 +43,13 @@ export function okfMarkers(): OkfMarker[] {
 }
 
 /**
+ * The fake Bundle's path within its git repository — the fake's
+ * `Backend.gitPrefix`. It models a Bundle opened at its repository toplevel
+ * (it has a commit history: `./git`), so `''`.
+ */
+export const FAKE_GIT_PREFIX: string | null = '';
+
+/**
  * Extract outbound internal link targets from a Concept's body, resolved.
  *
  * ## The `!`-asymmetry is DELIBERATE (af-1) — site 3 of 3
@@ -61,7 +68,7 @@ export function outboundLinks(path: string, content: string): string[] {
   const markers = okfMarkers();
   const targets = new Set<string>();
   for (const href of markdownLinkHrefs(body)) {
-    const resolved = resolveLinkIn(path, href, paths, markers);
+    const resolved = resolveLinkIn(path, href, paths, markers, FAKE_GIT_PREFIX);
     if (resolved.kind === 'internal') targets.add(resolved.path);
   }
   // Wikilinks ([[name]]) resolve by name (§1) and also feed backlinks.

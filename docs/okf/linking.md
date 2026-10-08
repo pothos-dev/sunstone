@@ -76,17 +76,16 @@ Path math is done by `paths::normalize_segments`, which collapses `.`/`..` and r
 
 ### Nested bundle root
 
-The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths, okf_markers)` (`sunstone-shared/src/bundle_root.rs`) identifies the root in rungs:
+The folder Sunstone opens is not always the OKF Bundle root — a repository commonly keeps its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored relative to *that* root. `find_bundle_root(all_paths, okf_markers, git_prefix)` (`sunstone-shared/src/bundle_root.rs`) identifies the root with an ordered ladder, first match wins:
 
-1. **Marker.** The outermost `index.md` whose Frontmatter declares `okf_version` (OKF v0.2 §12) is the root, overriding every structural rule. Unrelated sibling declarations are ambiguous and fall through. The markers arrive as data (`Backend.listOkfMarkers()`); the finder never reads a file.
-2. **Structure** (paths only):
-   1. Any top-level `.md` (a root `index.md` or a root-level Concept) → the opened folder **is** the root (`''`). Never redirect down; a Bundle at the opened root is the common case.
-   2. Otherwise the shallowest directory carrying an `index.md`; on a depth tie prefer the canonical `docs/`, else only commit when a single candidate is shallowest.
-   3. No `index.md` anywhere → the sole shared top-level segment if every Concept has one, else `''` (don't guess).
+1. **Marker.** The outermost `index.md` whose Frontmatter declares `okf_version` (OKF v0.2 §12). Unrelated sibling declarations are ambiguous and fall through.
+2. **`index.md` chain.** The outermost directory carrying an `index.md`, gaps in the chain tolerated; the shallowest across unrelated trees, `docs/` on a depth tie, and no guess between other same-depth siblings.
+3. **Git toplevel.** The repository containing the opened folder; when that lies above the opened folder, `/handbook/x.md` opened at `handbook/` resolves to `x.md`.
+4. **Opened folder.** Bundle-absolute links resolve against the linking Concept's own directory.
 
-See [Bundle → Finding the bundle root](/okf/bundle.md#finding-the-bundle-root-sunstone-extension) for the marker rules in full.
+The markers and the git prefix arrive as data (`Backend.listOkfMarkers()`, `Backend.gitPrefix()`); the finder never reads a file or runs git. See [Bundle → Finding the bundle root](/okf/bundle.md#finding-the-bundle-root-sunstone-extension) for each rung in full.
 
-`applyBundleRoot` then prepends the identified root to a bundle-absolute target **only when the rewritten path actually exists** (`opts.exists`). This safe fallback means a mis-identified root can never mis-navigate a link that would otherwise have worked — a wrong guess simply leaves the link unrooted.
+`apply_bundle_root` (`sunstone-shared/src/links.rs`) then takes the rung's candidate for a bundle-absolute target (`BundleRoot::anchor`) **only when it actually exists**, else keeps the path as written. This safe fallback holds at every rung: a mis-identified root can never mis-navigate a link that would otherwise have worked, and a wrong guess simply leaves the link unrooted.
 
 ## Wikilinks (`[[name]]`) — the name-based fallback
 

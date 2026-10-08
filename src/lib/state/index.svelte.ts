@@ -42,9 +42,9 @@ class IndexStore {
   #attachments: string[] = [];
 
   /**
-   * The OKF bundle root within the opened tree (`''` = opened root): the
-   * outermost `index.md` declaring `okf_version` when there is one, else the
-   * structural best effort (`sunstone-shared/src/bundle_root.rs`).
+   * The OKF bundle root within the opened tree (`''` = opened root): the first
+   * rung of the root ladder that matches — `okf_version` marker, outermost
+   * `index.md`, git toplevel, opened folder (`sunstone-shared/src/bundle_root.rs`).
    */
   bundleRoot(): string {
     return this.#handle?.bundleRoot() ?? '';
@@ -118,18 +118,20 @@ class IndexStore {
       // backs the handle, and the Attachment set held beside it (they are two
       // separate seam methods because they are two separate indexes — see
       // `Backend.listAttachmentPaths`).
-      // The `okf_version` markers ride beside the paths: the root finder is
-      // pure, so the marker reaches it as data (OKF v0.2 §12).
-      const [paths, attachments, markers] = await Promise.all([
+      // The root ladder's filesystem facts ride beside the paths — the
+      // `okf_version` markers (OKF v0.2 §12) and the git prefix: the root
+      // finder is pure, so they reach it as data.
+      const [paths, attachments, markers, gitPrefix] = await Promise.all([
         backend.listConceptPaths(),
         backend.listAttachmentPaths(),
         backend.listOkfMarkers(),
+        backend.gitPrefix(),
       ]);
       // Swap the handle: free the OLD one before building the new (ADR 0006
       // §4), only once we have a fresh set — so a backend error leaves the
       // previous handle AND the previous Attachment corpus untouched.
       this.#handle?.free();
-      this.#handle = wasm ? new wasm.BundleIndex(paths, markers) : null;
+      this.#handle = wasm ? new wasm.BundleIndex(paths, markers, gitPrefix) : null;
       this.#attachments = attachments;
       this.version += 1;
     } catch {

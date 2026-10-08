@@ -38,7 +38,7 @@ import {
   openExternalTab,
 } from './browserShell';
 import { renderConcept as renderConceptFake } from './fake/render';
-import { outboundLinks, planRewrites, okfMarkers } from './fake/links';
+import { outboundLinks, planRewrites, okfMarkers, FAKE_GIT_PREFIX } from './fake/links';
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
 import { FAKE_COMMITS, committedContentAt } from './fake/git';
 import { searchFiles } from './fake/search';
@@ -481,6 +481,10 @@ export const fakeBackend: Backend = {
   async listOkfMarkers(): Promise<OkfMarker[]> {
     await ensureIndexReady();
     return okfMarkers();
+  },
+
+  async gitPrefix(): Promise<string | null> {
+    return FAKE_GIT_PREFIX;
   },
 
   async backlinks(path: string): Promise<string[]> {

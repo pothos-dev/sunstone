@@ -296,6 +296,8 @@ fn router(state: Arc<ServerState>) -> Router {
         )
         // The `okf_version` markers the Bundle-root finder reads (OKF §12).
         .route("/_api/okf-markers", get(routes_read::okf_markers_handler))
+        // …and the git prefix its git-toplevel rung reads.
+        .route("/_api/git-prefix", get(routes_read::git_prefix_handler))
         .route("/_api/events", get(routes_read::events_handler))
         // Git history (Spec 2 §11) — both gated by the `AuthedUser` extractor,
         // because `file-at-rev` returns the full text of any path at any

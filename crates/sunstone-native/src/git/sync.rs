@@ -399,6 +399,20 @@ pub fn is_repo(root: &Path) -> bool {
     output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "true"
 }
 
+/// `root`'s path within the git work tree containing it
+/// (`git rev-parse --show-prefix`), `'/'`-separated with no trailing slash:
+/// `Some("")` when `root` IS the toplevel, `Some("docs")` one level below it,
+/// `None` outside a work tree (or when git is missing). The git-toplevel rung of
+/// the Bundle-root ladder (`sunstone_shared::bundle_root`) reads it as data.
+pub fn repo_prefix(root: &Path) -> Option<String> {
+    let output = run_git(root, &["rev-parse", "--show-prefix"])?;
+    if !output.status.success() {
+        return None;
+    }
+    let prefix = String::from_utf8_lossy(&output.stdout);
+    Some(prefix.trim_end_matches(['\n', '\r']).trim_end_matches('/').to_string())
+}
+
 /// The author date of the commit a stopped rebase is replaying (`REBASE_HEAD`),
 /// pre-formatted as §9's `<ts>` — `YYYYMMDDThhmmssZ`, UTC.
 ///
@@ -567,6 +581,20 @@ mod tests {
         commit_all(&plain, "first");
         assert_eq!(rev_parse(&plain, "--abbrev-ref HEAD"), "main");
         assert_eq!(remote_url(&plain), None, "no origin remote yet");
+    }
+
+    #[test]
+    fn repo_prefix_locates_the_folder_within_its_repository() {
+        if !git_available() {
+            return;
+        }
+        let plain = temp_dir("prefix-plain");
+        assert_eq!(repo_prefix(&plain), None, "outside a repository");
+        init(&plain, "main").unwrap();
+        assert_eq!(repo_prefix(&plain).as_deref(), Some(""));
+        let nested = plain.join("docs/kb");
+        std::fs::create_dir_all(&nested).unwrap();
+        assert_eq!(repo_prefix(&nested).as_deref(), Some("docs/kb"));
     }
 
     #[test]

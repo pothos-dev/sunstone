@@ -13,7 +13,8 @@
 // The rewrite tests mutate `FILES` and restore it afterwards.
 import { afterEach, describe, expect, test } from 'bun:test';
 import * as wasm from '$lib/wasm/pkg';
-import { okfMarkers, outboundLinks, planRewrites } from './links';
+import { FAKE_GIT_PREFIX, okfMarkers, outboundLinks, planRewrites } from './links';
+import { resolveLinkIn } from '$lib/wasm/exports';
 import { FILES, conceptPaths } from './store';
 
 const concept = (body: string) => `---\ntype: concept\ntitle: T\n---\n\n${body}\n`;
@@ -367,7 +368,7 @@ describe('okfMarkers — the Bundle-root marker (OKF v0.2 §12)', () => {
 
   /** The root the shipped wasm handle finds over the store — what `indexStore` builds. */
   const handleRoot = () => {
-    const index = new wasm.BundleIndex(conceptPaths(), okfMarkers());
+    const index = new wasm.BundleIndex(conceptPaths(), okfMarkers(), FAKE_GIT_PREFIX);
     try {
       return { dir: index.bundleRoot(), okfVersion: index.okfVersion() ?? null };
     } finally {
@@ -403,10 +404,50 @@ describe('okfMarkers — the Bundle-root marker (OKF v0.2 §12)', () => {
     expect(outboundLinks('docs/kb/index.md', concept('[x](/x.md)'))).toEqual(['docs/x.md']);
   });
 
-  test('no or malformed marker falls through to the structural rules', () => {
-    setFiles({ 'README.md': '# Repo\n', 'docs/index.md': '---\nokf_version: true\n---\n' });
+  test('no or malformed marker falls through to the index chain', () => {
+    setFiles({ 'README.md': '# Repo\n', 'index.md': '---\nokf_version: true\n---\n', 'docs/index.md': '' });
     expect(handleRoot()).toEqual({ dir: '', okfVersion: null });
-    setFiles({ 'docs/index.md': '# Docs\n', 'docs/x.md': '# X\n' });
+    setFiles({ 'README.md': '# Repo\n', 'docs/index.md': '# Docs\n', 'docs/x.md': '# X\n' });
     expect(handleRoot()).toEqual({ dir: 'docs', okfVersion: null });
+  });
+});
+
+describe('the Bundle-root ladder past the index chain', () => {
+  let snapshot: Record<string, string> | undefined;
+  const setFiles = (files: Record<string, string>) => {
+    snapshot ??= { ...FILES };
+    for (const k of Object.keys(FILES)) delete FILES[k];
+    Object.assign(FILES, files);
+  };
+  afterEach(() => {
+    if (snapshot) {
+      for (const k of Object.keys(FILES)) delete FILES[k];
+      Object.assign(FILES, snapshot);
+      snapshot = undefined;
+    }
+  });
+
+  const resolve = (from: string, href: string, gitPrefix: string | null) =>
+    resolveLinkIn(from, href, conceptPaths(), okfMarkers(), gitPrefix);
+
+  test('the fake Bundle sits at its repository toplevel', () => {
+    expect(FAKE_GIT_PREFIX).toBe('');
+  });
+
+  test('with no index.md a git toplevel roots bundle-absolute links', () => {
+    setFiles({ 'guide/setup.md': concept('[y](/y.md)'), 'guide/y.md': '# Y\n', 'y.md': '# Y\n' });
+    expect(outboundLinks('guide/setup.md', FILES['guide/setup.md'])).toEqual(['y.md']);
+    // The repository root one level above the opened folder.
+    expect(resolve('guide/setup.md', '/handbook/guide/y.md', 'handbook')).toMatchObject({
+      path: 'guide/y.md',
+      exists: true,
+    });
+  });
+
+  test('outside a repository they resolve against the Concept’s own directory', () => {
+    setFiles({ 'guide/setup.md': '# S\n', 'guide/y.md': '# Y\n', 'top.md': '# T\n' });
+    expect(resolve('guide/setup.md', '/y.md', null)).toMatchObject({ path: 'guide/y.md', exists: true });
+    expect(resolve('guide/setup.md', '/top.md', null)).toMatchObject({ path: 'top.md', exists: true });
+    expect(resolve('guide/setup.md', '/gone.md', null)).toMatchObject({ path: 'gone.md', exists: false });
   });
 });

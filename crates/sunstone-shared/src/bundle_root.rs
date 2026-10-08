@@ -2,24 +2,39 @@
 //!
 //! The folder Sunstone opens is often not the Bundle root: a repository keeps
 //! its Bundle under `docs/`, and bundle-absolute links (`/x.md`) are authored
-//! against THAT root. [`find_bundle_root`] answers "where is the root?" in rungs,
-//! first match wins:
+//! against THAT root. [`find_bundle_root`] answers "where is the root?" as an
+//! ordered ladder of named [`RootRung`]s, first match wins:
 //!
 //! 1. **The `okf_version` marker** ([`marker_root`]). OKF v0.2 §12 lets a
 //!    bundle-root `index.md` declare `okf_version` — the only Frontmatter a
 //!    Reserved file may carry — so an `index.md` that declares it is a positive
-//!    root declaration and outranks every structural guess.
-//! 2. **Structural inference** ([`structural_root`]), from the path list alone.
+//!    root declaration and outranks every guess below.
+//! 2. **The `index.md` chain** ([`index_chain_root`]): the outermost directory
+//!    carrying an `index.md`. Gaps do not stop it (an `index.md` is optional at
+//!    every level); same-depth siblings are ambiguous and fall through.
+//! 3. **The git toplevel** ([`git_toplevel_root`]): OKF names a git repository
+//!    as the recommended distribution unit, so the repository containing the
+//!    opened folder is the root — possibly ABOVE the opened folder.
+//! 4. **The opened folder** ([`opened_folder_root`]), always: bundle-absolute
+//!    links degrade to resolving against the linking Concept's own directory.
 //!
-//! The finder is PURE: it never reads a file. The marker reaches it as data
-//! ([`OkfMarker`], parsed by the caller with
-//! [`crate::frontmatter::okf_version_of`]) beside the path list, so the native
-//! index, the wasm `BundleIndex` and the Playwright fake all run this one
+//! Whatever the rung, [`BundleRoot::anchor`] only proposes a candidate; the
+//! caller (`links::resolve_link`) takes it only when it EXISTS, so a mis-found
+//! root can never break a link that would have worked against the opened folder.
+//!
+//! The finder is PURE: it never reads a file or runs git. Filesystem facts reach
+//! it as data — the markers ([`OkfMarker`], parsed by the caller with
+//! [`crate::frontmatter::okf_version_of`]) and the opened folder's git prefix —
+//! so the desktop, the web frontend and the Playwright fake all run this one
 //! function over the same inputs.
 //!
 //! A missing marker proves nothing (upstream issue #26: the reference agent's
 //! index regeneration drops `okf_version`), so its absence falls through to the
-//! structural rung rather than concluding there is no Bundle.
+//! next rung rather than concluding there is no Bundle.
+//!
+//! A user-chosen root (ticket ov-7) sits ON TOP of this ladder: a rung of its
+//! own ahead of [`RootRung::Marker`] whose [`BundleRoot`] carries the chosen
+//! `dir` and resolves through [`BundleRoot::anchor`] like a detected one.
 
 use serde::{Deserialize, Serialize};
 
@@ -40,24 +55,92 @@ pub struct OkfMarker {
     pub okf_version: String,
 }
 
-/// The detected Bundle root.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct BundleRoot {
-    /// Bundle-relative directory (`''` = the opened folder is the root).
-    pub dir: String,
-    /// The `okf_version` the root declares, when it was found by its marker.
-    /// `None` means the root was inferred structurally — the Bundle does not
-    /// declare itself (or does so ambiguously).
-    pub okf_version: Option<String>,
+/// Which rung of the ladder found the root, carrying what that rung needs to
+/// anchor a bundle-absolute link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootRung {
+    /// An `index.md` declaring `okf_version` (OKF v0.2 §12).
+    Marker,
+    /// The outermost directory carrying an `index.md`.
+    IndexChain,
+    /// The git repository containing the opened folder. `opened_at` is the
+    /// opened folder's path within the repository (`''` = the opened folder is
+    /// the toplevel; `docs` = the repository root lies one level above it).
+    GitToplevel { opened_at: String },
+    /// Nothing else matched: the opened folder, with bundle-absolute links
+    /// resolved against the linking Concept's own directory.
+    OpenedFolder,
 }
 
-/// The Bundle root within the opened tree: the [`marker_root`] when there is
-/// one, else the [`structural_root`].
-pub fn find_bundle_root(all_paths: &[String], markers: &[OkfMarker]) -> BundleRoot {
-    marker_root(all_paths, markers).unwrap_or_else(|| BundleRoot {
-        dir: structural_root(all_paths),
-        okf_version: None,
-    })
+/// The detected Bundle root.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BundleRoot {
+    /// Bundle-relative directory (`''` = the opened folder, or a root above it).
+    pub dir: String,
+    /// The `okf_version` the root declares, when it was found by its marker.
+    /// `None` means the root was inferred — the Bundle does not declare itself
+    /// (or does so ambiguously).
+    pub okf_version: Option<String>,
+    /// The rung that found it.
+    pub rung: RootRung,
+}
+
+impl BundleRoot {
+    /// A root at `dir` found by an inferring rung (no declared version).
+    fn inferred(dir: impl Into<String>, rung: RootRung) -> BundleRoot {
+        BundleRoot {
+            dir: dir.into(),
+            okf_version: None,
+            rung,
+        }
+    }
+
+    /// Where a bundle-absolute link's `path` (normalised, leading `/` dropped,
+    /// `''` = the root itself) lands under this root when linked from the
+    /// Concept at `current_path`, or `None` when the root does not move it.
+    /// Only a CANDIDATE: the caller keeps `path` unless the candidate exists.
+    pub fn anchor(&self, current_path: &str, path: &str) -> Option<String> {
+        let under = |dir: &str| match (dir.is_empty(), path.is_empty()) {
+            (true, _) => None,
+            (false, true) => Some(dir.to_string()),
+            (false, false) => Some(format!("{dir}/{path}")),
+        };
+        match &self.rung {
+            RootRung::Marker | RootRung::IndexChain => under(&self.dir),
+            RootRung::OpenedFolder => under(dir_of(current_path)),
+            // Authored against a repository root above the opened folder: strip
+            // the opened folder's own path off the front.
+            RootRung::GitToplevel { opened_at } if !opened_at.is_empty() => {
+                if path == opened_at {
+                    Some(String::new())
+                } else {
+                    path.strip_prefix(&format!("{opened_at}/")).map(str::to_string)
+                }
+            }
+            RootRung::GitToplevel { .. } => None,
+        }
+    }
+}
+
+/// The Bundle root within the opened tree: the first rung of the ladder that
+/// matches (see the module docs). `git_prefix` is the opened folder's path
+/// within its git repository as `git rev-parse --show-prefix` reports it (`''`
+/// at the toplevel; a trailing `/` is tolerated), `None` outside a repository.
+pub fn find_bundle_root(
+    all_paths: &[String],
+    markers: &[OkfMarker],
+    git_prefix: Option<&str>,
+) -> BundleRoot {
+    marker_root(all_paths, markers)
+        .or_else(|| index_chain_root(all_paths))
+        .or_else(|| git_toplevel_root(git_prefix))
+        .unwrap_or_else(opened_folder_root)
+}
+
+/// Whether directory `outer` strictly encloses `inner` (whole segments; `''`
+/// encloses everything but itself).
+fn encloses(outer: &str, inner: &str) -> bool {
+    outer != inner && (outer.is_empty() || inner.starts_with(&format!("{outer}/")))
 }
 
 /// Rung 1: the directory whose `index.md` declares `okf_version`.
@@ -66,7 +149,7 @@ pub fn find_bundle_root(all_paths: &[String], markers: &[OkfMarker]) -> BundleRo
 /// declare it along one ancestor chain, the OUTERMOST wins — an inner
 /// declaration is a nested Bundle, not the root. Several outermost markers in
 /// unrelated directories (sibling Bundles side by side) are ambiguous: `None`,
-/// so the caller falls through instead of guessing between them.
+/// so the ladder falls through instead of guessing between them.
 pub fn marker_root(all_paths: &[String], markers: &[OkfMarker]) -> Option<BundleRoot> {
     let declared: Vec<(&str, &OkfMarker)> = markers
         .iter()
@@ -74,9 +157,6 @@ pub fn marker_root(all_paths: &[String], markers: &[OkfMarker]) -> Option<Bundle
         .filter(|m| all_paths.contains(&m.index_path))
         .map(|m| (dir_of(&m.index_path), m))
         .collect();
-    let encloses = |outer: &str, inner: &str| {
-        outer != inner && (outer.is_empty() || inner.starts_with(&format!("{outer}/")))
-    };
     let mut outermost = declared
         .iter()
         .filter(|(d, _)| !declared.iter().any(|(o, _)| encloses(o, d)));
@@ -87,64 +167,56 @@ pub fn marker_root(all_paths: &[String], markers: &[OkfMarker]) -> Option<Bundle
     Some(BundleRoot {
         dir: dir.to_string(),
         okf_version: Some(marker.okf_version.clone()),
+        rung: RootRung::Marker,
     })
 }
 
-/// Rung 2: best-effort structural inference from the path list alone, as a
-/// bundle-relative prefix (`''` = the opened folder is itself the root).
-pub fn structural_root(all_paths: &[String]) -> String {
-    let mds: Vec<&String> = all_paths
+/// Rung 2: the outermost directory carrying an `index.md`.
+///
+/// Every `index.md` in `all_paths` names a candidate. One enclosed by another
+/// is a nested section, never the root, and an index-less directory between
+/// them (a gap) changes nothing. Among the outermost candidates the shallowest
+/// wins; on a depth tie the canonical `docs` wins, and any other tie (sibling
+/// Bundles side by side) is ambiguous: `None`, no guess.
+pub fn index_chain_root(all_paths: &[String]) -> Option<BundleRoot> {
+    let mut dirs: Vec<&str> = all_paths
         .iter()
-        .filter(|p| p.to_lowercase().ends_with(".md"))
+        .filter(|p| basename(p) == "index.md")
+        .map(|p| dir_of(p))
         .collect();
-    if mds.is_empty() {
-        return String::new();
-    }
+    dirs.sort_unstable();
+    dirs.dedup();
+    let outermost: Vec<&str> = dirs
+        .iter()
+        .copied()
+        .filter(|d| !dirs.iter().any(|o| encloses(o, d)))
+        .collect();
+    let depth = |d: &str| if d.is_empty() { 0 } else { d.split('/').count() };
+    let min_depth = outermost.iter().map(|d| depth(d)).min()?;
+    let shallowest: Vec<&str> = outermost
+        .into_iter()
+        .filter(|d| depth(d) == min_depth)
+        .collect();
+    let dir = match shallowest.as_slice() {
+        [only] => *only,
+        several if several.contains(&"docs") => "docs",
+        _ => return None,
+    };
+    Some(BundleRoot::inferred(dir, RootRung::IndexChain))
+}
 
-    // a. A top-level markdown file means the opened folder is the bundle root.
-    if mds.iter().any(|p| !p.contains('/')) {
-        return String::new();
-    }
+/// Rung 3: the git repository containing the opened folder. `git_prefix` is
+/// the opened folder's path within it (`''` = the toplevel itself), `None`
+/// when the opened folder is not inside a repository.
+pub fn git_toplevel_root(git_prefix: Option<&str>) -> Option<BundleRoot> {
+    let opened_at = git_prefix?.trim_matches('/').to_string();
+    Some(BundleRoot::inferred("", RootRung::GitToplevel { opened_at }))
+}
 
-    // b. Shallowest directory carrying an index.md.
-    let mut index_dirs: Vec<String> = Vec::new();
-    for p in &mds {
-        if basename(p) == "index.md" {
-            let d = dir_of(p).to_string();
-            if !index_dirs.contains(&d) {
-                index_dirs.push(d);
-            }
-        }
-    }
-    if !index_dirs.is_empty() {
-        let depth = |d: &str| d.split('/').count();
-        let min_depth = index_dirs.iter().map(|d| depth(d)).min().unwrap();
-        let shallow: Vec<&String> = index_dirs
-            .iter()
-            .filter(|d| depth(d) == min_depth)
-            .collect();
-        if shallow.iter().any(|d| d.as_str() == "docs") {
-            return "docs".to_string();
-        }
-        if shallow.len() == 1 {
-            return shallow[0].clone();
-        }
-        return String::new(); // ambiguous — several sibling bundles at the same depth
-    }
-
-    // c. No index.md anywhere: the sole shared top-level segment, if any.
-    let mut top_segs: Vec<&str> = Vec::new();
-    for p in &mds {
-        let seg = p.split('/').next().unwrap_or("");
-        if !top_segs.contains(&seg) {
-            top_segs.push(seg);
-        }
-    }
-    if top_segs.len() == 1 {
-        top_segs[0].to_string()
-    } else {
-        String::new()
-    }
+/// Rung 4, the floor: the opened folder, bundle-absolute links resolving
+/// against the linking Concept's own directory.
+pub fn opened_folder_root() -> BundleRoot {
+    BundleRoot::inferred("", RootRung::OpenedFolder)
 }
 
 #[cfg(test)]
@@ -162,44 +234,55 @@ mod tests {
         }
     }
 
-    /// The root dir with no markers — today's structural behaviour.
-    fn structural(ps: &[&str]) -> String {
-        find_bundle_root(&paths(ps), &[]).dir
+    /// The ladder outside any git repository and with no markers.
+    fn found(ps: &[&str]) -> BundleRoot {
+        find_bundle_root(&paths(ps), &[], None)
     }
 
     fn declared(dir: &str) -> BundleRoot {
         BundleRoot {
             dir: dir.to_string(),
             okf_version: Some("0.2".to_string()),
+            rung: RootRung::Marker,
         }
     }
 
-    fn inferred(dir: &str) -> BundleRoot {
-        BundleRoot {
-            dir: dir.to_string(),
-            okf_version: None,
-        }
+    fn chain(dir: &str) -> BundleRoot {
+        BundleRoot::inferred(dir, RootRung::IndexChain)
+    }
+
+    fn git(opened_at: &str) -> BundleRoot {
+        BundleRoot::inferred(
+            "",
+            RootRung::GitToplevel {
+                opened_at: opened_at.to_string(),
+            },
+        )
+    }
+
+    fn opened() -> BundleRoot {
+        opened_folder_root()
     }
 
     // --- rung 1: the okf_version marker --------------------------------------
 
     #[test]
-    fn a_declared_index_is_the_root_over_every_structural_rule() {
-        // A top-level README would make the opened folder the root structurally.
-        let ps = paths(&["README.md", "docs/index.md", "docs/a.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("docs/index.md")]), declared("docs"));
-        // The shallowest-index rule would pick `wiki`; the marker picks deeper.
+    fn a_declared_index_is_the_root_over_every_later_rung() {
+        // A root index would win the index chain; the declaration goes deeper.
+        let ps = paths(&["index.md", "docs/index.md", "docs/a.md"]);
+        assert_eq!(find_bundle_root(&ps, &[marker("docs/index.md")], Some("")), declared("docs"));
+        // The outermost-index rule would pick `wiki`; the marker picks deeper.
         let ps = paths(&["wiki/index.md", "wiki/kb/index.md", "wiki/kb/a.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("wiki/kb/index.md")]), declared("wiki/kb"));
-        // Sibling indexes are ambiguous structurally; one declaring settles it.
+        assert_eq!(find_bundle_root(&ps, &[marker("wiki/kb/index.md")], None), declared("wiki/kb"));
+        // Sibling indexes are ambiguous on the chain; one declaring settles it.
         let ps = paths(&["notes/index.md", "wiki/index.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("wiki/index.md")]), declared("wiki"));
+        assert_eq!(find_bundle_root(&ps, &[marker("wiki/index.md")], None), declared("wiki"));
         // The `docs` tiebreak loses to a declaration.
         let ps = paths(&["docs/index.md", "kb/index.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("kb/index.md")]), declared("kb"));
+        assert_eq!(find_bundle_root(&ps, &[marker("kb/index.md")], None), declared("kb"));
         // A root `index.md` marker roots at the opened folder.
         let ps = paths(&["index.md", "a.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("index.md")]), declared(""));
+        assert_eq!(find_bundle_root(&ps, &[marker("index.md")], None), declared(""));
     }
 
     #[test]
@@ -210,7 +293,7 @@ mod tests {
             okf_version: "0.3-draft".to_string(),
         };
         assert_eq!(
-            find_bundle_root(&ps, &[m]).okf_version.as_deref(),
+            find_bundle_root(&ps, &[m], None).okf_version.as_deref(),
             Some("0.3-draft")
         );
     }
@@ -219,96 +302,151 @@ mod tests {
     fn the_outermost_of_nested_markers_wins() {
         let ps = paths(&["repo/index.md", "repo/docs/index.md", "repo/docs/kb/index.md"]);
         let ms = [marker("repo/docs/kb/index.md"), marker("repo/index.md"), marker("repo/docs/index.md")];
-        assert_eq!(find_bundle_root(&ps, &ms), declared("repo"));
+        assert_eq!(find_bundle_root(&ps, &ms, None), declared("repo"));
         // The opened folder's own marker encloses everything.
         let ps = paths(&["index.md", "sub/index.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("sub/index.md"), marker("index.md")]), declared(""));
+        assert_eq!(find_bundle_root(&ps, &[marker("sub/index.md"), marker("index.md")], None), declared(""));
         // Whole segments only: `doc` does not enclose `docs`.
         let ps = paths(&["doc/index.md", "docs/index.md"]);
-        assert_eq!(find_bundle_root(&ps, &[marker("doc/index.md"), marker("docs/index.md")]), inferred("docs"));
+        assert_eq!(find_bundle_root(&ps, &[marker("doc/index.md"), marker("docs/index.md")], None), chain("docs"));
     }
 
     #[test]
     fn unrelated_markers_are_ambiguous_and_fall_through() {
-        // Two declared Bundles side by side: no guess between them; the
-        // structural rung decides exactly as it would with no markers.
+        // Two declared Bundles side by side: no guess between them; the later
+        // rungs decide exactly as they would with no markers.
         let ps = paths(&["notes/index.md", "wiki/index.md"]);
         let ms = [marker("notes/index.md"), marker("wiki/index.md")];
-        assert_eq!(find_bundle_root(&ps, &ms), inferred(""));
+        assert_eq!(find_bundle_root(&ps, &ms, None), opened());
+        assert_eq!(find_bundle_root(&ps, &ms, Some("")), git(""));
         let ps = paths(&["docs/index.md", "kb/index.md"]);
         let ms = [marker("docs/index.md"), marker("kb/index.md")];
-        assert_eq!(find_bundle_root(&ps, &ms), inferred("docs"));
+        assert_eq!(find_bundle_root(&ps, &ms, None), chain("docs"));
         // A nested marker under one of them does not break the tie.
         let ps = paths(&["a/index.md", "a/x/index.md", "b/index.md"]);
         let ms = [marker("a/index.md"), marker("a/x/index.md"), marker("b/index.md")];
-        assert_eq!(find_bundle_root(&ps, &ms), inferred(""));
+        assert_eq!(find_bundle_root(&ps, &ms, None), opened());
     }
 
     #[test]
     fn markers_off_the_path_set_or_not_on_an_index_are_ignored() {
         let ps = paths(&["notes/index.md", "wiki/index.md", "wiki/a.md"]);
         // A stale marker for a file not in the set.
-        assert_eq!(find_bundle_root(&ps, &[marker("gone/index.md")]), inferred(""));
+        assert_eq!(find_bundle_root(&ps, &[marker("gone/index.md")], None), opened());
         // `okf_version` on an ordinary Concept is not a root declaration.
-        assert_eq!(find_bundle_root(&ps, &[marker("wiki/a.md")]), inferred(""));
+        assert_eq!(find_bundle_root(&ps, &[marker("wiki/a.md")], None), opened());
         // An empty version is no declaration.
         let empty = OkfMarker {
             index_path: "wiki/index.md".to_string(),
             okf_version: String::new(),
         };
-        assert_eq!(find_bundle_root(&ps, &[empty]), inferred(""));
+        assert_eq!(find_bundle_root(&ps, &[empty], None), opened());
+    }
+
+    // --- rung 2: the index.md chain ------------------------------------------
+
+    #[test]
+    fn the_outermost_index_of_a_chain_wins() {
+        assert_eq!(found(&["docs/index.md", "docs/tables/orders.md"]), chain("docs"));
+        assert_eq!(found(&["wiki/index.md", "wiki/a/index.md", "wiki/a/b.md"]), chain("wiki"));
+        // A root index makes the opened folder the root.
+        assert_eq!(found(&["index.md", "tables/index.md", "tables/orders.md"]), chain(""));
     }
 
     #[test]
-    fn no_markers_is_exactly_the_structural_rung() {
-        for ps in [
-            &["index.md", "tables/orders.md"][..],
-            &["README.md", "docs/index.md"],
-            &["docs/index.md", "docs/tables/orders.md"],
-            &["wiki/index.md", "wiki/a/index.md", "wiki/a/b.md"],
-            &["notes/index.md", "wiki/index.md"],
-            &["docs/a.md", "docs/sub/b.md"],
-        ] {
-            assert_eq!(find_bundle_root(&paths(ps), &[]), inferred(&structural_root(&paths(ps))));
+    fn a_gap_in_the_chain_does_not_stop_the_walk() {
+        // `kb/a` and `kb/a/b` carry no index.md; `kb` still roots the chain.
+        assert_eq!(found(&["kb/index.md", "kb/a/b/c/index.md", "kb/a/b/x.md"]), chain("kb"));
+        // Nor does an index-less opened folder above it.
+        assert_eq!(found(&["repo/docs/index.md", "repo/docs/a/b/index.md"]), chain("repo/docs"));
+    }
+
+    #[test]
+    fn top_level_concepts_do_not_pin_the_opened_folder() {
+        // A repository's README beside its Bundle under `docs/`.
+        assert_eq!(found(&["README.md", "docs/index.md", "docs/a.md"]), chain("docs"));
+    }
+
+    #[test]
+    fn the_shallowest_outermost_index_wins_across_unrelated_trees() {
+        assert_eq!(found(&["docs/index.md", "src/ui/index.md"]), chain("docs"));
+        assert_eq!(found(&["wiki/index.md", "notes/deep/index.md"]), chain("wiki"));
+    }
+
+    #[test]
+    fn docs_wins_a_same_depth_tie() {
+        assert_eq!(found(&["docs/index.md", "notes/index.md"]), chain("docs"));
+        assert_eq!(found(&["doc/index.md", "docs/index.md"]), chain("docs"));
+    }
+
+    #[test]
+    fn ambiguous_siblings_do_not_guess() {
+        let ps = paths(&["notes/index.md", "wiki/index.md", "wiki/a.md"]);
+        assert_eq!(index_chain_root(&ps), None);
+        assert_eq!(find_bundle_root(&ps, &[], None), opened());
+        assert_eq!(find_bundle_root(&ps, &[], Some("")), git(""));
+    }
+
+    // --- rung 3: the git toplevel ---------------------------------------------
+
+    #[test]
+    fn no_index_anywhere_roots_at_the_git_toplevel() {
+        let ps = paths(&["docs/a.md", "docs/sub/b.md"]);
+        assert_eq!(find_bundle_root(&ps, &[], Some("")), git(""));
+        // The opened folder is a subdirectory of the repository.
+        assert_eq!(find_bundle_root(&ps, &[], Some("handbook/")), git("handbook"));
+        assert_eq!(find_bundle_root(&ps, &[], Some("a/b")), git("a/b"));
+        // An empty tree inside a repository, too.
+        assert_eq!(find_bundle_root(&[], &[], Some("")), git(""));
+    }
+
+    #[test]
+    fn an_index_chain_outranks_the_git_toplevel() {
+        let ps = paths(&["README.md", "docs/index.md"]);
+        assert_eq!(find_bundle_root(&ps, &[], Some("")), chain("docs"));
+    }
+
+    // --- rung 4: the opened folder --------------------------------------------
+
+    #[test]
+    fn with_every_rung_exhausted_the_opened_folder_is_the_root() {
+        assert_eq!(found(&[]), opened());
+        assert_eq!(found(&["a.md", "docs/b.md"]), opened());
+        assert_eq!(found(&["docs/a.md", "docs/sub/b.md"]), opened());
+    }
+
+    // --- anchoring a bundle-absolute link per rung ----------------------------
+
+    #[test]
+    fn a_directory_root_prefixes_its_dir() {
+        for root in [declared("docs"), chain("docs")] {
+            assert_eq!(root.anchor("docs/a.md", "x.md"), Some("docs/x.md".into()));
+            assert_eq!(root.anchor("README.md", ""), Some("docs".into()));
         }
-    }
-
-    // --- rung 2: structural inference (mirrors the former links.test.ts) -----
-
-    #[test]
-    fn empty_bundle_is_root() {
-        assert_eq!(structural(&[]), "");
+        // A root at the opened folder moves nothing.
+        assert_eq!(chain("").anchor("a/b.md", "x.md"), None);
+        assert_eq!(declared("").anchor("a/b.md", "x.md"), None);
     }
 
     #[test]
-    fn top_level_markdown_means_opened_folder_is_root() {
-        assert_eq!(structural(&["index.md", "tables/orders.md"]), "");
-        assert_eq!(structural(&["README.md", "docs/index.md"]), "");
+    fn a_git_root_above_the_opened_folder_strips_its_prefix() {
+        let root = git("handbook");
+        assert_eq!(root.anchor("a.md", "handbook/x/y.md"), Some("x/y.md".into()));
+        assert_eq!(root.anchor("a.md", "handbook"), Some(String::new()));
+        // Whole segments only, and a link outside the opened folder stays put.
+        assert_eq!(root.anchor("a.md", "handbooks/x.md"), None);
+        assert_eq!(root.anchor("a.md", "README.md"), None);
+        // At the toplevel the opened folder IS the root.
+        assert_eq!(git("").anchor("a/b.md", "x.md"), None);
     }
 
     #[test]
-    fn nested_under_docs_found_via_index() {
-        assert_eq!(structural(&["docs/index.md", "docs/tables/orders.md"]), "docs");
-    }
-
-    #[test]
-    fn shallowest_index_wins() {
-        assert_eq!(structural(&["wiki/index.md", "wiki/a/index.md", "wiki/a/b.md"]), "wiki");
-    }
-
-    #[test]
-    fn docs_preferred_on_same_depth_tie() {
-        assert_eq!(structural(&["docs/index.md", "notes/index.md"]), "docs");
-    }
-
-    #[test]
-    fn ambiguous_same_depth_siblings_is_root() {
-        assert_eq!(structural(&["notes/index.md", "wiki/index.md"]), "");
-    }
-
-    #[test]
-    fn no_index_uses_sole_shared_top_segment() {
-        assert_eq!(structural(&["docs/a.md", "docs/sub/b.md"]), "docs");
-        assert_eq!(structural(&["docs/a.md", "other/b.md"]), "");
+    fn the_opened_folder_anchors_at_the_concepts_own_directory() {
+        let root = opened();
+        assert_eq!(root.anchor("guide/setup.md", "x.md"), Some("guide/x.md".into()));
+        assert_eq!(root.anchor("guide/deep/setup.md", "y/z.md"), Some("guide/deep/y/z.md".into()));
+        assert_eq!(root.anchor("guide/setup.md", ""), Some("guide".into()));
+        // A top-level Concept's own directory is the opened folder.
+        assert_eq!(root.anchor("top.md", "x.md"), None);
     }
 }

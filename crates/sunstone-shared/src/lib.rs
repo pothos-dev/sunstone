@@ -29,6 +29,6 @@ pub mod sources;
 pub mod url;
 pub mod wikilink;
 
-pub use bundle_root::{find_bundle_root, BundleRoot, OkfMarker};
+pub use bundle_root::{find_bundle_root, BundleRoot, OkfMarker, RootRung};
 pub use links::{resolve_link, ResolvedLink, RewriteBody, WikilinkTarget};
 pub use rewrite::{rewrite_anchors_in, AnchorRename, AnchorRewrite};

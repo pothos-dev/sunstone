@@ -198,6 +198,16 @@ pub(crate) async fn okf_markers_handler(
     Ok(Json(index.okf_markers()))
 }
 
+/// The served Bundle's path within its git repository (`""` = the Bundle is the
+/// toplevel), `null` outside one: the git-toplevel rung's input to the
+/// frontend's Bundle-root ladder, beside `/_api/okf-markers`. Takes no path, so
+/// there is nothing to guard; it names no more than the served URLs already do.
+pub(crate) async fn git_prefix_handler(
+    State(state): State<Arc<ServerState>>,
+) -> Json<Option<String>> {
+    Json(state.app.git_prefix())
+}
+
 /// Acquire the shared index read lock, mapping a poisoned lock to a 500.
 pub(crate) fn read_index(
     state: &ServerState,
@@ -396,6 +406,30 @@ mod tests {
             serde_json::to_value(&markers).unwrap(),
             serde_json::json!([{ "indexPath": "sub/index.md", "okfVersion": "0.2" }])
         );
+    }
+
+    /// `/_api/git-prefix` serves the Bundle's path within its repository, and
+    /// `null` for a Bundle outside any.
+    #[tokio::test]
+    async fn git_prefix_route_locates_the_bundle_in_its_repository() {
+        use crate::config::Config;
+        let root = temp_bundle();
+        let Json(plain) = git_prefix_handler(State(server_state(Config::plain(root.clone())))).await;
+        assert_eq!(plain, None, "a temp Bundle is in no repository");
+        if std::process::Command::new("git").arg("--version").output().is_err() {
+            return;
+        }
+        let ok = std::process::Command::new("git")
+            .current_dir(&root)
+            .args(["init", "-q"])
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok);
+        let Json(top) = git_prefix_handler(State(server_state(Config::plain(root.clone())))).await;
+        assert_eq!(top.as_deref(), Some(""));
+        let Json(sub) = git_prefix_handler(State(server_state(Config::plain(root.join("sub"))))).await;
+        assert_eq!(sub.as_deref(), Some("sub"));
     }
 
     #[tokio::test]

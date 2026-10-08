@@ -47,7 +47,7 @@ The frontend's real backend (`tauri.ts`) is a thin `invoke(...)` over these; com
 
 - **Launcher / session** — `bundle_root`, `current_bundle` (drives launcher-vs-editor), `take_startup_document` (the CLI DOCUMENT, handed out once), `list_known_bundles`, `forget_bundle`, `open_bundle` (canonicalize + `Session::open`), `create_bundle` (the same, after `bundle::declare_okf_bundle` writes `okf_version` into the root `index.md`; ov-8), `pick_folder` (native chooser).
 - **Tree / Concept CRUD** — `list_tree`, `read_concept`, `write_concept` (autosave; records a self-write so the watcher suppresses its echo), `create_concept`, `create_folder`, `rename_path` / `move_path` (+ auto link-rewrite → `RewriteSummary`), `delete_path`, `rewrite_anchors`.
-- **Index queries** — `list_concept_paths`, `concept_exists`, `backlinks`, `all_tags`, `concepts_by_tag`, `all_types`, `all_keys`.
+- **Index queries** — `list_concept_paths`, `list_okf_markers` and `git_prefix` (the Bundle-root ladder's inputs), `concept_exists`, `backlinks`, `all_tags`, `concepts_by_tag`, `all_types`, `all_keys`.
 - **Search / git / render** — `search`, `file_history`, `file_at_rev`, `render_concept` (feeds the print/PDF path).
 - **Print / PDF** — `open_print_window`, `save_pdf`.
 - **Persisted state** — `load_bundle_state` / `save_bundle_state`.

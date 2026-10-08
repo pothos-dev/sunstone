@@ -194,6 +194,10 @@ export const tauriBackend: Backend = {
     return invoke<OkfMarker[]>('list_okf_markers');
   },
 
+  gitPrefix(): Promise<string | null> {
+    return invoke<string | null>('git_prefix');
+  },
+
   backlinks(path: string): Promise<string[]> {
     return invoke<string[]>('backlinks', { path });
   },

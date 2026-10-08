@@ -34,7 +34,7 @@ pub use env::{configure, GitEnv};
 pub use history::{file_at_rev, file_history, FileAtRev, FileCommit, FileHistory};
 pub use sync::{
     add_paths, anything_staged, checkout_ours, clone, current_branch, diff_name_status, fetch,
-    init, is_push_rejected, is_pushed, is_repo, push, rebase_abort, rebase_continue,
+    init, is_push_rejected, is_pushed, is_repo, push, rebase_abort, rebase_continue, repo_prefix,
     rebase_head_timestamp, rebase_onto, rebase_skip, remote_url, rev_list_count, rm_path,
     stage_entry, unmerged_paths, RebaseOutcome,
 };

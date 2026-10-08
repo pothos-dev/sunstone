@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(std::fs::read_to_string(root.join("docs/index.md")).unwrap(), "# Docs\n");
 
         let idx = crate::index::Index::build(&root);
-        let found = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers());
+        let found = sunstone_shared::find_bundle_root(&idx.concept_paths(), &idx.okf_markers(), None);
         assert_eq!(found.dir, "");
         assert_eq!(found.okf_version.as_deref(), Some("0.2"));
     }

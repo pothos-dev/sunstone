@@ -264,16 +264,17 @@ export function wikilinkRaws(body: string): string[] {
 
 /**
  * Resolve a markdown link `href` from `currentPath` against an explicit concept
- * path-set (the fake's corpus), rooted by `markers` exactly as the
- * `BundleIndex` handle would be. Degrades to `none`.
+ * path-set (the fake's corpus), rooted by `markers` and `gitPrefix` exactly as
+ * the `BundleIndex` handle would be. Degrades to `none`.
  */
 export function resolveLinkIn(
   currentPath: string,
   href: string,
   paths: string[],
   markers: OkfMarker[],
+  gitPrefix: string | null,
 ): ResolvedLink {
-  return mod ? mod.resolveLinkIn(currentPath, href, paths, markers) : { kind: 'none' };
+  return mod ? mod.resolveLinkIn(currentPath, href, paths, markers, gitPrefix) : { kind: 'none' };
 }
 
 /**

@@ -389,6 +389,20 @@ export interface Backend {
    */
   listOkfMarkers(): Promise<OkfMarker[]>;
 
+  /**
+   * The opened folder's path within the git repository containing it (`''` =
+   * it is the toplevel, `'docs'` = the repository root is one level up), or
+   * `null` when it is in no repository. The input to the git-toplevel rung of
+   * the Bundle-root ladder (`sunstone-shared/src/bundle_root.rs`): `indexStore`
+   * hands it to the wasm `BundleIndex` beside the markers, keeping the finder
+   * pure.
+   *
+   * `tauri.ts` / `http.ts` ask git once per opened Bundle
+   * (`AppState::git_prefix`, `git rev-parse --show-prefix`); `fake.ts` models a
+   * Bundle at its repository toplevel and answers `''`.
+   */
+  gitPrefix(): Promise<string | null>;
+
   // --- Attachments (slice: attachment-files) ---
 
   /**

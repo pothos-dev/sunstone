@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::bundle_root::BundleRoot;
 use crate::paths::{folder_index_fallback, index_of, is_external, resolve_location};
 
 /// The classified result of resolving a markdown link `href` (ADR 0006 §3).
@@ -70,35 +71,32 @@ fn extract_anchor(href: &str) -> Option<String> {
     }
 }
 
-/// Apply the identified nested bundle root to a bundle-absolute target, with a
-/// safe fallback: the root is only prepended when the rewritten path actually
-/// resolves to an existing Concept; otherwise the original path is kept.
-fn apply_bundle_root(path: &str, root: &str, exists: &impl Fn(&str) -> bool) -> String {
-    if root.is_empty() {
-        return path.to_string();
-    }
-    let rooted = if path.is_empty() {
-        root.to_string()
-    } else {
-        format!("{root}/{path}")
-    };
-    if exists(&rooted) {
-        rooted
-    } else {
-        path.to_string()
+/// Apply the detected Bundle root to a bundle-absolute target, with a safe
+/// fallback: the rung's candidate ([`BundleRoot::anchor`]) is taken only when
+/// it actually exists; otherwise the original (opened-folder) path is kept. So
+/// a mis-found root, at any rung, never breaks a link that would have worked.
+fn apply_bundle_root(
+    current_path: &str,
+    path: &str,
+    root: &BundleRoot,
+    exists: &impl Fn(&str) -> bool,
+) -> String {
+    match root.anchor(current_path, path) {
+        Some(rooted) if exists(&rooted) => rooted,
+        _ => path.to_string(),
     }
 }
 
 /// Resolve a markdown link `href` clicked inside the Concept at `current_path`
-/// to a target. Mirrors the former `resolveLink` in `src/lib/links.ts` exactly.
+/// to a target.
 ///
-/// When `bundle_root` is non-empty, bundle-absolute (`/…`) links resolve from
-/// THAT root with a safe fallback (see `apply_bundle_root`); relative links are
-/// never redirected. `exists` reports concept-set membership.
+/// Bundle-absolute (`/…`) links resolve from the detected `root` with a safe
+/// fallback (see `apply_bundle_root`); relative links are never redirected.
+/// `exists` reports concept-set membership.
 pub fn resolve_link(
     current_path: &str,
     href: &str,
-    bundle_root: &str,
+    root: &BundleRoot,
     exists: impl Fn(&str) -> bool,
 ) -> ResolvedLink {
     let raw = href.trim();
@@ -121,12 +119,12 @@ pub fn resolve_link(
     let Some(path) = resolve_location(current_path, raw) else {
         return ResolvedLink::None;
     };
-    // Bundle-absolute links are redirected into a nested OKF root when one is
-    // identified and the rooted target exists; relative links never are.
+    // Bundle-absolute links are anchored at the detected root when the anchored
+    // target exists; relative links never are.
     let path = if raw.starts_with('/') {
         // A rooted folder counts as present when it has an index to open.
         let present = |p: &str| exists(p) || exists(&index_of(p));
-        apply_bundle_root(&path, bundle_root, &present)
+        apply_bundle_root(current_path, &path, root, &present)
     } else {
         path
     };
@@ -146,6 +144,7 @@ pub fn resolve_link(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bundle_root::RootRung;
 
     fn paths(ps: &[&str]) -> Vec<String> {
         ps.iter().map(|s| s.to_string()).collect()
@@ -153,6 +152,84 @@ mod tests {
 
     fn no_exists(_: &str) -> bool {
         false
+    }
+
+    fn root_of(dir: &str, rung: RootRung) -> BundleRoot {
+        BundleRoot {
+            dir: dir.to_string(),
+            okf_version: None,
+            rung,
+        }
+    }
+
+    /// A root at `dir` found by the index chain (`''` = the opened folder).
+    fn at(dir: &str) -> BundleRoot {
+        root_of(dir, RootRung::IndexChain)
+    }
+
+    // --- the root ladder: each rung anchors, and every anchor is gated --------
+
+    #[test]
+    fn every_rung_anchors_only_onto_an_existing_target() {
+        let set = paths(&[
+            "index.md",
+            "x.md",
+            "docs/index.md",
+            "docs/x.md",
+            "guide/setup.md",
+            "guide/y.md",
+            "only-top.md",
+        ]);
+        let exists = |p: &str| set.iter().any(|x| x == p);
+        let marker = BundleRoot {
+            dir: "docs".to_string(),
+            okf_version: Some("0.2".to_string()),
+            rung: RootRung::Marker,
+        };
+        let git_above = root_of("", RootRung::GitToplevel { opened_at: "handbook".to_string() });
+        let git_here = root_of("", RootRung::GitToplevel { opened_at: String::new() });
+        let opened = root_of("", RootRung::OpenedFolder);
+        let cases: &[(&BundleRoot, &str, &str, &str)] = &[
+            // Directory rungs: anchored when the rooted target exists …
+            (&marker, "README.md", "/x.md", "docs/x.md"),
+            (&at("docs"), "README.md", "/x.md", "docs/x.md"),
+            (&at("docs"), "README.md", "/", "docs/index.md"),
+            // … and left alone when it does not.
+            (&marker, "docs/x.md", "/only-top.md", "only-top.md"),
+            (&at("docs"), "docs/x.md", "/guide/y.md", "guide/y.md"),
+            // A git root above the opened folder strips the opened folder's path.
+            (&git_above, "x.md", "/handbook/guide/y.md", "guide/y.md"),
+            (&git_above, "x.md", "/handbook/", "index.md"),
+            (&git_above, "x.md", "/handbook/missing.md", "handbook/missing.md"),
+            // At the toplevel the opened folder is the root: nothing moves.
+            (&git_here, "guide/setup.md", "/x.md", "x.md"),
+            // Opened folder: the Concept's own directory first, else as written.
+            (&opened, "guide/setup.md", "/y.md", "guide/y.md"),
+            (&opened, "guide/setup.md", "/x.md", "x.md"),
+            (&opened, "x.md", "/only-top.md", "only-top.md"),
+        ];
+        for (root, cur, href, want) in cases {
+            let got = match resolve_link(cur, href, root, exists) {
+                ResolvedLink::Internal { path, .. } => path,
+                ResolvedLink::None => String::new(),
+                other => panic!("{other:?}"),
+            };
+            assert_eq!(&got, want, "{:?} {cur} {href}", root.rung);
+        }
+    }
+
+    #[test]
+    fn the_opened_folder_rung_styles_broken_only_when_absent_everywhere() {
+        let set = paths(&["guide/setup.md", "guide/y.md", "top.md"]);
+        let exists = |p: &str| set.iter().any(|x| x == p);
+        let opened = root_of("", RootRung::OpenedFolder);
+        let resolved = |href: &str| resolve_link("guide/setup.md", href, &opened, exists);
+        assert!(matches!(resolved("/y.md"), ResolvedLink::Internal { exists: true, .. }));
+        assert!(matches!(resolved("/top.md"), ResolvedLink::Internal { exists: true, .. }));
+        assert_eq!(
+            resolved("/nowhere.md"),
+            ResolvedLink::Internal { path: "nowhere.md".to_string(), anchor: None, exists: false }
+        );
     }
 
     // --- resolve_link (mirrors links.test.ts::resolveLink) -------------------
@@ -167,14 +244,14 @@ mod tests {
             exists: true,
         };
         for (cur, href) in [("x.md", "/"), ("x.md", "./"), ("x.md", "."), ("a/b.md", ".."), ("a/b.md", "../")] {
-            assert_eq!(resolve_link(cur, href, "", exists), internal("index.md", None), "{cur} {href}");
+            assert_eq!(resolve_link(cur, href, &at(""), exists), internal("index.md", None), "{cur} {href}");
         }
-        assert_eq!(resolve_link("x.md", "/#Top", "", exists), internal("index.md", Some("Top")));
+        assert_eq!(resolve_link("x.md", "/#Top", &at(""), exists), internal("index.md", Some("Top")));
         // A nested bundle root's own index wins for a rooted link.
-        assert_eq!(resolve_link("docs/x.md", "/", "docs", exists), internal("docs/index.md", None));
+        assert_eq!(resolve_link("docs/x.md", "/", &at("docs"), exists), internal("docs/index.md", None));
         // No root index: nothing to open, as before.
         let bare = |p: &str| p == "a/b.md";
-        assert_eq!(resolve_link("x.md", "/", "", bare), ResolvedLink::None);
+        assert_eq!(resolve_link("x.md", "/", &at(""), bare), ResolvedLink::None);
     }
 
     #[test]
@@ -187,26 +264,26 @@ mod tests {
             exists: true,
         };
         for href in ["guide", "guide/", "./guide", "/guide/"] {
-            assert_eq!(resolve_link("cur.md", href, "", exists), internal("guide/index.md", None), "{href}");
+            assert_eq!(resolve_link("cur.md", href, &at(""), exists), internal("guide/index.md", None), "{href}");
         }
         assert_eq!(
-            resolve_link("cur.md", "guide#Setup", "", exists),
+            resolve_link("cur.md", "guide#Setup", &at(""), exists),
             internal("guide/index.md", Some("Setup"))
         );
         // Through a nested bundle root, too.
-        assert_eq!(resolve_link("docs/x.md", "/sub", "docs", exists), internal("docs/sub/index.md", None));
+        assert_eq!(resolve_link("docs/x.md", "/sub", &at("docs"), exists), internal("docs/sub/index.md", None));
         // A folder with no index stays a (broken) folder path.
         assert_eq!(
-            resolve_link("cur.md", "nothing/", "", exists),
+            resolve_link("cur.md", "nothing/", &at(""), exists),
             ResolvedLink::Internal { path: "nothing".to_string(), anchor: None, exists: false }
         );
     }
 
     #[test]
     fn empty_or_whitespace_is_none() {
-        assert_eq!(resolve_link("a.md", "", "", no_exists), ResolvedLink::None);
+        assert_eq!(resolve_link("a.md", "", &at(""), no_exists), ResolvedLink::None);
         assert_eq!(
-            resolve_link("a.md", "   ", "", no_exists),
+            resolve_link("a.md", "   ", &at(""), no_exists),
             ResolvedLink::None
         );
     }
@@ -214,7 +291,7 @@ mod tests {
     #[test]
     fn external_passes_through_trimmed() {
         assert_eq!(
-            resolve_link("a.md", "  https://x.com  ", "", no_exists),
+            resolve_link("a.md", "  https://x.com  ", &at(""), no_exists),
             ResolvedLink::External {
                 href: "https://x.com".to_string()
             }
@@ -224,7 +301,7 @@ mod tests {
     #[test]
     fn pure_anchor_is_none() {
         assert_eq!(
-            resolve_link("a.md", "#heading", "", no_exists),
+            resolve_link("a.md", "#heading", &at(""), no_exists),
             ResolvedLink::None
         );
     }
@@ -232,7 +309,7 @@ mod tests {
     #[test]
     fn bundle_absolute_strips_leading_slash() {
         assert_eq!(
-            resolve_link("dir/cur.md", "/foo/bar.md", "", no_exists),
+            resolve_link("dir/cur.md", "/foo/bar.md", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "foo/bar.md".to_string(),
                 anchor: None,
@@ -244,7 +321,7 @@ mod tests {
     #[test]
     fn relative_resolves_against_current_dir() {
         assert_eq!(
-            resolve_link("dir/cur.md", "./sib.md", "", no_exists),
+            resolve_link("dir/cur.md", "./sib.md", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "dir/sib.md".to_string(),
                 anchor: None,
@@ -252,7 +329,7 @@ mod tests {
             }
         );
         assert_eq!(
-            resolve_link("cur.md", "bare.md", "", no_exists),
+            resolve_link("cur.md", "bare.md", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "bare.md".to_string(),
                 anchor: None,
@@ -264,7 +341,7 @@ mod tests {
     #[test]
     fn parent_segments_normalized_and_escapes_dropped() {
         assert_eq!(
-            resolve_link("dir/sub/cur.md", "../up.md", "", no_exists),
+            resolve_link("dir/sub/cur.md", "../up.md", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "dir/up.md".to_string(),
                 anchor: None,
@@ -272,7 +349,7 @@ mod tests {
             }
         );
         assert_eq!(
-            resolve_link("cur.md", "/../x.md", "", no_exists),
+            resolve_link("cur.md", "/../x.md", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "x.md".to_string(),
                 anchor: None,
@@ -284,7 +361,7 @@ mod tests {
     #[test]
     fn anchor_carried_query_dropped() {
         assert_eq!(
-            resolve_link("cur.md", "path.md#sec", "", no_exists),
+            resolve_link("cur.md", "path.md#sec", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "path.md".to_string(),
                 anchor: Some("sec".to_string()),
@@ -292,7 +369,7 @@ mod tests {
             }
         );
         assert_eq!(
-            resolve_link("cur.md", "/path.md?x=1#sec", "", no_exists),
+            resolve_link("cur.md", "/path.md?x=1#sec", &at(""), no_exists),
             ResolvedLink::Internal {
                 path: "path.md".to_string(),
                 anchor: Some("sec".to_string()),
@@ -303,9 +380,9 @@ mod tests {
 
     #[test]
     fn absolute_normalizing_to_empty_is_none() {
-        assert_eq!(resolve_link("cur.md", "/", "", no_exists), ResolvedLink::None);
+        assert_eq!(resolve_link("cur.md", "/", &at(""), no_exists), ResolvedLink::None);
         assert_eq!(
-            resolve_link("cur.md", "/.", "", no_exists),
+            resolve_link("cur.md", "/.", &at(""), no_exists),
             ResolvedLink::None
         );
     }
@@ -315,7 +392,7 @@ mod tests {
         let known = paths(&["docs/index.md", "docs/tables/orders.md"]);
         let exists = |p: &str| known.iter().any(|k| k == p);
         assert_eq!(
-            resolve_link("docs/index.md", "/tables/orders.md", "docs", exists),
+            resolve_link("docs/index.md", "/tables/orders.md", &at("docs"), exists),
             ResolvedLink::Internal {
                 path: "docs/tables/orders.md".to_string(),
                 anchor: None,
@@ -327,7 +404,7 @@ mod tests {
     #[test]
     fn nested_root_safe_fallback_when_missing() {
         assert_eq!(
-            resolve_link("docs/index.md", "/tables/orders.md", "docs", no_exists),
+            resolve_link("docs/index.md", "/tables/orders.md", &at("docs"), no_exists),
             ResolvedLink::Internal {
                 path: "tables/orders.md".to_string(),
                 anchor: None,
@@ -339,7 +416,7 @@ mod tests {
     #[test]
     fn empty_root_is_a_noop() {
         assert_eq!(
-            resolve_link("cur.md", "/x.md", "", |_| true),
+            resolve_link("cur.md", "/x.md", &at(""), |_| true),
             ResolvedLink::Internal {
                 path: "x.md".to_string(),
                 anchor: None,
@@ -351,7 +428,7 @@ mod tests {
     #[test]
     fn relative_never_redirected_into_root() {
         assert_eq!(
-            resolve_link("docs/tables/cur.md", "./orders.md", "docs", |_| true),
+            resolve_link("docs/tables/cur.md", "./orders.md", &at("docs"), |_| true),
             ResolvedLink::Internal {
                 path: "docs/tables/orders.md".to_string(),
                 anchor: None,
@@ -365,7 +442,7 @@ mod tests {
         let known = paths(&["docs/tables/orders.md"]);
         let exists = |p: &str| known.iter().any(|k| k == p);
         assert_eq!(
-            resolve_link("docs/index.md", "/tables/orders.md#schema", "docs", exists),
+            resolve_link("docs/index.md", "/tables/orders.md#schema", &at("docs"), exists),
             ResolvedLink::Internal {
                 path: "docs/tables/orders.md".to_string(),
                 anchor: Some("schema".to_string()),
@@ -403,7 +480,7 @@ mod tests {
             ("a/cur.md", "  ../x.md#h  ", "", internal("x.md", Some("h"), false)),
         ];
         for (cur, href, root, want) in cases {
-            assert_eq!(&resolve_link(cur, href, root, no_exists), want, "{cur} {href}");
+            assert_eq!(&resolve_link(cur, href, &at(root), no_exists), want, "{cur} {href}");
         }
     }
 }

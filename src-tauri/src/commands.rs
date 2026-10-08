@@ -251,6 +251,14 @@ pub(crate) fn list_okf_markers(
     Ok(index.okf_markers())
 }
 
+/// The opened folder's path within its git repository (`""` = the toplevel),
+/// `None` outside one — the git-toplevel rung's input to the frontend's
+/// Bundle-root ladder, beside `list_okf_markers`.
+#[tauri::command]
+pub(crate) fn git_prefix(session: State<'_, Arc<Session>>) -> Result<Option<String>, String> {
+    Ok(session.current()?.git_prefix())
+}
+
 /// Sources linking TO `path` (backlinks). Used by the backlinks panel (slice 7).
 #[tauri::command]
 pub(crate) fn backlinks(session: State<'_, Arc<Session>>, path: String) -> Result<Vec<String>, String> {
