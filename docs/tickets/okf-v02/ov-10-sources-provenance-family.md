@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 blocked-by: [ov-1, ov-2, ov-3, ov-4, ov-14, ov-15, ov-17]
 ---
 
@@ -29,21 +29,21 @@ Per-claim attribution joins on `id`: the body cites with `[^id]`, and consumers 
 
 Editing `sources` itself is not this ticket's problem — the YAML Frontmatter editor is [ov-2](ov-2-frontmatter-yaml-editor.md) and its OKF lint/completion is [ov-3](ov-3-okf-language-service.md); this ticket consumes both, and contributes the `sources` rules to the second.
 
-- [ ] `sources` parses as a list of maps, with `resource` enforced as required within an entry (an ov-3 rule)
-- [ ] `usage_window` is read as a sibling of `sources`, and a per-entry override is respected when present
-- [ ] The Sources section renders at the end of the document in the editor (hybrid + reading) and in the web viewer, and is never written to the file
-- [ ] A `resource` that is a URL or an in-Bundle path is followable; a scope descriptor renders as plain text and is never styled as a broken link
-- [ ] Credibility signals render as the objective values they are
-- [ ] `[^id]` renders as a sequential number by first use; reordering `sources` does not change what a claim attributes to or how it is numbered
-- [ ] Hover on a citation shows id, title and resource; click jumps to the Sources entry; each entry jumps back to its citing claims
-- [ ] A `[^id]` with a `sources` entry and no body definition is resolved, not broken
-- [ ] A body definition for a `sources` id is hidden and its text shown on the entry
-- [ ] Edit on an entry opens the Frontmatter with that entry unfolded and the caret on it
-- [ ] A legacy `# Citations` body list still displays, and the recommended-keys vocabulary offers `sources`
-- [ ] The `[n]` superscript form still reads for v0.1 Bundles but is documented as deprecated everywhere it is described (`docs/okf/linking.md`, `docs/okf/concept.md`, `docs/editor/custom-extensions.md`, `docs/editor/atomic-editor-patch.md`)
-- [ ] An ADR records the `[^id]` attribution model (no body definition required, sequential numbering, virtual Sources section) and the deprecated-not-removed posture of `[n]`, in the shape of ADR 0004's optional-secondary-form decision
-- [ ] Unit tests cover entry parsing, the three `resource` kinds, id joining and numbering, and both legacy fallbacks (`# Citations`, `[n]`)
-- [ ] All four gates green
+- [x] `sources` parses as a list of maps, with `resource` enforced as required within an entry (an ov-3 rule)
+- [x] `usage_window` is read as a sibling of `sources`, and a per-entry override is respected when present
+- [x] The Sources section renders at the end of the document in the editor (hybrid + reading) and in the web viewer, and is never written to the file
+- [x] A `resource` that is a URL or an in-Bundle path is followable; a scope descriptor renders as plain text and is never styled as a broken link
+- [x] Credibility signals render as the objective values they are
+- [x] `[^id]` renders as a sequential number by first use; reordering `sources` does not change what a claim attributes to or how it is numbered
+- [x] Hover on a citation shows id, title and resource; click jumps to the Sources entry; each entry jumps back to its citing claims
+- [x] A `[^id]` with a `sources` entry and no body definition is resolved, not broken
+- [x] A body definition for a `sources` id is hidden and its text shown on the entry
+- [x] Edit on an entry opens the Frontmatter with that entry unfolded and the caret on it
+- [x] A legacy `# Citations` body list still displays, and the recommended-keys vocabulary offers `sources`
+- [x] The `[n]` superscript form still reads for v0.1 Bundles but is documented as deprecated everywhere it is described (`docs/okf/linking.md`, `docs/okf/concept.md`, `docs/editor/custom-extensions.md`, `docs/editor/atomic-editor-patch.md`)
+- [x] An ADR records the `[^id]` attribution model (no body definition required, sequential numbering, virtual Sources section) and the deprecated-not-removed posture of `[n]`, in the shape of ADR 0004's optional-secondary-form decision
+- [x] Unit tests cover entry parsing, the three `resource` kinds, id joining and numbering, and both legacy fallbacks (`# Citations`, `[n]`)
+- [x] All four gates green
 
 ## Decisions
 
@@ -57,3 +57,9 @@ Editing `sources` itself is not this ticket's problem — the YAML Frontmatter e
 
 - 2026-10-07: Pulled forward and shipped ahead of this ticket, because real Bundles already cite with string ids: the shared scanner numbers footnotes by first reference (`Footnote.num`, label on hover), and a label matching a `sources[].id` (`footnotes::source_ids`) counts as resolved without a body definition, in the editor and in the native and fake renders. Still open here: the Sources section (and so a jump target for source-only labels), hover with title/resource, hiding body definitions, Edit, the resource kinds, signals, and the legacy/deprecation work.
 - 2026-10-07: The Sources section, hover details and source links shipped as [ov-17](ov-17-sources-section-and-source-links.md). One change to the plan above: a click on a citation opens the source itself rather than jumping to its Sources entry. Still open here: Edit on an entry, jumps from an entry back to its claims, hiding body definitions, `usage_window`, the lint rules, and the legacy/deprecation work.
+- 2026-10-08: Done. Already satisfied by shipped work, ticked without new code: the Sources section in editor and web viewer, never written (ov-17); the three resource kinds (ov-17); sequential numbering independent of `sources` order (ov-14, ov-18); a `[^id]` resolved by `sources` alone (ov-14); `resource` REQUIRED (ov-3). Hover still opens the source on click, per ov-17's decision; the card now also shows the id. New here:
+  - `sunstone_shared::sources::Source` carries `usage_window` (own, else the sibling of `sources`), `index` (list position as written), `refs` (UTF-16 offsets of each citing `[^id]`) and `note` (a body definition's text).
+  - Sources entries show signals as written (`author` as an actor, `last_modified`, `usage_count (from – to)`), the hidden definition's text, `↑` / `↑ a b c` jumps back to each citing claim, and (editor) Edit: the Tile shows the Region, switches to editing, and `revealSource` unfolds the entry, folds its siblings and puts the caret on it (`src/lib/editor/sourceEntry.ts`).
+  - A body definition for a `sources` id is hidden: the editor block-replaces the line (reading always; editing unless the selection touches it, so it stays deletable), the native and fake renders drop it. Native source refs carry `id="fnref-label-k"` as the back-jump target.
+  - Provenance lint rules and `author` value completion in `families/provenance.ts` (shape, text fields, duplicate id, `usage_count`, `usage_window`/`last_modified` datetimes and order, info for an unframed count). `sources` joins the recommended-keys list.
+  - [ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md); `[n]` marked deprecated in `linking.md`, `concept.md`, `custom-extensions.md`, `atomic-editor-patch.md`.

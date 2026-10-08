@@ -2,7 +2,7 @@
 type: Concept
 title: Concept — how Sunstone treats an OKF concept
 description: What OKF says a Concept is, and how Sunstone models its frontmatter and body — the raw-YAML frontmatter editor, the stripped body document, and the body affordances that go beyond the spec.
-tags: [okf, concept, frontmatter, body, mermaid, citations]
+tags: [okf, concept, frontmatter, body, mermaid, sources, citations]
 timestamp: 2026-07-23T00:00:00Z
 ---
 
@@ -75,7 +75,8 @@ The body is where Sunstone's viewer/editor adds the most beyond plain markdown �
 - **Live preview** — Obsidian-style hybrid editing (source is truth; inactive lines render styled, the cursor line shows raw markup) via CodeMirror 6 decorations. See [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md) and the [editor docs](/editor/index.md).
 - **Outline** — the open Concept's headings in document order, derived live from the body (**frontmatter and fenced code excluded**). Powers the **Outline** [Section](/GLOSSARY.md).
 - **Diagrams** — ` ```mermaid ` fenced blocks are **rendered** as diagrams. To the spec these are just fenced code ([§4.2](/okf/spec.md#42-body)); Sunstone renders them via its own block-replace CodeMirror field (`securityLevel: 'strict'`, lazy-loaded). See [ADR 0005](/adr/0005-mermaid-block-rendering.md).
-- **Citations** — Sunstone honours the legacy `# Citations` convention ([§13.1](/okf/spec.md#131-breaking-changes)) _and_ adds inline **citation-reference superscripts**: a `[n]` token following a word renders as a clickable superscript that jumps to the matching `[n]` row. This is a Sunstone affordance beyond the spec. See [Linking → Citations](/okf/linking.md#citations). Markdown footnotes (`[^label]` / `[^label]:`) render the same way and are the form to write new attribution in; see [Linking → Footnotes](/okf/linking.md#footnotes).
+- **Sources and per-claim attribution** ([§5.1](/okf/spec.md#51-provenance-sources), [ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) — the way to attribute. The `sources` Frontmatter list is the store; the body cites an entry with `[^id]`, which renders as a sequential number by first use (the id on hover) and needs **no** body definition. The reader never sees `sources` as YAML: a virtual **Sources** section after the body lists every entry (cited by number, then uncited), with its `resource` (a link when it is a URL or a path, plain text when it is a scope descriptor like `all queries in project X`), its credibility signals as written (`author` as an actor, `last_modified`, `usage_count` over the entry's `usage_window` or the shared one beside `sources`; no score is computed), jumps back to each claim citing it, and an **Edit** action that opens the Frontmatter on that entry. A `[^id]: …` body definition for a `sources` id is hidden and its text shown on the entry. See [Linking → Footnotes](/okf/linking.md#footnotes) and [Sources section](/okf/linking.md#sources-section).
+- **Citations (deprecated)** — Sunstone still reads the legacy `# Citations` list ([§13.1](/okf/spec.md#131-breaking-changes)) and its inline **`[n]` superscripts**: a `[n]` token following a word renders as a clickable superscript that jumps to the matching `[n]` row, a Sunstone affordance beyond the spec kept for v0.1 Bundles. **Do not author new citations in this form**; use `sources` and `[^id]` (the `/llm-wiki` skill's `migrate-footnotes.ts` converts old documents). See [Linking → Citations](/okf/linking.md#citations).
 - **Wikilinks** — `[[name]]` links resolve by filename, a Sunstone-only secondary link form (OKF uses path-based markdown links only). See [Linking](/okf/linking.md) and [ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md).
 - **CriticMarkup** and other custom extensions round out the [editor's own extensions](/editor/custom-extensions.md).
 
@@ -94,7 +95,9 @@ The `# Schema` / `# Examples` conventional headings ([§4.2](/okf/spec.md#42-bod
 | Timestamps ([§5](/okf/spec.md#5-provenance-trust-and-lifecycle)) | ISO 8601 with an explicit offset | A value without one is **shown as written** and linted as a warning, never rejected |
 | `timestamp` ([§13.1](/okf/spec.md#131-breaking-changes)) | Superseded by `generated.at`; consumers MAY fall back | Falls back: a `timestamp`-only Concept shows it as the generation time, in every Bundle |
 | Mermaid | Just fenced code | **Rendered** as diagrams ([ADR 0005](/adr/0005-mermaid-block-rendering.md)) |
-| Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list, **plus** inline `[n]` superscript refs and `[^label]` footnotes |
+| Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list and inline `[n]` superscript refs, both **deprecated** ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |
+| Per-claim attribution ([§5.1](/okf/spec.md#51-provenance-sources)) | A footnote whose label is a `sources[].id`; consumers resolve through the entry | Shows a **sequential number** by first use, not the label; renders `sources` as a virtual **Sources** section after the body; hides a body definition for a `sources` id and shows its text on the entry ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |
+| `usage_window` ([§5.1](/okf/spec.md#51-provenance-sources)) | `{ from, to }` datetimes | Bounds shown **as written**; a half-open window is shown with `…` rather than rejected |
 | Links in body | Path-based markdown links ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 
 ## Related

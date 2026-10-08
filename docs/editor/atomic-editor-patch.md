@@ -21,7 +21,7 @@ Upstream `inlinePreview` hardcodes the hybrid rule "reveal raw markup on the lin
 
 ### 2. URL-less `Link` nodes render as literal text (OKF citations)
 
-The GFM parser parses a bracketed span like `[1]` (or `[note]`) with no matching reference definition as a `Link` node, even though it has no destination. Upstream would style it and hide its brackets. The patch tracks `urllessLinkStarts` — `Link` nodes with no `URL` child — and neither styles them nor hides their `[` `]`, so they render as the literal source text. This is what lets [citation markers](/editor/custom-extensions.md) like `[1]` survive as plain text for Sunstone's own citation extension to replace with a superscript.
+The GFM parser parses a bracketed span like `[1]` (or `[note]`) with no matching reference definition as a `Link` node, even though it has no destination. Upstream would style it and hide its brackets. The patch tracks `urllessLinkStarts` — `Link` nodes with no `URL` child — and neither styles them nor hides their `[` `]`, so they render as the literal source text. This is what lets [citation markers](/editor/custom-extensions.md) like `[1]` survive as plain text for Sunstone's own citation extension to replace with a superscript. The `[n]` citation form is **deprecated** (v0.1 attribution, still read; new attribution is a `[^id]` footnote against `sources`, [ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)), but the patch stays for as long as it is read.
 
 ### 3. Bare / GFM-autolinked URLs stay visible and clickable
 
