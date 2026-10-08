@@ -44,29 +44,32 @@ export function renderConcept(content: string): RenderPayload {
   for (const h of outline) byLine.set(h.line - offset - 1, h);
 
   // Every footnote of the whole body, numbered and resolved (body definitions
-  // and `sources[].id`s) by the shared scanner; each line looks its labels up.
+  // and `sources[].id`s) by ONE shared scan, which knows about fences and
+  // Embeds; each line takes the footnotes inside it, shifted to line offsets.
   const sources = sourceList(body, splitFrontmatter(content).yaml ?? '');
   sourcesById = new Map();
   for (const s of sources) {
     const id = s.id?.toLowerCase();
     if (id && !sourcesById.has(id)) sourcesById.set(id, s);
   }
-  footnotesByLabel = new Map(
-    scanFootnotes(body, [...sourcesById.keys()]).map((f) => [f.label.toLowerCase(), f]),
-  );
+  const lineNotes = footnotesByLine(scanFootnotes(body, [...sourcesById.keys()]), lines);
+  anchored = new Set();
 
   const htmlParts: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const h = byLine.get(i);
     if (h) {
-      htmlParts.push(`<h${h.level} id="${h.slug}">${renderInline(h.text)}</h${h.level}>`);
+      // The heading text sits inside its line; shift the line's footnotes to it.
+      const at = line.indexOf(h.text);
+      const notes = at < 0 ? [] : shift(lineNotes[i], at, at + h.text.length);
+      htmlParts.push(`<h${h.level} id="${h.slug}">${renderInline(h.text, notes)}</h${h.level}>`);
       continue;
     }
     if (line.trim() === '') continue;
     // Paragraph lines can begin with a citation-table row (`[n] …`), so pass
     // the line-start flag through for citation definition detection.
-    htmlParts.push(`<p>${renderInline(line, true)}</p>`);
+    htmlParts.push(`<p>${renderInline(line, lineNotes[i], true)}</p>`);
   }
 
   htmlParts.push(renderSourcesSection(sources));
@@ -74,25 +77,53 @@ export function renderConcept(content: string): RenderPayload {
 }
 
 /**
+ * The whole-body footnotes split per line (`lines` is the body split on `\n`),
+ * each with offsets relative to its line.
+ */
+function footnotesByLine(all: Footnote[], lines: string[]): Footnote[][] {
+  const out: Footnote[][] = lines.map(() => []);
+  let start = 0;
+  let k = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const end = start + lines[i].length;
+    while (k < all.length && all[k].from < end) {
+      if (all[k].from >= start) out[i].push({ ...all[k], from: all[k].from - start, to: all[k].to - start });
+      k++;
+    }
+    start = end + 1;
+  }
+  return out;
+}
+
+/** The footnotes lying wholly within `[from, to)`, shifted to start at `from`. */
+function shift(notes: Footnote[], from: number, to: number): Footnote[] {
+  return notes
+    .filter((f) => f.from >= from && f.to <= to)
+    .map((f) => ({ ...f, from: f.from - from, to: f.to - from }));
+}
+
+/**
  * Render one line of inline text: CriticMarkup marks become their `critic-*`
  * HTML; text between marks is HTML-escaped. Marks are found with the shared
- * pure scanner so the fake and the editor agree on what a mark is.
+ * pure scanner so the fake and the editor agree on what a mark is. `notes` are
+ * the footnotes of `text` (from the whole-body scan); one inside a mark stays
+ * text, as the mark's content is escaped whole.
  */
-function renderInline(text: string, lineStart = false): string {
+function renderInline(text: string, notes: Footnote[], lineStart = false): string {
   const marks = parseCriticMarks(text);
   let out = '';
   let pos = 0;
   for (const mark of marks) {
-    out += renderTextWithFootnotes(text.slice(pos, mark.from), lineStart && pos === 0);
+    out += renderTextWithFootnotes(text.slice(pos, mark.from), shift(notes, pos, mark.from), lineStart && pos === 0);
     out += renderMark(mark);
     pos = mark.to;
   }
-  out += renderTextWithFootnotes(text.slice(pos), lineStart && pos === 0);
+  out += renderTextWithFootnotes(text.slice(pos), shift(notes, pos, text.length), lineStart && pos === 0);
   return out;
 }
 
-/** The body's footnotes by lowercase label (set by `renderConcept`). */
-let footnotesByLabel = new Map<string, Footnote>();
+/** Lowercased labels whose first definition was rendered (reset per render). */
+let anchored = new Set<string>();
 /** The Concept's `sources` entries by lowercase id (set by `renderConcept`). */
 let sourcesById = new Map<string, Source>();
 
@@ -130,34 +161,36 @@ function renderSourcesSection(list: Source[]): string {
 }
 
 /**
- * Render footnotes to the SAME markup the Rust renderer emits
- * (`footnotes_to_sentinels`), handing the text between them to the citation
- * renderer. A definition counts only when this run is at the line start.
- * Omits Rust's `<br>` between consecutive definitions (one line per `<p>` here).
+ * Render `notes` (the footnotes of `seg`, segment offsets) to the SAME markup
+ * the Rust renderer emits (`footnotes_to_sentinels`), handing the text between
+ * them to the citation renderer. A definition counts only when this run is at
+ * the line start, and only a label's first definition carries the `fn-` id.
+ * Omits Rust's leading `<br>` on a definition (one line per `<p>` here).
  */
-function renderTextWithFootnotes(seg: string, atLineStart: boolean): string {
+function renderTextWithFootnotes(seg: string, notes: Footnote[], atLineStart: boolean): string {
   let out = '';
   let p = 0;
-  for (const f of scanFootnotes(seg)) {
+  for (const f of notes) {
     out += renderTextWithCitations(seg.slice(p, f.from), atLineStart && p === 0);
     const label = escapeHtml(f.label).replace(/"/g, '&quot;');
     // Labels match case-insensitively: one lowercased anchor, label as written.
     const anchor = escapeHtml(f.label.toLowerCase()).replace(/"/g, '&quot;');
-    const whole = footnotesByLabel.get(f.label.toLowerCase()) ?? f;
     const source = sourcesById.get(f.label.toLowerCase());
-    const n = whole.num;
+    const n = f.num;
     const sep = f.followsRef ? ',' : '';
     if (f.def && atLineStart) {
-      out += `<a id="fn-${anchor}" class="footnote-def" title="${label}">${n}</a>`;
+      const id = anchored.has(f.label.toLowerCase()) ? '' : `id="fn-${anchor}" `;
+      anchored.add(f.label.toLowerCase());
+      out += `<a ${id}class="footnote-def" title="${label}">${n}</a>`;
     } else if (source) {
       const d = sourceData(source);
       out +=
         source.kind === 'descriptor'
           ? `<sup class="footnote-ref source" ${d}>${sep}${n}</sup>`
           : `<sup class="footnote-ref source" ${d}>${sep}<a ${sourceLinkAttrs(source)}>${n}</a></sup>`;
-    } else if (whole.hasDef) {
+    } else if (f.hasDef) {
       out += `<sup class="footnote-ref" title="${label}">${sep}<a href="#fn-${anchor}">${n}</a></sup>`;
-    } else if (whole.defined) {
+    } else if (f.defined) {
       out += `<sup class="footnote-ref" title="${label}">${sep}${n}</sup>`;
     } else {
       out += `<sup class="footnote-ref broken" title="${label}">${sep}${n}</sup>`;

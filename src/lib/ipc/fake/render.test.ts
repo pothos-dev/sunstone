@@ -104,4 +104,25 @@ describe('renderConcept footnotes', () => {
     const { html } = renderConcept('# Title[^1]\n\n[^1]: n\n');
     expect(html).toContain('Title<sup class="footnote-ref" title="1"><a href="#fn-1">1</a></sup></h1>');
   });
+
+  test('a definition inside a fenced block is left alone (ov-16)', () => {
+    const { html } = renderConcept('x[^1]\n\n```\n[^1]: in code\ny[^1]\n```\n');
+    expect(html).not.toContain('footnote-def');
+    expect(html).toContain('<p>[^1]: in code</p>');
+    expect(html).toContain('<p>y[^1]</p>');
+    expect(html).toContain('x<sup class="footnote-ref broken" title="1">1</sup>');
+  });
+
+  test('only the first definition of a label owns the anchor (ov-16)', () => {
+    const { html } = renderConcept('x[^a]\n\n[^a]: one\n\n[^A]: two\n');
+    expect(html.match(/id="fn-a"/g)?.length).toBe(1);
+    expect(html).toContain('<a id="fn-a" class="footnote-def" title="a">1</a> one');
+    expect(html).toContain('<a class="footnote-def" title="A">1</a> two');
+  });
+
+  test('a footnote inside a CriticMarkup mark stays text', () => {
+    const { html } = renderConcept('a {++b[^1]++} c[^2]\n');
+    expect(html).toContain('<ins class="critic-add">b[^1]</ins>');
+    expect(html).toContain('c<sup class="footnote-ref broken" title="2">2</sup>');
+  });
 });

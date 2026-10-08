@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 1
 ---
 
@@ -12,11 +12,11 @@ priority: 1
 - The fake backend's `renderTextWithFootnotes` works one line at a time and does not know about fences, so it renders `[^1]: x` inside a fenced block as a definition. The native render leaves it alone.
 - A definition directly under a paragraph line (`Text.\n[^1]: note`) merges into that paragraph in the native render. The editor shows it on its own line.
 
-- [ ] Only the first definition of a label (case-insensitive) carries `id="fn-…"`; later duplicates render the `[label]` row head without an id
-- [ ] A definition line directly under a non-blank, non-definition line renders on its own line in the native render (leading `<br>`)
-- [ ] The fake backend leaves `[^label]` inside a fenced block alone, the same as the native render
-- [ ] The indented-code `[^1]` case is documented as a deviation in `docs/okf/linking.md`
-- [ ] Rust render tests and `src/lib/ipc/fake/render.test.ts` cases for each; all four gates green
+- [x] Only the first definition of a label (case-insensitive) carries `id="fn-…"`; later duplicates render the `[label]` row head without an id
+- [x] A definition line directly under a non-blank, non-definition line renders on its own line in the native render (leading `<br>`)
+- [x] The fake backend leaves `[^label]` inside a fenced block alone, the same as the native render
+- [x] The indented-code `[^1]` case is documented as a deviation in `docs/okf/linking.md`
+- [x] Rust render tests and `src/lib/ipc/fake/render.test.ts` cases for each; all four gates green
 
 ## Grounding
 
@@ -37,3 +37,4 @@ priority: 1
 ## Comments
 
 - 2026-10-07: Footnotes now number by first use and resolve against `sources[].id` (see ov-10 comment). In the fake backend `definedFootnotes` became `footnotesByLabel` (the whole-body `scanFootnotes` result by lowercase label), which is the per-label half of the "derive from the whole-body scan" decision above.
+- 2026-10-08: Done. Native: first definition per lowercase label owns `fn-…`, and a definition under any non-blank line gets the leading `<br>`. Fake: one whole-body `scanFootnotes` split per line (fences, Embeds and numbering now come from the shared scanner; `footnotesByLabel` is gone), same first-definition rule. Indented code recorded as a deviation in `docs/okf/linking.md#footnotes`.

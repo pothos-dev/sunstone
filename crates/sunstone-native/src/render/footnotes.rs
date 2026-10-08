@@ -9,9 +9,10 @@
 //!     scope descriptor. It carries the entry as `data-source` JSON, which the
 //!     web viewer's hover card reads (`src/lib/sourceCard.ts`). Any other label links
 //!     to its body definition, or is a non-link `broken` one without one;
-//!   - a line-start `[^label]:` definition → an `n` row head carrying
-//!     `id="fn-label"` (the jump target); the footnote text after it stays
-//!     ordinary markdown, rendered where it was written.
+//!   - a line-start `[^label]:` definition → an `n` row head; the label's first
+//!     definition carries `id="fn-label"` (the jump target, matching the
+//!     editor's `footnote_def_pos`), later duplicates none. The footnote text
+//!     after it stays ordinary markdown, rendered where it was written.
 //!
 //! The Sources section (`sources_section_html`) lists the `sources` entries at
 //! the end of the body, numbered like their superscripts
@@ -20,11 +21,13 @@
 //!
 //! comrak's own `extension.footnotes` is deliberately not used: it renumbers by
 //! first use and moves definitions to an end section, which would disagree
-//! with the editor. Consecutive definition lines would otherwise merge into one
-//! paragraph, so a definition directly under another gets a leading `<br>`.
+//! with the editor. A definition line directly under any non-blank line would
+//! otherwise merge into that paragraph, so it gets a leading `<br>`.
 //!
 //! A distinct PUA sentinel pair (shared plumbing via `sentinel::Sentinels`)
 //! keeps this pass independent of the CriticMarkup and citation passes.
+
+use std::collections::HashSet;
 
 use sunstone_shared::footnotes::{scan_footnotes, Footnote};
 use sunstone_shared::sources::{ResourceKind, Source};
@@ -81,11 +84,14 @@ fn footnote_ref_html(f: &Footnote, source: Option<&Source>, link: LinkAttrs) -> 
     }
 }
 
-fn footnote_def_html(f: &Footnote, after_def: bool) -> String {
+/// A definition's row head. `first` marks the label's first definition, the
+/// only one carrying the `fn-…` anchor (the editor's jump target too); `br`
+/// starts it on its own line when it sits directly under a non-blank line.
+fn footnote_def_html(f: &Footnote, first: bool, br: bool) -> String {
     let (l, n) = (attr_escape(&f.label), f.num);
-    let a = footnote_anchor(&f.label);
-    let br = if after_def { "<br>" } else { "" };
-    format!(r#"{br}<a id="fn-{a}" class="footnote-def" title="{l}">{n}</a>"#)
+    let id = if first { format!(r#"id="fn-{}" "#, footnote_anchor(&f.label)) } else { String::new() };
+    let br = if br { "<br>" } else { "" };
+    format!(r#"{br}<a {id}class="footnote-def" title="{l}">{n}</a>"#)
 }
 
 /// Rewrite footnote markers in `body` to sentinel tokens, returning the prepared
@@ -103,8 +109,8 @@ pub(super) fn footnotes_to_sentinels(
     let mut sentinels = Sentinels::new(FN_OPEN, FN_CLOSE);
     let mut out = String::with_capacity(body.len());
     let mut pos = 0usize;
-    // UTF-16 offset of the line after the last definition seen.
-    let mut next_line_after_def: Option<usize> = None;
+    // Lowercased labels whose first definition has been emitted.
+    let mut anchored: HashSet<String> = HashSet::new();
     for f in scan_footnotes(body, &ids) {
         out.push_str(&String::from_utf16_lossy(&units[pos..f.from]));
         let html = if f.def {
@@ -112,12 +118,17 @@ pub(super) fn footnotes_to_sentinels(
                 .iter()
                 .rposition(|&u| u == newline)
                 .map_or(0, |p| p + 1);
-            let after_def = next_line_after_def == Some(line_start);
-            next_line_after_def = units[f.to..]
-                .iter()
-                .position(|&u| u == newline)
-                .map(|p| f.to + p + 1);
-            footnote_def_html(&f, after_def)
+            // A non-blank previous line would swallow the definition into its
+            // paragraph as a soft break.
+            let br = line_start > 0 && {
+                let prev_start = units[..line_start - 1]
+                    .iter()
+                    .rposition(|&u| u == newline)
+                    .map_or(0, |p| p + 1);
+                !String::from_utf16_lossy(&units[prev_start..line_start - 1]).trim().is_empty()
+            };
+            let first = anchored.insert(f.label.to_lowercase());
+            footnote_def_html(&f, first, br)
         } else {
             footnote_ref_html(&f, source_for(sources, &f.label), link)
         };
@@ -298,6 +309,25 @@ mod tests {
         let html = render("![chart[^a]](x.png) text[^b]\n");
         assert!(html.contains(r#"text<sup class="footnote-ref broken" title="b">1</sup>"#), "{html}");
         assert!(!html.contains(r#"title="a""#), "{html}");
+    }
+
+    #[test]
+    fn only_the_first_definition_of_a_label_owns_the_anchor() {
+        let html = render("x[^a]\n\n[^a]: one\n\n[^A]: two\n");
+        assert_eq!(html.matches(r#"id="fn-a""#).count(), 1, "{html}");
+        assert!(html.contains(r#"<a id="fn-a" class="footnote-def" title="a">1</a> one"#), "{html}");
+        assert!(html.contains(r#"<a class="footnote-def" title="A">1</a> two"#), "{html}");
+    }
+
+    #[test]
+    fn a_definition_under_a_paragraph_line_breaks_onto_its_own_line() {
+        let html = render("Text.\n[^1]: note\n");
+        assert!(html.contains("Text.\n<br><a id=\"fn-1\""), "{html}");
+        // A blank line before it starts a new paragraph: no break.
+        let html = render("Text.\n\n[^1]: note\n");
+        assert!(!html.contains("<br>"), "{html}");
+        // The first line of the body has nothing to break from.
+        assert!(!render("[^1]: note\n").contains("<br>"));
     }
 
     #[test]
