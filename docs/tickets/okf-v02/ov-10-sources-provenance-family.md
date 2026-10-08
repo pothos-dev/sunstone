@@ -23,7 +23,7 @@ Per-claim attribution joins on `id`: the body cites with `[^id]`, and consumers 
 - A `[^id]` renders as a superscript with its **sequential number** (1, 2, 3 by first use), not the id. Hover shows the id, `title` and `resource`; a click jumps to the entry in the Sources section.
 - A `[^id]` matching a `sources[].id` is resolved even with **no** footnote definition in the body; that is the normal case. It is broken only when it matches neither a `sources` id nor a body definition.
 - A `[^id]: …` definition in the body is optional. When one exists for a label that has a `sources` entry, the editor hides the definition line in hybrid and reading mode and shows its text in the Sources entry instead. A definition with no `sources` entry keeps ov-14's behaviour.
-- A numeric `[^n]` with no `sources` entry (migrated v0.1 documents) keeps ov-14's behaviour: label as written, jump to its body definition.
+- A numeric `[^n]` with no `sources` entry (migrated v0.1 documents) is renumbered by first use like every other label (`A[^21] B[^2]` shows `1 2`; the label stays the hover title) and jumps to its body definition (decided in ov-18, 2026-10-08).
 
 **Legacy forms, deprecated but still read:** the `[n]` superscript form (`find_citation_refs` / `citation_def_pos` and the `citations` CodeMirror extension) and the body `# Citations` list. Nothing new should be authored in either, and the docs must say so. A consumer SHOULD read `sources` while MAY still parse a legacy `# Citations` list.
 

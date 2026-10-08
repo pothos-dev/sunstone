@@ -294,6 +294,13 @@ mod tests {
     }
 
     #[test]
+    fn a_footnote_in_embed_alt_text_neither_renders_nor_counts() {
+        let html = render("![chart[^a]](x.png) text[^b]\n");
+        assert!(html.contains(r#"text<sup class="footnote-ref broken" title="b">1</sup>"#), "{html}");
+        assert!(!html.contains(r#"title="a""#), "{html}");
+    }
+
+    #[test]
     fn no_sources_no_section() {
         assert!(!render("x[^1]\n\n[^1]: one\n").contains("sources"));
     }

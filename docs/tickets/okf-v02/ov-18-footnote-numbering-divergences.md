@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 1
 ---
 
@@ -19,9 +19,9 @@ The 2026-10-08 nightly review of b5d2bfc found:
 - ~~`footnotes::source_ids` reads YAML numbers as numbers, so `id: 007` becomes
   `"7"`~~ Not a bug: checked while grounding, see below.
 
-- [ ] ov-10's bullet on numeric `[^n]` says they are renumbered by first use, like every other label
-- [ ] A `[^label]` inside an Embed's alt text neither renders nor counts toward numbering, in the editor and the native and fake renders
-- [ ] Shared-scanner tests (`cargo test`) and a `src/lib/ipc/fake/render.test.ts` case; all four gates green
+- [x] ov-10's bullet on numeric `[^n]` says they are renumbered by first use, like every other label
+- [x] A `[^label]` inside an Embed's alt text neither renders nor counts toward numbering, in the editor and the native and fake renders
+- [x] Shared-scanner tests (`cargo test`) and a `src/lib/ipc/fake/render.test.ts` case; all four gates green
 
 ## Grounding
 
@@ -54,3 +54,12 @@ The 2026-10-08 nightly review of b5d2bfc found:
 - Embed alt text → `scan_footnotes` skips Embed spans, like code. Fixes all
   three surfaces at once through the shared scanner instead of teaching the
   editor about render-side markers.
+
+## Comments
+
+- 2026-10-08: Done. The Embed grounding above was off: `scan_embeds` closed the
+  alt at the first `]`, so `![chart[^a]](x.png)` was not an Embed at all and the
+  native render put footnote markup inside the `<img alt>`. Embed alt text now
+  takes balanced brackets (CommonMark link text), and `scan_footnotes` masks
+  every Embed span like code, so the editor, the native render and the fake all
+  skip it. ov-10's numeric-label bullet is corrected.

@@ -13,7 +13,10 @@
 //! - A label is one or more characters that are not whitespace, `[` or `]`.
 //!   Labels match case-insensitively, as in GFM.
 //! - Both are skipped inside fenced code blocks and inline code spans (the
-//!   shared [`crate::scan`] code contract).
+//!   shared [`crate::scan`] code contract), and inside an Embed
+//!   (`![alt[^x]](a.png)`, [`crate::embed::scan_embeds`]): the native render
+//!   turns an Embed into an image before footnotes run, so a marker in its alt
+//!   text is neither drawn nor numbered on any surface.
 //!
 //! Each label gets a display **number**, sequential by first reference (1, 2,
 //! 3, …); labels that are only defined, never referenced, follow in definition
@@ -73,6 +76,9 @@ pub fn scan_footnotes(text: &str, source_ids: &[String]) -> Vec<Footnote> {
         }
         None
     });
+    for e in crate::embed::scan_embeds(text) {
+        in_code[e.from..e.to].fill(true);
+    }
 
     // Byte offset → UTF-16 offset, valid at every char boundary.
     let mut utf16_at = vec![0usize; bytes.len() + 1];
@@ -262,6 +268,21 @@ mod tests {
         assert!(spans("`[^1]`").is_empty());
         assert!(spans("```\n[^1]: x\ny[^1]\n```\n").is_empty());
         assert_eq!(spans("```\n[^1]\n```\nz[^2]"), vec![s("2", false, false)]);
+    }
+
+    #[test]
+    fn embed_alt_text_is_skipped() {
+        assert_eq!(spans("![chart[^a]](x.png) text[^b]"), vec![s("b", false, false)]);
+        let f = scan_footnotes("![chart[^a]](x.png) text[^b]", &[]);
+        assert_eq!(f[0].num, 1);
+        assert!(spans("![[x.png]] [^a]").len() == 1);
+    }
+
+    #[test]
+    fn numeric_labels_number_by_first_use_too() {
+        let got: Vec<(String, usize)> =
+            nums("A[^21] B[^2]", &[]).into_iter().map(|(l, n, _)| (l, n)).collect();
+        assert_eq!(got, vec![("21".into(), 1), ("2".into(), 2)]);
     }
 
     #[test]

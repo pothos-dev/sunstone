@@ -267,7 +267,7 @@ pub fn scan_embeds(body: &str) -> Vec<Embed> {
 
         // --- `![alt](target "title")` — path-resolved ------------------------
         if i + 1 < bytes.len() && bytes[i + 1] == b'[' {
-            if let Some(close) = find_byte(bytes, i + 2, b']') {
+            if let Some(close) = alt_close(bytes, i + 2) {
                 if close + 1 < bytes.len() && bytes[close + 1] == b'(' {
                     if let Some(paren) = find_byte(bytes, close + 2, b')') {
                         let raw_alt = &body[i + 2..close];
@@ -302,6 +302,22 @@ pub fn scan_embeds(body: &str) -> Vec<Embed> {
     }
 
     out
+}
+
+/// The byte offset of the `]` closing an Embed's alt text that starts at
+/// `from`. Brackets nest, as in CommonMark link text, so `![chart[^a]](x.png)`
+/// is one Embed whose alt is `chart[^a]`.
+fn alt_close(bytes: &[u8], from: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (off, &b) in bytes[from..].iter().enumerate() {
+        match b {
+            b'[' => depth += 1,
+            b']' if depth == 0 => return Some(from + off),
+            b']' => depth -= 1,
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Rewrite every Embed's `from`/`to` from a BYTE offset into `body` to a UTF-16
@@ -482,6 +498,16 @@ mod tests {
         assert_eq!(e.target, "img/d.png");
         let e = &scan_embeds("![alt](<img/d.png> 'T')")[0];
         assert_eq!(e.target, "img/d.png");
+    }
+
+    #[test]
+    fn markdown_alt_text_may_hold_balanced_brackets() {
+        let body = "![chart[^a]](x.png) text";
+        let e = &scan_embeds(body)[0];
+        assert_eq!(&body[e.from..e.to], "![chart[^a]](x.png)");
+        assert_eq!((e.alt.as_str(), e.target.as_str()), ("chart[^a]", "x.png"));
+        // An unbalanced `[` never closes the alt: not an Embed.
+        assert!(scan_embeds("![a [b](x.png)").is_empty());
     }
 
     #[test]

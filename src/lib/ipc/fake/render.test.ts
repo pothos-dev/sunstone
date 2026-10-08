@@ -87,4 +87,21 @@ describe('renderConcept footnotes', () => {
     expect(html).toContain('href="#cite-6"');
     expect(html).toContain('href="#fn-1"');
   });
+
+  test('a footnote in Embed alt text neither renders nor counts (ov-18)', () => {
+    const { html } = renderConcept('![chart[^a]](x.png) text[^b]\n');
+    expect(html).toContain('text<sup class="footnote-ref broken" title="b">1</sup>');
+    expect(html).not.toContain('title="a"');
+  });
+
+  test('numeric labels number by first use', () => {
+    const { html } = renderConcept('A[^21] B[^2]\n');
+    expect(html).toContain('A<sup class="footnote-ref broken" title="21">1</sup>');
+    expect(html).toContain('B<sup class="footnote-ref broken" title="2">2</sup>');
+  });
+
+  test('a footnote in a heading still renders', () => {
+    const { html } = renderConcept('# Title[^1]\n\n[^1]: n\n');
+    expect(html).toContain('Title<sup class="footnote-ref" title="1"><a href="#fn-1">1</a></sup></h1>');
+  });
 });
