@@ -99,6 +99,30 @@ export type TagCount = {
  * A Document named on the desktop command line (`sunstone ./docs guide/setup.md#x`):
  * a bundle-relative path plus an optional heading anchor (the slug after `#`).
  */
+/**
+ * A newer Sunstone version, as the desktop updater (`src-tauri/src/updater.rs`)
+ * reports it. Delivered by `Backend.onUpdateNotice`.
+ *
+ *  - `installed`      — in place; the next start runs it (AppImage, macOS);
+ *  - `installsOnExit` — downloaded; it installs when Sunstone closes (Windows);
+ *  - `available`      — not installed here (`.deb`/`.rpm`); `url` is the
+ *                       version's release page to download it from.
+ */
+export type UpdateNotice = {
+  kind: 'installed' | 'installsOnExit' | 'available';
+  version: string;
+  url: string;
+};
+
+/**
+ * What changed since the version that ran before, shown once after an update:
+ * the embedded CHANGELOG sections, rendered to HTML by the desktop backend.
+ */
+export type ReleaseNotes = {
+  version: string;
+  html: string;
+};
+
 export type StartupDocument = {
   path: string;
   anchor: string | null;

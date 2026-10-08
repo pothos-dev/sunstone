@@ -12,6 +12,8 @@ import type {
   KnownBundle,
   StartupDocument,
   SyncNotice,
+  UpdateNotice,
+  ReleaseNotes,
 } from '$lib/types';
 
 /**
@@ -128,6 +130,24 @@ export interface Backend {
    * reported here — they ride the ordinary `onFileChanged` watcher path.
    */
   onSyncNotice(cb: (notice: SyncNotice) => void): () => void;
+
+  // --- Desktop updates (src-tauri/src/updater.rs, release_notes.rs) ---------
+
+  /**
+   * Subscribe to the desktop updater's notice for this run: a newer version was
+   * installed, queued for exit, or (package-managed Linux installs) is available
+   * to download. At most one per run; a notice raised before the subscription is
+   * delivered on subscribe. Returns an unsubscribe function. The web build has no
+   * updater, so `http.ts` never calls back.
+   */
+  onUpdateNotice(cb: (notice: UpdateNotice) => void): () => void;
+
+  /**
+   * The release notes to show after an update, handed out once: later calls
+   * (e.g. after a webview reload) and a start without an update give `null`.
+   * Always `null` on the web.
+   */
+  takeReleaseNotes(): Promise<ReleaseNotes | null>;
 
   // --- Tree CRUD (slice: tree-crud) ---
   // Structural filesystem operations driven from the document tree. All paths

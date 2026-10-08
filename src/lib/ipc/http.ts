@@ -431,6 +431,15 @@ export const httpBackend: Backend = {
   // `EventSource` dispatches a named event ONLY to a matching listener, so the
   // unnamed `message` channel above (and `parseFileChange`, and the `FileChange`
   // type) is untouched. No second connection, no polling.
+  // The web build has no updater: nothing to report, no notes to show.
+  onUpdateNotice(): () => void {
+    return () => {};
+  },
+
+  async takeReleaseNotes(): Promise<null> {
+    return null;
+  },
+
   onSyncNotice(cb: (notice: SyncNotice) => void): () => void {
     const source = acquireEvents();
     if (!source) return () => {};

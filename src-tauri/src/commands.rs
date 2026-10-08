@@ -44,6 +44,23 @@ pub(crate) fn take_startup_document(
     pending.0.lock().ok()?.take()
 }
 
+/// The update notice this run has raised, if any. The frontend asks once when
+/// it subscribes, in case the notice fired before it was listening.
+#[tauri::command]
+pub(crate) fn update_notice(
+    notice: State<'_, crate::updater::CurrentNotice>,
+) -> Option<crate::updater::UpdateNotice> {
+    notice.0.lock().ok()?.clone()
+}
+
+/// The release notes to show after an update, handed out ONCE per process.
+#[tauri::command]
+pub(crate) fn take_release_notes(
+    pending: State<'_, crate::release_notes::PendingReleaseNotes>,
+) -> Option<crate::release_notes::ReleaseNotes> {
+    pending.0.lock().ok()?.take()
+}
+
 /// The launcher's known-folder list (previously-opened Bundles), most-recent
 /// first. Purely config-derived — no open Bundle required.
 #[tauri::command]

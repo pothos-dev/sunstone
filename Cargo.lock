@@ -4195,9 +4195,11 @@ name = "sunstone"
 version = "0.25.1"
 dependencies = [
  "block2",
+ "comrak",
  "gtk",
  "objc2-foundation",
  "objc2-web-kit",
+ "semver",
  "serde",
  "serde_json",
  "sunstone-native",

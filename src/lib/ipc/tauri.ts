@@ -17,10 +17,42 @@ import type {
   RenderPayload,
   KnownBundle,
   StartupDocument,
+  UpdateNotice,
+  ReleaseNotes,
 } from '$lib/types';
 
 /** Tauri event name emitted by the Rust watcher (matches watcher.rs). */
 const FILE_CHANGED_EVENT = 'file-changed';
+
+/** Tauri event name emitted by the updater (matches updater.rs). */
+const UPDATE_NOTICE_EVENT = 'update-notice';
+
+/**
+ * Listen to a Tauri event behind a SYNCHRONOUS unsubscribe. `listen` resolves
+ * asynchronously to an unlisten fn; our seam exposes a synchronous unsubscribe.
+ * Bridge the two: subscribe eagerly, and have the returned fn detach once (or as
+ * soon as) the listener is ready.
+ */
+function subscribe<T>(event: string, cb: (payload: T) => void): () => void {
+  let unlisten: UnlistenFn | null = null;
+  let cancelled = false;
+
+  void listen<T>(event, (e) => {
+    cb(e.payload);
+  }).then((fn) => {
+    if (cancelled) {
+      fn();
+    } else {
+      unlisten = fn;
+    }
+  });
+
+  return () => {
+    cancelled = true;
+    unlisten?.();
+    unlisten = null;
+  };
+}
 
 /**
  * Sunstone's custom URI scheme for Attachment bytes (ADR-0011). Matches the
@@ -85,27 +117,7 @@ export const tauriBackend: Backend = {
   },
 
   onFileChanged(cb: (change: FileChange) => void): () => void {
-    // `listen` resolves asynchronously to an unlisten fn; our seam exposes a
-    // synchronous unsubscribe. Bridge the two: subscribe eagerly, and have the
-    // returned fn detach once (or as soon as) the listener is ready.
-    let unlisten: UnlistenFn | null = null;
-    let cancelled = false;
-
-    void listen<FileChange>(FILE_CHANGED_EVENT, (event) => {
-      cb(event.payload);
-    }).then((fn) => {
-      if (cancelled) {
-        fn();
-      } else {
-        unlisten = fn;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-      unlisten = null;
-    };
+    return subscribe<FileChange>(FILE_CHANGED_EVENT, cb);
   },
 
   /**
@@ -116,6 +128,25 @@ export const tauriBackend: Backend = {
    */
   onSyncNotice(): () => void {
     return () => {};
+  },
+
+  onUpdateNotice(cb: (notice: UpdateNotice) => void): () => void {
+    let active = true;
+    const unsubscribe = subscribe<UpdateNotice>(UPDATE_NOTICE_EVENT, cb);
+    // The check runs from launch and may have finished before this listener:
+    // ask for the notice it kept. Both paths can deliver the same notice; the
+    // caller only displays the latest.
+    void invoke<UpdateNotice | null>('update_notice').then((notice) => {
+      if (active && notice) cb(notice);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  },
+
+  takeReleaseNotes(): Promise<ReleaseNotes | null> {
+    return invoke<ReleaseNotes | null>('take_release_notes');
   },
 
   createConcept(path: string): Promise<void> {

@@ -41,7 +41,7 @@ git log --oneline <last-tag>..HEAD   # or: git log --oneline   (first release)
 
 Group them into `### Added`, `### Changed`, `### Fixed`, `### Removed` based on commit messages. Skip purely internal commits (refactors with no user-visible effect, "fix typo", test-retry tweaks). Focus on user-visible behavior; when unsure, lean toward including.
 
-**Record only user-relevant changes.** The changelog is user-facing — every entry must describe something the user actually experiences. Drop anything internal even if the commit is a `feat`/`refactor`: code or terminology renames (e.g. Pane→Tile "to match the glossary"), internal restructuring, and doc/glossary/wayfinder commits never belong here. When an entry only makes sense to someone reading the source, cut it.
+**Record only user-relevant changes.** The changelog is user-facing: it becomes the GitHub release notes, and the desktop app embeds it and shows the new sections in a "What's new" dialog on the first start after an update. So every entry must describe something the user actually experiences. Drop anything internal even if the commit is a `feat`/`refactor`: code or terminology renames (e.g. Pane→Tile "to match the glossary"), internal restructuring, and doc/glossary/wayfinder commits never belong here. When an entry only makes sense to someone reading the source, cut it.
 
 Prepend a new section to `CHANGELOG.md` (Keep a Changelog style), using today's date in ISO format:
 

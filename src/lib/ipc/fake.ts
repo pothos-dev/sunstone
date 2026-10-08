@@ -13,6 +13,8 @@ import type {
   KnownBundle,
   StartupDocument,
   SyncNotice,
+  UpdateNotice,
+  ReleaseNotes,
 } from '$lib/types';
 import {
   FAKE_BUNDLE_ROOT,
@@ -200,6 +202,32 @@ function simulateSyncNotice(notice: SyncNotice): void {
   }
 }
 
+/** Subscribers to simulated updater notices (see `onUpdateNotice`). */
+const updateNoticeSubscribers = new Set<(notice: UpdateNotice) => void>();
+
+/**
+ * Test hook: raise an updater notice, as if the desktop updater had installed a
+ * newer version (or found one a `.deb` install cannot take). Exposed on
+ * `window.__sunstoneFake`.
+ */
+function simulateUpdateNotice(notice: UpdateNotice): void {
+  for (const cb of updateNoticeSubscribers) {
+    cb(notice);
+  }
+}
+
+/** Canned notes for `?releaseNotes`, shaped like the Rust-rendered changelog. */
+const FAKE_RELEASE_NOTES: ReleaseNotes = {
+  version: '9.9.0',
+  html:
+    '<h2>9.9.0</h2>\n<h3>Added</h3>\n<ul>\n<li>Something new, see ' +
+    '<a href="https://example.com/notes">the notes</a>.</li>\n</ul>\n' +
+    '<h2>9.8.0</h2>\n<h3>Fixed</h3>\n<ul>\n<li>Something fixed.</li>\n</ul>\n',
+};
+
+/** `takeReleaseNotes` hands the notes out once per page load. */
+let releaseNotesTaken = false;
+
 /** Flushes registered through `onBeforeClose`, for {@link simulateCloseRequest}. */
 const closeFlushes = new Set<() => Promise<void>>();
 
@@ -217,6 +245,7 @@ if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).__sunstoneFake = {
     simulateExternalChange,
     simulateSyncNotice,
+    simulateUpdateNotice,
     simulateCloseRequest,
     clearAllTags,
     files: FILES,
@@ -321,6 +350,22 @@ export const fakeBackend: Backend = {
     return () => {
       syncNoticeSubscribers.delete(cb);
     };
+  },
+
+  // Emitter-backed so Playwright can raise a notice through
+  // `window.__sunstoneFake.simulateUpdateNotice`.
+  onUpdateNotice(cb: (notice: UpdateNotice) => void): () => void {
+    updateNoticeSubscribers.add(cb);
+    return () => {
+      updateNoticeSubscribers.delete(cb);
+    };
+  },
+
+  // `?releaseNotes` in the URL stands in for a start right after an update.
+  async takeReleaseNotes(): Promise<ReleaseNotes | null> {
+    if (releaseNotesTaken || typeof location === 'undefined') return null;
+    releaseNotesTaken = true;
+    return new URLSearchParams(location.search).has('releaseNotes') ? FAKE_RELEASE_NOTES : null;
   },
 
   // --- Tree CRUD (slice: tree-crud) ---

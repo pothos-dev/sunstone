@@ -20,7 +20,7 @@ timestamp: 2026-07-23T00:00:00Z
 - Persist window geometry (Rust-owned) and per-Bundle [view state](/interface/view-state.md).
 - Manage the separate print window and perform platform-native direct PDF export.
 - Serve [Attachment](/okf/bundle.md) bytes to the webview over the `sunstone-asset://` URI scheme, and the user's [font files](/interface/fonts.md) over `sunstone-font://`.
-- Update itself silently from the GitHub release feed (see [Self-update](#self-update)).
+- Update itself from the GitHub release feed and show what changed afterwards (see [Self-update](#self-update)).
 
 ## Files
 
@@ -34,7 +34,8 @@ timestamp: 2026-07-23T00:00:00Z
 | `src/pdf.rs` | Print-window and PDF-export machinery (per-platform `export_webview_pdf` impls). |
 | `src/startup.rs` | Startup-bundle resolution, `--detached` re-spawn, window-geometry capture/persistence. |
 | `src/session.rs` | `Session`: the current `AppState` and its `WatcherHandle` behind mutexes. `open()` builds the index, starts a fresh watcher (dropping the old), records the folder in config, and restores window geometry. |
-| `src/updater.rs` | Silent self-update over `tauri-plugin-updater`: `spawn_check` (from `setup`) and `install_pending` (on `RunEvent::Exit`). See [Self-update](#self-update). |
+| `src/updater.rs` | Self-update over `tauri-plugin-updater`: `spawn_check` (from `setup`), the `update-notice` event, and `install_pending` (on `RunEvent::Exit`). See [Self-update](#self-update). |
+| `src/release_notes.rs` | The embedded `CHANGELOG.md` sections since the previously run version, rendered for the frontend once after an update. See [Self-update](#self-update). |
 | `src/cli.rs` | Hand-rolled arg parser (no clap): `CliAction` (`Run`/`Serve`/`Version`/`Help`/`Error`), `RunOptions { bundle, document, detached }`, `ServeOptions { bundle, port }`. |
 | `src/serve.rs` | `sunstone serve`: resolves the Bundle (`SUNSTONE_BUNDLE`, the argument, else the current dir) and hands [sunstone-server](/architecture/sunstone-server.md#local-mode-sunstone-serve)'s `serve_local` the SPA Tauri embedded (`Context::assets`; a dev build embeds nothing and reads `build/` from disk). No window and no Tauri app — only `generate_context!` (for the assets) and `tauri::async_runtime` (to block on the server). |
 | `tauri.conf.json` | Product config: single frameless 1200×800 window, frontend served from `../build` (the SvelteKit static SPA), and the updater's public key and feed URL. |
@@ -61,9 +62,13 @@ An optional second positional names a Document to open (`sunstone ./docs guide/s
 
 ## Self-update
 
-At launch, `updater::spawn_check` asks `https://github.com/pothos-dev/sunstone/releases/latest/download/latest.json` for a newer version. If there is one, it downloads the signed installer in the background. Nothing appears in the UI, and the running session continues; the next launch runs the new version. AppImage and macOS `.app` installs are replaced on disk as soon as the download finishes. On Windows the plugin runs the installer and exits the process, so there the download waits for `RunEvent::Exit` and installs with the passive installer (`restart_after_install(false)`: Sunstone does not reopen).
+At launch, `updater::spawn_check` asks `https://github.com/pothos-dev/sunstone/releases/latest/download/latest.json` for a newer version. If there is one, it downloads the signed installer in the background while the running session continues; the next launch runs the new version. AppImage and macOS `.app` installs are replaced on disk as soon as the download finishes. On Windows the plugin runs the installer and exits the process, so there the download waits for `RunEvent::Exit` and installs with the passive installer (`restart_after_install(false)`: Sunstone does not reopen).
 
-The check runs only for installs the plugin can replace without a password: AppImage, NSIS, MSI, and a macOS executable inside a `.app`. It is skipped for `.deb`/`.rpm` (the plugin would `pkexec`), for an unbundled binary (`install-local.sh`, which `bundle_type()` reports as `None`), for debug builds, and when `SUNSTONE_NO_UPDATE` is set. Errors go to stderr.
+`.deb`/`.rpm` installs are checked but not updated: the plugin would need `pkexec`. They only learn that a newer version exists. The check is skipped entirely for an unbundled binary (`install-local.sh`, which `bundle_type()` reports as `None`), for debug builds, and when `SUNSTONE_NO_UPDATE` is set. Errors go to stderr.
+
+Once an update is installed, queued for exit, or (`.deb`/`.rpm`) available, the frontend shows a dismissible notice (`UpdateNotice.svelte`, over `Backend.onUpdateNotice`). The notice is emitted as the `update-notice` event and also kept in state (the `update_notice` command), because the check can finish before the frontend listens. A `.deb`/`.rpm` notice links to the version's GitHub release page.
+
+Every launch records its version as `lastRunVersion` in `state.json` (`config::record_run_version`). When the previous version is older, `release_notes.rs` renders the sections of the embedded `CHANGELOG.md` after it up to the running version, and the frontend shows them once in a dialog (`ReleaseNotesDialog.svelte`, over `Backend.takeReleaseNotes`). A fresh install shows nothing. A store written before `lastRunVersion` existed counts as an update and shows only the running version's section.
 
 The release workflow signs the updater artifacts (`bundle.createUpdaterArtifacts`) with the `TAURI_SIGNING_PRIVATE_KEY` repository secret, and `tauri-action` merges each platform into the release's `latest.json`. The public half sits in `tauri.conf.json` (`plugins.updater.pubkey`). If the private key is lost, installed copies can't verify any later release and stay on their version until reinstalled by hand.
 

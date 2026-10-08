@@ -3,6 +3,7 @@ mod cli;
 mod commands;
 mod font;
 mod pdf;
+mod release_notes;
 mod serve;
 mod session;
 mod startup;
@@ -95,6 +96,7 @@ pub fn run() {
 
             startup::wire_window_persistence(app, sess.clone());
             updater::spawn_check(app.handle());
+            app.manage(release_notes::on_launch());
 
             // Open the startup Bundle if one was named (env/CLI); otherwise leave
             // the Session empty so the frontend shows the launcher. `open` builds
@@ -125,6 +127,8 @@ pub fn run() {
             commands::bundle_root,
             commands::current_bundle,
             commands::take_startup_document,
+            commands::update_notice,
+            commands::take_release_notes,
             commands::list_known_bundles,
             commands::forget_bundle,
             commands::load_appearance,

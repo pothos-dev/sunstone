@@ -3,6 +3,8 @@
   import { backend } from '$lib/ipc';
   import App from '$lib/App.svelte';
   import Launcher from '$lib/components/Launcher.svelte';
+  import ReleaseNotesDialog from '$lib/components/ReleaseNotesDialog.svelte';
+  import UpdateNotice from '$lib/components/UpdateNotice.svelte';
 
   // The desktop (Tauri/fake) entry decides, on startup, between two shells:
   //  - a Bundle is open (launched with a path, or picked in the launcher) → the
@@ -31,3 +33,8 @@
 {:else if mode === 'launcher'}
   <Launcher />
 {/if}
+
+<!-- Updates are about the app, not a Bundle: shown over the launcher and the
+     editor alike. -->
+<UpdateNotice />
+<ReleaseNotesDialog />

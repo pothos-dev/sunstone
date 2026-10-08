@@ -132,9 +132,9 @@ struct Store {
     pub bundles: HashMap<String, BundleState>,
 }
 
-/// App-level state (not per-Bundle). Only the OS-driven theme default ships
-/// now. User colours and fonts are NOT here: they live in the hand-written
-/// `config.json` ([`load_appearance`]).
+/// App-level state (not per-Bundle): the OS-driven theme default and the
+/// version that last ran. User colours and fonts are NOT here: they live in the
+/// hand-written `config.json` ([`load_appearance`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
@@ -142,12 +142,16 @@ pub struct AppConfig {
     /// setting; future values (`"light"`, `"dark"`, custom theme ids) can be
     /// honoured by the frontend theme store later.
     pub theme: String,
+    /// The Sunstone version that last started, so the next start can tell it
+    /// was updated (see [`record_run_version`]). `None` in stores that predate it.
+    pub last_run_version: Option<String>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
+            last_run_version: None,
         }
     }
 }
@@ -228,6 +232,34 @@ fn with_store(update: impl FnOnce(&mut Store) -> bool) -> Result<(), String> {
         save_store(&store)?;
     }
     Ok(())
+}
+
+/// What the store knew about the run before this one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreviousRun {
+    /// No store at all: a fresh install.
+    FirstRun,
+    /// A store written before Sunstone recorded `lastRunVersion`: an update
+    /// from an older version.
+    Unrecorded,
+    /// The version that last ran.
+    Version(String),
+}
+
+/// Record `current` as the version that last ran and report the one before it.
+/// A failed write is ignored: at worst the release notes show again next start.
+pub fn record_run_version(current: &str) -> PreviousRun {
+    let existed = store_path().is_some_and(|p| p.exists());
+    let mut previous = None;
+    let _ = with_store(|store| {
+        previous = store.config.last_run_version.replace(current.to_string());
+        previous.as_deref() != Some(current)
+    });
+    match previous {
+        Some(v) => PreviousRun::Version(v),
+        None if existed => PreviousRun::Unrecorded,
+        None => PreviousRun::FirstRun,
+    }
 }
 
 /// The user's appearance overrides — the `colors` and `fonts` values of
@@ -393,6 +425,18 @@ pub fn forget_bundle(path: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn last_run_version_round_trips_and_defaults_to_none() {
+        let old: Store = serde_json::from_str(r#"{"config":{"theme":"system"}}"#).unwrap();
+        assert_eq!(old.config.last_run_version, None);
+        let mut store = Store::default();
+        store.config.last_run_version = Some("0.26.0".into());
+        let json = serde_json::to_string(&store).unwrap();
+        assert!(json.contains(r#""lastRunVersion":"0.26.0""#));
+        let back: Store = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.config.last_run_version.as_deref(), Some("0.26.0"));
+    }
 
     #[test]
     fn bundle_state_defaults_are_empty() {
