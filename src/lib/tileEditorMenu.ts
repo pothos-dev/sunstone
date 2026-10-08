@@ -14,8 +14,14 @@ import {
   toggleInlineCode,
   insertOrEditLink,
 } from '$lib/editor/commands';
+import type { MenuIconName } from '$lib/menuIcons';
 
-export type EditorMenuItem = { id: string; label: string; separated?: boolean };
+export type EditorMenuItem = {
+  id: string;
+  label: string;
+  separated?: boolean;
+  icon?: MenuIconName;
+};
 
 export interface EditorMenuBuildInput {
   /** Whether the CodeMirror view is currently read-only. */
@@ -55,6 +61,7 @@ export function buildEditorMenuItems(input: EditorMenuBuildInput): EditorMenuBui
         {
           id: 'annotate',
           label: annotateAction === 'add' ? 'Add comment' : 'Remove comment',
+          icon: annotateAction === 'add' ? 'commentAdd' : 'commentRemove',
         },
       ],
       annotateUsesSelectionRange: annotateAction === 'add',
@@ -63,26 +70,28 @@ export function buildEditorMenuItems(input: EditorMenuBuildInput): EditorMenuBui
 
   const items: EditorMenuItem[] = [];
   if (hasSelection) {
-    items.push({ id: 'cut', label: 'Cut' });
-    items.push({ id: 'copy', label: 'Copy' });
+    items.push({ id: 'cut', label: 'Cut', icon: 'cut' });
+    items.push({ id: 'copy', label: 'Copy', icon: 'copy' });
   }
-  items.push({ id: 'paste', label: 'Paste' });
+  items.push({ id: 'paste', label: 'Paste', icon: 'paste' });
   if (hasSelection) {
-    items.push({ id: 'bold', label: 'Bold', separated: true });
-    items.push({ id: 'italic', label: 'Italic' });
-    items.push({ id: 'strike', label: 'Strikethrough' });
-    items.push({ id: 'code', label: 'Inline code' });
+    items.push({ id: 'bold', label: 'Bold', separated: true, icon: 'bold' });
+    items.push({ id: 'italic', label: 'Italic', icon: 'italic' });
+    items.push({ id: 'strike', label: 'Strikethrough', icon: 'strike' });
+    items.push({ id: 'code', label: 'Inline code', icon: 'code' });
   }
   items.push({
     id: 'link',
     label: linkAction === 'edit' ? 'Edit link' : 'Insert link',
     separated: true,
+    icon: 'link',
   });
   if (annotateAction) {
     items.push({
       id: 'annotate',
       label: annotateAction === 'add' ? 'Add comment' : 'Remove comment',
       separated: true,
+      icon: annotateAction === 'add' ? 'commentAdd' : 'commentRemove',
     });
   }
 

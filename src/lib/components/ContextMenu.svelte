@@ -4,12 +4,16 @@
    * renders a list of actions, and closes on outside-click / Escape / action.
    * Generic over the action id so the caller decides the items.
    */
+  import { menuIconSvg, type MenuIconName } from '$lib/menuIcons';
+
   interface MenuItem {
     id: string;
     label: string;
     /** Visually separate from the previous item (e.g. before a destructive op). */
     separated?: boolean;
     danger?: boolean;
+    /** Leading glyph; items without one keep the slot so labels stay aligned. */
+    icon?: MenuIconName;
   }
 
   interface Props {
@@ -58,6 +62,9 @@
       data-action={item.id}
       onclick={() => choose(item.id)}
     >
+      <span class="icon">
+        {#if item.icon}{@html menuIconSvg(item.icon)}{/if}
+      </span>
       {item.label}
     </button>
   {/each}
@@ -85,7 +92,9 @@
   }
 
   .item {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     width: 100%;
     padding: 0.35rem 0.6rem;
     border: none;
@@ -96,6 +105,14 @@
     cursor: pointer;
     border-radius: var(--radius-sm);
     transition: background 0.12s ease;
+  }
+
+  .icon {
+    display: inline-flex;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    opacity: 0.8;
   }
 
   .item:hover {

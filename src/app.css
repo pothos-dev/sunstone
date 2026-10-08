@@ -291,6 +291,28 @@ body {
   white-space: normal;
 }
 
+/* Icons in the table cell context menu (`src/lib/editor/tableMenuIcons.ts`),
+   laid out like our own `ContextMenu.svelte`. */
+.cm-atomic-table-menu .cm-atomic-table-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.cm-atomic-table-menu-item .sunstone-menu-icon {
+  display: inline-flex;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+}
+.cm-atomic-table-menu .cm-atomic-table-menu-item.danger {
+  color: var(--danger);
+}
+.cm-atomic-table-menu .cm-atomic-table-menu-item.danger:hover {
+  background: var(--danger);
+  color: var(--danger-contrast);
+}
+
 /* Find matches inside table cells (`src/lib/editor/tableSearch.ts`). The
    search panel's `.cm-searchMatch` marks cannot reach into the table widget, so
    those matches are CSS Custom Highlights in the same colours. */

@@ -28,7 +28,9 @@ describe('buildEditorMenuItems', () => {
       annotateAction: 'add',
       linkAction: null,
     });
-    expect(result.items).toEqual([{ id: 'annotate', label: 'Add comment' }]);
+    expect(result.items).toEqual([
+      { id: 'annotate', label: 'Add comment', icon: 'commentAdd' },
+    ]);
     expect(result.annotateUsesSelectionRange).toBe(true);
   });
 
@@ -39,7 +41,9 @@ describe('buildEditorMenuItems', () => {
       annotateAction: 'remove',
       linkAction: null,
     });
-    expect(result.items).toEqual([{ id: 'annotate', label: 'Remove comment' }]);
+    expect(result.items).toEqual([
+      { id: 'annotate', label: 'Remove comment', icon: 'commentRemove' },
+    ]);
     expect(result.annotateUsesSelectionRange).toBe(false);
   });
 
@@ -51,8 +55,8 @@ describe('buildEditorMenuItems', () => {
       linkAction: 'insert',
     });
     expect(result.items).toEqual([
-      { id: 'paste', label: 'Paste' },
-      { id: 'link', label: 'Insert link', separated: true },
+      { id: 'paste', label: 'Paste', icon: 'paste' },
+      { id: 'link', label: 'Insert link', separated: true, icon: 'link' },
     ]);
   });
 
@@ -64,14 +68,14 @@ describe('buildEditorMenuItems', () => {
       linkAction: 'insert',
     });
     expect(result.items).toEqual([
-      { id: 'cut', label: 'Cut' },
-      { id: 'copy', label: 'Copy' },
-      { id: 'paste', label: 'Paste' },
-      { id: 'bold', label: 'Bold', separated: true },
-      { id: 'italic', label: 'Italic' },
-      { id: 'strike', label: 'Strikethrough' },
-      { id: 'code', label: 'Inline code' },
-      { id: 'link', label: 'Insert link', separated: true },
+      { id: 'cut', label: 'Cut', icon: 'cut' },
+      { id: 'copy', label: 'Copy', icon: 'copy' },
+      { id: 'paste', label: 'Paste', icon: 'paste' },
+      { id: 'bold', label: 'Bold', separated: true, icon: 'bold' },
+      { id: 'italic', label: 'Italic', icon: 'italic' },
+      { id: 'strike', label: 'Strikethrough', icon: 'strike' },
+      { id: 'code', label: 'Inline code', icon: 'code' },
+      { id: 'link', label: 'Insert link', separated: true, icon: 'link' },
     ]);
   });
 
@@ -86,6 +90,7 @@ describe('buildEditorMenuItems', () => {
       id: 'link',
       label: 'Edit link',
       separated: true,
+      icon: 'link',
     });
   });
 
@@ -100,6 +105,7 @@ describe('buildEditorMenuItems', () => {
       id: 'annotate',
       label: 'Add comment',
       separated: true,
+      icon: 'commentAdd',
     });
     expect(result.annotateUsesSelectionRange).toBe(true);
   });

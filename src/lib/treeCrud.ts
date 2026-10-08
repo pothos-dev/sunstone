@@ -10,6 +10,7 @@
 import type { TreeNode } from '$lib/types';
 import { dirname, stripMd } from '$lib/path';
 import { reservedPath, RESERVED_FILES, type ReservedKind } from '$lib/reserved';
+import type { MenuIconName } from '$lib/menuIcons';
 
 /**
  * Folder a NEW child of `node` should live in: the node itself if it's a
@@ -64,6 +65,7 @@ export interface TreeMenuItem {
   label: string;
   separated?: boolean;
   danger?: boolean;
+  icon?: MenuIconName;
 }
 
 /**
@@ -76,8 +78,8 @@ export interface TreeMenuItem {
  */
 export function menuItemsFor(node: TreeNode): TreeMenuItem[] {
   const items: TreeMenuItem[] = [
-    { id: 'newConcept', label: 'New Concept' },
-    { id: 'newFolder', label: 'New Folder' },
+    { id: 'newConcept', label: 'New Concept', icon: 'newConcept' },
+    { id: 'newFolder', label: 'New Folder', icon: 'newFolder' },
   ];
   const deleteReserved: TreeMenuItem[] = [];
   if (node.isDir) {
@@ -89,6 +91,7 @@ export function menuItemsFor(node: TreeNode): TreeMenuItem[] {
           id: `deleteReserved:${kind}`,
           label: `Delete ${RESERVED_FILES[kind]}`,
           danger: true,
+          icon: 'delete',
         });
         continue;
       }
@@ -96,14 +99,15 @@ export function menuItemsFor(node: TreeNode): TreeMenuItem[] {
         id: `createReserved:${kind}`,
         label: `Create ${RESERVED_FILES[kind]}`,
         separated: first,
+        icon: kind,
       });
       first = false;
     }
   }
   items.push(
-    { id: 'rename', label: 'Rename', separated: true },
-    { id: 'move', label: 'Move…' },
-    { id: 'delete', label: 'Delete', separated: true, danger: true },
+    { id: 'rename', label: 'Rename', separated: true, icon: 'rename' },
+    { id: 'move', label: 'Move…', icon: 'move' },
+    { id: 'delete', label: 'Delete', separated: true, danger: true, icon: 'delete' },
     ...deleteReserved,
   );
   return items;

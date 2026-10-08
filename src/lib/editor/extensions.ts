@@ -48,6 +48,7 @@ import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from '
 import { anchorTracking } from './anchor-tracking';
 import { findExtensions, findPanelTheme } from './find';
 import { readOnlyTables } from './tableReadOnly';
+import { tableMenuIcons } from './tableMenuIcons';
 import { inlineWrapCommand, headingCommand, annotateCommand } from './commands';
 
 /**
@@ -236,6 +237,7 @@ export function modeExtensions(
     // `view.dispatch`, so `EditorState.readOnly` below does NOT reach them —
     // reading mode locks them here instead.
     readOnlyTables(reading),
+    tableMenuIcons,
     // Embedded images (ADR-0010). REPLACES atomic-editor's `imageBlocks()`,
     // which is deliberately NOT in this list: it is always block-below (so
     // `see ![x](d.png) here` breaks the paragraph), it cannot size an image, it
