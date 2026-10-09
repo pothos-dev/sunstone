@@ -353,10 +353,21 @@ fn link_attrs(url: &str, source_path: &str, exists: &dyn Fn(&str) -> bool) -> St
     } else if let Some(path) = marked.strip_prefix(M_BROKEN) {
         internal_link_attrs(path, true)
     } else if let Some(href) = marked.strip_prefix(M_EXTERNAL) {
+        if is_script_url(href) {
+            return String::new();
+        }
         format!(r#"href="{}" target="_blank" rel="noopener noreferrer""#, attr_escape(href))
     } else {
         format!(r#"href="{}""#, attr_escape(&marked))
     }
+}
+
+/// A URL scheme that runs or embeds content when followed. comrak drops these
+/// from markdown links; `link_attrs` builds its anchors after comrak, so it
+/// refuses them itself (the link keeps its text, without an `href`).
+fn is_script_url(url: &str) -> bool {
+    let scheme = url.split(':').next().unwrap_or("").to_ascii_lowercase();
+    matches!(scheme.as_str(), "javascript" | "vbscript" | "data" | "file")
 }
 
 fn internal_link_attrs(path: &str, broken: bool) -> String {
@@ -482,6 +493,16 @@ mod tests {
         // Another type: no card, even with the same keys.
         let other = content.replace("Attested Computation", "Metric");
         assert!(!render(&other, "computations/revenue.md", &all).html.contains("computation-fields"));
+    }
+
+    #[test]
+    fn contract_card_and_sources_drop_script_urls() {
+        let content = "---\ntype: Attested Computation\nverified: { by: human:a }\n\
+                       computation: 'JavaScript:alert(1)'\nsources:\n  - id: s\n    resource: 'javascript:alert(2)'\n\
+                       ---\nClaim[^s].\n";
+        let html = render(content, "c.md", &["c.md"]).html;
+        assert!(!html.to_ascii_lowercase().contains("href=\"javascript:"), "{html}");
+        assert!(html.contains(r#"data-testid="computation""#), "{html}");
     }
 
     /// ov-13: an Attested Computation's `# Computation` section is wrapped,
