@@ -13,7 +13,7 @@ import { menuIconSvg, type MenuIconName } from '$lib/menuIcons';
 // phase and decorates on the next animation frame, i.e. after the cell listener
 // has opened the menu but before it is painted.
 
-export const TABLE_MENU_ICONS: Record<string, MenuIconName> = {
+const TABLE_MENU_ICONS: Record<string, MenuIconName> = {
   'Insert row above': 'rowAbove',
   'Insert row below': 'rowBelow',
   'Delete row': 'rowDelete',

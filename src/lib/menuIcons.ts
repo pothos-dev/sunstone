@@ -1,7 +1,7 @@
 /**
- * Hand-drawn context-menu icons, kept as inner SVG markup so both
- * `MenuIcon.svelte` (our `ContextMenu`) and plain DOM (atomic-editor's table
- * cell menu, see `editor/tableMenuIcons.ts`) can render them.
+ * Hand-drawn context-menu icons, kept as inner SVG markup so both our
+ * `ContextMenu.svelte` and plain DOM (atomic-editor's table cell menu, see
+ * `editor/tableMenuIcons.ts`) can render them.
  *
  * Every glyph is drawn on a 16×16 grid as a stroked outline; `menuIconSvg`
  * supplies the shared stroke attributes and `currentColor`, so an icon follows
