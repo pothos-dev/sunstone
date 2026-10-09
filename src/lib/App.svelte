@@ -559,8 +559,6 @@
 
   // --- Tree CRUD: context menu + dialogs --------------------------------------
   let treeCrud = $state<ReturnType<typeof TreeCrud> | null>(null);
-  // The root index.md is reached by clicking the Explorer header title (like a
-  // folder name), so only the other reserved files keep a header icon.
   // The Bundle root, as the Explorer header shows it (ov-7): which folder, and
   // whether the user set it. Re-read whenever the index rebuilds.
   const rootLabel = $derived.by(() => {
@@ -574,6 +572,8 @@
     void indexStore.setRootOverride(session.bundleRootOverride);
   });
 
+  // The root index.md is reached by clicking the Explorer header title (like a
+  // folder name), so only the other reserved files keep a header icon.
   const rootReservedSorted = $derived(
     bundle.tree ? reservedChildren(bundle.tree).filter((r) => r.kind !== 'index') : [],
   );

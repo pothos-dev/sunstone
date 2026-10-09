@@ -7,7 +7,7 @@
 //! `appearance_config`). It is read on every request, so editing it shows on
 //! the next page load; no file, no variable or invalid JSON all answer `null`
 //! and the frontend keeps its defaults. Both routes are unauthenticated: the
-//! look of a wiki is as public as its pages.
+//! look of a wiki is as public as its Concepts.
 //!
 //! What a font request may read is [`appearance::font_file`]'s decision
 //! (listed in the config, a font extension, inside the config's directory),

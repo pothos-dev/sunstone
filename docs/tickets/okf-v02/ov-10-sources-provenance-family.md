@@ -35,7 +35,7 @@ Editing `sources` itself is not this ticket's problem — the YAML Frontmatter e
 - [x] A `resource` that is a URL or an in-Bundle path is followable; a scope descriptor renders as plain text and is never styled as a broken link
 - [x] Credibility signals render as the objective values they are
 - [x] `[^id]` renders as a sequential number by first use; reordering `sources` does not change what a claim attributes to or how it is numbered
-- [x] Hover on a citation shows id, title and resource; click jumps to the Sources entry; each entry jumps back to its citing claims
+- [x] Hover on a citation shows id, title and resource; click opens the source (changed from "jumps to the Sources entry" by ov-17); each entry jumps back to its citing claims
 - [x] A `[^id]` with a `sources` entry and no body definition is resolved, not broken
 - [x] A body definition for a `sources` id is hidden and its text shown on the entry
 - [x] Edit on an entry opens the Frontmatter with that entry unfolded and the caret on it

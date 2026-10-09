@@ -310,7 +310,7 @@ fn router(state: Arc<ServerState>) -> Router {
         // Build identification, unauthenticated for the same reason.
         .route("/_api/version", get(routes_read::version_handler))
         // The user's colours and fonts (`SUNSTONE_CONFIG`), and the font files
-        // it lists — unauthenticated: a wiki's look is as public as its pages.
+        // it lists — unauthenticated: a wiki's look is as public as its Concepts.
         .route("/_api/appearance", get(routes_appearance::appearance_handler))
         .route("/_api/appearance/font", get(routes_appearance::font_handler))
         .with_state(state)
