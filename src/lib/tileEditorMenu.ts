@@ -56,16 +56,7 @@ export function buildEditorMenuItems(input: EditorMenuBuildInput): EditorMenuBui
 
   if (readOnly) {
     if (!annotateAction) return { items: [], annotateUsesSelectionRange: false };
-    return {
-      items: [
-        {
-          id: 'annotate',
-          label: annotateAction === 'add' ? 'Add comment' : 'Remove comment',
-          icon: annotateAction === 'add' ? 'commentAdd' : 'commentRemove',
-        },
-      ],
-      annotateUsesSelectionRange: annotateAction === 'add',
-    };
+    return { items: [annotateItem(annotateAction)], annotateUsesSelectionRange: annotateAction === 'add' };
   }
 
   const items: EditorMenuItem[] = [];
@@ -86,16 +77,15 @@ export function buildEditorMenuItems(input: EditorMenuBuildInput): EditorMenuBui
     separated: true,
     icon: 'link',
   });
-  if (annotateAction) {
-    items.push({
-      id: 'annotate',
-      label: annotateAction === 'add' ? 'Add comment' : 'Remove comment',
-      separated: true,
-      icon: annotateAction === 'add' ? 'commentAdd' : 'commentRemove',
-    });
-  }
+  if (annotateAction) items.push({ ...annotateItem(annotateAction), separated: true });
 
   return { items, annotateUsesSelectionRange: annotateAction === 'add' };
+}
+
+function annotateItem(action: 'add' | 'remove'): EditorMenuItem {
+  return action === 'add'
+    ? { id: 'annotate', label: 'Add comment', icon: 'commentAdd' }
+    : { id: 'annotate', label: 'Remove comment', icon: 'commentRemove' };
 }
 
 /**
