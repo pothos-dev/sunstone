@@ -22,7 +22,7 @@
 //!   the confinement primitive every Attachment read uses — `..`, absolute
 //!   paths and symlink escapes are refused).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
@@ -86,14 +86,11 @@ pub fn font_file(config_path: &Path, file: &str) -> Result<(Vec<u8>, &'static st
     let content_type = font_content_type(file).ok_or_else(not_found)?;
     let listed = load(config_path)
         .and_then(|a| a.get("fonts").cloned())
-        .is_some_and(|fonts| listed_files(&fonts).any(|f| f == file));
+        .is_some_and(|fonts| listed_files(&fonts).any(|f| f.trim() == file));
     if !listed {
         return Err(not_found());
     }
-    let dir = config_path
-        .parent()
-        .and_then(|d| d.canonicalize().ok())
-        .ok_or_else(not_found)?;
+    let dir = config_dir(config_path).ok_or_else(not_found)?;
     let resolved = bundle::resolve(&dir, file).map_err(|msg| {
         if msg.contains("escapes the bundle") || msg.contains("must be bundle-relative") {
             FontError::Forbidden(msg)
@@ -105,8 +102,16 @@ pub fn font_file(config_path: &Path, file: &str) -> Result<(Vec<u8>, &'static st
     Ok((bytes, content_type))
 }
 
+/// The canonical directory holding the config. A bare `config.json` has the
+/// empty path as its parent, which means the working directory.
+fn config_dir(config_path: &Path) -> Option<PathBuf> {
+    let parent = config_path.parent()?;
+    let parent = if parent.as_os_str().is_empty() { Path::new(".") } else { parent };
+    parent.canonicalize().ok()
+}
+
 /// Every file name under any `fonts.<role>.files` — a string, or an object's
-/// `src`. Malformed entries are skipped, as the frontend skips them.
+/// `src`, untrimmed. Malformed entries are skipped, as the frontend skips them.
 fn listed_files(fonts: &Value) -> impl Iterator<Item = &str> {
     fonts
         .as_object()
@@ -193,6 +198,19 @@ mod tests {
         assert!(matches!(font_file(&config, "Other.woff2"), Err(FontError::NotFound(_))));
         assert!(matches!(font_file(&config, "state.json"), Err(FontError::NotFound(_))));
         assert!(matches!(font_file(&config, "config.json"), Err(FontError::NotFound(_))));
+    }
+
+    #[test]
+    fn a_listed_font_with_surrounding_spaces_is_served_by_its_trimmed_name() {
+        // The frontend trims `src` before building the URL, so the check must too.
+        let config = temp_config(r#"{ "fonts": { "ui": { "files": [" Inter.woff2 "] } } }"#);
+        assert_eq!(font_file(&config, "Inter.woff2"), Ok((b"wOF2-inter".to_vec(), "font/woff2")));
+    }
+
+    #[test]
+    fn a_bare_config_file_name_lives_in_the_working_directory() {
+        let cwd = std::env::current_dir().unwrap().canonicalize().unwrap();
+        assert_eq!(config_dir(Path::new("config.json")), Some(cwd));
     }
 
     #[test]
