@@ -94,16 +94,6 @@ export type TagCount = {
 };
 
 /**
- * One entry in the launcher's "known folders" list — a previously-opened Bundle,
- * derived from the persisted per-Bundle config. Matches the Rust `KnownBundle`
- * (`serde rename_all = "camelCase"`). Returned by `Backend.listKnownBundles()`,
- * ordered most-recently-opened first.
- */
-/**
- * A Document named on the desktop command line (`sunstone ./docs guide/setup.md#x`):
- * a bundle-relative path plus an optional heading anchor (the slug after `#`).
- */
-/**
  * A newer Sunstone version, as the desktop updater (`src-tauri/src/updater.rs`)
  * reports it. Delivered by `Backend.onUpdateNotice`.
  *
@@ -127,11 +117,21 @@ export type ReleaseNotes = {
   html: string;
 };
 
+/**
+ * A Document named on the desktop command line (`sunstone ./docs guide/setup.md#x`):
+ * a bundle-relative path plus an optional heading anchor (the slug after `#`).
+ */
 export type StartupDocument = {
   path: string;
   anchor: string | null;
 };
 
+/**
+ * One entry in the launcher's "known folders" list — a previously-opened Bundle,
+ * derived from the persisted per-Bundle config. Matches the Rust `KnownBundle`
+ * (`serde rename_all = "camelCase"`). Returned by `Backend.listKnownBundles()`,
+ * ordered most-recently-opened first.
+ */
 export type KnownBundle = {
   /** absolute path of the Bundle root; also the store key used by forgetBundle/openBundle */
   path: string;

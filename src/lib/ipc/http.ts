@@ -430,11 +430,6 @@ export const httpBackend: Backend = {
     };
   },
 
-  // --- Git sync-loop divergence notices (git-sync spec §10.3). ---------------
-  // The loop sends `event: sync` frames on the SAME `/_api/events` stream;
-  // `EventSource` dispatches a named event ONLY to a matching listener, so the
-  // unnamed `message` channel above (and `parseFileChange`, and the `FileChange`
-  // type) is untouched. No second connection, no polling.
   // The web build has no updater: nothing to report, no notes to show.
   onUpdateNotice(): () => void {
     return () => {};
@@ -444,6 +439,11 @@ export const httpBackend: Backend = {
     return null;
   },
 
+  // --- Git sync-loop divergence notices (git-sync spec §10.3). ---------------
+  // The loop sends `event: sync` frames on the SAME `/_api/events` stream;
+  // `EventSource` dispatches a named event ONLY to a matching listener, so the
+  // unnamed `message` channel above (and `parseFileChange`, and the `FileChange`
+  // type) is untouched. No second connection, no polling.
   onSyncNotice(cb: (notice: SyncNotice) => void): () => void {
     const source = acquireEvents();
     if (!source) return () => {};
