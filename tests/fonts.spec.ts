@@ -47,7 +47,7 @@ test('each role takes its configured family and size', async ({ page }) => {
 
   // UI: the root size (so every rem) and the chrome family.
   await expect(page.locator('html')).toHaveCSS('font-size', '18px');
-  expect((await fontOf(page, 'body')).family).toBe('"Sunstone UI", Georgia, serif');
+  expect((await fontOf(page, 'body')).family).toBe('Georgia, serif');
 
   // Content: the editor prose and the explorer, in the file-backed face.
   const body = await fontOf(page, '[data-testid="editor"] .cm-line');
@@ -64,7 +64,7 @@ test('each role takes its configured family and size', async ({ page }) => {
     mono: getComputedStyle(el).getPropertyValue('--font-mono').trim(),
     scale: getComputedStyle(el).getPropertyValue('--font-code-scale').trim(),
   }));
-  expect(html).toEqual({ mono: "'Sunstone Code', 'Courier New', monospace", scale: '0.8' });
+  expect(html).toEqual({ mono: "'Courier New', monospace", scale: '0.8' });
 });
 
 test('zoom scales the configured base sizes', async ({ page }) => {

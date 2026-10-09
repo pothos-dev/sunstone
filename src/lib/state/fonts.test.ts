@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'bun:test';
-import { fontsCss, isFontFamily, parseFonts } from './fonts';
+import { FONT_ROLES, fontsCss, isFontFamily, parseFonts } from './fonts';
 
 const url = (src: string) => `/f/${src}`;
 
@@ -80,11 +81,23 @@ describe('fontsCss', () => {
     expect(fontsCss({}, url)).toBe('');
   });
 
-  test('emits the role tokens on :root, the family behind its private face', () => {
+  test('emits the role tokens on :root, with no private face when there are no files', () => {
     const css = fontsCss(parseFonts({ ui: { family: 'Inter', size: 15 }, code: { size: 0.8 } }), url);
-    expect(css).toBe(
-      ":root {\n  --font-ui: 'Sunstone UI', Inter;\n  --font-ui-size: 15px;\n  --font-code-scale: 0.8;\n}\n",
-    );
+    expect(css).toBe(":root {\n  --font-ui: Inter;\n  --font-ui-size: 15px;\n  --font-code-scale: 0.8;\n}\n");
+  });
+
+  test('puts the private face in front only when the role has files', () => {
+    const css = fontsCss(parseFonts({ ui: { family: 'Inter', files: ['i.woff2'] }, content: { files: ['c.woff2'] } }), url);
+    expect(css).toContain("  --font-ui: 'Sunstone UI', Inter;\n");
+    expect(css).toContain(`  --font-content: 'Sunstone Content', ${FONT_ROLES.content.stack};\n`);
+  });
+
+  test("each role's default stack matches app.css, which names no private face", () => {
+    const appCss = readFileSync(new URL('../../app.css', import.meta.url), 'utf8');
+    for (const spec of Object.values(FONT_ROLES)) {
+      expect(appCss).toContain(`  ${spec.family}: ${spec.stack};\n`);
+    }
+    expect(appCss).not.toMatch(/--font-(ui|content|mono):[^;]*Sunstone/);
   });
 
   test('registers each file under the role face, with its descriptors', () => {
@@ -96,7 +109,8 @@ describe('fontsCss', () => {
       "@font-face {\n  font-family: 'Sunstone Content';\n  src: url(\"/font?file=a%20b.woff2\") format('woff2');\n" +
         '  font-weight: 100 900;\n  font-style: italic;\n  font-display: swap;\n}\n' +
         "@font-face {\n  font-family: 'Sunstone Content';\n  src: url(\"/font?file=c.ttf\") format('truetype');\n" +
-        '  font-display: swap;\n}\n',
+        '  font-display: swap;\n}\n' +
+        `:root {\n  --font-content: 'Sunstone Content', ${FONT_ROLES.content.stack};\n}\n`,
     );
   });
 });

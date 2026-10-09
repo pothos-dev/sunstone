@@ -13,18 +13,27 @@
  *
  * `ui` and `content` sizes are px at 100% zoom; `code`'s is a factor of the
  * surrounding text. Files sit next to the config and are registered with
- * `@font-face` under the role's private family (`'Sunstone UI'`, …), which
- * `app.css` puts first in every role's stack — so a file wins over an installed
- * font, and a role with files but no `family` still uses them.
+ * `@font-face` under the role's private family (`'Sunstone UI'`, …), which the
+ * override puts first in the role's stack — so a file wins over an installed
+ * font, and a role with files but no `family` still uses them. The private name
+ * appears only when the role has files: WebKitGTK (the Linux desktop) asks
+ * fontconfig for an unknown family and takes its substitute, so a stack led by
+ * a name with no `@font-face` would never reach Jost.
  *
  * Everything is validated syntactically here, with no DOM (the web SSR emits
  * the same stylesheet): a value that could break out of its declaration is
  * dropped, as is anything out of range.
  */
 
-/** Role → its family token, size token, private `@font-face` family, size range. */
+const SANS = "'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif";
+
+/**
+ * Role → its family token, size token, private `@font-face` family, size range,
+ * and the default stack `app.css` declares (the fallback behind a file-backed
+ * face when no `family` is set; a test keeps the two in step).
+ */
 export const FONT_ROLES = {
-  ui: { family: '--font-ui', size: '--font-ui-size', face: 'Sunstone UI', unit: 'px', min: 8, max: 32 },
+  ui: { family: '--font-ui', size: '--font-ui-size', face: 'Sunstone UI', unit: 'px', min: 8, max: 32, stack: SANS },
   content: {
     family: '--font-content',
     size: '--font-content-size',
@@ -32,8 +41,17 @@ export const FONT_ROLES = {
     unit: 'px',
     min: 8,
     max: 48,
+    stack: SANS,
   },
-  code: { family: '--font-mono', size: '--font-code-scale', face: 'Sunstone Code', unit: '', min: 0.5, max: 2 },
+  code: {
+    family: '--font-mono',
+    size: '--font-code-scale',
+    face: 'Sunstone Code',
+    unit: '',
+    min: 0.5,
+    max: 2,
+    stack: "ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, monospace",
+  },
 } as const;
 
 export type FontRoleName = keyof typeof FONT_ROLES;
@@ -159,7 +177,8 @@ export function fontsCss(fonts: Fonts, fontUrl: (src: string) => string): string
     if (!role) continue;
     const spec = FONT_ROLES[name];
     for (const file of role.files) faces.push(fontFace(spec.face, file, fontUrl));
-    if (role.family) decls.push(`  ${spec.family}: '${spec.face}', ${role.family};`);
+    const family = role.files.length > 0 ? `'${spec.face}', ${role.family ?? spec.stack}` : role.family;
+    if (family) decls.push(`  ${spec.family}: ${family};`);
     if (role.size !== undefined) decls.push(`  ${spec.size}: ${role.size}${spec.unit};`);
   }
   const root = decls.length > 0 ? `:root {\n${decls.join('\n')}\n}\n` : '';

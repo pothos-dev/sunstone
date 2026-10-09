@@ -230,12 +230,13 @@ html {
      base size the user can override in `config.json` (`fonts`, see
      state/fonts.ts): the override stylesheet re-declares these on `:root`. They
      live on <html>, not in the theme blocks, because those also match the app
-     root and would shadow an override. Each stack starts with the role's private
-     `@font-face` family, which exists only when the config lists font files. */
-  --font-ui: 'Sunstone UI', 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
-  --font-content: 'Sunstone Content', 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Sunstone Code', ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas,
-    monospace;
+     root and would shadow an override. The stacks hold no private
+     `@font-face` name: WebKitGTK lets fontconfig substitute an unknown family
+     instead of falling through, so the override puts it in front only when the
+     config lists font files. Keep in step with `FONT_ROLES[*].stack`. */
+  --font-ui: 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
+  --font-content: 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, monospace;
   --font-ui-size: 16px;
   --font-content-size: 14px;
 

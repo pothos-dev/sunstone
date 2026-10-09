@@ -16,7 +16,7 @@ Sunstone sets type in three **roles**. Each has a family and a base size, declar
 | `content` | Concept prose in the editor, the rendered article, the Explorer tree, the print/PDF body | `--font-content` | Jost | `--font-content-size` | `14px` |
 | `code` | Inline code and fenced code blocks | `--font-mono` | the system monospace stack | `--font-code-scale` | unset: `1` in the editor, `0.9` in the rendered article |
 
-Every family stack starts with a private name (`'Sunstone UI'`, `'Sunstone Content'`, `'Sunstone Code'`). It only exists when the config lists font files for that role (see below), so by default the browser skips it.
+Each role also has a private family name (`'Sunstone UI'`, `'Sunstone Content'`, `'Sunstone Code'`) for its font files. It is put in front of the role's stack only when the config lists files for that role (see below). The default stacks never name it: WebKitGTK, the Linux desktop's engine, lets fontconfig substitute an unknown family rather than move on to the next one, so a private name with no `@font-face` behind it replaced Jost with the system's default sans.
 
 ## Overriding fonts
 
