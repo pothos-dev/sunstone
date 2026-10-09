@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { appearanceCss, httpFontUrl, isSafeColorSyntax } from './appearance';
+import { appearanceCss, httpFontUrl, inlineAppearanceStyle, isSafeColorSyntax } from './appearance';
 
 const deps = { isColor: isSafeColorSyntax, fontUrl: httpFontUrl };
 
@@ -35,4 +35,10 @@ describe('isSafeColorSyntax', () => {
 
 test('httpFontUrl encodes the whole path into the query', () => {
   expect(httpFontUrl('fonts/a b.woff2')).toBe('/_api/appearance/font?file=fonts%2Fa%20b.woff2');
+});
+
+test('inlineAppearanceStyle puts the style before </head> and keeps `$` literal', () => {
+  const css = ":root { --font-ui: \"Foo$'$&$`\", sans-serif; }\n";
+  const html = inlineAppearanceStyle('<head><title>t</title></head><body>b</body>', css);
+  expect(html).toBe(`<head><title>t</title><style id="sunstone-appearance">\n${css}</style>\n</head><body>b</body>`);
 });

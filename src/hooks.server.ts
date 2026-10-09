@@ -2,12 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { handle as authHandle } from './auth';
 import { needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
-import {
-  APPEARANCE_STYLE_ID,
-  appearanceCss,
-  httpFontUrl,
-  isSafeColorSyntax,
-} from '$lib/state/appearance';
+import { appearanceCss, httpFontUrl, inlineAppearanceStyle, isSafeColorSyntax } from '$lib/state/appearance';
 
 /**
  * Same-origin `/_api/*` proxy (WEB build only, adapter-node), now with the
@@ -96,7 +91,7 @@ const appearanceStyle: Handle = ({ event, resolve }) =>
       }
       const css = appearanceCss(raw, { isColor: isSafeColorSyntax, fontUrl: httpFontUrl });
       if (css === '') return html;
-      return html.replace('</head>', `<style id="${APPEARANCE_STYLE_ID}">\n${css}</style>\n</head>`);
+      return inlineAppearanceStyle(html, css);
     },
   });
 

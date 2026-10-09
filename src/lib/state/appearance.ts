@@ -36,6 +36,15 @@ export function isSafeColorSyntax(value: string): boolean {
   return value.length <= 100 && /^[#A-Za-z0-9(),.%\s/+-]+$/.test(value);
 }
 
+/**
+ * `html` with the override stylesheet inlined just before `</head>` (the SSR
+ * pass). A replacer function, so a `$` in the CSS (a quoted family name may hold
+ * one) stays literal instead of acting as a replacement pattern.
+ */
+export function inlineAppearanceStyle(html: string, css: string): string {
+  return html.replace('</head>', () => `<style id="${APPEARANCE_STYLE_ID}">\n${css}</style>\n</head>`);
+}
+
 /** Where Sunstone Web (and `sunstone serve`) serves a config-relative font file. */
 export function httpFontUrl(src: string): string {
   return `/_api/appearance/font?file=${encodeURIComponent(src)}`;
