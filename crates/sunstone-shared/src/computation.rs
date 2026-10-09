@@ -33,6 +33,7 @@
 use serde::{Deserialize, Serialize};
 use serde_yaml::{Mapping, Value};
 
+use crate::frontmatter::scalar;
 use crate::paths::is_external;
 
 /// The `type` value that marks an Attested Computation (§10.1).
@@ -217,17 +218,6 @@ fn names(v: &Value) -> Vec<String> {
         Value::Sequence(items) => items.iter().filter_map(scalar).collect(),
         other => scalar(other).into_iter().collect(),
     }
-}
-
-/// A scalar as text (numbers and booleans too), `None` when empty or not one.
-fn scalar(v: &Value) -> Option<String> {
-    let s = match v {
-        Value::String(s) => s.trim().to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        _ => return None,
-    };
-    (!s.is_empty()).then_some(s)
 }
 
 /// The `# Computation` section of an Attested Computation's body (§4.2, §10.3,

@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::{Mapping, Value};
 
 use crate::actor::parse_actor;
+use crate::frontmatter::scalar;
 
 /// The derived trust tier (§5.3), lowest to highest.
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
@@ -221,17 +222,6 @@ fn stamp(m: Option<&Mapping>) -> Stamp {
 fn stamp_of(by: Option<String>, at: Option<String>) -> Stamp {
     let iso = at.as_deref().is_some_and(is_iso_datetime);
     Stamp { by, at, iso }
-}
-
-/// A non-empty YAML scalar as text; `None` for null, empty, maps and lists.
-fn scalar(v: &Value) -> Option<String> {
-    let s = match v {
-        Value::String(s) => s.trim().to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        _ => return None,
-    };
-    (!s.is_empty()).then_some(s)
 }
 
 #[cfg(test)]

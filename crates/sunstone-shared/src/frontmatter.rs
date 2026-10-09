@@ -277,7 +277,13 @@ pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
 /// purpose — `stale_after` is compared to *now* at display time, so nothing
 /// derived from the clock is ever cached in the index.
 fn lifecycle_scalar(map: &serde_yaml::Mapping, key: &str) -> Option<String> {
-    let s = match map.get(serde_yaml::Value::from(key))? {
+    scalar(map.get(serde_yaml::Value::from(key))?)
+}
+
+/// A non-empty YAML scalar as text, trimmed (numbers and booleans too); `None`
+/// for null, empty, maps and lists.
+pub(crate) fn scalar(v: &serde_yaml::Value) -> Option<String> {
+    let s = match v {
         serde_yaml::Value::String(s) => s.trim().to_string(),
         serde_yaml::Value::Number(n) => n.to_string(),
         serde_yaml::Value::Bool(b) => b.to_string(),
