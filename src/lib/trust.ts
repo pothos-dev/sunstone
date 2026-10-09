@@ -29,7 +29,7 @@ import { trustOf, type Stamp, type Trust, type TrustTier } from '$lib/wasm/expor
 export type { Trust, TrustTier, Stamp };
 
 /** The tier names readers see, lowest to highest (§5.3). */
-export const TIER_LABEL: Record<TrustTier, string> = {
+const TIER_LABEL: Record<TrustTier, string> = {
   unverified: 'Unverified',
   machineConfirmed: 'Machine-confirmed',
   humanReviewed: 'Human-reviewed',

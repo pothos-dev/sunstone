@@ -52,11 +52,6 @@ export function actorView(raw: string | null | undefined): ActorView {
   return { kind: a.kind, kindLabel, text, version, title, raw: a.raw };
 }
 
-/** Whether `raw` is a `human:` actor — the trust-tier test (§5.3). */
-export function isHumanActor(raw: string | null | undefined): boolean {
-  return parseActor(raw ?? '').kind === 'human';
-}
-
 /** The DOM for `raw`, for surfaces built outside Svelte (hover cards). */
 export function actorElement(raw: string | null | undefined): HTMLElement {
   const v = actorView(raw);

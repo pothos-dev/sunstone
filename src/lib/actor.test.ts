@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { actorView, isHumanActor } from './actor';
+import { actorView } from './actor';
 
 describe('actorView', () => {
   test('a person: chip, id, no version', () => {
@@ -53,15 +53,5 @@ describe('actorView', () => {
     }
     expect(actorView(null).text).toBe('');
     expect(actorView(undefined).kind).toBe('unknown');
-  });
-});
-
-describe('isHumanActor', () => {
-  test('only the human: prefix counts', () => {
-    expect(isHumanActor('human:dan')).toBe(true);
-    expect(isHumanActor('process:dan')).toBe(false);
-    expect(isHumanActor('dan/1')).toBe(false);
-    expect(isHumanActor('team:dan')).toBe(false);
-    expect(isHumanActor(null)).toBe(false);
   });
 });
