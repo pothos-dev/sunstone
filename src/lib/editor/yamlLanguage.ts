@@ -73,8 +73,8 @@ function frontmatterLinter(): Extension {
 }
 
 /**
- * OKF key/value completion (ADR 0009), replacing the Properties panel's
- * `OKF_KEYS` suggestions. Silent outside `'okf'` mode. An empty key prefix only
+ * OKF key/value completion (ADR 0009), replacing the old Properties panel's
+ * key suggestions. Silent outside `'okf'` mode. An empty key prefix only
  * completes on explicit request (Ctrl+Space) so a new line does not pop a list;
  * a value position (`status: `) completes as soon as there is something to offer.
  */
