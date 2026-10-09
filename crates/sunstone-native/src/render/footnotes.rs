@@ -129,7 +129,13 @@ pub(super) fn footnotes_to_sentinels(
     let mut anchored: HashSet<String> = HashSet::new();
     // Source references seen so far, per lowercased label.
     let mut cited: HashMap<String, usize> = HashMap::new();
+    // End of the last hidden source-definition line (its `\n`), if any.
+    let mut hidden_end: Option<usize> = None;
     for f in scan_footnotes(body, &ids) {
+        if f.from < pos {
+            // On a hidden definition's line: gone with it.
+            continue;
+        }
         out.push_str(&String::from_utf16_lossy(&units[pos..f.from]));
         let source = source_for(sources, &f.label);
         if f.def && source.is_some() {
@@ -138,6 +144,7 @@ pub(super) fn footnotes_to_sentinels(
                 .iter()
                 .position(|&u| u == newline)
                 .map_or(units.len(), |p| f.to + p);
+            hidden_end = Some(pos);
             continue;
         }
         let html = if f.def {
@@ -146,8 +153,8 @@ pub(super) fn footnotes_to_sentinels(
                 .rposition(|&u| u == newline)
                 .map_or(0, |p| p + 1);
             // A non-blank previous line would swallow the definition into its
-            // paragraph as a soft break.
-            let br = line_start > 0 && {
+            // paragraph as a soft break. A hidden line counts as blank.
+            let br = line_start > 0 && hidden_end != Some(line_start - 1) && {
                 let prev_start = units[..line_start - 1]
                     .iter()
                     .rposition(|&u| u == newline)
@@ -500,6 +507,21 @@ mod tests {
         // A definition with no `sources` entry keeps ov-14's behaviour.
         assert!(text.contains(r#"<a id="fn-n" class="footnote-def" title="n">2</a> a plain note"#), "{text}");
         assert!(section.contains(r#"<span class="source-note">Written &lt;by&gt; hand</span>"#), "{section}");
+    }
+
+    #[test]
+    fn a_hidden_source_definition_with_a_ref_on_its_line_does_not_panic() {
+        let body = "---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n---\n\nClaim[^s].\n\n[^s]: see also[^t]\n[^t]: other\n";
+        let html = render(body);
+        assert!(html.contains("see also"), "{html}");
+    }
+
+    #[test]
+    fn a_definition_under_a_hidden_source_definition_gets_no_leading_break() {
+        let body = "---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n---\n\nClaim[^s] and[^n].\n\n[^s]: by hand\n[^n]: a plain note\n";
+        let html = render(body);
+        assert!(!html.contains("<p><br>"), "{html}");
+        assert!(html.contains(r#"<a id="fn-n" class="footnote-def" title="n">2</a> a plain note"#), "{html}");
     }
 
     #[test]
