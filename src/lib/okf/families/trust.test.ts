@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { lintFrontmatter } from '../lint';
 import { completeFrontmatter } from '../complete';
-import { isoNow } from './trust';
 
 /** Trust findings as `[severity, marked text]`. */
 function trustMarks(yaml: string, mode: 'yaml' | 'okf' = 'okf') {
@@ -96,9 +95,5 @@ describe('trust completion (ov-9)', () => {
 
   test('a new verification event gets by/at', () => {
     expect(valuesAt('verified:\n  - by: human:a\n    at: 2026-06-25T09:00:00Z\n  - |')).toEqual(['by', 'at']);
-  });
-
-  test('isoNow drops the milliseconds and keeps the Z', () => {
-    expect(isoNow(new Date('2026-06-30T14:00:00.123Z'))).toBe('2026-06-30T14:00:00Z');
   });
 });

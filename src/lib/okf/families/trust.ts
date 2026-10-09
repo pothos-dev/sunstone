@@ -14,6 +14,7 @@
 // the spec asks for), a `by` offers the `human:` / `process:` actor prefixes.
 
 import { isMap, isScalar, isSeq, type Node, type YAMLMap } from 'yaml';
+import { isoUtc } from '$lib/instant';
 import { isIsoDatetime } from '$lib/wasm/exports';
 import {
   isEmptyValue,
@@ -33,11 +34,6 @@ const byAt = [
 ];
 
 const ISO_HINT = 'an ISO 8601 datetime with a UTC offset, e.g. `2026-06-30T14:00:00Z` (OKF §5.2)';
-
-/** `now` as an ISO 8601 UTC datetime to the second: `2026-06-30T14:00:00Z`. */
-export function isoNow(now: Date = new Date()): string {
-  return now.toISOString().replace(/\.\d{3}Z$/, 'Z');
-}
 
 /** Each `{ by, at }` map of the trust keys, with the range to blame. */
 function stamps(ctx: RuleContext): { map: YAMLMap; anchor: Range }[] {
@@ -130,7 +126,7 @@ function atSpec(path: string[]): CompletionSpec {
   return {
     path,
     get values(): CompletionOption[] {
-      return [{ label: isoNow(), detail: 'now (UTC)', info: 'The current time, ISO 8601 with a UTC offset.' }];
+      return [{ label: isoUtc(new Date()), detail: 'now (UTC)', info: 'The current time, ISO 8601 with a UTC offset.' }];
     },
   };
 }
