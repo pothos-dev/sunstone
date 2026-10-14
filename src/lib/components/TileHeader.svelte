@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { IndexedCrumb } from '$lib/tileTitle';
   import type { Lifecycle } from '$lib/lifecycle';
   import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
@@ -16,6 +17,12 @@
   // Presentational and thin: it owns no state. All logic (edit toggle, undo/redo,
   // review, export, close, split) lives in Tile.svelte and is passed in as
   // callbacks + reactive flags.
+  //
+  // The anonymous web reader (`web/WebReader.svelte`, wr-1) renders this same
+  // header `readOnly`: only the title, crumbs, lifecycle, Frontmatter toggle and
+  // Export PDF show, plus whatever it passes in the `leading` / `trailing`
+  // snippets (its narrow-screen drawer, quick-nav and overflow buttons). The
+  // editing props are optional for that reason; the desktop passes them all.
 
   interface Props {
     /** The active Concept's derived header label ('' when the Tile is empty). */
@@ -39,37 +46,47 @@
     titlePath?: string | null;
     /** Whether a Concept is open (gates the per-Concept controls). */
     hasOpenConcept: boolean;
+    /**
+     * A read-only surface (the anonymous web reader): no Back/Forward, undo/redo,
+     * Save, Edit, Review, split or close — only the title, the Frontmatter
+     * toggle and Export PDF. The desktop and the signed-in web App never set it.
+     */
+    readOnly?: boolean;
+    /** Extra controls ahead of the title (the reader's narrow-screen Explorer drawer toggle). */
+    leading?: Snippet;
+    /** Extra controls after the built-in ones (the reader's narrow-screen buttons + overflow menu). */
+    trailing?: Snippet;
     /** Whether the editor is in live-editing mode (vs read-only reading). */
-    editing: boolean;
+    editing?: boolean;
     /** Whether more than one tile is on screen (gates the Close affordance —
      *  closing the sole tile would just clear it to empty state). */
-    multipleTiles: boolean;
+    multipleTiles?: boolean;
     /** Whether there is a previous / next Concept in the Tile's history. */
-    canGoBack: boolean;
-    canGoForward: boolean;
-    onBack: () => void;
-    onForward: () => void;
+    canGoBack?: boolean;
+    canGoForward?: boolean;
+    onBack?: () => void;
+    onForward?: () => void;
     /** Undo/redo availability over the Tile's Document (body+frontmatter) history. */
-    canUndo: boolean;
-    canRedo: boolean;
+    canUndo?: boolean;
+    canRedo?: boolean;
     /** Whether the Concept is currently in review (working-tree ↔ HEAD) mode. */
-    reviewActive: boolean;
+    reviewActive?: boolean;
     /** Whether the review toggle is available (the file has reviewable history). */
-    reviewEnabled: boolean;
+    reviewEnabled?: boolean;
     /** Tooltip for the review toggle (explains the disabled reason when disabled). */
-    reviewTooltip: string;
+    reviewTooltip?: string;
     /** Close this Tile (the button only shows while several Tiles are open). */
-    onClose: () => void;
+    onClose?: () => void;
     /** Open this Tile's Concept in a new Column to the right. */
-    onSplitRight: () => void;
+    onSplitRight?: () => void;
     /** Open this Tile's Concept in a new TileSlot below, in this Column. */
-    onSplitDown: () => void;
-    onUndo: () => void;
-    onRedo: () => void;
-    onToggleReview: () => void;
+    onSplitDown?: () => void;
+    onUndo?: () => void;
+    onRedo?: () => void;
+    onToggleReview?: () => void;
     onExportPdf: () => void;
     /** Toggle live editing on/off for this Concept. */
-    onToggleEditing: () => void;
+    onToggleEditing?: () => void;
     /** Show the explicit Save button. On WEB: editing + unsaved changes. On
      *  desktop: only when the save gate is HOLDING the write because the
      *  frontmatter does not parse (ADR 0008) — autosave covers the rest. */
@@ -93,17 +110,20 @@
     onCrumb,
     titlePath = null,
     hasOpenConcept,
-    editing,
-    multipleTiles,
-    canGoBack,
-    canGoForward,
+    readOnly = false,
+    leading,
+    trailing,
+    editing = false,
+    multipleTiles = false,
+    canGoBack = false,
+    canGoForward = false,
     onBack,
     onForward,
-    canUndo,
-    canRedo,
-    reviewActive,
-    reviewEnabled,
-    reviewTooltip,
+    canUndo = false,
+    canRedo = false,
+    reviewActive = false,
+    reviewEnabled = false,
+    reviewTooltip = '',
     onClose,
     onSplitRight,
     onSplitDown,
@@ -121,10 +141,11 @@
 
 <header class="tile-header" data-testid="tile-header" aria-label="Concept header">
   <div class="tile-title-group">
+    {@render leading?.()}
     <!-- Per-Tile navigation history (the Tile owns its own Back/Forward stack).
          Desktop only: on web the URL tracks the Tile (`urlSync.ts`), so the
          browser's own Back/Forward drives it — through the same dirty-leave gate. -->
-    {#if !__SUNSTONE_WEB__}
+    {#if !__SUNSTONE_WEB__ && !readOnly}
     <div class="btn-group">
       <button
         type="button"
@@ -170,7 +191,7 @@
          They sit to the LEFT of the Edit toggle. The mousedown-prevent keeps
          clicking a button from blurring/committing an in-progress frontmatter
          edit before the command runs. -->
-    {#if editing}
+    {#if editing && !readOnly}
       <div class="btn-group">
         <button
           type="button"
@@ -202,7 +223,7 @@
          write back — there it is both the held-write indicator and the way to
          force the write through (ADR 0008). The mousedown-prevent keeps the
          click from blurring a frontmatter edit before the save runs. -->
-    {#if showSave}
+    {#if showSave && !readOnly}
       <button
         type="button"
         class="text-btn save-btn"
@@ -217,6 +238,7 @@
     <!-- Edit toggle: the single view-mode control (editing-boolean-edit-toggle).
          Pressed = live editing (rendered with the cursor line shown raw, editable);
          unpressed = reading (fully rendered, read-only — the default). -->
+    {#if !readOnly}
     <button
       type="button"
       class="text-btn"
@@ -241,6 +263,7 @@
       </svg>
       Edit</button
     >
+    {/if}
 
     <!-- Frontmatter toggle: shows/hides the open Concept's frontmatter inline.
          Moved here from the deleted NavBar; drives the global
@@ -253,6 +276,7 @@
       title={frontmatterShown ? 'Hide Frontmatter' : 'Show Frontmatter'}
       aria-label="Frontmatter"
       aria-pressed={frontmatterShown}
+      disabled={readOnly && !hasOpenConcept}
       onclick={onToggleFrontmatter}
     >
       <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
@@ -266,6 +290,7 @@
 
     <!-- Review changes (working-tree ↔ HEAD): a read-only diff view. Disabled
          with an explanatory tooltip when the Concept has no reviewable history. -->
+    {#if !readOnly}
     <button
       type="button"
       class="icon-btn"
@@ -286,6 +311,7 @@
         <path d="M4 8.5 Q4 5.5 10.4 5.5" fill="none" stroke="currentColor" stroke-width="1.2" />
       </svg>
     </button>
+    {/if}
 
     <!-- Export as PDF: render the Concept to static HTML in a clean preview
          window (Tile.svelte's `exportPdf`), not the virtualized editor. -->
@@ -324,7 +350,7 @@
          `web/urlSync.ts`), which is only well-defined with a single Tile — so the
          web build ships no split affordance at all (`__SUNSTONE_WEB__` is a
          compile-time constant, so these buttons are stripped from that bundle). -->
-    {#if !__SUNSTONE_WEB__}
+    {#if !__SUNSTONE_WEB__ && !readOnly}
       <div class="btn-group">
         <button
           type="button"
@@ -358,7 +384,7 @@
     <!-- Close the Concept: sits at the far right edge, past the split buttons.
          Only shown when more than one tile is on screen — closing the sole tile
          would just clear it to the empty state, so the affordance is pointless. -->
-    {#if multipleTiles}
+    {#if multipleTiles && !readOnly}
       <button
         type="button"
         class="icon-btn"
@@ -369,6 +395,7 @@
         onclick={onClose}>×</button
       >
     {/if}
+    {@render trailing?.()}
   </div>
 </header>
 

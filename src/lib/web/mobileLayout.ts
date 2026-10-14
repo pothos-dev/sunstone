@@ -1,6 +1,6 @@
 // Pure state helpers for the web reader's narrow-screen (phone) layout. Below
 // the `NARROW_MAX_WIDTH` breakpoint `WebReader.svelte` turns both Sidebars into
-// slide-over drawers and folds the rails' controls into the concept strip and
+// slide-over drawers and folds the rails' controls into the Tile header and
 // an overflow menu. The layout switch itself is pure CSS (so the SSR first
 // paint is already right on a phone); this module owns the small transient
 // state the drawers and the menu need. None of it is persisted — the desktop

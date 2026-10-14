@@ -3,18 +3,18 @@ import { test, expect } from './fixtures';
 /**
  * ov-11 in the web viewer: a Concept past its `stale_after` (the fixture's
  * `guide/topic.md`, `status: deprecated`, stale since 2000) is marked stale in
- * the concept strip and its Explorer row, and still reads normally. A Concept
+ * the Tile header and its Explorer row, and still reads normally. A Concept
  * with neither lifecycle key shows nothing.
  */
-test('a stale Concept is marked in the strip and the Explorer, and still reads', async ({ page }) => {
+test('a stale Concept is marked in the header and the Explorer, and still reads', async ({ page }) => {
   await page.goto('/guide/topic');
   const rendered = page.getByTestId('rendered');
   await expect(rendered.locator('h1')).toContainText('Topic');
   await expect(rendered).toContainText('A guide topic Concept');
 
-  const strip = page.getByTestId('concept-strip');
-  await expect(strip.getByTestId('lifecycle-stale')).toBeVisible();
-  await expect(strip.getByTestId('lifecycle-status')).toHaveText('deprecated');
+  const header = page.getByTestId('tile-header');
+  await expect(header.getByTestId('lifecycle-stale')).toBeVisible();
+  await expect(header.getByTestId('lifecycle-status')).toHaveText('deprecated');
 
   // Folders open collapsed: expand `guide` to see the row — after hydration
   // (the Tags Section renders from an onMount fetch; see web-sources.spec.ts).

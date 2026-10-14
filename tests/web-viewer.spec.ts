@@ -347,13 +347,13 @@ test('quick-nav: Ctrl+K opens a fuzzy palette that navigates client-side', async
  * Layout parity (rebuilt on main's auth-aware WebViewer): the anon read surface
  * adopts the desktop chrome — a far-left ActivityRail (menu stub + quick-nav +
  * search + a bottom user slot wired to the REAL Auth.js sign-in), SidebarEdge
- * click/drag borders, and a slim concept strip (history + Properties + export +
+ * click/drag borders, and the Tile header (Frontmatter + export +
  * theme). Asserts the rail launches search, the user slot surfaces the real
  * sign-in affordance (NOT an inert WebUserMenu scaffold), the anon reader has no
  * Edit button, the theme toggle flips, and dragging the left edge resizes +
  * persists the Sidebar width. Saves tests/screenshots/web-layout-parity.png.
  */
-test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resize persists', async ({
+test('layout parity: rail, real sign-in, Tile header, theme toggle, edge resize persists', async ({
   page,
 }) => {
   await page.goto('/good');
@@ -386,14 +386,14 @@ test('layout parity: rail, real sign-in, concept strip, theme toggle, edge resiz
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('search-panel')).toHaveCount(0);
 
-  // The slim concept strip carries Properties + export (theme moved to the
+  // The Tile header (wr-1) carries Frontmatter + export (theme moved to the
   // rail; Back/Forward is the browser's own); the old header collapse toggles
   // are gone (collapse moved to the edges), and the anon reader has no Edit
   // affordance.
-  await expect(page.getByTestId('concept-strip')).toBeVisible();
+  await expect(page.getByTestId('tile-header')).toBeVisible();
   await expect(page.getByTestId('nav-back')).toHaveCount(0);
   await expect(page.getByTestId('nav-forward')).toHaveCount(0);
-  await expect(page.getByTestId('properties-panel-toggle')).toBeVisible();
+  await expect(page.getByTestId('frontmatter-toggle')).toBeVisible();
   await expect(page.getByTestId('export-pdf')).toBeVisible();
   await expect(page.getByTestId('sidebar-toggle')).toHaveCount(0);
   await expect(page.getByTestId('right-sidebar-toggle')).toHaveCount(0);
@@ -465,11 +465,11 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
 
   // Properties collapses (body removed) and re-expands.
   await expect(page.getByTestId('properties')).toBeVisible();
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   // Screenshot the DARK parity view with Properties re-expanded.
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.screenshot({ path: 'tests/screenshots/web-parity-dark.png', fullPage: true });
 
@@ -498,7 +498,7 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await expect(topic).toBeVisible();
   await page.getByTestId('tags-section-header').click();
   await expect(page.getByTestId('tag-browser')).toHaveCount(0);
-  await page.getByTestId('properties-panel-toggle').click();
+  await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   await page.reload();

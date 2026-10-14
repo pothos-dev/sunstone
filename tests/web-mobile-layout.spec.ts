@@ -3,12 +3,14 @@ import { test, expect } from './fixtures';
 /**
  * The anonymous web reader on a phone-sized viewport (`mobileLayout.ts`). Below
  * the breakpoint both Sidebars are slide-over drawers, the rails are hidden and
- * their controls live in the concept strip + an overflow menu. Asserts:
+ * their controls live in the Tile header + an overflow menu. Asserts:
  *   - the Concept gets the full width on first load (no Sidebar squeezing it,
  *     no horizontal page scroll), with the rails gone,
  *   - ☰ opens the Explorer drawer; opening a Concept from it closes the drawer,
  *   - ≡ opens the Outline & Backlinks drawer; the scrim closes it,
- *   - the ⋯ menu toggles Properties and closes on Escape.
+ *   - the ⋯ menu toggles the Frontmatter and closes on Escape,
+ *   - the header's wide-only controls (Frontmatter, Export PDF) are folded away,
+ *   - a breadcrumb with an index opens it (here: `guide/`).
  */
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -65,4 +67,19 @@ test('phone layout gives the Concept the full width and uses drawers', async ({ 
   await expect(page.getByTestId('strip-menu-list')).toHaveCount(0);
 
   await page.screenshot({ path: 'tests/screenshots/web-mobile-layout.png' });
+
+  // The Tile header (wr-1): its wide-only controls live in the ⋯ menu.
+  const header = page.getByTestId('tile-header');
+  await expect(header).toBeVisible();
+  await expect(header.getByTestId('frontmatter-toggle')).toBeHidden();
+  await expect(header.getByTestId('export-pdf')).toBeHidden();
+  await expect(header.getByTestId('strip-quicknav')).toBeVisible();
+
+  // A crumb with an index opens it (and the drawer stays closed).
+  await page.goto('/guide/topic');
+  await expect(rendered.locator('h1')).toContainText('Topic');
+  await expect(page.getByTestId('tag-browser')).toBeAttached();
+  await page.getByTestId('tile-crumb').tap();
+  await expect(page).toHaveURL(/\/guide$/);
+  await expect(left).toBeHidden();
 });

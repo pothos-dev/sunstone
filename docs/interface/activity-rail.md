@@ -75,9 +75,15 @@ surfaces](/interface/app-shell.md)):
   path — explicit Save, concurrency gate).
 - The **anonymous** read-only SSR surface renders the same Activity Rails — with
   a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
-  but replaces the full Concept header with a **slim concept strip** over the
-  centre: a read-only properties view of the frontmatter, export-PDF and a
-  light/dark theme toggle. It has no back/forward — the browser's own does that. There is no Edit toggle until you sign in.
+  renders the same **Concept header** (`TileHeader`, `readOnly`): the title with
+  its folder crumbs and lifecycle chips, the Frontmatter toggle (a read-only
+  frontmatter grid) and Export PDF. No back/forward — the browser's own does
+  that — and no Edit, undo/redo, Save, Review, split or close until you sign
+  in. A crumb opens its folder's `index.md` when it has one and always reveals
+  the folder in the reader's Explorer. At ≤ 768px the header also carries the
+  Explorer drawer toggle, quick nav, the Outline & Backlinks drawer and an
+  overflow menu (Search, Frontmatter, Export PDF, theme, Sign in); the light/dark
+  theme toggle otherwise sits in the rail.
 
 ## Relationships
 

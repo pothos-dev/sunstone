@@ -26,11 +26,13 @@
   import { matchesHotkey } from '$lib/matchesHotkey';
   import { conceptTitle } from './conceptUrl';
   import { lifecycleFromFields } from '$lib/lifecycle';
-  import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
+  import TileHeader from '$lib/components/TileHeader.svelte';
+  import { foldersToExpand, type IndexedCrumb } from '$lib/tileTitle';
+  import { readerCrumbAction, readerCrumbs } from './readerHeader';
   import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
-  import { escapeTarget, toggleDrawer, type Drawer } from './mobileLayout';
+  import { escapeTarget, NARROW_MAX_WIDTH, toggleDrawer, type Drawer } from './mobileLayout';
 
   /**
    * The anonymous, read-only "Sunstone Web" reader — the surface `WebViewer`
@@ -56,7 +58,7 @@
   // activity rail (quick-nav + search + a bottom theme toggle + a user slot wired
   // to real Auth.js), click/drag SidebarEdge borders around a left Sidebar Accordion
   // (Explorer + Tags) and a right one (Outline + Backlinks) reusing the desktop
-  // `SidebarSection`, a slim concept strip over the centre (title + Properties +
+  // `SidebarSection`, the desktop `TileHeader` over the centre (title + crumbs + Frontmatter +
   // export-PDF; Back/Forward is the browser's own), and the rendered Concept in the centre. No write path /
   // editor / CodeMirror on the anon surface. UI state persists (uiState).
 
@@ -68,15 +70,41 @@
   }
 
   // --- Narrow-screen (phone) layout: below the breakpoint both Sidebars are
-  // slide-over drawers and the rails' controls move into the concept strip + an
+  // slide-over drawers and the rails' controls move into the Tile header + an
   // overflow menu. The switch is CSS-only; this is just the transient drawer /
   // menu state (never persisted — see `mobileLayout.ts`). Opening a Concept or
   // jumping to a heading closes the drawer so the Concept is what you see. ---
   let drawer = $state<Drawer>(null);
   let menuOpen = $state(false);
 
-  // The concept strip's title (the same name `WebViewer` puts in `<title>`).
+  // The header's title (the same name `WebViewer` puts in `<title>`) and its
+  // folder crumbs.
   const pageTitle = $derived(conceptTitle(data.selected, data.rendered));
+  const headerCrumbs = $derived(readerCrumbs(data.selected, data.tree));
+
+  // A header crumb opens its folder's index.md (if it has one) and shows the
+  // folder in the Explorer: every ancestor expanded, the Explorer (and on a
+  // narrow screen its drawer) open, the row scrolled into view.
+  function openCrumb(crumb: IndexedCrumb) {
+    const narrow = window.matchMedia(`(max-width: ${NARROW_MAX_WIDTH}px)`).matches;
+    const action = readerCrumbAction(crumb, data.selected, narrow);
+    for (const folder of foldersToExpand(crumb.folder)) setExpanded(folder, true);
+    ui.explorerOpen = true;
+    if (!narrow) ui.leftSidebarOpen = true;
+    if (action.open !== null) open(action.open);
+    else drawer = action.drawer;
+    requestAnimationFrame(() => {
+      const row = appRoot?.querySelector(`[data-testid="tree-dir"][data-path="${CSS.escape(crumb.folder)}"]`);
+      row?.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  // Export the open Concept as PDF: open a chrome-free print TAB
+  // (`/?print=<path>`) that renders just the Concept body and hands straight to
+  // the browser's native print → Save-as-PDF preview.
+  function exportPdf() {
+    if (data.selected) window.open(printUrl(data.selected), '_blank');
+  }
 
   // --- Theme: applied to the app root; mode persisted via uiState. The anon web
   // surface offers a manual light/dark toggle in the activity rail (the desktop
@@ -386,14 +414,24 @@
   </div>
 
   <div class="center">
-    <!-- Slim "concept strip": the web analogue of the desktop concept header
-         (web has no tiles/CodeMirror, so it is light). The left group holds the
-         title; the right group the per-Concept controls
-         (Properties, export-PDF; theme lives in the activity rail). Sidebar
-         collapse/resize moved to the edge borders. -->
-    <div class="concept-strip" data-testid="concept-strip">
-      <div class="cs-title-group">
-        <!-- Narrow screens only: the Explorer drawer (the left rail is hidden). -->
+    <!-- The Concept header: the desktop `TileHeader` (wr-1), read-only — title
+         with folder crumbs, lifecycle, the Frontmatter toggle and Export PDF.
+         Back/Forward is the browser's own. Narrow screens add the Explorer
+         drawer toggle ahead of the title and quick nav, the Outline & Backlinks
+         drawer and an overflow menu after the controls (the rails are hidden). -->
+    <TileHeader
+      readOnly
+      title={data.selected ? pageTitle : ''}
+      lifecycle={data.rendered ? lifecycleFromFields(data.rendered.frontmatter) : null}
+      crumbs={headerCrumbs}
+      onCrumb={openCrumb}
+      titlePath={data.selected}
+      hasOpenConcept={data.rendered !== null}
+      onExportPdf={exportPdf}
+      frontmatterShown={ui.propertiesOpen}
+      onToggleFrontmatter={() => (ui.propertiesOpen = !ui.propertiesOpen)}
+    >
+      {#snippet leading()}
         <button
           type="button"
           class="icon-btn narrow-only"
@@ -411,60 +449,8 @@
             <path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
           </svg>
         </button>
-        {#if data.selected}
-          <span class="tile-title" data-testid="tile-title" title={data.selected}>{pageTitle}</span>
-          <LifecycleBadge lifecycle={data.rendered ? lifecycleFromFields(data.rendered.frontmatter) : null} />
-        {/if}
-      </div>
-
-      <div class="cs-controls">
-        <!-- Properties show/hide: flips the read-only Properties panel in the centre. -->
-        <button
-          type="button"
-          class="icon-btn wide-only"
-          class:active={ui.propertiesOpen}
-          data-testid="properties-panel-toggle"
-          title={ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-          aria-label={ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}
-          aria-pressed={ui.propertiesOpen}
-          disabled={!data.rendered}
-          onclick={() => (ui.propertiesOpen = !ui.propertiesOpen)}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-            <!-- sliders glyph: two horizontal rails with knobs (properties). -->
-            <line x1="2.5" y1="5" x2="13.5" y2="5" stroke="currentColor" stroke-width="1.2" />
-            <line x1="2.5" y1="11" x2="13.5" y2="11" stroke="currentColor" stroke-width="1.2" />
-            <circle cx="6" cy="5" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-            <circle cx="10.5" cy="11" r="1.8" fill="var(--bg-elevated)" stroke="currentColor" stroke-width="1.2" />
-          </svg>
-        </button>
-        <!-- Export the open Concept as PDF: open a chrome-free print TAB
-             (`/?print=<path>`) that renders just the Concept body and hands
-             straight to the browser's native print → Save-as-PDF preview. -->
-        <button
-          type="button"
-          class="icon-btn wide-only"
-          data-testid="export-pdf"
-          title="Export as PDF"
-          aria-label="Export as PDF"
-          disabled={!data.rendered}
-          onclick={() => data.selected && window.open(printUrl(data.selected), '_blank')}
-        >
-          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
-            <path
-              d="M4 2.5h5l3 3v8a0 0 0 0 1 0 0H4a0 0 0 0 1 0 0z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.2"
-              stroke-linejoin="round"
-            />
-            <path d="M9 2.5v3h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-            <path d="M8 7.5v4m0 0 1.6-1.6M8 11.5 6.4 9.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-
-        <!-- Narrow screens only: quick nav, the Outline & Backlinks drawer and an
-             overflow menu stand in for the hidden rails + the controls above. -->
+      {/snippet}
+      {#snippet trailing()}
         <button
           type="button"
           class="icon-btn narrow-only"
@@ -536,7 +522,7 @@
                 onclick={() => {
                   menuOpen = false;
                   ui.propertiesOpen = !ui.propertiesOpen;
-                }}>{ui.propertiesOpen ? 'Hide Properties' : 'Show Properties'}</button
+                }}>{ui.propertiesOpen ? 'Hide Frontmatter' : 'Show Frontmatter'}</button
               >
               <button
                 type="button"
@@ -545,7 +531,7 @@
                 disabled={!data.rendered}
                 onclick={() => {
                   menuOpen = false;
-                  if (data.selected) window.open(printUrl(data.selected), '_blank');
+                  exportPdf();
                 }}>Export as PDF</button
               >
               <button
@@ -563,8 +549,8 @@
             </div>
           {/if}
         </div>
-      </div>
-    </div>
+      {/snippet}
+    </TileHeader>
 
     <main class="reader" aria-label="Concept">
       {#if data.renderError}
@@ -810,43 +796,6 @@
     overflow: hidden;
   }
 
-  /* Slim concept strip: the title at the start, the
-     per-Concept controls at the end. */
-  .concept-strip {
-    flex: none;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 0.4rem;
-    padding: 0.3rem 0.6rem;
-    border-bottom: 1px solid var(--border, #e2e2e2);
-    background: var(--bg-elevated, #f9fafc);
-  }
-
-  .cs-title-group {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .tile-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text, #222);
-  }
-
-  .cs-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: none;
-  }
-
   .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -959,7 +908,7 @@
   }
 
   /* Read-only Properties: a metadata grid (frontmatter key → value), shown/hidden
-     via the concept strip's Properties toggle (desktop parity). */
+     via the Tile header's Frontmatter toggle (desktop parity). */
   .properties {
     display: grid;
     grid-template-columns: max-content 1fr;
@@ -995,7 +944,7 @@
   }
 
   /* --- Narrow-screen controls (see `mobileLayout.ts`). Hidden on wide screens;
-     the `@media` block below swaps them in for the rails + wide-only buttons. --- */
+     the `@media` block below swaps them in for the rails + the header's wide-only buttons. --- */
   .narrow-only,
   .drawer-scrim {
     display: none;
@@ -1049,7 +998,7 @@
 
   /* Phones / narrow windows: one column for the Concept. The Sidebars leave the
      grid and become slide-over drawers, the rails and resize edges go, and the
-     rails' controls live in the concept strip (☰ / quick nav / ≡ / ⋯). Keep the
+     rails' controls live in the Tile header (☰ / quick nav / ≡ / ⋯). Keep the
      breakpoint in step with `NARROW_MAX_WIDTH` (`mobileLayout.ts`). */
   @media (max-width: 768px) {
     .app {
@@ -1057,8 +1006,7 @@
     }
 
     .app > :global(.activity-rail),
-    .edge-slot,
-    .wide-only {
+    .edge-slot {
       display: none;
     }
 
@@ -1120,12 +1068,18 @@
       background: transparent;
     }
 
-    .concept-strip {
-      padding: 0.35rem 0.5rem;
-      padding-top: max(0.35rem, env(safe-area-inset-top));
+    /* The header's wide-only controls fold into the overflow menu, and the
+       header clears a notch. */
+    .center > :global(.tile-header) {
+      padding-top: max(0.3rem, env(safe-area-inset-top));
     }
 
-    .cs-controls {
+    .center :global(.tile-header [data-testid='frontmatter-toggle']),
+    .center :global(.tile-header [data-testid='export-pdf']) {
+      display: none;
+    }
+
+    .center :global(.tile-header .tile-controls) {
       gap: 0.3rem;
     }
 
