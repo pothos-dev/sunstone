@@ -7,7 +7,14 @@
   import { treeDnd } from '$lib/state/treeDnd.svelte';
   import { dropZoneHandlers } from '$lib/treeDnd';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
-  import { folderNameClick, holdsPath, ordinaryChildren as ordinaryChildrenOf, treeLabel, reservedChildren } from '$lib/treeNav';
+  import {
+    folderNameClick,
+    holdsPath,
+    indexChild,
+    ordinaryChildren as ordinaryChildrenOf,
+    treeLabel,
+    reservedChildren,
+  } from '$lib/treeNav';
   import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
   import LifecycleBadge from './LifecycleBadge.svelte';
@@ -74,7 +81,14 @@
   // persisted state, so the folder folds back once another Concept (or none)
   // is open, unless the user expanded it themselves.
   const ownExpanded = $derived(node.isDir && session.isExpanded(node.path));
-  const expanded = $derived(ownExpanded || (node.isDir && holdsPath(node.path, selected)));
+  // Pinned = shown expanded ONLY because of that override (its own state is
+  // collapsed). The twisty paints accent then, so a click that "does nothing"
+  // visibly flips it to the user's own expanded state and back.
+  const pinned = $derived(!ownExpanded && node.isDir && holdsPath(node.path, selected));
+  const expanded = $derived(ownExpanded || pinned);
+  // A folder whose index page is the open Concept carries the open marker on
+  // its name, the way a Concept row does.
+  const indexOpen = $derived(node.isDir && selected !== null && indexChild(node) === selected);
 
   const indent = $derived(depth * 16);
 
@@ -188,7 +202,7 @@
     ondragleave={drop.ondragleave}
     ondrop={drop.ondrop}
     role="treeitem"
-    aria-selected="false"
+    aria-selected={indexOpen}
     aria-expanded={expanded}
     tabindex={isFocusedItem ? 0 : -1}
   >
@@ -208,10 +222,11 @@
       aria-expanded={expanded}
       aria-label={displayName}
     >
-      <span class="twisty" class:open={expanded}>▸</span>
+      <span class="twisty" class:open={expanded} class:pinned>▸</span>
     </button>
     <button
       class="entry dir-toggle name-toggle"
+      class:selected={indexOpen}
       type="button"
       onclick={onNameClick}
       tabindex="-1"
@@ -397,7 +412,8 @@
     outline-offset: -1px;
   }
 
-  .file-entry.selected {
+  .file-entry.selected,
+  .name-toggle.selected {
     background: var(--accent-soft);
     color: var(--tag-text);
   }
@@ -417,6 +433,11 @@
 
   .twisty.open {
     transform: rotate(90deg);
+  }
+
+  /* Held open by the open Concept, not by the user (see `pinned`). */
+  .twisty.pinned {
+    color: var(--accent);
   }
 
   .name {

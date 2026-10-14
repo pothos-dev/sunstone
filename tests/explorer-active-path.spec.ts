@@ -62,3 +62,34 @@ test('a folder the user expanded stays open after navigating away', async ({ pag
   await expect(row(page, 'concepts/editor/live-preview.md')).toHaveCount(0);
   await expect(row(page, 'concepts/codemirror.md')).toBeVisible();
 });
+
+test('a pinned folder shows an accent twisty; the twisty flips it to user-expanded', async ({
+  page,
+}) => {
+  await freshLoad(page, []);
+  await openViaQuickNav(page, 'live-prev', 'concepts/editor/live-preview.md');
+
+  const twisty = row(page, 'concepts').locator('.twisty');
+  await expect(twisty).toHaveClass(/pinned/);
+
+  // Clicking it records the user's own expansion: still open, no longer pinned.
+  await row(page, 'concepts').locator('.twisty-toggle').click();
+  await expect(row(page, 'concepts')).toHaveAttribute('aria-expanded', 'true');
+  await expect(twisty).not.toHaveClass(/pinned/);
+
+  // Clicking again drops it back to pinned (held open by the open Concept).
+  await row(page, 'concepts').locator('.twisty-toggle').click();
+  await expect(twisty).toHaveClass(/pinned/);
+});
+
+test('the open index page highlights its folder name', async ({ page }) => {
+  await freshLoad(page, []);
+  const concepts = row(page, 'concepts');
+  await expect(concepts.locator('.name-toggle')).not.toHaveClass(/selected/);
+
+  await concepts.locator('.name-toggle').click();
+  await expect(concepts.locator('.name-toggle')).toHaveClass(/selected/);
+  await expect(concepts).toHaveAttribute('aria-selected', 'true');
+  // Its own index open pins nothing: the folder row itself shows the Concept.
+  await expect(concepts.locator('.twisty')).not.toHaveClass(/pinned/);
+});
