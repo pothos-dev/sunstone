@@ -132,17 +132,20 @@ test('the Sources section lists cited entries by number, then uncited ones', asy
   await expect(page.locator('[data-path="concepts/links-demo.md"]')).toHaveClass(/selected/);
 });
 
-test('an entry shows its signals as written and a hidden body definition', async ({ page }) => {
+test('an entry shows its signals on one line and a hidden body definition', async ({ page }) => {
+  // Pin the page clock so the relative time is stable (ov-24).
+  await page.clock.setFixedTime(new Date('2026-06-13T00:00:00Z'));
   const editor = await openConcept(page);
   const section = editor.getByTestId('sources-section');
   await section.scrollIntoViewIfNeeded();
   const web = section.locator('li').nth(0);
-  // Author as an actor, the values as written, the count over its window.
-  await expect(web.locator('.cm-source-signals .actor-human .actor-id')).toHaveText('dan');
-  await expect(web.locator('.cm-source-signals')).toContainText('Last modified 2026-05-30T00:00:00Z');
-  await expect(web.locator('.cm-source-signals')).toContainText(
-    'Usage count 42 (2026-06-01T00:00:00Z – 2026-06-30T00:00:00Z)',
-  );
+  // One line: author as an actor · modified, relative · the count over its window.
+  const signals = web.locator('.cm-source-signals');
+  await expect(signals.locator('.actor-human .actor-id')).toHaveText('dan');
+  await expect(signals.locator('.cm-source-signal')).toHaveText(['persondan', 'modified 2 weeks ago', '42× used in June 2026']);
+  const modified = signals.locator('time.fm-time');
+  await expect(modified).toHaveAttribute('datetime', '2026-05-30T00:00:00Z');
+  await expect(modified).toHaveAttribute('title', /2026/);
   // The body definition's text moves onto the entry; its line is not shown.
   await expect(web.locator('.cm-source-note')).toHaveText('Handgeschriebene Notiz');
   await expect(editor.locator('.cm-line', { hasText: 'Handgeschriebene' })).toHaveCount(0);

@@ -17,9 +17,11 @@
 //! The Sources section (`sources_section_html`) lists the `sources` entries at
 //! the end of the body, numbered like their superscripts
 //! (`sunstone_shared::sources::source_list`). It exists only in the render,
-//! never in the file. Each entry shows its credibility signals as written
-//! (`author` as an actor, `last_modified`, `usage_count` over its
-//! `usage_window`), the text of a body definition for its id, and a jump back
+//! never in the file. Each entry shows its credibility signals on one line
+//! (ov-24): `author` as an actor · `modified <time>` · `1,280× used in
+//! September 2026` (`usage_count` over its `usage_window`); a timestamp the
+//! shared ISO check accepts carries `datetime`, and the client shows it
+//! relative ("2 weeks ago"). Then the text of a body definition for its id, and a jump back
 //! to every claim citing it: a source reference carries `id="fnref-label-k"`
 //! (k counting that label's references from 1) and the entry links to each
 //! (ov-10). A body `[^id]: …` definition for a `sources` id is dropped from the
@@ -38,6 +40,7 @@ use std::collections::{HashMap, HashSet};
 use sunstone_shared::actor::{parse_actor, ActorKind};
 use sunstone_shared::footnotes::{scan_footnotes, Footnote};
 use sunstone_shared::sources::{ResourceKind, Source, UsageWindow};
+use sunstone_shared::trust::is_iso_datetime;
 
 use super::attr_escape;
 use super::sentinel::Sentinels;
@@ -218,24 +221,21 @@ pub(super) fn sources_section_html(list: &[Source], link: LinkAttrs) -> String {
     out
 }
 
-/// The entry's credibility signals as written (§5.1); `""` when it has none.
-/// No score is computed.
+/// The entry's credibility signals on one line (§5.1, ov-24); `""` when it
+/// has none. No score is computed. `src/lib/ipc/fake/render.ts` writes the same.
 fn signals_html(s: &Source) -> String {
     let mut items = Vec::new();
-    let mut push = |key: &str, value: String| {
-        items.push(format!(
-            r#"<span class="source-signal"><span class="source-signal-key">{key}</span> {value}</span>"#
-        ))
-    };
     if let Some(a) = s.author.as_deref().filter(|a| !a.is_empty()) {
-        push("Author", actor_html(a));
+        items.push(format!(r#"<span class="source-signal source-author">{}</span>"#, actor_html(a)));
     }
     if let Some(m) = s.last_modified.as_deref().filter(|m| !m.is_empty()) {
-        push("Last modified", attr_escape(m));
+        items.push(format!(r#"<span class="source-signal source-modified">modified {}</span>"#, time_html(m)));
     }
     if let Some(c) = s.usage_count.as_deref().filter(|c| !c.is_empty()) {
-        let window = s.usage_window.as_ref().map(window_text).unwrap_or_default();
-        push("Usage count", attr_escape(&format!("{c}{window}")));
+        items.push(format!(
+            r#"<span class="source-signal source-usage">{}</span>"#,
+            usage_html(c, s.usage_window.as_ref())
+        ));
     }
     if items.is_empty() {
         return String::new();
@@ -243,12 +243,90 @@ fn signals_html(s: &Source) -> String {
     format!(r#"<span class="source-signals">{}</span>"#, items.concat())
 }
 
-/// ` (from – to)` for a usage window; an open bound shows as `…`. The card's
-/// `usageText` (`src/lib/sourceCard.ts`) writes the same.
-fn window_text(w: &UsageWindow) -> String {
-    let from = w.from.as_deref().unwrap_or("…");
-    let to = w.to.as_deref().unwrap_or("…");
-    format!(" ({from} – {to})")
+/// A Frontmatter timestamp as written. One the shared ISO check accepts
+/// carries `datetime`, which the client rewrites relative ("3 days ago") with
+/// the absolute local time on hover (`src/lib/frontmatterTime.ts`).
+fn time_html(at: &str) -> String {
+    let at = at.trim();
+    let datetime = if is_iso_datetime(at) {
+        format!(r#" datetime="{}""#, attr_escape(at))
+    } else {
+        String::new()
+    };
+    format!(r#"<time class="fm-time"{datetime} title="{0}">{0}</time>"#, attr_escape(at))
+}
+
+const MONTHS: [&str; 12] = [
+    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+    "November", "December",
+];
+
+/// An integer count with thousands separators (`1,280`); anything else as written.
+fn format_count(count: &str) -> String {
+    let t = count.trim();
+    if t.is_empty() || !t.bytes().all(|b| b.is_ascii_digit()) {
+        return t.to_string();
+    }
+    let mut out = String::new();
+    for (i, ch) in t.chars().enumerate() {
+        if i > 0 && (t.len() - i) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// `(year, month 1-12, day)` of a `YYYY-MM-DD…` value.
+fn ymd(raw: &str) -> Option<(i32, u32, u32)> {
+    let b = raw.trim().as_bytes();
+    let num = |from: usize, len: usize| -> Option<u32> {
+        let part = b.get(from..from + len)?;
+        part.iter().all(u8::is_ascii_digit).then(|| part.iter().fold(0, |n, d| n * 10 + u32::from(d - b'0')))
+    };
+    if b.get(4) != Some(&b'-') || b.get(7) != Some(&b'-') {
+        return None;
+    }
+    Some((i32::try_from(num(0, 4)?).ok()?, num(5, 2)?, num(8, 2)?))
+}
+
+fn days_in(year: i32, month: u32) -> u32 {
+    match month {
+        2 if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
+/// `in September 2026` / `in 2025` when the window is one whole calendar month or year.
+fn calendar_period(from: &str, to: &str) -> Option<String> {
+    let (a, b) = (ymd(from)?, ymd(to)?);
+    if a.0 != b.0 || a.2 != 1 || !(1..=12).contains(&a.1) {
+        return None;
+    }
+    if a.1 == b.1 && b.2 == days_in(b.0, b.1) {
+        return Some(format!("in {} {}", MONTHS[a.1 as usize - 1], a.0));
+    }
+    (a.1 == 1 && b.1 == 12 && b.2 == 31).then(|| format!("in {}", a.0))
+}
+
+/// `usage_count` over `usage_window` as one phrase: `1,280× used in September
+/// 2026`, `3× used since <time>`, `3× used from <time> to <time>`, or `7× used`.
+/// The same words as `usagePhrase` (`src/lib/frontmatterTime.ts`).
+fn usage_html(count: &str, w: Option<&UsageWindow>) -> String {
+    let used = attr_escape(&format!("{}× used", format_count(count)));
+    let bound = |b: Option<&String>| b.map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+    let (from, to) = (bound(w.and_then(|w| w.from.as_ref())), bound(w.and_then(|w| w.to.as_ref())));
+    match (from, to) {
+        (Some(f), Some(t)) => match calendar_period(&f, &t) {
+            Some(period) => format!("{used} {period}"),
+            None => format!("{used} from {} to {}", time_html(&f), time_html(&t)),
+        },
+        (Some(f), None) => format!("{used} since {}", time_html(&f)),
+        (None, Some(t)) => format!("{used} until {}", time_html(&t)),
+        (None, None) => used,
+    }
 }
 
 /// An actor (§7) in the markup of `actorElement` (`src/lib/actor.ts`).
@@ -317,6 +395,7 @@ fn backref_letter(k: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::{format_count, usage_html, UsageWindow};
     use crate::render::render_body;
 
     fn render_in(body: &str, path: &str, all: &[&str]) -> String {
@@ -489,11 +568,13 @@ mod tests {
         let body = "---\ntype: N\nsources:\n  - id: a\n    resource: https://a\n    author: human:dan\n    usage_count: 5000\n    last_modified: 2026-05-30T00:00:00Z\n  - id: b\n    resource: https://b\n    usage_count: 3\n    usage_window: { from: 2026-01-01 }\nusage_window: { from: 2026-06-01, to: 2026-06-30 }\n---\n\nx[^a]\n";
         let html = render(body);
         let section = &html[html.find(r#"<section class="sources">"#).expect("section")..];
-        assert!(section.contains(r#"<span class="source-signal"><span class="source-signal-key">Author</span> <span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>"#), "{section}");
-        assert!(section.contains(r#"<span class="source-signal-key">Last modified</span> 2026-05-30T00:00:00Z"#), "{section}");
-        assert!(section.contains(r#"<span class="source-signal-key">Usage count</span> 5000 (2026-06-01 – 2026-06-30)"#), "{section}");
-        // An entry's own window overrides the shared one; an open bound is `…`.
-        assert!(section.contains(r#"<span class="source-signal-key">Usage count</span> 3 (2026-01-01 – …)"#), "{section}");
+        assert!(section.contains(concat!(
+            r#"<span class="source-signals"><span class="source-signal source-author"><span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>"#,
+            r#"<span class="source-signal source-modified">modified <time class="fm-time" datetime="2026-05-30T00:00:00Z" title="2026-05-30T00:00:00Z">2026-05-30T00:00:00Z</time></span>"#,
+            r#"<span class="source-signal source-usage">5,000× used in June 2026</span></span>"#,
+        )), "{section}");
+        // An entry's own window overrides the shared one; a date-only bound has no `datetime`.
+        assert!(section.contains(r#"<span class="source-signal source-usage">3× used since <time class="fm-time" title="2026-01-01">2026-01-01</time></span>"#), "{section}");
         assert!(!section.contains("score"), "{section}");
     }
 
@@ -532,6 +613,33 @@ mod tests {
         assert!(html.contains(r#"<a id="cite-2" class="citation-def">[2]</a> Q4 call"#), "{html}");
         assert!(html.contains("Citations</h1>"), "{html}");
         assert!(!html.contains(r#"class="sources""#), "{html}");
+    }
+
+    #[test]
+    fn usage_phrases_match_the_frontend() {
+        // The same cases as `usagePhrase` in `src/lib/frontmatterTime.test.ts`.
+        let w = |from: Option<&str>, to: Option<&str>| UsageWindow {
+            from: from.map(str::to_string),
+            to: to.map(str::to_string),
+        };
+        assert_eq!(usage_html("1280", Some(&w(Some("2026-09-01"), Some("2026-09-30")))), "1,280× used in September 2026");
+        assert_eq!(
+            usage_html("3", Some(&w(Some("2024-02-01T00:00:00Z"), Some("2024-02-29T23:59:59Z")))),
+            "3× used in February 2024"
+        );
+        assert_eq!(usage_html("3", Some(&w(Some("2025-01-01"), Some("2025-12-31")))), "3× used in 2025");
+        assert_eq!(
+            usage_html("3", Some(&w(Some("2026-01-15"), Some("2026-03-31")))),
+            r#"3× used from <time class="fm-time" title="2026-01-15">2026-01-15</time> to <time class="fm-time" title="2026-03-31">2026-03-31</time>"#
+        );
+        assert_eq!(
+            usage_html("3", Some(&w(None, Some("2026-06-30")))),
+            r#"3× used until <time class="fm-time" title="2026-06-30">2026-06-30</time>"#
+        );
+        assert_eq!(usage_html("7", None), "7× used");
+        assert_eq!(usage_html("7", Some(&w(None, None))), "7× used");
+        assert_eq!(usage_html("about 5k", None), "about 5k× used");
+        assert_eq!(format_count("1234567"), "1,234,567");
     }
 
     #[test]

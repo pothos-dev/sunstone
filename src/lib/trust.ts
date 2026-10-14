@@ -2,14 +2,16 @@ import { actorView } from '$lib/actor';
 import { trustOf, type Stamp, type Trust, type TrustTier } from '$lib/wasm/exports';
 
 // ---------------------------------------------------------------------------
-// The trust line (OKF v0.2 §5.2, §5.3, ov-9)
+// The static trust line (OKF v0.2 §5.2, §5.3, ov-9, ov-24)
 //
-// One line above the body that says who wrote a Concept, who confirmed it and
-// how recently, with the derived trust tier first. The reading of the keys —
+// One line that says who wrote a Concept, who confirmed it and when, with the
+// derived trust tier first. On screen the Tile header's metadata pill shows
+// this (ov-24, `metaPill.ts`); paper has no hover, so the print view keeps
+// this line under the title (`PrintView.svelte`). The reading of the keys —
 // the bare `verified` mapping as a one-element list, the tier, the legacy
-// `timestamp` fallback — is `sunstone_shared::trust` over wasm (`trustOf`);
-// this module only builds the markup. The native render emits the same markup
-// (`sunstone-native/src/render/trust.rs`), styled by `.trust*` in `app.css`:
+// `timestamp` fallback — is `sunstone_shared::trust` (wasm `trustOf`, or the
+// render payload's `trust`); this module only builds the markup, styled by
+// `.trust*` in `app.css`. The tier words are shared with the pill's popover:
 //
 //   <div class="trust trust-human-reviewed" data-testid="trust">
 //     <span class="trust-tier" title="…">Human-reviewed</span>
@@ -29,14 +31,14 @@ import { trustOf, type Stamp, type Trust, type TrustTier } from '$lib/wasm/expor
 export type { Trust, TrustTier, Stamp };
 
 /** The tier names readers see, lowest to highest (§5.3). */
-const TIER_LABEL: Record<TrustTier, string> = {
+export const TIER_LABEL: Record<TrustTier, string> = {
   unverified: 'Unverified',
   machineConfirmed: 'Machine-confirmed',
   humanReviewed: 'Human-reviewed',
 };
 
 /** What each tier means, for the chip's tooltip. */
-const TIER_HINT: Record<TrustTier, string> = {
+export const TIER_HINT: Record<TrustTier, string> = {
   unverified: 'Trust tier (OKF §5.3): nobody has confirmed this Concept',
   machineConfirmed: 'Trust tier (OKF §5.3): confirmed by processes or agents only',
   humanReviewed: 'Trust tier (OKF §5.3): confirmed by a person',

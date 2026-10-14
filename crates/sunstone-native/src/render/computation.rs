@@ -1,6 +1,6 @@
 //! The contract card of an Attested Computation (OKF v0.2 §10, ov-12): its
 //! `runtime`, `parameters`, `computation`, `executor` (with `receipt`) and
-//! `attester`, shown above the body after the trust line. Rendered only; it is
+//! `attester`, shown above the body. Rendered only; it is
 //! never in the file, and nothing is executed or verified.
 //!
 //! The reading of the keys is `sunstone_shared::computation`; this module only

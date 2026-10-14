@@ -4,7 +4,8 @@ import type { Source } from '$lib/wasm/exports';
 import { scanFootnotes, sourceList } from '$lib/wasm/exports';
 import { frontmatterField } from './frontmatter-field';
 import { jumpAndFlash, jumpFlashField } from './jumpFlash';
-import { attachSourceCard, detachSourceCard, usageText } from '$lib/sourceCard';
+import { attachSourceCard, detachSourceCard } from '$lib/sourceCard';
+import { fmTimeHtml, refreshFrontmatterTimes, usageHtml } from '$lib/frontmatterTime';
 import { actorElement } from '$lib/actor';
 
 // ---------------------------------------------------------------------------
@@ -19,8 +20,9 @@ import { actorElement } from '$lib/actor';
 // (`onLinkClick`: a Concept in the app, a URL in the browser); a scope
 // descriptor is plain text.
 //
-// Each entry also shows its credibility signals as written (`author` as an
-// actor, `last_modified`, `usage_count` over its `usage_window`; no score), the
+// Each entry also shows its credibility signals on one line (ov-24): `author`
+// as an actor · `modified 2 weeks ago` · `1,280× used in September 2026` (no
+// score; times relative, refreshed by the Tile on the minute clock), the
 // text of a body `[^id]: …` definition, a jump back to every claim citing it
 // (`↑`, or `↑ a b c`), and an Edit action that opens the Frontmatter Region on
 // the entry (`onEditSource`). The definition line itself is hidden
@@ -135,25 +137,27 @@ class SourcesWidget extends WidgetType {
   }
 }
 
-/** The credibility signals as written (§5.1), or `null` when there are none. */
+/**
+ * The credibility signals on one line (§5.1, ov-24) — the same words as the
+ * native render's `signals_html` — or `null` when there are none.
+ */
 function signalsElement(s: Source): HTMLElement | null {
-  const rows: [string, string | Node][] = [];
-  if (s.author) rows.push(['Author', actorElement(s.author)]);
-  if (s.lastModified) rows.push(['Last modified', s.lastModified]);
-  const usage = usageText(s);
-  if (usage) rows.push(['Usage count', usage]);
-  if (rows.length === 0) return null;
+  const items: HTMLElement[] = [];
+  const item = (kind: string) => {
+    const el = document.createElement('span');
+    el.className = `cm-source-signal source-${kind}`;
+    items.push(el);
+    return el;
+  };
+  if (s.author) item('author').append(actorElement(s.author));
+  // Built from escaped text only (`fmTimeHtml` / `usageHtml`).
+  if (s.lastModified) item('modified').innerHTML = `modified ${fmTimeHtml(s.lastModified)}`;
+  if (s.usageCount) item('usage').innerHTML = usageHtml(s.usageCount, s.usageWindow);
+  if (items.length === 0) return null;
   const wrap = document.createElement('span');
   wrap.className = 'cm-source-signals';
-  for (const [key, value] of rows) {
-    const item = document.createElement('span');
-    item.className = 'cm-source-signal';
-    const k = document.createElement('span');
-    k.className = 'cm-source-signal-key';
-    k.textContent = key;
-    item.append(k, ' ', value);
-    wrap.append(item);
-  }
+  wrap.append(...items);
+  refreshFrontmatterTimes(wrap, Date.now());
   return wrap;
 }
 
@@ -326,13 +330,12 @@ export const sourcesTheme = EditorView.theme({
     overflowWrap: 'anywhere',
   },
   '.cm-source-signals': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.2em 1em',
     fontSize: '0.85em',
-  },
-  '.cm-source-signal-key': {
     color: 'var(--text-muted)',
+  },
+  '.cm-source-signal + .cm-source-signal::before': {
+    content: '"·"',
+    margin: '0 0.45em',
   },
   '.cm-source-note': {
     fontSize: '0.9em',

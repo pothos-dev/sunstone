@@ -3,8 +3,8 @@ import { trustOf } from '$lib/wasm/exports';
 import { trustLineHtml } from './trust';
 import { formatYaml } from './frontmatter';
 
-// The trust line markup. The native render's `render/trust.rs` asserts the
-// same goldens, so the desktop editor, the fake and the web viewer agree.
+// The static trust line markup: the print view's line under the title (ov-24;
+// on screen the Tile header's metadata pill shows the same data).
 
 describe('trustOf (shared Rust over wasm)', () => {
   test('tier derivation from verified alone', () => {

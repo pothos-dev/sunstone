@@ -86,6 +86,16 @@ export const MENU_ICONS = {
   colDelete:
     '<rect x="2.5" y="2.5" width="6.5" height="11" rx="1"/><path d="M5.75 2.5v11M2.5 8H9"/>' +
     '<path d="m11.25 6.5 3 3M14.25 6.5l-3 3"/>',
+
+  // ---- Concept metadata (the Tile header's pill, ov-24) ----
+  // A shield with a check: the trust tier.
+  shield:
+    '<path d="M8 1.75 13 3.6v4.1c0 3.05-2.1 5.4-5 6.55-2.9-1.15-5-3.5-5-6.55V3.6z"/>' +
+    '<path d="m5.75 8 1.6 1.6 3-3.1"/>',
+  // An open book: the sources.
+  book:
+    '<path d="M8 4.25C6.6 3.2 4.6 2.75 1.75 2.9v9.6c2.85-.15 4.85.3 6.25 1.35 1.4-1.05 3.4-1.5 6.25-1.35V2.9C11.4 2.75 9.4 3.2 8 4.25z"/>' +
+    '<path d="M8 4.25v9.6"/>',
 } as const;
 
 export type MenuIconName = keyof typeof MENU_ICONS;

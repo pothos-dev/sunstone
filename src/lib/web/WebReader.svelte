@@ -29,6 +29,9 @@
   import TileHeader from '$lib/components/TileHeader.svelte';
   import { foldersToExpand, type IndexedCrumb } from '$lib/tileTitle';
   import { readerCrumbAction, readerCrumbs } from './readerHeader';
+  import type { ConceptMeta } from '$lib/metaPill';
+  import { refreshFrontmatterTimes } from '$lib/frontmatterTime';
+  import { clock } from '$lib/state/clock.svelte';
   import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
   import { ensureWasm } from '$lib/wasm';
@@ -97,6 +100,23 @@
       const row = appRoot?.querySelector(`[data-testid="tree-dir"][data-path="${CSS.escape(crumb.folder)}"]`);
       row?.scrollIntoView({ block: 'nearest' });
     });
+  }
+
+  // The header's metadata pill (ov-24): trust and the sources count ride on the
+  // render payload (SSR has no wasm), the lifecycle comes from its fields.
+  const conceptMeta = $derived<ConceptMeta | null>(
+    data.rendered
+      ? {
+          trust: data.rendered.trust ?? null,
+          lifecycle: lifecycleFromFields(data.rendered.frontmatter),
+          sourceCount: data.rendered.sourceCount ?? 0,
+        }
+      : null,
+  );
+
+  // The popover's "view ↓": the Sources section closes the rendered body.
+  function viewSources() {
+    articleEl?.querySelector('.sources')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // Export the open Concept as PDF: open a chrome-free print TAB
@@ -213,6 +233,15 @@
     const el = articleEl;
     if (!el) return;
     return wireRemoteEmbeds(el);
+  });
+
+  // --- Frontmatter timestamps read relative (ov-24) ---
+  // The render writes them as written (SSR cannot know the reader's clock or
+  // time zone); the browser re-words them, and again on every minute tick.
+  $effect(() => {
+    void data.rendered?.html;
+    const now = clock.now;
+    if (articleEl) refreshFrontmatterTimes(articleEl, now);
   });
 
   // --- Source hover cards (ov-17) ---
@@ -415,14 +444,16 @@
 
   <div class="center">
     <!-- The Concept header: the desktop `TileHeader` (wr-1), read-only — title
-         with folder crumbs, lifecycle, the Frontmatter toggle and Export PDF.
+         with folder crumbs, the metadata pill (ov-24), the Frontmatter toggle
+         and Export PDF.
          Back/Forward is the browser's own. Narrow screens add the Explorer
          drawer toggle ahead of the title and quick nav, the Outline & Backlinks
          drawer and an overflow menu after the controls (the rails are hidden). -->
     <TileHeader
       readOnly
       title={data.selected ? pageTitle : ''}
-      lifecycle={data.rendered ? lifecycleFromFields(data.rendered.frontmatter) : null}
+      meta={conceptMeta}
+      onViewSources={viewSources}
       crumbs={headerCrumbs}
       onCrumb={openCrumb}
       titlePath={data.selected}

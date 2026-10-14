@@ -42,7 +42,6 @@ mod critic;
 mod embeds;
 mod footnotes;
 mod sentinel;
-mod trust;
 
 use std::path::Path;
 use std::sync::LazyLock;
@@ -60,13 +59,13 @@ use sunstone_shared::outline::{scan_headings, OutlineHeading};
 use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_location};
 use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
+use sunstone_shared::trust::{trust, Trust};
 
 use citations::{citations_to_sentinels, substitute_citation_sentinels};
 use computation::{contract_card_html, wrap_computation_section};
 use critic::{critic_to_sentinels, substitute_critic_sentinels};
 use embeds::{embeds_to_markers, rewrite_embed_markers};
 use footnotes::{footnotes_to_sentinels, sources_section_html};
-use trust::trust_line_html;
 
 /// The rendered read-only view of a Concept: body HTML plus the parsed
 /// frontmatter and the document outline. Matches the TS shape consumed by the
@@ -82,6 +81,12 @@ pub struct RenderPayload {
     /// The shared `OutlineHeading` (ADR 0006 §6): `render.rs` re-points here and
     /// derives the outline from the pure `scan_headings` scan, not a comrak walk.
     pub outline: Vec<OutlineHeading>,
+    /// The trust Frontmatter (`sunstone_shared::trust`), or `None` without it.
+    /// Not in `html` (ov-24): the Tile header's metadata pill shows it, and the
+    /// print view draws its static line from it.
+    pub trust: Option<Trust>,
+    /// How many `sources` entries the Concept lists (the pill's count).
+    pub source_count: usize,
 }
 
 /// Render the Concept at `rel_path` (validated against the Bundle root, like the
@@ -227,10 +232,10 @@ pub fn render_body(
     let body_html = footnote_repls.substitute(&html);
     // An Attested Computation's `# Computation` section is set apart (ov-13).
     let body_html = wrap_computation_section(&body_html, yaml, strip_frontmatter(content), &outline);
-    // The virtual trust line opens the body (ov-9); it is not in the file.
-    let mut html = trust_line_html(yaml);
-    // An Attested Computation's contract card follows it (ov-12): display only.
-    html.push_str(&contract_card_html(yaml, &link));
+    // An Attested Computation's contract card opens the body (ov-12): display
+    // only. The trust metadata is not in the body (ov-24): it rides on the
+    // payload for the Tile header's pill.
+    let mut html = contract_card_html(yaml, &link);
     html.push_str(&body_html);
     // The virtual Sources section closes the body (ov-17); it is not in the file.
     html.push_str(&sources_section_html(&source_list, &link));
@@ -239,6 +244,8 @@ pub fn render_body(
         html,
         frontmatter,
         outline,
+        trust: trust(yaml),
+        source_count: source_list.len(),
     }
 }
 
@@ -471,8 +478,7 @@ mod tests {
         )
     }
 
-    /// ov-12: an Attested Computation's contract card sits between the trust
-    /// line and the body, and its path-valued fields resolve like markdown
+    /// ov-12: an Attested Computation's contract card opens the body, and its path-valued fields resolve like markdown
     /// links written in the Concept (relative, bundle-absolute, URL).
     #[test]
     fn attested_computation_contract_card_links_like_markdown_links() {
@@ -481,10 +487,12 @@ mod tests {
                        attester: { resource: 'https://x.example/a.py' }\n---\n# Computation\n";
         let all = ["computations/revenue.md", "computations/references/run.md", "lib/revenue.md"];
         let p = render(content, "computations/revenue.md", &all);
-        let trust = p.html.find(r#"data-testid="trust""#).expect("trust line");
         let card = p.html.find(r#"data-testid="computation""#).expect("contract card");
         let body = p.html.find("<h1").expect("body");
-        assert!(trust < card && card < body);
+        assert!(card < body);
+        // The trust metadata is on the payload, not in the body (ov-24).
+        assert!(!p.html.contains(r#"data-testid="trust""#));
+        assert_eq!(p.trust.as_ref().map(|t| t.verified.len()), Some(1));
         assert!(p.html.contains(r#"<a data-resource="/lib/revenue.md" class="internal-link" data-path="lib/revenue.md""#));
         assert!(p.html.contains(
             r#"<a data-resource="references/run.md" class="internal-link" data-path="computations/references/run.md""#

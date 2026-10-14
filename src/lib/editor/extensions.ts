@@ -43,7 +43,6 @@ import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-
 import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
 import { hiddenSourceDefs, sourcesSection, sourcesTheme } from './sources';
-import { trustLine } from './trust';
 import { computationSectionLines, contractCard } from './computation';
 import { smartDashes } from './smartDashesView';
 import { criticMarkupAnnotations, criticMarkupTheme, type OnCommentEdit } from './criticMarkupView';
@@ -273,8 +272,6 @@ export function modeExtensions(
     // and the hiding of body definitions whose text it shows (ov-10).
     sourcesSection(onLinkClick, opts?.onEditSource),
     hiddenSourceDefs(reading),
-    // The virtual trust line above the first line (ov-9), in both modes.
-    trustLine(),
     // An Attested Computation's contract card after it (ov-12), in both modes.
     contractCard(onLinkClick),
     // An Attested Computation's `# Computation` section, set apart (ov-13).

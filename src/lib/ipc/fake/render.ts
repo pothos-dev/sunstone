@@ -24,14 +24,14 @@ import {
   scanFootnotes,
   sourceList,
   computationSection,
+  trustOf,
   type CriticMark,
   type Footnote,
   type Source,
 } from '$lib/wasm/exports';
-import { trustLineHtml } from '$lib/trust';
 import { contractCardHtml } from '$lib/computation';
 import { actorView } from '$lib/actor';
-import { usageText } from '$lib/sourceCard';
+import { fmTimeHtml, usageHtml } from '$lib/frontmatterTime';
 
 /** Render a Concept's raw markdown to the fake `RenderPayload`. */
 export function renderConcept(content: string): RenderPayload {
@@ -67,11 +67,10 @@ export function renderConcept(content: string): RenderPayload {
     lineNotes.flatMap((ns, i) => (ns.some((f) => f.def && sourcesById.has(f.label.toLowerCase())) ? [i] : [])),
   );
 
-  // The trust line opens the body (ov-9), as in the native render.
+  // No trust line in the body (ov-24): the trust metadata rides on the payload
+  // for the Tile header's pill, as in the native render. An Attested
+  // Computation's contract card opens the body (ov-12), as in Rust.
   const htmlParts: string[] = [];
-  const trust = trustLineHtml(splitFrontmatter(content).yaml ?? '');
-  if (trust) htmlParts.push(trust);
-  // An Attested Computation's contract card follows it (ov-12), as in Rust.
   const card = contractCardHtml(splitFrontmatter(content).yaml ?? '');
   if (card) htmlParts.push(card);
   // An Attested Computation's `# Computation` section is set apart (ov-13), as
@@ -99,7 +98,8 @@ export function renderConcept(content: string): RenderPayload {
 
   if (section && section.endLine >= lines.length) htmlParts.push('</section>');
   htmlParts.push(renderSourcesSection(sources));
-  return { html: htmlParts.join('\n'), frontmatter, outline };
+  const trust = trustOf(splitFrontmatter(content).yaml ?? '');
+  return { html: htmlParts.join('\n'), frontmatter, outline, trust, sourceCount: sources.length };
 }
 
 /**
@@ -189,15 +189,14 @@ function renderSourcesSection(list: Source[]): string {
   return out + '</ol></section>';
 }
 
-/** Rust's `signals_html`: the credibility signals as written. */
+/** Rust's `signals_html`: the credibility signals on one line (ov-24). */
 function renderSignals(s: Source): string {
   const items: string[] = [];
-  const push = (key: string, value: string) =>
-    items.push(`<span class="source-signal"><span class="source-signal-key">${key}</span> ${value}</span>`);
-  if (s.author) push('Author', renderActor(s.author));
-  if (s.lastModified) push('Last modified', attr(s.lastModified));
-  const usage = usageText(s);
-  if (usage) push('Usage count', attr(usage));
+  const push = (kind: string, value: string) =>
+    items.push(`<span class="source-signal source-${kind}">${value}</span>`);
+  if (s.author) push('author', renderActor(s.author));
+  if (s.lastModified) push('modified', `modified ${fmTimeHtml(s.lastModified)}`);
+  if (s.usageCount) push('usage', usageHtml(s.usageCount, s.usageWindow));
   return items.length ? `<span class="source-signals">${items.join('')}</span>` : '';
 }
 

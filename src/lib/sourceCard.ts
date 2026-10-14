@@ -1,5 +1,6 @@
 import type { Source } from '$lib/wasm/exports';
 import { actorElement } from '$lib/actor';
+import { fmTimeHtml, refreshFrontmatterTimes, usageHtml } from '$lib/frontmatterTime';
 
 // ---------------------------------------------------------------------------
 // Source hover card (ov-17)
@@ -44,17 +45,6 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 }
 
-/**
- * `usage_count` with the window it covers (§5.1): `5000 (2026-06-01 – 2026-06-30)`,
- * an open bound as `…`, the bare count without a window. As written: no score
- * is computed. The native render's `window_text` writes the same.
- */
-export function usageText(s: Pick<Source, 'usageCount' | 'usageWindow'>): string | null {
-  if (s.usageCount == null || s.usageCount === '') return null;
-  const w = s.usageWindow;
-  return w ? `${s.usageCount} (${w.from ?? '…'} – ${w.to ?? '…'})` : s.usageCount;
-}
-
 /** The card's DOM for `s`. */
 function buildCard(s: Source): HTMLElement {
   const card = el('div', 'source-card');
@@ -69,20 +59,28 @@ function buildCard(s: Source): HTMLElement {
   }
   card.append(el('div', 'source-card-title', s.title ?? s.resource ?? s.id ?? ''));
   if (s.title != null && s.resource) card.append(el('div', 'source-card-resource', s.resource));
-  // `author` is an actor (§7): shown with its kind, like every actor.
-  const meta: [string, string | null | undefined, ((v: string) => Node)?][] = [
-    ['Author', s.author, actorElement],
-    ['Last modified', s.lastModified],
-    ['Usage count', usageText(s)],
+  // `author` is an actor (§7): shown with its kind, like every actor. Times
+  // read relative with the absolute time on hover (ov-24); the usage reads as
+  // one phrase (`1,280× used in September 2026`). Markup from escaped text only.
+  const html = (markup: string) => () => {
+    const span = el('span', '');
+    span.innerHTML = markup;
+    return span;
+  };
+  const meta: [string, (() => Node) | null][] = [
+    ['Author', s.author ? () => actorElement(s.author) : null],
+    ['Last modified', s.lastModified ? html(fmTimeHtml(s.lastModified)) : null],
+    ['Usage', s.usageCount ? html(usageHtml(s.usageCount, s.usageWindow)) : null],
   ];
-  const rows = meta.filter(([, v]) => v != null && v !== '');
+  const rows = meta.filter(([, v]) => v !== null);
   if (rows.length > 0) {
     const dl = el('dl', 'source-card-meta');
-    for (const [k, v, render] of rows) {
+    for (const [k, render] of rows) {
       const dd = el('dd', '');
-      dd.append(render ? render(v!) : v!);
+      dd.append(render!());
       dl.append(el('dt', '', k), dd);
     }
+    refreshFrontmatterTimes(dl, Date.now());
     card.append(dl);
   }
   // A body `[^id]: …` definition's text (ov-10): the line is hidden, its text shown here.

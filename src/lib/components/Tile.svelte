@@ -53,7 +53,16 @@
   } from '$lib/editor/cm';
   import { createTileReview } from '$lib/tileReview.svelte';
   import { DEFAULT_FENCES } from '$lib/frontmatter';
-  import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
+  import {
+    splitFrontmatter,
+    frontmatterLineCount,
+    findHeadingLine,
+    sourceList,
+    trustOf,
+  } from '$lib/wasm/exports';
+  import type { ConceptMeta } from '$lib/metaPill';
+  import { refreshFrontmatterTimes } from '$lib/frontmatterTime';
+  import { clock } from '$lib/state/clock.svelte';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
   import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
   import { lifecycleFromYaml } from '$lib/lifecycle';
@@ -191,6 +200,38 @@
     tileHeaderLabel(tile.activePath, splitFrontmatter(tile.content).yaml, session.titlesShown),
   );
   const headerCrumbs = $derived(indexCrumbs(headerLabel.crumbs, bundle.tree, session.titlesShown));
+
+  // The header's metadata pill (ov-24): trust, lifecycle and the sources count,
+  // read from the live Frontmatter so the pill follows every edit.
+  const conceptMeta = $derived<ConceptMeta | null>(
+    tile.activePath === null
+      ? null
+      : {
+          trust: trustOf(frontmatterYaml),
+          lifecycle: lifecycleFromYaml(frontmatterYaml),
+          sourceCount: sourceList('', frontmatterYaml).length,
+        },
+  );
+
+  // The popover's "view ↓": bring the Sources section (a block widget after
+  // the last line) into view. Scroll the document end into the viewport first
+  // so CodeMirror renders the widget, then align the section itself.
+  function viewSources() {
+    const v = view;
+    if (!v) return;
+    v.dispatch({ effects: EditorView.scrollIntoView(v.state.doc.length, { y: 'end' }) });
+    requestAnimationFrame(() =>
+      v.dom.querySelector('[data-testid="sources-section"]')?.scrollIntoView({ block: 'start' }),
+    );
+  }
+
+  // Frontmatter timestamps in the body (the Sources entries' `modified …`) read
+  // relative; re-word them on the minute clock (ov-24).
+  let tileEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    const now = clock.now;
+    if (tileEl) refreshFrontmatterTimes(tileEl, now);
+  });
 
   // A header breadcrumb opens that folder's index.md (when it has one and it is
   // not already open) and shows the folder in the Explorer.
@@ -703,12 +744,14 @@
   class="tile"
   class:tile-active={active}
   data-testid="tile"
+  bind:this={tileEl}
   onfocusin={onActivate}
   onpointerdown={onActivate}
 >
   <TileHeader
     title={headerLabel.name}
-    lifecycle={tile.activePath === null ? null : lifecycleFromYaml(frontmatterYaml)}
+    meta={conceptMeta}
+    onViewSources={viewSources}
     crumbs={headerCrumbs}
     onCrumb={openCrumb}
     titlePath={tile.activePath}

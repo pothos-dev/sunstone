@@ -5,7 +5,7 @@ import { type Page } from '@playwright/test';
  * ov-11: the lifecycle family — `status` (OKF §5.4) and `stale_after` (§5.5).
  *
  * A Concept past its `stale_after` is marked stale in the Explorer row and the
- * Tile header (the places a Concept is summarised) and stays fully readable and
+ * Tile header's metadata pill (the places a Concept is summarised) and stays fully readable and
  * editable. Staleness is derived at display time and never written back. A
  * Concept with neither key shows no lifecycle affordance. In an OKF Bundle the
  * Frontmatter editor lints `status` against the enum and completes its values.
@@ -68,12 +68,17 @@ test('lifecycle: a stale Concept is marked where it is summarised, and stays rea
   // Every Concept with neither key: nothing at all.
   await expect(page.getByTestId('tree').getByTestId('lifecycle')).toHaveCount(2);
 
-  // The Tile header of the open Concept.
+  // The Tile header of the open Concept: the metadata pill's lifecycle
+  // segment (ov-24), the detail in its popover.
   await row(page, STALE).click();
   const header = page.getByTestId('tile-header');
-  await expect(header.getByTestId('lifecycle-stale')).toBeVisible();
-  await expect(header.getByTestId('lifecycle-status')).toHaveText('deprecated');
-  await expect(header.getByTestId('lifecycle')).toHaveAttribute('title', /Stale since 2000-01-01T00:00:00Z/);
+  await expect(header.getByTestId('meta-pill-lifecycle')).toHaveText('stale');
+  await header.getByTestId('meta-pill').hover();
+  const lifecycle = page.getByTestId('meta-popover-lifecycle');
+  await expect(lifecycle.locator('.mp-status')).toHaveText('deprecated');
+  await expect(lifecycle).toContainText('Stale since');
+  await expect(lifecycle.locator('time')).toHaveAttribute('datetime', '2000-01-01T00:00:00Z');
+  await page.mouse.move(5, 600);
 
   // Fully readable…
   await expect(page.locator('.cm-content').first()).toContainText('Old facts.');
@@ -95,7 +100,7 @@ test('lifecycle: a Concept with neither key shows no lifecycle affordance', asyn
   await row(page, 'plain-probe.md').click();
   await expect(row(page, 'plain-probe.md').getByTestId('lifecycle')).toHaveCount(0);
   await expect(page.getByTestId('tile-title')).toBeVisible();
-  await expect(page.getByTestId('tile-header').getByTestId('lifecycle')).toHaveCount(0);
+  await expect(page.getByTestId('tile-header').getByTestId('meta-pill')).toHaveCount(0);
 });
 
 test('lifecycle: status is linted and completed in an OKF Bundle', async ({ page }) => {

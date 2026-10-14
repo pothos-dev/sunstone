@@ -97,8 +97,9 @@ test('contract card: follows the YAML as edited; another type has none', async (
   expect(saved).not.toContain('computation-');
 });
 
-test('contract card: follows the trust line', async ({ page }) => {
+test('contract card: opens the body (the trust metadata lives in the header pill)', async ({ page }) => {
   const editor = await openProbe(page, CONTENT.replace('runtime:', 'verified: { by: human:a }\nruntime:'));
-  await expect(editor.locator('.cm-content > :nth-child(1)')).toHaveClass(/cm-trust/);
-  await expect(editor.locator('.cm-content > :nth-child(2)')).toHaveClass(/cm-computation/);
+  await expect(editor.locator('.cm-content > :nth-child(1)')).toHaveClass(/cm-computation/);
+  await expect(editor.getByTestId('trust')).toHaveCount(0);
+  await expect(page.getByTestId('meta-pill-trust')).toHaveText('Reviewed');
 });

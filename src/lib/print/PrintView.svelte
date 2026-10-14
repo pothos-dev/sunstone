@@ -7,6 +7,8 @@
   import { hydrateMermaid } from '$lib/web/webMermaid';
   import { wireRemoteEmbeds } from '$lib/web/remoteEmbed';
   import { conceptTitle } from '$lib/web/conceptUrl';
+  import { trustHtml } from '$lib/trust';
+  import { ensureWasm } from '$lib/wasm';
 
   // Chrome-free print/PDF preview of a single Concept, opened in its OWN
   // window/tab (never inside the app shell). Two modes:
@@ -21,6 +23,9 @@
   //
   // Both render the SAME server-quality HTML via `backend.renderConcept` and
   // reuse the shared `rendered.css`, so the printed page matches the web viewer.
+  // Paper has no hover, so where the screen shows the header's metadata pill
+  // (ov-24) the print keeps a compact static line under the title: the trust
+  // tier and who generated / verified the Concept, with absolute dates.
 
   interface Props {
     path: string;
@@ -94,8 +99,15 @@
         if (renderGuard.isLatest(token)) error = e instanceof Error ? e.message : String(e);
         return;
       }
+      // The static trust line's actors are parsed by wasm (`actorHtml`).
+      if (payload.trust) await ensureWasm();
       if (!renderGuard.isLatest(token) || !bodyEl) return;
       bodyEl.innerHTML = payload.html;
+      if (payload.trust) {
+        const h1 = bodyEl.querySelector(':scope > h1');
+        if (h1) h1.insertAdjacentHTML('afterend', trustHtml(payload.trust));
+        else bodyEl.insertAdjacentHTML('afterbegin', trustHtml(payload.trust));
+      }
       // Force light Mermaid — dark diagrams read wrong / waste ink on paper.
       await hydrateMermaid(bodyEl, 'light');
       await appearanceLoaded;

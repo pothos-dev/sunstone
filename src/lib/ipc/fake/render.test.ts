@@ -1,29 +1,35 @@
 import { describe, expect, test } from 'bun:test';
 import { renderConcept } from './render';
 
-// ov-9: the trust line opens the body, like the native render.
-describe('renderConcept trust line', () => {
-  test('a Concept with trust keys starts with the trust line', () => {
-    const { html } = renderConcept('---\ntype: x\nverified: { by: human:a }\n---\n\n# T\n');
-    expect(html.startsWith('<div class="trust trust-human-reviewed" data-testid="trust">')).toBe(true);
+// ov-24: the trust metadata rides on the payload for the header's pill; the
+// body has no trust line, like the native render.
+describe('renderConcept trust metadata', () => {
+  test('a Concept with trust keys carries them on the payload, not in the body', () => {
+    const p = renderConcept('---\ntype: x\nverified: { by: human:a }\n---\n\n# T\n');
+    expect(p.html).not.toContain('class="trust');
+    expect(p.trust?.tier).toBe('humanReviewed');
+    expect(p.sourceCount).toBe(0);
   });
 
-  test('a Concept without them renders as before', () => {
-    const { html } = renderConcept('---\ntype: x\n---\n\n# T\n');
-    expect(html).not.toContain('class="trust');
+  test('a Concept without them has none', () => {
+    expect(renderConcept('---\ntype: x\n---\n\n# T\n').trust).toBeNull();
+  });
+
+  test('the payload counts the sources entries', () => {
+    const p = renderConcept('---\ntype: x\nsources:\n  - resource: https://a\n  - resource: https://b\n---\n\nx\n');
+    expect(p.sourceCount).toBe(2);
   });
 });
 
-// ov-12: an Attested Computation's contract card follows the trust line.
+// ov-12: an Attested Computation's contract card opens the body.
 describe('renderConcept contract card', () => {
-  test('sits between the trust line and the body', () => {
+  test('sits before the body', () => {
     const { html } = renderConcept(
       '---\ntype: Attested Computation\nverified: { by: human:a }\nruntime: bigquery\n---\n\n# T\n',
     );
-    const trust = html.indexOf('data-testid="trust"');
     const card = html.indexOf('data-testid="computation"');
-    expect(trust).toBeGreaterThanOrEqual(0);
-    expect(card).toBeGreaterThan(trust);
+    expect(html.startsWith('<section class="computation" data-testid="computation">')).toBe(true);
+    expect(card).toBeGreaterThan(0);
     expect(html.indexOf('<h1')).toBeGreaterThan(card);
   });
 
@@ -146,7 +152,7 @@ describe('renderConcept footnotes', () => {
 
   test('entries show signals, a body definition and every citing place (Rust markup)', () => {
     const { html } = renderConcept(
-      '---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n    author: human:dan\n    usage_count: 7\n    last_modified: 2026-05-30\nusage_window: { from: 2026-06-01, to: 2026-06-30 }\n---\n\nA[^s] B[^s]\n\n[^s]: Written by hand\n',
+      '---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n    author: human:dan\n    usage_count: 1280\n    last_modified: 2026-05-30T00:00:00Z\nusage_window: { from: 2026-06-01, to: 2026-06-30 }\n---\n\nA[^s] B[^s]\n\n[^s]: Written by hand\n',
     );
     const [text, section] = html.split('<section class="sources">');
     // The definition line is gone from the body; its text sits on the entry.
@@ -155,11 +161,20 @@ describe('renderConcept footnotes', () => {
     expect(text).toContain('B<sup id="fnref-s-2" class="footnote-ref source"');
     expect(section).toContain(
       '<span class="source-signals">' +
-        '<span class="source-signal"><span class="source-signal-key">Author</span> <span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>' +
-        '<span class="source-signal"><span class="source-signal-key">Last modified</span> 2026-05-30</span>' +
-        '<span class="source-signal"><span class="source-signal-key">Usage count</span> 7 (2026-06-01 – 2026-06-30)</span>' +
+        '<span class="source-signal source-author"><span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>' +
+        '<span class="source-signal source-modified">modified <time class="fm-time" datetime="2026-05-30T00:00:00Z" title="2026-05-30T00:00:00Z">2026-05-30T00:00:00Z</time></span>' +
+        '<span class="source-signal source-usage">1,280× used in June 2026</span>' +
         '</span><span class="source-note">Written by hand</span>' +
         '<span class="source-backrefs">↑ <a class="source-backref" href="#fnref-s-1" title="Jump to citation 1">a</a> <a class="source-backref" href="#fnref-s-2" title="Jump to citation 2">b</a></span>',
+    );
+  });
+
+  test('a date-only usage bound stays as written (Rust markup)', () => {
+    const { html } = renderConcept(
+      '---\ntype: N\nsources:\n  - resource: https://s\n    usage_count: 3\n    usage_window: { from: 2026-01-01 }\n---\n\nx\n',
+    );
+    expect(html).toContain(
+      '<span class="source-signal source-usage">3× used since <time class="fm-time" title="2026-01-01">2026-01-01</time></span>',
     );
   });
 

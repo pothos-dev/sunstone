@@ -51,8 +51,8 @@ _Avoid_: "user", "owner", "identity" for these values.
 **Trust tier**:
 How confirmed a Concept is, derived from its `verified` events alone and never stored
 (OKF [§5.3](/okf/spec.md#53-trust-tiers)): **unverified** (no events), **machine-confirmed**
-(only non-`human:` **Actors**) or **human-reviewed** (any `human:` Actor). Shown first in the
-trust line above the body. See [Concept → trust](/okf/concept.md#trust).
+(only non-`human:` **Actors**) or **human-reviewed** (any `human:` Actor). Shown as the first
+segment of the Concept's metadata pill in the Tile header. See [Concept → trust](/okf/concept.md#trust).
 _Avoid_: "verified" as an adjective for the tier, "trust score", "status" (that is lifecycle).
 
 **Attested Computation**:

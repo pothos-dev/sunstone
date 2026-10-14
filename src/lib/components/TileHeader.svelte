@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import type { IndexedCrumb } from '$lib/tileTitle';
-  import type { Lifecycle } from '$lib/lifecycle';
-  import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
+  import type { ConceptMeta } from '$lib/metaPill';
+  import MetaPill from '$lib/components/MetaPill.svelte';
 
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
   //   - the Concept title + a close affordance (clears the Tile to empty state),
+  //   - the Concept's metadata pill (trust tier, sources, lifecycle; ov-24),
   //   - the Edit toggle (read ⇄ live editing), the single view-mode control
   //     (editing-boolean-edit-toggle),
   //   - Split Right (new Column) / Split Down (new TileSlot in this Column) affordances,
@@ -19,7 +20,7 @@
   // callbacks + reactive flags.
   //
   // The anonymous web reader (`web/WebReader.svelte`, wr-1) renders this same
-  // header `readOnly`: only the title, crumbs, lifecycle, Frontmatter toggle and
+  // header `readOnly`: only the title, crumbs, metadata pill, Frontmatter toggle and
   // Export PDF show, plus whatever it passes in the `leading` / `trailing`
   // snippets (its narrow-screen drawer, quick-nav and overflow buttons). The
   // editing props are optional for that reason; the desktop passes them all.
@@ -28,11 +29,13 @@
     /** The active Concept's derived header label ('' when the Tile is empty). */
     title: string;
     /**
-     * The open Concept's OKF lifecycle keys (§5.4/§5.5), shown as a status /
-     * stale chip after the label; `null` (neither key, or an empty Tile) shows
-     * nothing.
+     * The open Concept's trust, lifecycle and sources metadata, shown as one
+     * segmented pill after the label with a hover popover (ov-24); `null` (an
+     * empty Tile) or nothing to show renders no pill.
      */
-    lifecycle?: Lifecycle | null;
+    meta?: ConceptMeta | null;
+    /** Jump to the Concept's Sources section (the popover's "view ↓"). */
+    onViewSources?: () => void;
     /**
      * The Concept's ancestor folders, outermost first, shown dimmed ahead of the
      * label as clickable breadcrumbs (`concepts/editor/`) so the header says
@@ -105,7 +108,8 @@
 
   let {
     title,
-    lifecycle = null,
+    meta = null,
+    onViewSources,
     crumbs = [],
     onCrumb,
     titlePath = null,
@@ -182,7 +186,7 @@
               onclick={() => onCrumb?.(crumb)}>{crumb.name}</button
             >/{/each}</span
         >{/if}{title}</span
-    ><LifecycleBadge {lifecycle} />
+    ><MetaPill {meta} {onViewSources} />
   </div>
 
   <div class="tile-controls">

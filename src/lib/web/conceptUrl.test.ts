@@ -79,6 +79,8 @@ describe('conceptTitle', () => {
     html: '',
     frontmatter: [],
     outline: [],
+    trust: null,
+    sourceCount: 0,
     ...over,
   });
 

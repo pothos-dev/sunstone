@@ -4,6 +4,7 @@
 
 import type { EditorMode } from '$lib/editor/cm';
 import type { StoredLayout } from '$lib/state/layoutPersist';
+import type { Trust } from '$lib/wasm/exports';
 
 /**
  * A node in the Bundle's directory tree. Paths are bundle-relative,
@@ -390,6 +391,14 @@ export interface RenderPayload {
   html: string;
   frontmatter: FrontmatterField[];
   outline: OutlineHeading[];
+  /**
+   * The trust Frontmatter (`sunstone_shared::trust`, the wasm `trustOf`
+   * shape), or `null` without it. Not in `html` (ov-24): the Tile header's
+   * metadata pill shows it, and the print view draws its static line from it.
+   */
+  trust: Trust | null;
+  /** How many `sources` entries the Concept lists (the pill's count). */
+  sourceCount: number;
 }
 
 /**

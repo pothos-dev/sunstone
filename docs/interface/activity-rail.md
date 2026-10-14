@@ -46,6 +46,7 @@ Tile's Concept:
 | Control | Does |
 | ------- | ---- |
 | Back / forward | Move through the Tile's own navigation history |
+| Metadata pill | Next to the title: trust tier, sources count, lifecycle as one segmented pill; hover 0.5 s for the detail ([Concept → metadata pill](/okf/concept.md#metadata-pill)) |
 | **Edit** toggle | Switch the Tile between `read` and `editing` — the boolean view mode (see [ADR 0001](/adr/0001-codemirror-hybrid-live-preview.md)) |
 | Frontmatter toggle | Show/hide the inline frontmatter YAML editor (drives the app-wide `frontmatterShown` flag) |
 | Undo / redo | Over the Tile's single body+frontmatter history — **shown only while editing** |
@@ -76,7 +77,7 @@ surfaces](/interface/app-shell.md)):
 - The **anonymous** read-only SSR surface renders the same Activity Rails — with
   a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
   renders the same **Concept header** (`TileHeader`, `readOnly`): the title with
-  its folder crumbs and lifecycle chips, the Frontmatter toggle (a read-only
+  its folder crumbs and metadata pill, the Frontmatter toggle (a read-only
   frontmatter grid) and Export PDF. No back/forward — the browser's own does
   that — and no Edit, undo/redo, Save, Review, split or close until you sign
   in. A crumb opens its folder's `index.md` when it has one and always reveals

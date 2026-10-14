@@ -8,7 +8,7 @@ import { frontmatterField } from './frontmatter-field';
 // Contract card (ov-12)
 //
 // An Attested Computation's contract (`runtime`, `parameters`, `computation`,
-// `executor`, `attester`) shown above the body, after the trust line. A block
+// `executor`, `attester`) shown above the body. A block
 // widget before the first line, never part of the document; rebuilt from the
 // Frontmatter on every change. The markup is `$lib/computation` (the same the
 // native render emits). A path-valued field opens through `onLinkClick`, the
@@ -51,7 +51,6 @@ class ContractWidget extends WidgetType {
 function build(state: EditorState, onLinkClick: (url: string) => void): DecorationSet {
   const html = contractCardHtml(state.field(frontmatterField, false) ?? '');
   if (!html) return Decoration.none;
-  // `side: 0` keeps it after the trust line (`side: -1`) at the same position.
   return Decoration.set([
     Decoration.widget({ widget: new ContractWidget(html, onLinkClick), block: true, side: 0 }).range(0),
   ]);

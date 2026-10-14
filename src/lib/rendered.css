@@ -194,17 +194,17 @@
   overflow-wrap: anywhere;
 }
 
-/* Credibility signals, a body definition's text, and the jumps back to the
-   citing claims (ov-10). Mirrors the editor's `.cm-source-*`. */
+/* Credibility signals on one line (ov-24: author · modified … · usage), a body
+   definition's text, and the jumps back to the citing claims (ov-10). Mirrors
+   the editor's `.cm-source-*`. */
 .rendered .source-signals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.2em 1em;
   font-size: 0.85em;
+  color: var(--text-muted, #777);
 }
 
-.rendered .source-signal-key {
-  color: var(--text-muted, #777);
+.rendered .source-signal + .source-signal::before {
+  content: '·';
+  margin: 0 0.45em;
 }
 
 .rendered .source-note {
