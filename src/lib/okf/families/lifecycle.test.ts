@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { lintFrontmatter } from '../lint';
 import { completeFrontmatter } from '../complete';
-import { parseInstant } from '$lib/instant';
+import { epochSeconds } from '$lib/wasm/exports';
 
 /** Lifecycle findings as `[severity, marked text]`. */
 function marks(yaml: string, mode: 'yaml' | 'okf' = 'okf') {
@@ -43,6 +43,18 @@ describe('lifecycle lint: stale_after (§5.5)', () => {
     expect(marks('type: x\nstale_after: "2026-09-23T02:00:00+02:00"\n')).toEqual([]);
   });
 
+  test('every form the shared Rust grammar accepts is clean', () => {
+    for (const v of ['2026-01-01T00:00:00+02', '2026-01-01T00:00:00,5Z', '2026-12-31T23:59:60Z', '2026-01-01t00:00:00z', '2026-01-01T02:00:00+0200']) {
+      expect(marks(`type: x\nstale_after: ${v}\n`)).toEqual([]);
+    }
+  });
+
+  test('a space separator is not ISO 8601, not a missing offset', () => {
+    const f = lintFrontmatter('stale_after: 2026-09-23 10:30Z\n', 'okf').find((x) => x.source === 'okf-lifecycle')!;
+    expect(f.message).toContain('should be an ISO 8601 datetime');
+    expect(f.message).not.toContain('offset');
+  });
+
   test('no UTC offset: a warning, not an error', () => {
     expect(marks('type: x\nstale_after: 2026-09-23T00:00:00\n')).toEqual([['warning', '2026-09-23T00:00:00']]);
     expect(marks('type: x\nstale_after: 2026-09-23\n')).toEqual([['warning', '2026-09-23']]);
@@ -76,7 +88,7 @@ describe('lifecycle completion', () => {
     for (const o of r.options) {
       const text = o.apply ?? o.label;
       expect(text).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-      expect(parseInstant(text)!).toBeGreaterThan(before);
+      expect(epochSeconds(text)! * 1000).toBeGreaterThan(before);
     }
   });
 

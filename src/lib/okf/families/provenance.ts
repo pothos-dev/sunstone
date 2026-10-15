@@ -25,6 +25,7 @@ import {
   type Range,
   type RuleContext,
 } from '../family';
+import { epochSeconds, isIsoDatetime } from '$lib/wasm/exports';
 
 const fromTo = [
   { label: 'from', detail: 'datetime', info: 'ISO 8601 with a UTC offset, e.g. `2026-06-01T00:00:00Z`.' },
@@ -36,9 +37,6 @@ const actorStarts: CompletionOption[] = [
   { label: 'human:', detail: 'person', info: 'A person, e.g. `human:alice`.', apply: 'human:' },
   { label: 'process:', detail: 'process', info: 'An automated process, e.g. `process:nightly`.', apply: 'process:' },
 ];
-
-/** ISO 8601 date-time with an explicit UTC offset (`Z` or `±hh:mm`), §5. */
-const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/;
 
 const DATETIME_HINT = 'an ISO 8601 datetime with a UTC offset, e.g. `2026-06-30T14:00:00Z` (OKF §5)';
 
@@ -137,7 +135,8 @@ const usageCount: OkfRule = (ctx) => {
 function datetime(ctx: RuleContext, node: unknown, key: string, fallback: Range): Finding[] {
   if (blank(node)) return [];
   const v = isScalar(node) ? node.value : undefined;
-  if (typeof v === 'string' && ISO_DATETIME.test(v.trim())) return [];
+  // The shared Rust grammar (`instant::is_iso_datetime`), as trust and lifecycle use.
+  if (typeof v === 'string' && isIsoDatetime(v)) return [];
   return [ctx.at(rangeOf(node, fallback), 'warning', `\`${key}\` should be ${DATETIME_HINT}`)];
 }
 
@@ -160,8 +159,11 @@ function windowFindings(ctx: RuleContext, node: unknown, fallback: Range): Findi
     ...(to ? datetime(ctx, to.value, 'usage_window.to', fallback) : []),
   ];
   if (out.length === 0 && from && to && isScalar(from.value) && isScalar(to.value)) {
-    const [a, b] = [Date.parse(String(from.value.value)), Date.parse(String(to.value.value))];
-    if (!Number.isNaN(a) && !Number.isNaN(b) && a > b) {
+    // Ordered by the shared Rust reader; a side it cannot read is not ordered
+    // (that side already has its own finding, or wasm is not loaded yet).
+    const read = (v: unknown) => (typeof v === 'string' ? epochSeconds(v) : null);
+    const [a, b] = [read(from.value.value), read(to.value.value)];
+    if (a !== null && b !== null && a > b) {
       out.push(ctx.at(rangeOf(node, fallback), 'warning', '`usage_window.from` is after `usage_window.to`'));
     }
   }

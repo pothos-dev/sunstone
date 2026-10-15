@@ -56,6 +56,7 @@ import type {
   Embed,
   EmbedKind,
   EmbedTargetKind,
+  LifecycleKeys,
 } from '$lib/wasm/pkg';
 
 /** The generated wasm DTOs, surfaced for consumers (ADR 0006 §6). */
@@ -93,6 +94,7 @@ export type {
   Embed,
   EmbedKind,
   EmbedTargetKind,
+  LifecycleKeys,
 };
 
 /** The wasm module namespace (`BundleIndex` + the free exports). */
@@ -274,6 +276,34 @@ export function computationSection(yaml: string, body: string): ComputationSecti
  */
 export function isIsoDatetime(s: string): boolean {
   return mod ? mod.isIsoDatetime(s) : true;
+}
+
+/**
+ * `s` as seconds since the Unix epoch when it is `isIsoDatetime` (the strict
+ * form, offset required; a fraction is dropped), else `null`. Before wasm is
+ * registered it is `null`: nothing orders, so nothing is flagged.
+ */
+export function epochSeconds(s: string): number | null {
+  return mod ? (mod.epochSeconds(s) ?? null) : null;
+}
+
+/**
+ * `s` as seconds since the Unix epoch, read leniently for staleness (ov-11):
+ * the strict form, the same with no offset (as UTC), or a bare date (midnight
+ * UTC); else `null`. Before wasm is registered it is `null`, so nothing goes
+ * stale ("an unreadable date must not mark anything").
+ */
+export function instantSeconds(s: string): number | null {
+  return mod ? (mod.instantSeconds(s) ?? null) : null;
+}
+
+/**
+ * The lifecycle keys (OKF §5.4/§5.5) of a Frontmatter block (inner YAML), raw
+ * trimmed scalars, read exactly as the Explorer's walker reads them. `null`
+ * when neither is set, the block does not parse, and before wasm is registered.
+ */
+export function lifecycleOf(yaml: string): LifecycleKeys | null {
+  return mod ? (mod.lifecycleOf(yaml) ?? null) : null;
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */

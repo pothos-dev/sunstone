@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { isStale, lifecycleFromFields, lifecycleFromYaml, lifecycleOfNode, lifecycleView } from './lifecycle';
+import { isIsoDatetime } from '$lib/wasm/exports';
 
 const AT = '2026-09-23T00:00:00Z';
 const AT_MS = Date.UTC(2026, 8, 23);
@@ -31,6 +32,30 @@ describe('isStale: the §5.5 boundary (now >= stale_after)', () => {
   test('a value without an offset is read as UTC', () => {
     expect(isStale('2026-09-23T00:00:00', AT_MS)).toBe(true);
     expect(isStale('2026-09-23T00:00:00', AT_MS - 1)).toBe(false);
+    expect(isStale('2026-09-23', AT_MS)).toBe(true);
+    expect(isStale('2026-09-23', AT_MS - 1)).toBe(false);
+  });
+
+  test('agrees with isIsoDatetime on every form the shared Rust accepts', () => {
+    const forms: [string, number][] = [
+      ['2026-09-23T02:00:00+02', AT_MS],
+      ['2026-09-23T02:00:00+0200', AT_MS],
+      ['2026-09-23T00:00:00,5Z', AT_MS],
+      ['2026-09-23T00:00:00.250Z', AT_MS],
+      ['2026-09-22T23:59:60Z', AT_MS],
+      ['2026-09-23t00:00:00z', AT_MS],
+      ['2026-09-23T00:00Z', AT_MS],
+    ];
+    for (const [v, at] of forms) {
+      expect(isIsoDatetime(v)).toBe(true);
+      expect(isStale(v, at)).toBe(true);
+      expect(isStale(v, at - 1000)).toBe(false);
+    }
+  });
+
+  test('a space separator is read by neither reader', () => {
+    expect(isIsoDatetime('2026-09-23 10:30Z')).toBe(false);
+    expect(isStale('2026-09-23 10:30Z', Number.MAX_SAFE_INTEGER)).toBe(false);
   });
 });
 

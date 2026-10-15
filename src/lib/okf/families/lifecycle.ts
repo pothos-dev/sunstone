@@ -10,8 +10,8 @@
 // instants written the canonical way (`isoUtc`: whole seconds, `Z` offset).
 
 import { isScalar } from 'yaml';
-import { isoUtc, parseInstant } from '$lib/instant';
-import { isIsoDatetime } from '$lib/wasm/exports';
+import { isoUtc } from '$lib/instant';
+import { instantSeconds, isIsoDatetime } from '$lib/wasm/exports';
 import { LIFECYCLE_STATUSES, STATUS_MEANING, isLifecycleStatus } from '$lib/lifecycle';
 import { lineFrom, rangeOf, type CompletionOption, type OkfFamily, type OkfRule, type RuleContext } from '../family';
 import type { Pair } from 'yaml';
@@ -34,10 +34,12 @@ const staleAfterInstant: OkfRule = (ctx) => {
   const p = ctx.pair(ctx.root, 'stale_after');
   if (!p) return [];
   const raw = isScalar(p.value) && typeof p.value.value === 'string' ? p.value.value : null;
-  // The same check as the trust family's `at` (shared Rust, `trust::is_iso_datetime`).
+  // The same check as the trust family's `at` (shared Rust, `instant::is_iso_datetime`).
   if (raw !== null && isIsoDatetime(raw)) return [];
+  // Read leniently (`instant::instant_seconds`) it still compares: the only
+  // thing missing is the offset.
   const message =
-    raw !== null && parseInstant(raw) !== null
+    raw !== null && instantSeconds(raw) !== null
       ? '`stale_after` has no UTC offset; it is read as UTC. Write it with one, e.g. `2026-09-23T00:00:00Z` (OKF §5.5)'
       : '`stale_after` should be an ISO 8601 datetime, e.g. `2026-09-23T00:00:00Z` (OKF §5.5)';
   return [ctx.at(valueRange(ctx, p), 'warning', message)];

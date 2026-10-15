@@ -7,8 +7,7 @@
 //
 // The language-service half (lint + completion) is `okf/families/lifecycle.ts`.
 
-import { parseDocument, isScalar } from 'yaml';
-import { parseInstant } from '$lib/instant';
+import { instantSeconds, lifecycleOf } from '$lib/wasm/exports';
 import type { FrontmatterField, TreeNode } from '$lib/types';
 
 /** The three `status` values §5.4 defines, in lifecycle order. */
@@ -45,12 +44,14 @@ export function isLifecycleStatus(value: unknown): value is LifecycleStatus {
 /**
  * Whether a Concept with this `stale_after` is stale at `now` (§5.5:
  * `now >= stale_after`). Absent or malformed is never stale — the signal is
- * advisory, so an unreadable date must not mark anything.
+ * advisory, so an unreadable date must not mark anything. Read by the shared
+ * Rust `instant_seconds`: the strict ISO 8601 form, or (ov-11) the same with
+ * no offset or a bare date, read as UTC. Second resolution.
  */
 export function isStale(staleAfter: string | null | undefined, now: Date | number): boolean {
   if (staleAfter == null) return false;
-  const at = parseInstant(staleAfter);
-  return at !== null && +now >= at;
+  const at = instantSeconds(staleAfter);
+  return at !== null && +now >= at * 1000;
 }
 
 function text(value: unknown): string | null {
@@ -64,21 +65,14 @@ function lifecycle(status: string | null, staleAfter: string | null): Lifecycle 
   return status === null && staleAfter === null ? null : { status, staleAfter };
 }
 
-/** The lifecycle keys of a Frontmatter block (inner YAML), or `null` when neither is set or it does not parse. */
+/**
+ * The lifecycle keys of a Frontmatter block (inner YAML), or `null` when
+ * neither is set or it does not parse. The shared Rust reader the Explorer's
+ * walker uses (`frontmatter::lifecycle`), so a Tile header and its Explorer row
+ * always read the same values.
+ */
 export function lifecycleFromYaml(yaml: string): Lifecycle | null {
-  if (yaml.trim() === '') return null;
-  let doc;
-  try {
-    doc = parseDocument(yaml, { uniqueKeys: false });
-  } catch {
-    return null;
-  }
-  if (doc.errors.length > 0) return null;
-  const read = (key: string) => {
-    const node = doc.get(key, true);
-    return isScalar(node) ? text(node.value) : null;
-  };
-  return lifecycle(read('status'), read('stale_after'));
+  return lifecycleOf(yaml);
 }
 
 /** The lifecycle keys out of server-rendered Frontmatter fields (the web reader). */
@@ -119,6 +113,6 @@ export function lifecycleView(
   const parts: string[] = [];
   if (status) parts.push(`${capitalise(status)}: ${STATUS_MEANING[status]}.`);
   if (stale) parts.push(`Stale since ${lc.staleAfter}: treat as possibly out of date.`);
-  else if (lc.staleAfter && parseInstant(lc.staleAfter) !== null) parts.push(`Stale after ${lc.staleAfter}.`);
+  else if (lc.staleAfter && instantSeconds(lc.staleAfter) !== null) parts.push(`Stale after ${lc.staleAfter}.`);
   return { status, stale, title: parts.join(' ') };
 }

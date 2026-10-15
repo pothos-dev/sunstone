@@ -80,6 +80,26 @@ describe('provenance lint (§5.1)', () => {
     expect(marks(entry)).toEqual([['warning', 'yesterday']]);
   });
 
+  test('datetimes follow the shared Rust grammar (instant::is_iso_datetime)', () => {
+    const window = (from: string, to: string) => marks(`usage_window: { from: ${from}, to: ${to} }\n`);
+    // `+02`, `+0200`, a lowercase `t`/`z` and a `,` fraction are ISO 8601 with an offset.
+    expect(window('2026-06-01T00:00:00+02', '2026-06-30T00:00:00+0200')).toEqual([]);
+    expect(window('2026-06-01t00:00:00z', '"2026-06-30T00:00:00,5Z"')).toEqual([]);
+    // Impossible values are not.
+    expect(window('2026-02-30T00:00:00Z', '2026-06-30T00:00:00Z')).toEqual([['warning', '2026-02-30T00:00:00Z']]);
+    expect(window('2026-06-01T25:00:00Z', '2026-06-30T00:00:00Z')).toEqual([['warning', '2026-06-01T25:00:00Z']]);
+  });
+
+  test('the window is ordered by instant, offsets honoured', () => {
+    const window = (from: string, to: string) => `usage_window: { from: ${from}, to: ${to} }\n`;
+    // 12:00Z after 11:00Z, although the text reads the other way.
+    const inverted = window('2026-06-30T10:00:00-0200', '2026-06-30T13:00:00+0200');
+    expect(marks(inverted)).toEqual([['warning', inverted.slice('usage_window: '.length, -1)]]);
+    expect(marks(window('2026-06-30T13:00:00+0200', '2026-06-30T10:00:00-0200'))).toEqual([]);
+    // A side that is not ISO gets its own warning and no ordering finding.
+    expect(marks(window('2026-07-01', '2026-06-30T00:00:00Z'))).toEqual([['warning', '2026-07-01']]);
+  });
+
   test('last_modified is an ISO datetime', () => {
     expect(marks(lines('sources:', '  - { resource: x, last_modified: May 2026 }'))).toEqual([
       ['warning', 'May 2026'],
