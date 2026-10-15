@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 2
 ---
 
@@ -20,10 +20,10 @@ nightly review of 59ccaa5 found three cases that break:
   the `#topic`, so a reload lands at the top. `tests/serve-deep-link.spec.ts`
   currently asserts the hash is dropped.
 
-- [ ] `release-1.2.md` and `v1.0/index.md` reload from the address bar without a 404
-- [ ] With `guide.md` and `guide/index.md` both present, `guide.md` active, a reload reopens `guide.md`
-- [ ] `/guide/topic.md#topic` keeps `#topic` after the URL is rewritten; navigating to another Concept drops it
-- [ ] Unit tests on the pure helper, a `tests/serve-deep-link.spec.ts` case per bullet; all four gates green
+- [x] `release-1.2.md` and `v1.0/index.md` reload from the address bar without a 404
+- [x] With `guide.md` and `guide/index.md` both present, `guide.md` active, a reload reopens `guide.md`
+- [x] `/guide/topic.md#topic` keeps `#topic` after the URL is rewritten; navigating to another Concept drops it
+- [x] Unit tests on the pure helper, a `tests/serve-deep-link.spec.ts` case per bullet; all four gates green
 
 ## Grounding
 
@@ -62,3 +62,12 @@ nightly review of 59ccaa5 found three cases that break:
   already named (the `.md` → pretty rewrite at startup), keep `location.hash`.
   Navigating to another Concept drops it. Tracking the scrolled-to heading
   live is not asked for.
+
+## Comments
+
+- 2026-10-15 nightly: done. `servedAddress` in `src/lib/ipc/servedStartup.ts`
+  verifies the pretty URL through `startupFromUrl` (no TS twin of
+  `url_to_concept`), falling back to the Bundle path. Besides the three listed
+  cases, the anchor was also lost because the effect wrote the restored
+  layout's URL (or `/`) before the startup Concept opened; the sync now waits
+  for it (`startupTarget` in `App.svelte`).
