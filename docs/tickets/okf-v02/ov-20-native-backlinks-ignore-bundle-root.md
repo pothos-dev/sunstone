@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 2
 ---
 
@@ -21,14 +21,14 @@ web and fake agree. `docs/okf/bundle.md` and the ov-7 ticket describe the old
 behaviour wrongly as "resolves against the detected root". (Already corrected
 in 50baa70: both now say it resolves against the opened folder and point here.)
 
-- [ ] `Index` builds a `BundleRoot` and resolves links through it
-- [ ] An `index.rs` test with a nested root and a bundle-absolute backlink
-- [ ] `ConceptEntry` keeps the raw hrefs (like `wikilinks`); `rebuild_reverse` computes `find_bundle_root(concept_paths, okf_markers, git_prefix, None)` once per rebuild and resolves each href with `sunstone_shared::links::resolve_link` against the Concept set, the same call wasm `resolveLinkIn` makes
-- [ ] A root that changes (an `index.md` gains or loses `okf_version`, a top-level `.md` appears) re-resolves every Concept's links on the next mutation, not only the edited one's (`index.rs` test: add the marker with `reindex_concept`, the backlink appears)
-- [ ] A bundle-absolute link whose rooted target does not exist still falls back to the opened folder, as `apply_bundle_root` does (test)
-- [ ] The git prefix reaches the index, so the git-toplevel rung anchors as it does in the frontend
-- [ ] `docs/okf/bundle.md` (the "Only the frontend sees the override" paragraph) and ov-7's "Known limit" say Backlinks follow the detected root and only the override stays frontend-only
-- [ ] All four gates green
+- [x] `Index` builds a `BundleRoot` and resolves links through it
+- [x] An `index.rs` test with a nested root and a bundle-absolute backlink
+- [x] `ConceptEntry` keeps the raw hrefs (like `wikilinks`); `rebuild_reverse` computes `find_bundle_root(concept_paths, okf_markers, git_prefix, None)` once per rebuild and resolves each href with `sunstone_shared::links::resolve_link` against the Concept set, the same call wasm `resolveLinkIn` makes
+- [x] A root that changes (an `index.md` gains or loses `okf_version`, a top-level `.md` appears) re-resolves every Concept's links on the next mutation, not only the edited one's (`index.rs` test: add the marker with `reindex_concept`, the backlink appears)
+- [x] A bundle-absolute link whose rooted target does not exist still falls back to the opened folder, as `apply_bundle_root` does (test)
+- [x] The git prefix reaches the index, so the git-toplevel rung anchors as it does in the frontend
+- [x] `docs/okf/bundle.md` (the "Only the frontend sees the override" paragraph) and ov-7's "Known limit" say Backlinks follow the detected root and only the override stays frontend-only
+- [x] All four gates green
 
 ## Grounding
 
@@ -80,3 +80,19 @@ in 50baa70: both now say it resolves against the opened folder and point here.)
 - Git prefix → an `Index` field set by `AppState` from `git_prefix()` once the
   index is built, then a `rebuild_reverse`. Tests set it directly. If the desktop
   runs a boot-time `git init` after `AppState::new`, set it after that instead.
+
+## Comments
+
+- 2026-10-15 nightly: `ConceptEntry.links` holds the raw hrefs
+  (`index/links.rs::extract_link_hrefs`). `rebuild_reverse` runs one
+  `find_bundle_root(paths, okf_markers, git_prefix, None)` and then
+  `resolve_link` with `exists = concepts.contains_key`. `AppState::new` reads
+  `git_prefix()` right after building the index and passes it to
+  `Index::set_git_prefix`. Neither host runs `git init` after `AppState::new`
+  (the server clones/inits before it; the desktop never does). New `index.rs`
+  tests: nested root, root change via `reindex_concept`, opened-folder
+  fallback, git prefix. A side effect, matching the frontend: in a git repo
+  with no `index.md`, native Backlinks now use the git-toplevel rung instead
+  of the opened-folder rung. Gates: `bun test src/lib`, `bun run check`,
+  `cargo test` and `cargo check` all pass; desktop Playwright 242/242 and
+  serve suite 10/10 pass.
