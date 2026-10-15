@@ -3,7 +3,7 @@
   import { replaceState } from '$app/navigation';
   import { backend } from '$lib/ipc';
   import { servedDesktop } from '$lib/ipc/served';
-  import { conceptHref } from '$lib/web/urlSync';
+  import { servedAddress } from '$lib/ipc/servedStartup';
   import { bundle } from '$lib/state/bundle.svelte';
   import { editor } from '$lib/state/editor.svelte';
   import { indexStore } from '$lib/state/index.svelte';
@@ -36,7 +36,7 @@
   import { retryFrames } from '$lib/retryFrames';
   import { resolveStoredLayout } from '$lib/state/layoutPersist';
   import { ensureWasm } from '$lib/wasm';
-  import { parseFrontmatter, splitFrontmatter } from '$lib/wasm/exports';
+  import { conceptToUrl, parseFrontmatter, splitFrontmatter } from '$lib/wasm/exports';
   import { windowTitle, foldersToExpand } from '$lib/tileTitle';
   import { dirname } from '$lib/path';
   import { bundleRootLabel } from '$lib/bundleRootLabel';
@@ -116,6 +116,10 @@
   // New-Concept create focuses the `type` field: the path we want focused. The
   // active Tile's Frontmatter focuses `type` while it matches its open Concept.
   let focusTypeForPath = $state<string | null>(null);
+  // `sunstone serve`: the Concept the page URL named (`null`: none), once the
+  // startup lookup has settled; `undefined` before. Gates the address bar sync.
+  let startupTarget = $state<string | null | undefined>(undefined);
+  let startupLanded = false;
 
   onMount(() => {
     // Slug-anchor rewriting: after each autosave, reconcile heading-slug changes
@@ -190,6 +194,7 @@
         if (initialConcept !== null) await editor.open(initialConcept);
       }
 
+      startupTarget = startupDoc?.path ?? null;
       session.endRestore();
 
       // A Document named on the command line (`sunstone ./docs guide/setup.md#x`)
@@ -409,11 +414,28 @@
   // `sunstone serve`: keep the address bar on the active Tile's Concept, so a
   // copied URL is a deep link and a reload lands back on it. Replaced, never
   // pushed: every Tile keeps its own Back/Forward, and browser history entries
-  // would fight them (why the web build allows only one Tile).
+  // would fight them (why the web build allows only one Tile). `servedAddress`
+  // picks the spelling that reloads the same Concept (the Bundle path when the
+  // pretty URL would not) and keeps the deep link's `#anchor` while the Concept
+  // is the one the URL already named; `indexStore.version` re-runs it once the
+  // index knows the Concept. Held until the deep link's Concept has opened
+  // (`startupTarget`): until then the Tile still shows the restored layout, and
+  // writing its URL would lose the Concept and `#anchor` the page URL named.
   $effect(() => {
-    if (!servedDesktop) return;
-    const href = conceptHref(editor.path);
-    if (session.restored && href !== location.pathname) replaceState(href, {});
+    if (!servedDesktop || startupTarget === undefined) return;
+    if (!startupLanded && startupTarget !== null && editor.path !== startupTarget) return;
+    startupLanded = true;
+    void indexStore.version;
+    const href = servedAddress(
+      editor.path,
+      location,
+      indexStore.conceptPaths(),
+      (p) => indexStore.urlToConcept(p),
+      conceptToUrl,
+    );
+    if (session.restored && href !== null && href !== location.pathname + location.hash) {
+      replaceState(href, {});
+    }
   });
 
   // Persist the full tiling layout (columns + weights, each tile's Concept +

@@ -82,7 +82,13 @@ either:
   URL with SvelteKit's `replaceState`, so a copied URL is a deep link and a reload lands
   back on it. It replaces and never pushes: each Tile has its own Back/Forward, and browser
   history entries would fight them. That conflict is why the web build allows a single
-  Tile, and serve mode keeps the tiling layout.
+  Tile, and serve mode keeps the tiling layout. The written URL always reloads the same
+  Concept (`servedAddress` in `ipc/servedStartup.ts`): when the pretty URL would not, it
+  writes the Bundle path instead, for a dot in the last segment (`/release-1.2.md`,
+  `/v1.0/index.md`, since the server 404s `/release-1.2`) and for a leaf shadowed by a
+  same-named folder index (`/guide.md` beside `guide/index.md`). The deep link's `#anchor`
+  survives the rewrite while the Concept is the one the URL named; opening another Concept
+  drops it.
 - **The API moved from `/api` to `/_api`.** Under `/api` a Concept in a top-level `api/`
   folder had no URL: the fallback 404s unrouted API paths on purpose (a client calling a
   route that does not exist should get an error, not a page), and Sunstone Web's proxy

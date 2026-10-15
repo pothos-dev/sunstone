@@ -103,6 +103,15 @@ class IndexStore {
   }
 
   /**
+   * The Concept a pretty URL path (percent-DECODED, no leading `/` needed)
+   * names — a folder `index.md` wins over a same-named leaf, as on Sunstone
+   * Web (`sunstone_shared::url::url_to_concept`). `null` on a null handle.
+   */
+  urlToConcept(urlPath: string): string | null {
+    return this.#handle?.urlToConcept(urlPath) ?? null;
+  }
+
+  /**
    * Every Attachment path (bundle-relative), sorted — the name model's
    * candidate set. `[]` before the first refresh.
    */

@@ -40,6 +40,49 @@ export function startupFromUrl(
   return { kind: 'open', doc: { path, anchor: anchor === '' ? null : anchor } };
 }
 
+/**
+ * The address-bar URL (path + hash) the served desktop shell writes for the
+ * active Tile's `concept`, or `null` when it cannot tell yet (the Concept is not
+ * in `conceptPaths`, e.g. before the index loads): leave the URL alone then.
+ *
+ * Binding: whatever this returns resolves back to `concept` through
+ * {@link startupFromUrl}, so a reload or a copied link lands on it.
+ *   - The pretty URL (`conceptToUrl`) when it round-trips and its last segment
+ *     has no dot.
+ *   - Otherwise the Bundle path (`/release-1.2.md`, `/v1.0/index.md`,
+ *     `/guide.md` beside `guide/index.md`): `sunstone serve` 404s a missing
+ *     dotted path that is not `.md` (`is_spa_route`), and a leaf shadowed by a
+ *     same-named folder index has no other spelling.
+ *   - The root Concept keeps `/`, which names the Bundle's front page.
+ * `current` is the page URL now (raw `location.pathname` / `hash`). Its hash is
+ * kept when that URL already names `concept` (the `.md` → pretty rewrite of the
+ * deep link the page opened with), and dropped for any other Concept.
+ */
+export function servedAddress(
+  concept: string | null,
+  current: { pathname: string; hash: string },
+  conceptPaths: readonly string[],
+  urlToConcept: (urlPath: string) => string | null,
+  conceptToUrl: (path: string) => string,
+): string | null {
+  if (concept === null) return '/';
+  const names = (pathname: string): string | null => {
+    const link = startupFromUrl(pathname, '', conceptPaths, urlToConcept);
+    return link?.kind === 'open' ? link.doc.path : null;
+  };
+  const pretty = conceptToUrl(concept);
+  const lastSegment = decode(pretty).split('/').pop() ?? '';
+  let href: string;
+  if (pretty === '/' || (!lastSegment.includes('.') && names(pretty) === concept)) {
+    href = pretty;
+  } else {
+    href = '/' + concept.split('/').map(encodeURIComponent).join('/');
+    if (names(href) !== concept) return null;
+  }
+  const hash = current.hash.length > 1 && names(current.pathname) === concept ? current.hash : '';
+  return href + hash;
+}
+
 /** `decodeURIComponent`, keeping a malformed escape (`%zz`) as written. */
 function decode(s: string): string {
   try {
