@@ -1,5 +1,5 @@
 ---
-status: active
+status: review
 priority: 3
 ---
 
@@ -27,30 +27,30 @@ the toolbar's **placement**: a second row inside the per-Tile Concept header,
 under the existing title/controls row and above the editor text, shown only
 while the Tile is editing.
 
-- [ ] An editing Tile shows a toolbar as a second row of its Concept header,
+- [x] An editing Tile shows a toolbar as a second row of its Concept header,
       carrying controls for bold, italic, inline code, strikethrough, heading
       level and link
-- [ ] Each control applies the existing command from `editor/commands.ts`; no
+- [x] Each control applies the existing command from `editor/commands.ts`; no
       formatting transform is reimplemented in a component
-- [ ] Each control reflects whether the format is active at the caret, updating
+- [x] Each control reflects whether the format is active at the caret, updating
       as the selection moves, via a pure query unit-tested in `src/lib`
-- [ ] Each control carries its hotkey in its tooltip, so the toolbar teaches
+- [x] Each control carries its hotkey in its tooltip, so the toolbar teaches
       the keyboard path rather than replacing it
-- [ ] Clicking a control returns focus to the editor with the selection intact
-- [ ] The toolbar is absent when the Tile is in reading mode, and present in
+- [x] Clicking a control returns focus to the editor with the selection intact
+- [x] The toolbar is absent when the Tile is in reading mode, and present in
       both the desktop and the web shell
-- [ ] The toolbar is reachable by keyboard and announces state to a screen
+- [x] The toolbar is reachable by keyboard and announces state to a screen
       reader
-- [ ] The toolbar does not steal the Region focus model's semantics — Escape
+- [x] The toolbar does not steal the Region focus model's semantics — Escape
       and Tab behave as the focus model documents
-- [ ] The toolbar does not break the Concept header's existing layout at narrow
+- [x] The toolbar does not break the Concept header's existing layout at narrow
       Tile widths (a Column can be a third of the Editor pane)
-- [ ] `docs/GLOSSARY.md` carries a **Toolbar** entry and the _Avoid_ lines
+- [x] `docs/GLOSSARY.md` carries a **Toolbar** entry and the _Avoid_ lines
       under **Concept header** and **Activity Rail** no longer claim the term
       is removed
-- [ ] Playwright covers apply, toggle-off, active-state readout and the
+- [x] Playwright covers apply, toggle-off, active-state readout and the
       reading-mode case over the fake backend
-- [ ] All four gates green
+- [x] All four gates green
 
 ## Grounding
 
@@ -101,3 +101,34 @@ while the Tile is editing.
   exposes, so the chrome and the transforms do not land in one change.
 - Tables get their own affordances in `aa-2`; no table control appears in this
   toolbar.
+
+## Comments
+
+**2026-10-15 (nightly agent):** Built; every box above is met and the four gates,
+the desktop Playwright suite and a web e2e spec are green. Set to `review`, not
+`done`, because these need a person's judgement:
+
+1. **Caret inside a run.** With the caret inside `**bold**` (nothing selected),
+   Bold shows as pressed, but clicking it does what `Mod-B` already does there:
+   it inserts an empty `****` pair at the caret instead of unbolding the word.
+   Only a selection over the run (or the whole marked run) toggles it off. That
+   is the settled `toggleInlineWrap` semantics, so I left it alone. A
+   non-technical author may expect the click to unbold the word. Changing that
+   means a new pure transform (expand to the enclosing run), so it would be a
+   follow-up ticket.
+2. **Link has no hotkey.** The keymap binds none, so the link control's tooltip
+   names no shortcut. I did not add `Mod-K`, because the app already uses
+   `Ctrl/Cmd+K` for Quick nav.
+3. **Vertical space at narrow widths.** In a third-width Column the header now
+   takes four short rows while editing (title, wrapped controls, the second
+   control row, Toolbar). It stays inside the Tile (Playwright checks this),
+   but whether that costs too much height is a call to make by eye.
+4. **Screen reader.** State is exposed as `role="toolbar"` + `aria-pressed` +
+   labelled controls + a labelled `<select>`. Playwright checks the attributes.
+   Nobody has listened to it with a real screen reader.
+
+Keyboard path: `Alt+F10` from the Tile moves focus into the Toolbar (Tab
+indents in the text, so it cannot be the way in), arrows/Home/End move between
+controls, and Escape returns to the text. The formatting keymap moved,
+unchanged, into `editor/formattingKeymap.ts`, so a unit test can check the
+Toolbar's tooltips against it.
