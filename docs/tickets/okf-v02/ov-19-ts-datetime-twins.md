@@ -1,5 +1,5 @@
 ---
-status: active
+status: review
 priority: 2
 ---
 
@@ -26,14 +26,14 @@ The 2026-10-09 nightly review found:
   package for the Tile header; the Explorer reads them through Rust
   `parseFrontmatter`.
 
-- [ ] An `epochSeconds` wasm export; `parseInstant`, the provenance regex and its `Date.parse` ordering go
-- [ ] `isStale` agrees with `isIsoDatetime` on every form Rust accepts (test in `lifecycle.test.ts`)
-- [ ] A second shared reader, `instant_seconds` (wasm `instantSeconds`), reads the forms ov-11 tolerates: the strict grammar with the offset optional (read as UTC) and a bare date (midnight UTC). `isStale`, `lifecycleView`'s "Stale after" line and the `stale_after` "no UTC offset" lint message use it, so `2026-09-23` and `2026-09-23T00:00:00` still go stale as `docs/okf/concept.md#lifecycle` documents
-- [ ] Rust goldens (`cargo test`) for both readers: `+02`, `,5` fraction, `:60`, lowercase `t`/`z`, `±HHMM`, no offset, bare date, `2026-02-30`, hour 24, a space separator (rejected by both)
-- [ ] Provenance `datetime()` uses `isIsoDatetime`; the `usage_window` `from` > `to` check compares `epochSeconds` and says nothing when either side is not ISO (`provenance.test.ts` cases: `+02` accepted, lowercase `t` accepted, `2026-02-30` warned, an inverted window with `+0200` offsets warned)
-- [ ] `lifecycleFromYaml` reads through a wasm export over the same Rust reader the Explorer uses (`frontmatter::lifecycle_scalar`); it no longer imports `yaml`
-- [ ] `src/lib/instant.ts` keeps only `isoUtc`; the `parseInstant` cases in `instant.test.ts` move into the Rust goldens; `lifecycle.test.ts` no longer imports `parseInstant`
-- [ ] All four gates green, after `bun run build:wasm`
+- [x] An `epochSeconds` wasm export; `parseInstant`, the provenance regex and its `Date.parse` ordering go
+- [x] `isStale` agrees with `isIsoDatetime` on every form Rust accepts (test in `lifecycle.test.ts`)
+- [x] A second shared reader, `instant_seconds` (wasm `instantSeconds`), reads the forms ov-11 tolerates: the strict grammar with the offset optional (read as UTC) and a bare date (midnight UTC). `isStale`, `lifecycleView`'s "Stale after" line and the `stale_after` "no UTC offset" lint message use it, so `2026-09-23` and `2026-09-23T00:00:00` still go stale as `docs/okf/concept.md#lifecycle` documents
+- [x] Rust goldens (`cargo test`) for both readers: `+02`, `,5` fraction, `:60`, lowercase `t`/`z`, `±HHMM`, no offset, bare date, `2026-02-30`, hour 24, a space separator (rejected by both)
+- [x] Provenance `datetime()` uses `isIsoDatetime`; the `usage_window` `from` > `to` check compares `epochSeconds` and says nothing when either side is not ISO (`provenance.test.ts` cases: `+02` accepted, lowercase `t` accepted, `2026-02-30` warned, an inverted window with `+0200` offsets warned)
+- [x] `lifecycleFromYaml` reads through a wasm export over the same Rust reader the Explorer uses (`frontmatter::lifecycle_scalar`); it no longer imports `yaml`
+- [x] `src/lib/instant.ts` keeps only `isoUtc`; the `parseInstant` cases in `instant.test.ts` move into the Rust goldens; `lifecycle.test.ts` no longer imports `parseInstant`
+- [x] All four gates green, after `bun run build:wasm`
 
 ## Grounding
 
@@ -97,3 +97,26 @@ The 2026-10-09 nightly review found:
 - `lifecycleFromYaml` → a yaml-taking wasm export (`lifecycleOf(yaml)`, like
   `trustOf(yaml)`) over `lifecycle_scalar`, rather than re-wrapping the YAML in
   fences to call `parseFrontmatter`.
+
+## Comments
+
+- 2026-10-15 (nightly agent): Built; all criteria met. Gates: `bun test src/lib`,
+  `bun run check`, `cargo test`, `cargo check` green; desktop Playwright 241
+  passed + 1 flaky, web e2e 58/58. Two things need a human:
+  1. **SSR HTML no longer carries the `stale` chip.** Staleness is now read over
+     wasm, and SSR never loads wasm (ADR 0006 §5), so the server-rendered web
+     page shows the status chip but not `stale`. The chip appears once the page
+     hydrates and `WebReader`'s `ensureWasm()` resolves: `LifecycleBadge` holds
+     a local wasm-loaded flag so it re-derives then, not at the next minute
+     tick. `web-lifecycle.spec.ts` passes. Before, `parseInstant` was plain TS
+     and SSR showed it. If no-JS readers matter, the fix is a server-side
+     `stale` flag on the render payload from `instant_seconds` (render-time
+     `now`). Is the hydration-only chip acceptable?
+  2. `frontmatter-language.spec.ts` › "key completion only in an OKF Bundle"
+     failed its first attempt in every desktop run (Enter does not accept the
+     `tags` completion) and passed on retry. That path runs none of the code
+     this ticket touched. I did not check it against the base commit.
+  The provenance acceptance case "an inverted window with `+0200` offsets" is a
+  window that reads in order as text but is inverted by instant
+  (`10:00-0200` → `13:00+0200`). `sources.rs` was not touched: it never parses
+  datetimes, so it has nothing to call in `instant.rs`.
