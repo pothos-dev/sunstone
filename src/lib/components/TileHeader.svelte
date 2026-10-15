@@ -2,6 +2,9 @@
   import type { IndexedCrumb } from '$lib/tileTitle';
   import type { Lifecycle } from '$lib/lifecycle';
   import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
+  import FormatToolbar from '$lib/components/FormatToolbar.svelte';
+  import type { FormatState } from '$lib/editor/formatState';
+  import type { InlineControlId } from '$lib/editor/formatToolbar';
 
   // Per-Tile header (slice: per-tile-header). A slim strip above the Editor
   // carrying everything that is logically PER-PANE for the active Concept:
@@ -11,7 +14,8 @@
   //   - Split Right (new Column) / Split Down (new TileSlot in this Column) affordances,
   //   - undo / redo over the active Tile's Document history (shown only while editing),
   //   - the review-diff toggle (working-tree ↔ HEAD),
-  //   - Export as PDF.
+  //   - Export as PDF,
+  //   - the formatting Toolbar (aa-1) as a SECOND row, only while editing.
   //
   // Presentational and thin: it owns no state. All logic (edit toggle, undo/redo,
   // review, export, close, split) lives in Tile.svelte and is passed in as
@@ -84,6 +88,18 @@
      * from the deleted NavBar; the flag's scope is unchanged — app-wide).
      */
     onToggleFrontmatter: () => void;
+    /**
+     * The formatting Toolbar's wiring (aa-1). Present = the Toolbar row shows
+     * (Tile passes it only while editing an open Concept outside review);
+     * absent = no row at all, as in reading mode.
+     */
+    toolbar?: {
+      formatState: FormatState;
+      onInline: (id: InlineControlId) => void;
+      onHeading: (level: number) => void;
+      onLink: () => void;
+      onEscape: () => void;
+    } | null;
   }
 
   let {
@@ -116,7 +132,17 @@
     onSave,
     frontmatterShown,
     onToggleFrontmatter,
+    toolbar = null,
   }: Props = $props();
+
+  let toolbarRef = $state<ReturnType<typeof FormatToolbar> | null>(null);
+
+  /** Move keyboard focus into the Toolbar (Alt+F10). False when it is not shown. */
+  export function focusToolbar(): boolean {
+    if (!toolbarRef) return false;
+    toolbarRef.focus();
+    return true;
+  }
 </script>
 
 <header class="tile-header" data-testid="tile-header" aria-label="Concept header">
@@ -370,6 +396,19 @@
       >
     {/if}
   </div>
+
+  <!-- The formatting Toolbar: its own full-width row under the title/controls,
+       only while editing (reading mode is inert — no row at all). -->
+  {#if toolbar}
+    <FormatToolbar
+      bind:this={toolbarRef}
+      formatState={toolbar.formatState}
+      onInline={toolbar.onInline}
+      onHeading={toolbar.onHeading}
+      onLink={toolbar.onLink}
+      onEscape={toolbar.onEscape}
+    />
+  {/if}
 </header>
 
 <style>
@@ -430,6 +469,11 @@
     align-items: center;
     gap: 0.5rem;
     flex: none;
+    /* In a third-width Column the editing-only controls (undo/redo, Save) can
+       outgrow even a row of their own: capped at the header's width, they wrap
+       rather than spill past the Tile. Wider Tiles are unaffected (no shrink). */
+    flex-wrap: wrap;
+    max-width: 100%;
   }
 
   .btn-group {

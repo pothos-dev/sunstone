@@ -55,6 +55,13 @@
   import { DEFAULT_FENCES } from '$lib/frontmatter';
   import { splitFrontmatter, frontmatterLineCount, findHeadingLine } from '$lib/wasm/exports';
   import { buildEditorMenuItems, editorCommandFor, type EditorMenuItem } from '$lib/tileEditorMenu';
+  import { NO_FORMAT, sameFormatState, type FormatState } from '$lib/editor/formatState';
+  import {
+    isToolbarFocusKey,
+    runHeadingControl,
+    runInlineControl,
+    runLinkControl,
+  } from '$lib/editor/formatToolbar';
   import { indexCrumbs, tileHeaderLabel, type IndexedCrumb } from '$lib/tileTitle';
   import { lifecycleFromYaml } from '$lib/lifecycle';
   import { bundle } from '$lib/state/bundle.svelte';
@@ -512,6 +519,35 @@
     commitAnchorBaseline(view);
   }
 
+  // --- Formatting Toolbar (aa-1) ------------------------------------------------
+  // The formats active at the selection, pushed out of the editor's update
+  // listener (`onFormatState`), so the Toolbar's pressed states follow the caret.
+  // Every control runs the existing command its hotkey runs, then refocuses the
+  // editor (`editor/formatToolbar.ts`). Shown only while editing an open Concept
+  // outside review — reading mode has no Toolbar row at all.
+  let formatState = $state<FormatState>(NO_FORMAT);
+  let tileHeaderRef = $state<ReturnType<typeof TileHeader> | null>(null);
+  function setFormatState(next: FormatState) {
+    if (!sameFormatState(formatState, next)) formatState = next;
+  }
+  const toolbar = $derived(
+    editing && tile.activePath !== null && !review.active
+      ? {
+          formatState,
+          onInline: (id: Parameters<typeof runInlineControl>[1]) => view && runInlineControl(view, id),
+          onHeading: (level: number) => view && runHeadingControl(view, level),
+          onLink: () => view && runLinkControl(view),
+          onEscape: () => view?.focus(),
+        }
+      : null,
+  );
+  // Alt+F10 from anywhere in this Tile reaches its Toolbar (the rich-text
+  // convention); Escape in the Toolbar hands focus back to the text.
+  function onTileKeydown(e: KeyboardEvent) {
+    if (!isToolbarFocusKey(e)) return;
+    if (tileHeaderRef?.focusToolbar()) e.preventDefault();
+  }
+
   // --- Build / update this Tile's CodeMirror view ------------------------------
   $effect(() => {
     const content = tile.content;
@@ -548,6 +584,7 @@
         },
         onHistory: syncHistoryDepths,
         onHistoryStep,
+        onFormatState: setFormatState,
         onLinkClick: handleLinkClick,
         onCommentEdit: openCommentPopup,
         onEditSource: editSource,
@@ -705,8 +742,10 @@
   data-testid="tile"
   onfocusin={onActivate}
   onpointerdown={onActivate}
+  onkeydown={onTileKeydown}
 >
   <TileHeader
+    bind:this={tileHeaderRef}
     title={headerLabel.name}
     lifecycle={tile.activePath === null ? null : lifecycleFromYaml(frontmatterYaml)}
     crumbs={headerCrumbs}
@@ -739,6 +778,7 @@
     }}
     frontmatterShown={session.frontmatterShown}
     onToggleFrontmatter={() => session.setFrontmatterShown(!session.frontmatterShown)}
+    {toolbar}
   />
 
   {#if tile.error}

@@ -121,7 +121,10 @@ test('two tiles: Outline and Backlinks follow the ACTIVE tile', async ({ page })
   // Activate tile 1 (bundle): Outline lists bundle's heading. Backlinks describe
   // bundle — and since bundle is NOT linked by codemirror, codemirror does not
   // appear as a backlink here.
-  await page.getByTestId('tile').nth(1).locator('.cm-content').click();
+  // Click plain text, not the content's centre: where the centre lands moves
+  // with the header's height (the editing-only Toolbar row), and on a link it
+  // would follow the link instead of just focusing the editor.
+  await page.getByTestId('tile').nth(1).locator('.cm-line', { hasText: 'root folder' }).click();
   await expect.poll(() => activeRegion(page)).toBe('editor');
   await expect(page.getByTestId('outline')).toContainText('Bundle');
   await expect(
@@ -131,7 +134,11 @@ test('two tiles: Outline and Backlinks follow the ACTIVE tile', async ({ page })
   // Activate tile 0 (codemirror): the satellite views switch to describe it.
   // codemirror.md IS linked by bundle.md, so bundle now appears as a backlink —
   // proving Backlinks tracks the active tile, not a fixed Concept.
-  await page.getByTestId('tile').nth(0).locator('.cm-content').click();
+  await page
+    .getByTestId('tile')
+    .nth(0)
+    .locator('.cm-line', { hasText: 'CodeMirror 6 is the editor core' })
+    .click();
   await expect(page.getByTestId('outline')).toContainText('CodeMirror');
   await expect(
     page.getByTestId('backlinks').locator('[data-path="concepts/bundle.md"]'),
