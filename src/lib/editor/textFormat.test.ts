@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   headingFormatEdit,
+  headingLevelAt,
   insertLink,
   linkAt,
   setHeadingLevel,
@@ -204,5 +205,23 @@ describe('headingFormatEdit', () => {
         { from: 3, to: 4, insert: '# b' },
       ],
     });
+  });
+});
+
+describe('headingLevelAt', () => {
+  test('reads the caret line: its ATX level, or 0 for a paragraph', () => {
+    expect(headingLevelAt('# One\nplain', 2, 2)).toBe(1);
+    expect(headingLevelAt('# One\nplain', 8, 8)).toBe(0);
+    expect(headingLevelAt('#nospace', 2, 2)).toBe(0); // not an ATX heading
+  });
+
+  test('a blank caret line reads as a paragraph', () => {
+    expect(headingLevelAt('# One\n\n# Two', 6, 6)).toBe(0);
+  });
+
+  test('a selection reads the shared level of its non-blank lines, else null', () => {
+    const doc = '## a\n\n## b\n### c';
+    expect(headingLevelAt(doc, 0, 10)).toBe(2);
+    expect(headingLevelAt(doc, 0, doc.length)).toBeNull();
   });
 });

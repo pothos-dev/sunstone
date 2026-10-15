@@ -208,3 +208,21 @@ export function headingFormatEdit(
   }
   return { changes };
 }
+
+/**
+ * The heading level the selection reads as — the readout half of
+ * `headingFormatEdit`, over the same lines it would format:
+ *   - `1`–`6` when every non-blank line the selection touches is that ATX level,
+ *   - `0` when they are all plain paragraphs (or every touched line is blank),
+ *   - `null` when the lines disagree (a mixed selection).
+ * Applying `headingFormatEdit` with a level other than the one returned here
+ * sets it; applying the returned level removes it (the toggle).
+ */
+export function headingLevelAt(doc: string, from: number, to: number): number | null {
+  const levels = lineSpans(doc, from, to)
+    .map((s) => doc.slice(s.start, s.end))
+    .filter((t) => t.trim().length > 0)
+    .map(headingLevel);
+  if (levels.length === 0) return 0;
+  return levels.every((l) => l === levels[0]) ? levels[0] : null;
+}

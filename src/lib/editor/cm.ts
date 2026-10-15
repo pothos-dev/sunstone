@@ -2,6 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { EditorState, Compartment } from '@codemirror/state';
 import { DEFAULT_FENCES, type Fences } from '$lib/frontmatter';
 import { minimalChange } from '$lib/minimalChange';
+import { formatStateOf } from './formatState';
 
 import {
   setFrontmatter,
@@ -265,6 +266,7 @@ export function setEditorConcept(
     // empty, so refresh the host's undo/redo state too.
     options?.onFrontmatterChange?.(yaml);
     options?.onHistory?.();
+    options?.onFormatState?.(formatStateOf(view.state));
     return;
   }
 

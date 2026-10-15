@@ -3,7 +3,6 @@ import {
   keymap,
   highlightActiveLine,
   drawSelection,
-  type KeyBinding,
 } from '@codemirror/view';
 import { EditorState, Annotation, Compartment, type Extension } from '@codemirror/state';
 import {
@@ -12,7 +11,8 @@ import {
   defaultKeymap,
   indentWithTab,
 } from '@codemirror/commands';
-import { indentOnInput } from '@codemirror/language';
+import { indentOnInput, syntaxTree } from '@codemirror/language';
+import { formatStateOf, type FormatState } from './formatState';
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { backend } from '$lib/ipc';
@@ -51,7 +51,7 @@ import { anchorTracking } from './anchor-tracking';
 import { findExtensions, findPanelTheme } from './find';
 import { readOnlyTables } from './tableReadOnly';
 import { tableMenuIcons } from './tableMenuIcons';
-import { inlineWrapCommand, headingCommand, annotateCommand } from './commands';
+import { formattingKeymap } from './formattingKeymap';
 
 /**
  * Marks a dispatch as a programmatic document replacement (Concept switch or
@@ -121,6 +121,13 @@ export interface BuildEditorOptions {
    * when that is the frontmatter.
    */
   onHistoryStep?: (target: 'frontmatter' | 'body') => void;
+  /**
+   * Called with the formats active at the selection (`formatStateOf`) whenever
+   * that may have changed — the selection moved, the doc changed, or the parse
+   * tree advanced — and after a state rebuild on Concept switch. Drives the
+   * formatting Toolbar's pressed states (aa-1) off CodeMirror's own updates.
+   */
+  onFormatState?: (state: FormatState) => void;
   /**
    * Called when the user clicks a rendered link in the live preview (inline
    * links and table-cell links). See the slice-5 seam below.
@@ -294,28 +301,6 @@ export function modeExtensions(
   ];
 }
 
-/**
- * Markdown formatting shortcuts (Obsidian-style; `Mod` = Cmd on macOS, Ctrl
- * elsewhere). Everything toggles. Headings follow the de-facto Word/LibreOffice
- * convention (`Mod-1`…`Mod-6`, `Mod-0` for paragraph) since Obsidian ships no
- * heading defaults. These bind keys the app's global handler and the default
- * keymaps leave free; placed ahead of the general keymap so they win.
- */
-const formattingKeymap: KeyBinding[] = [
-  { key: 'Mod-b', run: inlineWrapCommand('**'), preventDefault: true },
-  { key: 'Mod-i', run: inlineWrapCommand('*'), preventDefault: true },
-  { key: 'Mod-e', run: inlineWrapCommand('`'), preventDefault: true },
-  { key: 'Mod-Shift-m', run: inlineWrapCommand('~~'), preventDefault: true },
-  { key: 'Mod-1', run: headingCommand(1), preventDefault: true },
-  { key: 'Mod-2', run: headingCommand(2), preventDefault: true },
-  { key: 'Mod-3', run: headingCommand(3), preventDefault: true },
-  { key: 'Mod-4', run: headingCommand(4), preventDefault: true },
-  { key: 'Mod-5', run: headingCommand(5), preventDefault: true },
-  { key: 'Mod-6', run: headingCommand(6), preventDefault: true },
-  { key: 'Mod-0', run: headingCommand(0), preventDefault: true },
-  // Toggle a CriticMarkup highlight+comment annotation ('m' for comment/margin).
-  { key: 'Mod-Alt-m', run: annotateCommand, preventDefault: true },
-];
 
 /**
  * Everything BELOW the frontmatter field in the extension list: the live-preview
@@ -331,7 +316,7 @@ export function editorExtensions(
   mode: EditorMode,
   theme: ResolvedTheme,
 ): Extension[] {
-  const { onChange, onFrontmatterChange, onBlur, onHistory, onHistoryStep, brokenLinkContext, wikiLinkContext } = opts;
+  const { onChange, onFrontmatterChange, onBlur, onHistory, onHistoryStep, onFormatState, brokenLinkContext, wikiLinkContext } = opts;
 
   // Notify on user edits to the body OR the frontmatter. Frontmatter edits are
   // carried by `setFrontmatter` effects (no doc change), so we watch for both.
@@ -364,6 +349,19 @@ export function editorExtensions(
         update.state.field(fencesField),
       ),
     );
+  });
+
+  // Toolbar readout (aa-1): re-read the formats at the selection whenever the
+  // selection, the doc, or the parse tree under it changed.
+  const formatStateListener = EditorView.updateListener.of((update) => {
+    if (!onFormatState) return;
+    if (
+      update.selectionSet ||
+      update.docChanged ||
+      syntaxTree(update.startState) !== syntaxTree(update.state)
+    ) {
+      onFormatState(formatStateOf(update.state));
+    }
   });
 
   // Save-on-blur: flush any pending autosave when focus leaves the editor.
@@ -433,6 +431,7 @@ export function editorExtensions(
     ]),
     EditorView.lineWrapping,
     changeListener,
+    formatStateListener,
     blurListener,
   ];
 }
