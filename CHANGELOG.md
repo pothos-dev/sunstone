@@ -4,6 +4,58 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-10-15
+
+### Added
+
+- OKF v0.2 support. Bundles that declare `okf_version` in their root `index.md`
+  get spec-aware help in the Frontmatter editor: missing required fields and
+  wrongly typed values are flagged, and keys and values are completed. Plain
+  folders of markdown only get YAML syntax checks.
+- New Bundle… in the launcher and the Bundle switcher creates a Bundle that
+  declares `okf_version`.
+- The Bundle root is found more reliably: a declared `okf_version` wins, then
+  the outermost `index.md`, then the git repository, then the opened folder.
+  Right-click a folder and choose Set as Bundle Root to pick it yourself; the
+  Explorer header shows the current root.
+- A Concept's trust, lifecycle and sources show as one compact pill next to its
+  title. Hover it to see who generated and verified the Concept and when, its
+  status and whether it is stale, and its sources.
+- Dates from the Frontmatter read as relative times ("3 days ago"); hover one
+  for the exact date and time.
+- `status` and `stale_after`: draft, deprecated and stale Concepts are marked
+  in the Explorer and the header.
+- Authors, generators and verifiers are shown as a person, a process or an
+  agent with its version.
+- Sources entries show their author, when they were last modified and how
+  often they were used, link back to every place in the text that cites them,
+  and have an Edit button that jumps to the entry in the Frontmatter. A
+  footnote definition for a source is shown in its Sources entry instead of in
+  the text.
+- Attested Computation Concepts show their contract (runtime, parameters,
+  executor, attester) in a card, and their `# Computation` section is set
+  apart.
+- After an update, Sunstone shows what's new in the installed version.
+- The anonymous web reader uses the same Concept header as the app, with folder
+  breadcrumbs.
+- Pinned folders in the Explorer have an accent-coloured arrow, and the folder
+  of the open `index.md` is highlighted.
+
+### Changed
+
+- Numbered citations (`[n]`) are deprecated in favour of footnotes that name a
+  source id (`[^id]`). Existing `[n]` citations still work.
+
+### Fixed
+
+- On Linux the interface fell back to the system font instead of Jost.
+- Sunstone Web serves configured font files when `SUNSTONE_CONFIG` is a bare
+  file name, and keeps `$` characters in configured colours and fonts.
+- Footnotes: definitions get unique anchors and always start on their own line,
+  and a footnote inside an image's alt text no longer shifts the numbering.
+- Links to `javascript:` or `data:` URLs in sources and contract cards are no
+  longer clickable.
+
 ## [0.25.1] - 2026-10-08
 
 ### Added
