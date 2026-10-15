@@ -509,11 +509,49 @@ mod tests {
         assert!(section.contains(r#"<span class="source-note">Written &lt;by&gt; hand</span>"#), "{section}");
     }
 
+    /// Every Sources back-ref (`href="#fnref-…"`) lands on an `id=` in `html`.
+    fn assert_backrefs_resolve(html: &str) {
+        let hrefs: Vec<&str> = html
+            .match_indices(r##"href="#fnref-"##)
+            .map(|(i, m)| {
+                let start = i + m.len() - "fnref-".len();
+                &html[start..start + html[start..].find('"').unwrap()]
+            })
+            .collect();
+        assert!(!hrefs.is_empty(), "no back-refs in {html}");
+        for id in hrefs {
+            assert_eq!(html.matches(&format!(r#"id="{id}""#)).count(), 1, "{id} in {html}");
+        }
+    }
+
+    const TWO_SOURCES: &str = "---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n  - id: t\n    resource: https://t\n---\n\n";
+
     #[test]
     fn a_hidden_source_definition_with_a_ref_on_its_line_does_not_panic() {
         let body = "---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n---\n\nClaim[^s].\n\n[^s]: see also[^t]\n[^t]: other\n";
         let html = render(body);
         assert!(html.contains("see also"), "{html}");
+    }
+
+    #[test]
+    fn a_source_ref_on_a_hidden_definition_line_gets_no_back_ref() {
+        let html = render(&format!("{TWO_SOURCES}Claim[^s] and[^t].\n\n[^s]: see also[^t]\n"));
+        assert_backrefs_resolve(&html);
+        let section = &html[html.find(r#"<section class="sources">"#).expect("section")..];
+        // `t`'s only drawn ref is the body's: one lone `↑`.
+        assert!(section.contains(r##"<a class="source-backref" href="#fnref-t-1" title="Jump to citation 1">↑</a>"##), "{section}");
+        assert!(!section.contains("fnref-t-2"), "{section}");
+    }
+
+    #[test]
+    fn source_refs_in_marks_and_comments_match_their_back_refs() {
+        // Inside an insertion a ref is a reference with its id; inside a
+        // comment it is plain text, and the entry does not count it.
+        let html = render(&format!("{TWO_SOURCES}a {{++b[^s]++}} c[^s] {{>>see[^s]<<}} d[^t]\n"));
+        assert_backrefs_resolve(&html);
+        assert!(html.contains(r#"<ins class="critic-add">b<sup id="fnref-s-1""#), "{html}");
+        assert!(html.contains(r#"c<sup id="fnref-s-2""#), "{html}");
+        assert!(!html.contains("fnref-s-3"), "{html}");
     }
 
     #[test]

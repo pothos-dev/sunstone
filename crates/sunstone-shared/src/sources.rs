@@ -13,7 +13,8 @@
 //! - [`source_list`] numbers each entry by the first `[^id]` citing it, the
 //!   number the footnote superscript shows; uncited entries follow, unnumbered,
 //!   in list order. It also records where the body cites each entry (`refs`,
-//!   the jumps back to the claims) and the text of a body `[^id]: …`
+//!   the jumps back to the claims: only the references a render draws, so not
+//!   one on a hidden definition's line or inside a CriticMarkup comment) and the text of a body `[^id]: …`
 //!   definition, if one was written (`note`; the renderers hide that line and
 //!   show the text on the entry instead, ov-10).
 //! - `usage_window` (`{ from, to }`) is read as a sibling of `sources` and
@@ -22,6 +23,7 @@
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
+use crate::critic::{parse_critic_marks, CriticMarkKind};
 use crate::footnotes::scan_footnotes;
 use crate::paths::is_external;
 
@@ -154,6 +156,22 @@ pub fn source_list(body: &str, yaml: &str) -> Vec<Source> {
     let mut list = sources(yaml);
     let ids: Vec<String> = list.iter().filter_map(|s| s.id.clone()).collect();
     let units: Vec<u16> = body.encode_utf16().collect();
+    let line_end = |at: usize| {
+        units[at..]
+            .iter()
+            .position(|&u| u == u16::from(b'\n'))
+            .map_or(units.len(), |p| at + p)
+    };
+    // A CriticMarkup comment renders as plain text, so a `[^id]` inside one is
+    // no reference on either render (native `critic_to_sentinels`).
+    let comments: Vec<(usize, usize)> = parse_critic_marks(body)
+        .into_iter()
+        .filter(|m| m.kind == CriticMarkKind::Comment)
+        .map(|m| (m.from, m.to))
+        .collect();
+    // End of the last hidden source-definition line: a ref before it is gone
+    // with the line (native `footnotes_to_sentinels`), so it has no back-ref.
+    let mut hidden_to = 0usize;
     for f in scan_footnotes(body, &ids) {
         let label = f.label.to_lowercase();
         // The first entry with the id owns it; a duplicate stays uncited.
@@ -164,17 +182,19 @@ pub fn source_list(body: &str, yaml: &str) -> Vec<Source> {
             continue;
         };
         if f.def {
+            let end = line_end(f.to);
             if s.note.is_none() {
-                let end = units[f.to..]
-                    .iter()
-                    .position(|&u| u == u16::from(b'\n'))
-                    .map_or(units.len(), |p| f.to + p);
                 let text = String::from_utf16_lossy(&units[f.to..end]).trim().to_string();
                 s.note = (!text.is_empty()).then_some(text);
             }
+            hidden_to = hidden_to.max(end);
         } else {
+            // Numbering stays the scanner's, even for a ref no render shows.
             s.num.get_or_insert(f.num);
-            s.refs.push(f.from);
+            let in_comment = comments.iter().any(|&(a, b)| a <= f.from && f.to <= b);
+            if f.from >= hidden_to && !in_comment {
+                s.refs.push(f.from);
+            }
         }
     }
     // Stable: uncited entries keep list order.
@@ -285,6 +305,28 @@ mod tests {
         assert_eq!(list[0].id.as_deref(), Some("c"));
         assert_eq!(list[0].num, Some(1));
         assert!(scan_footnotes("Claim.[^c]\n", &["c".into()])[0].defined);
+    }
+
+    #[test]
+    fn a_ref_on_a_hidden_definition_line_has_no_back_ref() {
+        // `[^s]: …` is hidden (its text moves onto the entry), and with it the
+        // `[^t]` on that line: `t` jumps back only to the body's refs.
+        let yaml = "sources:\n  - id: s\n    resource: https://s\n  - id: t\n    resource: https://t\n";
+        let body = "Claim[^s] and[^t].\n\n[^s]: see also[^t]\nMore[^t].\n";
+        let list = source_list(body, yaml);
+        let t = list.iter().find(|s| s.id.as_deref() == Some("t")).unwrap();
+        assert_eq!(t.refs, vec![13, 43]);
+        assert_eq!(t.num, Some(2));
+        let s = list.iter().find(|s| s.id.as_deref() == Some("s")).unwrap();
+        assert_eq!(s.note.as_deref(), Some("see also[^t]"));
+    }
+
+    #[test]
+    fn a_ref_inside_a_critic_comment_has_no_back_ref() {
+        let body = "a {>>see[^c]<<} b[^c] {++x[^c]++}\n";
+        let list = source_list(body, YAML);
+        let c = list.iter().find(|s| s.id.as_deref() == Some("c")).unwrap();
+        assert_eq!(c.refs, vec![17, 26]);
     }
 
     #[test]
