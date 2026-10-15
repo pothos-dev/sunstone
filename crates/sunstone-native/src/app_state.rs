@@ -35,12 +35,21 @@ pub struct AppState {
 impl AppState {
     pub fn new(bundle_root: PathBuf) -> Self {
         let index = Index::build(&bundle_root);
-        Self {
+        let state = Self {
             bundle_root,
             index: RwLock::new(index),
             self_writes: Mutex::new(HashMap::new()),
             git_prefix: OnceLock::new(),
+        };
+        // The git-toplevel rung anchors Backlinks as it does in the frontend
+        // (ov-20). Every host boots its repository (the server's clone or
+        // `git init`) before constructing the state, so asking now is "after
+        // any boot-time git init".
+        let prefix = state.git_prefix();
+        if let Ok(mut index) = state.index.write() {
+            index.set_git_prefix(prefix);
         }
+        state
     }
 
     /// The opened folder's path within the git repository containing it (`''`

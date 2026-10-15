@@ -6,11 +6,14 @@
 //! (`watcher.rs`): a created/modified/removed Concept reindexes just that file
 //! and refreshes the reverse map and aggregates.
 //!
-//! Link resolution is `sunstone_shared::paths::resolve_internal`
-//! (bundle-absolute `/x.md` from the root; relative `./`, `../`, or bare `x.md`
+//! Link resolution is `sunstone_shared::links::resolve_link` against the
+//! detected Bundle root (`find_bundle_root` over the Concept paths, the
+//! `okf_version` markers and the git prefix; bundle-absolute `/x.md` from that
+//! root with the opened-folder fallback; relative `./`, `../`, or bare `x.md`
 //! against the Concept's directory; external `scheme:` and pure-anchor links
-//! ignored) — the same code the frontend runs through the wasm build, which is
-//! what lets its broken-link decoration trust the Rust index.
+//! ignored). It is the same call the frontend's wasm `resolveLinkIn` makes, so
+//! native and fake Backlinks agree (ov-20). The user's root override is View
+//! state that never reaches the backend (ov-7), so it plays no part here.
 //!
 //! Pure module logic — the host wrappers (`src-tauri/src/commands.rs`, the
 //! server's routes) stay thin.
@@ -21,18 +24,18 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::paths::{bundle_walker, md_files};
-use sunstone_shared::paths::{folder_index_fallback, to_rel_string};
+use sunstone_shared::paths::to_rel_string;
 use sunstone_shared::wikilink;
-use sunstone_shared::OkfMarker;
+use sunstone_shared::{find_bundle_root, resolve_link, OkfMarker, ResolvedLink};
 
 pub mod frontmatter;
 mod links;
 
 use frontmatter::{parse_frontmatter, strip_frontmatter, ParsedFrontmatter};
-use links::extract_links;
+use links::extract_link_hrefs;
 
 /// One Concept's indexed data: parsed frontmatter fields we care about plus its
-/// outbound internal links (bundle-relative target paths).
+/// outbound links (raw, resolved to targets in `Index::rebuild_reverse`).
 #[derive(Debug, Clone, Default)]
 pub struct ConceptEntry {
     /// `type` from the frontmatter, if present (docs/GLOSSARY.md: required, but we
@@ -44,12 +47,13 @@ pub struct ConceptEntry {
     /// Feeds the Properties panel's key-name autocomplete (key-and-tag
     /// autocomplete slice). Empty when the Concept has no/invalid frontmatter.
     pub keys: Vec<String>,
-    /// Outbound internal link targets (bundle-relative, '/'-separated).
+    /// Raw markdown link hrefs (`[text](href)`, Embeds excluded). Resolved to
+    /// bundle paths in `rebuild_reverse`: a bundle-absolute href resolves
+    /// against the detected Bundle root, which depends on every path (ov-20).
     pub links: Vec<String>,
     /// Raw wikilink inner texts (`[[ ... ]]`, alias/anchor included). Resolved
     /// to bundle paths in `rebuild_reverse`, which has the full path set —
-    /// name-based resolution needs to see every concept, unlike the path-based
-    /// markdown links above which resolve from this concept's location alone.
+    /// name-based resolution needs to see every concept.
     pub wikilinks: Vec<String>,
     /// `okf_version` from the frontmatter (OKF v0.2 §12), if declared. Only an
     /// `index.md` carrying it is a Bundle-root marker ([`Index::okf_markers`]).
@@ -77,6 +81,10 @@ pub struct Index {
     /// `concepts` — see [`Index::attachment_paths`] for why it is not a
     /// type-tagged single list. Sorted by construction (`BTreeSet`).
     attachments: BTreeSet<String>,
+    /// The opened folder's path within its git repository (`""` = toplevel),
+    /// `None` outside one: the git-toplevel rung of the Bundle-root ladder.
+    /// Set by `AppState` once the index is built ([`Index::set_git_prefix`]).
+    git_prefix: Option<String>,
 }
 
 impl Index {
@@ -106,9 +114,10 @@ impl Index {
             okf_version,
             ..
         } = parse_frontmatter(content);
-        let links = extract_links(rel, content);
-        // Wikilink inner texts are captured raw here and resolved later in
-        // `rebuild_reverse` (name-based resolution needs the full path set).
+        // Link hrefs and wikilink inner texts are captured raw here and resolved
+        // later in `rebuild_reverse`, which has the full path set (the Bundle
+        // root and name-based resolution both depend on every Concept).
+        let links = extract_link_hrefs(content);
         let wikilinks = wikilink::wikilink_raws(strip_frontmatter(content));
         self.concepts.insert(
             rel.to_string(),
@@ -123,22 +132,43 @@ impl Index {
         );
     }
 
+    /// Set the opened folder's git prefix (the git-toplevel rung's input) and
+    /// re-resolve every link against the root it may move.
+    pub fn set_git_prefix(&mut self, git_prefix: Option<String>) {
+        self.git_prefix = git_prefix;
+        self.rebuild_reverse();
+    }
+
     /// Recompute the reverse (backlink) map from scratch from the forward map.
+    ///
+    /// The Bundle root is found here, once per rebuild, from the whole Concept
+    /// set: any mutation can move it (an `index.md` gaining or losing
+    /// `okf_version`, a top-level `.md` appearing), and every Concept's
+    /// bundle-absolute links must then follow, not only the edited one's.
     fn rebuild_reverse(&mut self) {
-        // The full set of concept paths, needed for name-based wikilink
-        // resolution (basename / path-suffix matching across the whole bundle).
-        let all_paths: Vec<String> = self.concepts.keys().cloned().collect();
+        // The full set of concept paths, needed for the Bundle root and for
+        // name-based wikilink resolution (basename / path-suffix matching).
+        let mut all_paths: Vec<String> = self.concepts.keys().cloned().collect();
+        all_paths.sort();
+        let root = find_bundle_root(
+            &all_paths,
+            &self.okf_markers(),
+            self.git_prefix.as_deref(),
+            None,
+        );
+        let exists = |p: &str| self.concepts.contains_key(p);
         let mut reverse: HashMap<String, BTreeSet<String>> = HashMap::new();
         for (source, entry) in &self.concepts {
-            // Markdown links (already resolved by path). A link to a folder
-            // opens its `index.md`, so it is a Backlink of that index — the
-            // same `folder_index_fallback` the link resolver applies. A root
-            // link with no root index, and a self-edge, contribute nothing.
-            for target in &entry.links {
-                let target =
-                    folder_index_fallback(target.clone(), &|p| self.concepts.contains_key(p));
-                if !target.is_empty() && target != *source {
-                    reverse.entry(target).or_default().insert(source.clone());
+            // Markdown links, through the shared resolver the frontend runs
+            // (wasm `resolveLinkIn`): rooting with the opened-folder fallback,
+            // and a folder link lands on its `index.md`. External, anchor and
+            // empty links, a root link with no root index, and a self-edge
+            // contribute nothing.
+            for href in &entry.links {
+                if let ResolvedLink::Internal { path, .. } = resolve_link(source, href, &root, exists) {
+                    if path != *source {
+                        reverse.entry(path).or_default().insert(source.clone());
+                    }
                 }
             }
             // Wikilinks resolve by NAME against every concept. Each resolved
@@ -692,6 +722,74 @@ mod tests {
         idx.reindex_concept("docs/index.md", "# Docs\n");
         idx.remove_concept("docs/kb/index.md");
         assert!(idx.okf_markers().is_empty());
+    }
+
+    // --- Bundle-root-aware Backlinks (ov-20) ---------------------------------
+
+    #[test]
+    fn a_bundle_absolute_backlink_resolves_against_a_nested_root() {
+        // The repo's README sits beside `docs/`, whose `index.md` makes `docs`
+        // the Bundle root, so `/a.md` in `docs/b.md` means `docs/a.md` — as the
+        // fake backend and the render already resolve it.
+        let mut idx = Index::default();
+        idx.insert_concept("README.md", "# Repo\n");
+        idx.insert_concept("docs/index.md", "# Docs\n");
+        idx.insert_concept("docs/a.md", "# A\n");
+        idx.insert_concept("docs/b.md", "see [A](/a.md) and [home](/)\n");
+        idx.rebuild_reverse();
+        assert_eq!(idx.backlinks("docs/a.md"), vec!["docs/b.md"]);
+        // `/` is the Bundle root, so its index is `docs/index.md`.
+        assert_eq!(idx.backlinks("docs/index.md"), vec!["docs/b.md"]);
+        assert!(idx.backlinks("a.md").is_empty());
+    }
+
+    #[test]
+    fn a_root_change_re_resolves_every_concepts_links() {
+        // A root `index.md` holds the root at the opened folder: `/a.md` from
+        // `docs/b.md` misses there and falls back to the (absent) `a.md`.
+        let mut idx = Index::default();
+        idx.insert_concept("index.md", "# Home\n");
+        idx.insert_concept("docs/index.md", "# Docs\n");
+        idx.insert_concept("docs/a.md", "# A\n");
+        idx.insert_concept("docs/b.md", "[A](/a.md)\n");
+        idx.rebuild_reverse();
+        assert!(idx.backlinks("docs/a.md").is_empty());
+
+        // `docs/index.md` gains the OKF marker: `docs` becomes the root, and
+        // `docs/b.md` (not the edited Concept) re-resolves on this mutation.
+        idx.reindex_concept("docs/index.md", "---\nokf_version: \"0.2\"\n---\n# Docs\n");
+        assert_eq!(idx.backlinks("docs/a.md"), vec!["docs/b.md"]);
+
+        // And it loses it again: the edge goes with it.
+        idx.reindex_concept("docs/index.md", "# Docs\n");
+        assert!(idx.backlinks("docs/a.md").is_empty());
+    }
+
+    #[test]
+    fn a_rooted_target_that_is_missing_falls_back_to_the_opened_folder() {
+        // `docs` is the root, but `docs/x.md` does not exist while `x.md` does:
+        // the link keeps the opened-folder target, as `apply_bundle_root` does.
+        let mut idx = Index::default();
+        idx.insert_concept("x.md", "# X\n");
+        idx.insert_concept("docs/index.md", "---\nokf_version: \"0.2\"\n---\n");
+        idx.insert_concept("docs/b.md", "[X](/x.md)\n");
+        idx.rebuild_reverse();
+        assert_eq!(idx.backlinks("x.md"), vec!["docs/b.md"]);
+    }
+
+    #[test]
+    fn the_git_prefix_anchors_links_authored_at_the_repository_root() {
+        // Opened at `sub/` inside a repository, with no index anywhere: a link
+        // written against the repository root (`/sub/notes/a.md`) reaches
+        // `notes/a.md` only once the index knows the git prefix.
+        let mut idx = Index::default();
+        idx.insert_concept("notes/a.md", "# A\n");
+        idx.insert_concept("notes/b.md", "[A](/sub/notes/a.md)\n");
+        idx.rebuild_reverse();
+        assert!(idx.backlinks("notes/a.md").is_empty());
+
+        idx.set_git_prefix(Some("sub".to_string()));
+        assert_eq!(idx.backlinks("notes/a.md"), vec!["notes/b.md"]);
     }
 
     #[test]
