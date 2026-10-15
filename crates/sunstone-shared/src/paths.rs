@@ -37,6 +37,26 @@ pub fn dir_of(path: &str) -> &str {
     }
 }
 
+/// A URL whose scheme runs or embeds content when followed (`javascript:`,
+/// `vbscript:`, `data:`, `file:`, case-insensitive). comrak drops these from
+/// markdown links; an anchor built outside comrak (a footnote to its source,
+/// the Sources entry) asks this and gets no `href` instead. The ONE check for
+/// the native render and the fake (over wasm, `isScriptUrl`).
+///
+/// The scheme is read the way a browser reads an `href`: leading spaces and
+/// control characters are skipped and tabs/newlines inside it are ignored, so
+/// ` java\tscript:` counts too.
+pub fn is_script_url(url: &str) -> bool {
+    let scheme: String = url
+        .trim_start_matches(|c: char| c <= ' ')
+        .chars()
+        .take_while(|&c| c != ':')
+        .filter(|c| !matches!(c, '\t' | '\n' | '\r'))
+        .collect::<String>()
+        .to_ascii_lowercase();
+    url.contains(':') && matches!(scheme.as_str(), "javascript" | "vbscript" | "data" | "file")
+}
+
 /// True for `scheme:`-prefixed URLs (http, https, mailto, tel, ...). Mirrors
 /// the `SCHEME_RE` in the former `src/lib/links.ts`.
 pub fn is_external(href: &str) -> bool {
@@ -145,6 +165,16 @@ pub fn folder_index_fallback(path: String, exists: &impl Fn(&str) -> bool) -> St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn script_urls_are_recognised_as_a_browser_reads_them() {
+        for url in ["javascript:alert(1)", "JavaScript:x", "vbscript:x", "data:text/html,x", "file:///etc/passwd", "  javascript:x", "java\tscript:x", "\u{1}data:x"] {
+            assert!(is_script_url(url), "{url:?}");
+        }
+        for url in ["https://x", "mailto:a@b", "/docs/javascript.md", "javascript", "notes/data.md", ""] {
+            assert!(!is_script_url(url), "{url:?}");
+        }
+    }
 
     #[test]
     fn split_suffix_splits_at_first_anchor_or_query() {

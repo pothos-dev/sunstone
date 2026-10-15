@@ -57,7 +57,7 @@ use crate::index::frontmatter::strip_frontmatter;
 use crate::index::Index;
 use sunstone_shared::frontmatter::{frontmatter_fields, split, FrontmatterField};
 use sunstone_shared::outline::{scan_headings, OutlineHeading};
-use sunstone_shared::paths::{folder_index_fallback, is_external, resolve_location};
+use sunstone_shared::paths::{folder_index_fallback, is_external, is_script_url, resolve_location};
 use sunstone_shared::url::{concept_url, percent_decode};
 use sunstone_shared::wikilink::{self, parse_target};
 
@@ -360,14 +360,6 @@ fn link_attrs(url: &str, source_path: &str, exists: &dyn Fn(&str) -> bool) -> St
     } else {
         format!(r#"href="{}""#, attr_escape(&marked))
     }
-}
-
-/// A URL scheme that runs or embeds content when followed. comrak drops these
-/// from markdown links; `link_attrs` builds its anchors after comrak, so it
-/// refuses them itself (the link keeps its text, without an `href`).
-fn is_script_url(url: &str) -> bool {
-    let scheme = url.split(':').next().unwrap_or("").to_ascii_lowercase();
-    matches!(scheme.as_str(), "javascript" | "vbscript" | "data" | "file")
 }
 
 fn internal_link_attrs(path: &str, broken: bool) -> String {

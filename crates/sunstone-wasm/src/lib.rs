@@ -295,6 +295,13 @@ pub fn source_list(body: String, yaml: String) -> Vec<Source> {
     sources::source_list(&body, &yaml)
 }
 
+/// True when following `url` would run or embed content (`javascript:`,
+/// `vbscript:`, `data:`, `file:`): an anchor built for it gets no `href`.
+#[wasm_bindgen(js_name = isScriptUrl)]
+pub fn is_script_url(url: String) -> bool {
+    sunstone_shared::paths::is_script_url(&url)
+}
+
 /// Parse an OKF actor string (§7) into its kind and id. Never fails: an empty,
 /// malformed or unknown-prefix actor comes back as `unknown` with `raw` intact.
 #[wasm_bindgen(js_name = parseActor)]

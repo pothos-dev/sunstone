@@ -231,6 +231,15 @@ export function sourceList(body: string, yaml: string): Source[] {
 }
 
 /**
+ * True when following `url` would run or embed content (`javascript:`,
+ * `vbscript:`, `data:`, `file:`), so an anchor built for it gets no `href`.
+ * Before wasm is registered every URL counts as one: refusing a link is safe.
+ */
+export function isScriptUrl(url: string): boolean {
+  return mod ? mod.isScriptUrl(url) : true;
+}
+
+/**
  * Parse an OKF actor string (§7). Before wasm is registered it degrades to the
  * `unknown` kind with the raw string — the same answer a malformed actor gets.
  */
