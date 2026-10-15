@@ -21,10 +21,11 @@ use sunstone_shared::computation::{self, ComputationSection, Contract};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
+use sunstone_shared::instant;
 use sunstone_shared::sources::{self, Source};
 use sunstone_shared::trust::{self, Trust};
 use sunstone_shared::frontmatter::{
-    self, FrontmatterField, IndexFrontmatter, SplitConcept,
+    self, FrontmatterField, IndexFrontmatter, LifecycleKeys, SplitConcept,
 };
 use sunstone_shared::outline::{self, OutlineHeading};
 use sunstone_shared::rewrite::{build_move_map, plan_rewrites, ConceptContent, MovePlan};
@@ -334,7 +335,29 @@ pub fn computation_section(yaml: String, body: String) -> Option<ComputationSect
 /// Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).
 #[wasm_bindgen(js_name = isIsoDatetime)]
 pub fn is_iso_datetime(s: String) -> bool {
-    trust::is_iso_datetime(&s)
+    instant::is_iso_datetime(&s)
+}
+
+/// `s` as seconds since the Unix epoch when it is [`is_iso_datetime`], else
+/// `undefined` (a JS number: exact well past any plausible date).
+#[wasm_bindgen(js_name = epochSeconds)]
+pub fn epoch_seconds(s: String) -> Option<f64> {
+    instant::epoch_seconds(&s).map(|t| t as f64)
+}
+
+/// `s` as seconds since the Unix epoch, read leniently for staleness (ov-11):
+/// the strict form, the same with no offset (UTC), or a bare date (midnight
+/// UTC). `undefined` otherwise.
+#[wasm_bindgen(js_name = instantSeconds)]
+pub fn instant_seconds(s: String) -> Option<f64> {
+    instant::instant_seconds(&s).map(|t| t as f64)
+}
+
+/// The lifecycle keys (OKF §5.4/§5.5) of a Frontmatter block (inner YAML),
+/// raw, as the Explorer's walker reads them. `null` when neither is set.
+#[wasm_bindgen(js_name = lifecycleOf)]
+pub fn lifecycle_of(yaml: String) -> Option<LifecycleKeys> {
+    frontmatter::lifecycle(&yaml)
 }
 
 /// The offset of footnote `label`'s definition (`[^label]:`), or `null`.

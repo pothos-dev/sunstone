@@ -19,6 +19,7 @@ pub mod critic;
 pub mod embed;
 pub mod footnotes;
 pub mod frontmatter;
+pub mod instant;
 pub mod links;
 pub mod okf_marker;
 pub mod outline;

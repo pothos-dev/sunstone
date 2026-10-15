@@ -14,7 +14,10 @@
 //!   - [`frontmatter_fields`] — every top-level entry as `key` + value(s) for
 //!     the render payload (the web viewer's read-only frontmatter list and its
 //!     `title` lookup; former native `render.rs::frontmatter_fields` + the fake's
-//!     `parseFrontmatterFields`). Desktop editing is YAML text (ADR-0008).
+//!     `parseFrontmatterFields`). Desktop editing is YAML text (ADR-0008);
+//!   - [`lifecycle`] — `status` / `stale_after` of an inner YAML block, the
+//!     Tile header's reading of the keys the Explorer gets from
+//!     [`parse_frontmatter`] (former TS `lifecycleFromYaml` over `yaml`).
 //!
 //! Broken/invalid frontmatter is TOLERATED, never blocked (docs/GLOSSARY.md):
 //! parsing returns empty aggregates rather than erroring. The editor's verbatim
@@ -280,6 +283,31 @@ fn lifecycle_scalar(map: &serde_yaml::Mapping, key: &str) -> Option<String> {
     scalar(map.get(serde_yaml::Value::from(key))?)
 }
 
+/// The lifecycle keys (OKF v0.2 §5.4/§5.5) of a Frontmatter block, raw, as
+/// [`lifecycle_scalar`] reads them for the Explorer.
+#[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
+#[cfg_attr(feature = "wasm", tsify(into_wasm_abi))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleKeys {
+    pub status: Option<String>,
+    pub stale_after: Option<String>,
+}
+
+/// The lifecycle keys of a Frontmatter block (the inner YAML, without `---`
+/// fences) — the Tile header's reading, the same as the Explorer's
+/// ([`parse_frontmatter`]). `None` when neither is set or the block does not
+/// parse to a mapping.
+pub fn lifecycle(yaml: &str) -> Option<LifecycleKeys> {
+    let value: serde_yaml::Value = serde_yaml::from_str(yaml).ok()?;
+    let map = value.as_mapping()?;
+    let keys = LifecycleKeys {
+        status: lifecycle_scalar(map, "status"),
+        stale_after: lifecycle_scalar(map, "stale_after"),
+    };
+    (keys.status.is_some() || keys.stale_after.is_some()).then_some(keys)
+}
+
 /// A non-empty YAML scalar as text, trimmed (numbers and booleans too); `None`
 /// for null, empty, maps and lists.
 pub(crate) fn scalar(v: &serde_yaml::Value) -> Option<String> {
@@ -381,6 +409,31 @@ mod tests {
         assert_eq!((p.status, p.stale_after), (None, None));
         let p = parse_frontmatter("---\ntype: x\n---\n");
         assert_eq!((p.status, p.stale_after), (None, None));
+    }
+
+    #[test]
+    fn lifecycle_of_a_block_reads_what_the_explorer_reads() {
+        let keys = |s: Option<&str>, a: Option<&str>| {
+            Some(LifecycleKeys { status: s.map(str::to_string), stale_after: a.map(str::to_string) })
+        };
+        assert_eq!(
+            lifecycle("type: x\nstatus: ' draft '\nstale_after: 2026-09-23T00:00:00Z\n"),
+            keys(Some("draft"), Some("2026-09-23T00:00:00Z"))
+        );
+        for block in ["status: wip\nstale_after: soon\n", "status: ''\nstale_after: [a]\n", "type: x\n"] {
+            let p = parse_frontmatter(&format!("---\n{block}---\n"));
+            let want = (p.status.is_some() || p.stale_after.is_some()).then(|| LifecycleKeys {
+                status: p.status.clone(),
+                stale_after: p.stale_after.clone(),
+            });
+            assert_eq!(lifecycle(block), want, "{block}");
+        }
+        assert_eq!(lifecycle("status: deprecated"), keys(Some("deprecated"), None));
+        assert_eq!(lifecycle("stale_after: \"2026-09-23\""), keys(None, Some("2026-09-23")));
+        assert_eq!(lifecycle("status: 3"), keys(Some("3"), None));
+        assert_eq!(lifecycle(""), None);
+        assert_eq!(lifecycle("status: [draft\n"), None);
+        assert_eq!(lifecycle("- a\n- b\n"), None);
     }
 
     #[test]

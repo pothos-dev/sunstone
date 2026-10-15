@@ -17,7 +17,7 @@
 //!   reads the same way.
 //! - Legacy v0.1 `timestamp` stands in for `generated.at` when `generated` is
 //!   absent (§13.1), flagged `legacy`.
-//! - Datetimes are kept as written. [`is_iso_datetime`] says whether one is an
+//! - Datetimes are kept as written. [`is_iso_datetime`] (`crate::instant`) says whether one is an
 //!   ISO 8601 datetime with an explicit UTC offset, the form the spec requires
 //!   (§5); any other value is still shown, never rejected.
 //!
@@ -28,6 +28,7 @@ use serde_yaml::{Mapping, Value};
 
 use crate::actor::parse_actor;
 use crate::frontmatter::scalar;
+use crate::instant::{epoch_seconds, is_iso_datetime};
 
 /// The derived trust tier (§5.3), lowest to highest.
 #[cfg_attr(feature = "wasm", derive(tsify::Tsify))]
@@ -123,84 +124,6 @@ pub fn trust_tier(verified: &[Stamp]) -> TrustTier {
     } else {
         TrustTier::MachineConfirmed
     }
-}
-
-/// Whether `s` is an ISO 8601 datetime with an explicit UTC offset:
-/// `YYYY-MM-DDTHH:MM[:SS[.fff]]` then `Z` or `±HH:MM` (also `±HHMM`, `±HH`).
-pub fn is_iso_datetime(s: &str) -> bool {
-    epoch_seconds(s).is_some()
-}
-
-/// `s` as seconds since the Unix epoch, when it is [`is_iso_datetime`].
-pub fn epoch_seconds(s: &str) -> Option<i64> {
-    let b = s.trim().as_bytes();
-    let num = |from: usize, len: usize| -> Option<i64> {
-        let part = b.get(from..from + len)?;
-        part.iter().all(u8::is_ascii_digit).then(|| part.iter().fold(0i64, |n, d| n * 10 + i64::from(d - b'0')))
-    };
-    let at = |i: usize, c: u8| b.get(i) == Some(&c);
-    let (year, month, day) = (num(0, 4)?, num(5, 2)?, num(8, 2)?);
-    if !(at(4, b'-') && at(7, b'-') && (at(10, b'T') || at(10, b't'))) {
-        return None;
-    }
-    let (hour, minute) = (num(11, 2)?, num(14, 2)?);
-    if !at(13, b':') {
-        return None;
-    }
-    let mut i = 16;
-    let mut second = 0;
-    if at(i, b':') {
-        second = num(i + 1, 2)?;
-        i += 3;
-        if at(i, b'.') || at(i, b',') {
-            i += 1;
-            let start = i;
-            while b.get(i).is_some_and(u8::is_ascii_digit) {
-                i += 1;
-            }
-            if i == start {
-                return None;
-            }
-        }
-    }
-    let offset = match b.get(i)? {
-        b'Z' | b'z' if i + 1 == b.len() => 0,
-        sign @ (b'+' | b'-') => {
-            let oh = num(i + 1, 2)?;
-            let om = match b.len() - (i + 3) {
-                0 => 0,
-                2 => num(i + 3, 2)?,
-                3 if at(i + 3, b':') => num(i + 4, 2)?,
-                _ => return None,
-            };
-            if oh > 23 || om > 59 {
-                return None;
-            }
-            let o = oh * 3600 + om * 60;
-            if *sign == b'-' { -o } else { o }
-        }
-        _ => return None,
-    };
-    let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-    let days_in = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if !(1..=12).contains(&month) || day < 1 || day > days_in[(month - 1) as usize] {
-        return None;
-    }
-    if hour > 23 || minute > 59 || second > 60 {
-        return None;
-    }
-    Some(days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second - offset)
-}
-
-/// Days since 1970-01-01 of a proleptic Gregorian date (Howard Hinnant).
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let mp = (m + 9) % 12;
-    let doy = (153 * mp + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
 }
 
 /// The latest event's `at`: by instant among the ISO ones, else the last
@@ -330,42 +253,5 @@ mod tests {
         let g = t("generated: { by: a/1, at: 2026-06-20 }\n").generated.unwrap();
         assert_eq!(g.at.as_deref(), Some("2026-06-20"));
         assert!(!g.iso);
-    }
-
-    #[test]
-    fn iso_datetimes() {
-        for ok in [
-            "2026-06-20T22:53:05Z",
-            "2026-06-20T22:53Z",
-            "2026-06-20T22:53:05.123Z",
-            "2026-06-20T22:53:05+00:00",
-            "2026-06-20T22:53:05-0530",
-            "2026-06-20T22:53:05+02",
-            "2024-02-29T00:00:00Z",
-        ] {
-            assert!(is_iso_datetime(ok), "{ok}");
-        }
-        for bad in [
-            "",
-            "2026-06-20",
-            "2026-06-20T22:53:05",
-            "2026-06-20 22:53:05Z",
-            "2026-13-01T00:00:00Z",
-            "2026-02-29T00:00:00Z",
-            "2026-06-20T24:00:00Z",
-            "2026-06-20T22:53:05.Z",
-            "2026-06-20T22:53:05+2",
-            "2026-06-20T22:53:05Zjunk",
-            "yesterday",
-        ] {
-            assert!(!is_iso_datetime(bad), "{bad}");
-        }
-    }
-
-    #[test]
-    fn epoch_seconds_honours_the_offset() {
-        assert_eq!(epoch_seconds("1970-01-01T00:00:00Z"), Some(0));
-        assert_eq!(epoch_seconds("1970-01-01T01:00:00+01:00"), Some(0));
-        assert_eq!(epoch_seconds("2000-03-01T00:00:00Z"), Some(951_868_800));
     }
 }
