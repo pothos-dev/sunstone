@@ -6,6 +6,7 @@
   // display time, against a minute-ticking clock — never stored.
   import { lifecycleView, type Lifecycle } from '$lib/lifecycle';
   import { clock } from '$lib/state/clock.svelte';
+  import { wasmReady } from '$lib/wasm/ready.svelte';
 
   interface Props {
     lifecycle: Lifecycle | null;
@@ -15,7 +16,13 @@
 
   let { lifecycle, compact = false }: Props = $props();
 
-  const view = $derived(lifecycleView(lifecycle, clock.now, { compact }));
+  // `stale_after` is read by the shared Rust over wasm, which may register
+  // after this first renders (an Explorer row, a hydrated web page): re-derive
+  // then rather than at the next clock tick.
+  const view = $derived.by(() => {
+    void wasmReady.loaded;
+    return lifecycleView(lifecycle, clock.now, { compact });
+  });
 </script>
 
 {#if view}
