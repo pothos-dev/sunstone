@@ -77,6 +77,16 @@ Undo and redo are forwarded to the **body** editor's history, so one timeline
 spans both surfaces; a step that changes the frontmatter moves focus back here,
 expanding the Region if it was collapsed.
 
+### The Toolbar inside the Editor Region
+
+The formatting **Toolbar** (the editing-only second row of a Tile's Concept
+header) is not a Region of its own: it sits inside the **Editor** Region, so the
+grid above is unchanged and `Alt`+arrows behave the same from it. It is a single
+Tab stop with a roving Focused item (`Left`/`Right`/`Home`/`End`), reached with
+`Alt`+`F10` from the Tile. `Escape` in the Toolbar peels one layer — back to the
+editor text — and nothing further, matching the peel everywhere else. See
+[Activity Rail and Concept header](/interface/activity-rail.md#toolbar).
+
 ## Relationships
 
 - Each **Region** has at most one **Focused item**.

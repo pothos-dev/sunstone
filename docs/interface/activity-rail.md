@@ -3,7 +3,7 @@ type: Concept
 title: Activity Rail and Concept header — where the controls live
 description: The two control surfaces that replaced the deleted global nav bar — the left and right Activity Rails for application-global controls, and the per-Tile Concept header for concept-scoped controls.
 tags: [interface, activity-rail, concept-header, toolbar, chrome]
-timestamp: 2026-07-23
+timestamp: 2026-10-15
 ---
 
 # Activity Rail and Concept header
@@ -54,6 +54,7 @@ Tile's Concept:
 | Split | Split Right (new Column) / Split Down (new Tile in this Column) |
 | Save | Persist explicitly. On the web: while editing with unsaved changes. On desktop: only while the [save gate](/adr/0008-raw-yaml-frontmatter-editing.md) is holding a write because the frontmatter does not parse |
 | Close | Clear the Tile (shown only when more than one Tile is on screen) |
+| **Toolbar** | A second row of formatting controls — **shown only while editing** (see below) |
 
 A single open Concept therefore shows just its Concept header — there is no
 second global bar above it. The **Edit** toggle is the sole view-mode control:
@@ -65,14 +66,50 @@ visible Tile renders its own Concept's frontmatter inline; off, no Tile shows an
 Frontmatter chrome — and no Tile builds a YAML editor or fetches its grammar. It
 is **off by default**, and its scope is unchanged from the old header.
 
+## Toolbar
+
+While a Tile is editing, its Concept header grows a second row: the **Toolbar**
+(`FormatToolbar.svelte`, aa-1). It is the way to format text for someone who does
+not know the markdown syntax or the hotkeys, and it teaches both:
+
+| Control | Command | Hotkey |
+| ------- | ------- | ------ |
+| Heading level | `headingCommand(level)` — Paragraph or Heading 1–6 for the touched lines | `Ctrl`/`Cmd`+`0`…`6` |
+| Bold | `inlineWrapCommand('**')` | `Ctrl`/`Cmd`+`B` |
+| Italic | `inlineWrapCommand('*')` | `Ctrl`/`Cmd`+`I` |
+| Strikethrough | `inlineWrapCommand('~~')` | `Ctrl`/`Cmd`+`Shift`+`M` |
+| Inline code | ``inlineWrapCommand('`')`` | `Ctrl`/`Cmd`+`E` |
+| Insert / Edit link | `insertOrEditLink` — the right-click menu's link item | none |
+
+- **No transform of its own.** Every control runs the command its hotkey runs
+  (`editor/formatToolbar.ts` maps control → command), so the toggling semantics
+  are the keymap's: re-applying over the same selection removes the format.
+- **State readout.** A control is pressed (`aria-pressed`) while the selection
+  sits in that format, and the picker shows the line's heading level (or
+  "Mixed"). The readout is the pure `formatStateAt` (`editor/formatState.ts`)
+  over the editor's Lezer tree, pushed from CodeMirror's update listener on every
+  selection, doc or parse change — so it agrees with what the live preview
+  renders (markers inside inline code are not bold).
+- **Focus.** Buttons never take focus on click, so the editor keeps its
+  selection and the caret; the picker hands focus back after a change.
+- **Keyboard.** The Toolbar is one Tab stop (`role="toolbar"`, roving
+  tabindex): `Alt`+`F10` from the Tile jumps in (Tab itself indents in the
+  text, so it cannot be the way out), `Left`/`Right`/`Home`/`End` move between controls, `Enter`/`Space` activates,
+  and `Escape` returns to the text. It lives inside the **Editor** Region, so the
+  Region grid and the unified Escape peel are unchanged (see the
+  [focus model](/interface/focus-model.md)).
+- **Inert in reading mode** and during review: the row is not rendered at all.
+- **Narrow Tiles.** The row and the header's own control row both wrap rather
+  than spill past the Tile, so a third-width Column stays inside its bounds.
+
 ## On the web
 
 Both surfaces carry over to the web build (see [app shell → web
 surfaces](/interface/app-shell.md)):
 
 - The **authenticated** surface mounts the full desktop `App.svelte` shell, so it
-  inherits the Activity Rail and Concept header unchanged (with the web write
-  path — explicit Save, concurrency gate).
+  inherits the Activity Rail and Concept header unchanged — the Toolbar
+  included — with the web write path (explicit Save, concurrency gate).
 - The **anonymous** read-only SSR surface renders the same Activity Rails — with
   a live **Quick nav** and **Search** island and a rail **Sign in** affordance —
   but replaces the full Concept header with a **slim concept strip** over the

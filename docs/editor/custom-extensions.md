@@ -108,7 +108,9 @@ Rules and completions come from **families**, never from a switch in the engine.
 
 ## Formatting commands
 
-`textFormat.ts` is pure: `toggleInlineWrap` (`**`/`*`/`` ` ``/`~~`), `insertLink`, `linkAt`, and `headingFormatEdit` (ATX levels 1–6 or plain across the touched lines) all return CM-shaped `{changes, selection}` edits. `cm.ts` wraps them in `Command`s bound in the `formattingKeymap` (`Mod-b/i/e`, `Mod-Shift-m`, `Mod-0…6`), placed before the general keymap so they win, and re-exposes them as imperative functions (`toggleBold`, `insertOrEditLink`, …) for the right-click menu. All are read-only-gated and toggle (re-applying removes) for Obsidian parity.
+`textFormat.ts` is pure: `toggleInlineWrap` (`**`/`*`/`` ` ``/`~~`), `insertLink`, `linkAt`, and `headingFormatEdit` (ATX levels 1–6 or plain across the touched lines) all return CM-shaped `{changes, selection}` edits. `commands.ts` wraps them in `Command`s bound in the `formattingKeymap` (`formattingKeymap.ts`: `Mod-b/i/e`, `Mod-Shift-m`, `Mod-0…6`), placed before the general keymap so they win, and re-exposes them as imperative functions (`toggleBold`, `insertOrEditLink`, …) for the right-click menu. All are read-only-gated and toggle (re-applying removes) for Obsidian parity.
+
+The **Toolbar** ([Concept header → Toolbar](/interface/activity-rail.md#toolbar)) dispatches the same commands through `formatToolbar.ts`, and reads its pressed states from `formatState.ts`: `formatStateAt(tree, doc, from, to)` walks the Lezer tree for `StrongEmphasis` / `Emphasis` / `InlineCode` / `Strikethrough` nodes holding the selection (a caret strictly inside, a range fully covered), reads the link from `linkAt` and the heading level from `headingLevelAt` — the readout twins of the toggles. The `onFormatState` build option pushes `formatStateOf(state)` from an update listener on selection, doc or parse-tree change.
 
 ## Review toggle
 

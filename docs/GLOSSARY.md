@@ -173,17 +173,27 @@ flanks (so it stays visible when that Sidebar is collapsed). There is one per Si
 carries that Sidebar's collapse toggle at the top; the left rail also holds **Quick nav**,
 **Search**, and a bottom user/avatar slot (login/logout, web only) — none of which are scoped to
 the open Concept. See [Activity Rail and Concept header](/interface/activity-rail.md).
-_Avoid_: "toolbar", "nav bar" (there is no global nav/tool bar; the Rail and the per-Tile
-**Concept header** replaced it).
+_Avoid_: "toolbar", "nav bar" (the Rail is not a **Toolbar**, and there is no global
+nav/tool bar; the Rail and the per-Tile **Concept header** replaced it).
 
 **Concept header**:
 The per-**Tile** control bar above each open Concept, carrying the controls scoped to that
 Concept/Tile: back/forward (desktop only — on web the browser's own Back/Forward
 navigates), the **Edit** toggle, the **Frontmatter** toggle, undo/redo (shown
-only while editing), review, export-PDF, split, and close. A single open Concept therefore
-shows just its Concept header — there is no second global bar above it. See
-[Activity Rail and Concept header](/interface/activity-rail.md).
-_Avoid_: "nav bar", "toolbar" (removed), "title bar".
+only while editing), review, export-PDF, split, and close; while editing, its second row is
+the **Toolbar**. A single open Concept therefore shows just its Concept header — there is no
+second global bar above it. See [Activity Rail and Concept header](/interface/activity-rail.md).
+_Avoid_: "nav bar", "title bar", "toolbar" for the header as a whole (the **Toolbar** is only
+its formatting row).
+
+**Toolbar**:
+The formatting row of a **Tile**'s **Concept header**, shown only while that Tile is editing
+and absent in reading mode: a heading-level picker plus bold, italic, strikethrough, inline
+code and link controls. Each control runs the same command as its hotkey (named in its
+tooltip) and shows as pressed when the selection already carries that format. It is per-Tile;
+there is no global tool bar. See [Activity Rail and Concept header](/interface/activity-rail.md).
+_Avoid_: "formatting bar", "ribbon", and "toolbar" for the **Activity Rail** or the whole
+**Concept header**.
 
 **Section**:
 One collapsible item in a Sidebar — an always-visible header plus a toggleable body. The current
@@ -290,6 +300,11 @@ _Avoid_: "command palette" in prose (use **Quick nav**), "go to file".
   shapes** (**plain** / **git-local** / **git-synced**), which name the deployment rather than an
   env value and so survive the variable's deletion. _Avoid_: "mode on/off", "git mode",
   `SUNSTONE_GIT_MODE`. See [ADR-0007](/adr/0007-server-owns-the-git-sync-loop.md).
+- "toolbar" was retired when the global nav/tool bar gave way to the **Activity Rail** and the
+  per-Tile **Concept header**, then brought back (aa-1) for one thing only: the editing-only
+  formatting row of a Concept header — the word a non-technical author already knows.
+  Resolved: **Toolbar** names that row; the Rail and the Concept header as a whole are not
+  toolbars, and there is still no global tool bar.
 - "side panel" / "panel" / "pane" / "accordion section" were used loosely for the collapsible
   sidebar items — resolved to **Section**, inside a **Sidebar**, with **Accordion** naming only
   the height-sharing behaviour. "Panel" is avoided (VSCode bottom-dock collision).

@@ -28,7 +28,7 @@ The **Concept header** carries every concept-scoped control — back/forward (de
 browser's Back/Forward navigates, see `web/urlSync.ts`), the
 **Edit** toggle (which flips the Tile between `read` and `editing`), the
 Frontmatter toggle, undo/redo (only while editing), review, export-PDF, split and
-close. There is no global nav bar; app-global controls live on the
+close — plus, while editing, the formatting **Toolbar** as its second row. There is no global nav bar; app-global controls live on the
 [Activity Rail](/interface/activity-rail.md) instead.
 
 `Split Right` / `Split Down` are the actions that create a new Column / Tile;
