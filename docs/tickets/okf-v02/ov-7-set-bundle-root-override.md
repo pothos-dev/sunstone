@@ -28,6 +28,5 @@ Detected Bundle Root**) and shown in the Explorer header (`/docs`, flagged when
 the user set it). It never reaches the server, so no route needed guarding.
 Playwright: `tests/bundle-root-override.spec.ts`.
 
-Known limit: the native index's Backlinks extraction resolves bundle-absolute
-links against the opened folder, not the detected root (ov-20). The override
-applies to the frontend's link resolution only.
+Known limit: Backlinks follow the detected root (since ov-20) but not the
+override, which applies to the frontend's link resolution only.
