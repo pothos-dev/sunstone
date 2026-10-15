@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 1
 ---
 
@@ -21,12 +21,12 @@ Found in the 2026-10-09 nightly review:
 - The fake's `sourceLinkAttrs` writes a `resource` straight into `href`; the
   native render now drops `javascript:`/`data:`/`vbscript:`/`file:` there.
 
-- [ ] `sources::source_list` leaves out of `refs` every reference on a hidden source-definition line (a definition whose label is a `sources[].id`, to the end of that line), the same span `footnotes_to_sentinels` drops; the fake gets this through wasm `sourceList`
-- [ ] The fake renders a footnote inside a CriticMarkup mark the way the native render does (as a reference, with its `fnref` id), so every ref `source_list` counts carries an id
-- [ ] The fake's heading path never drops a line's footnotes: heading refs are located without the `indexOf` fallback that returns `[]`
-- [ ] The script-URL check (`is_script_url`) moves into `sunstone-shared` and is exported through wasm; the fake's `sourceLinkAttrs` gives such a resource no `href`, in the reference and the Sources entry, as the native render does
-- [ ] Tests: a `sources.rs` golden (`[^s]: see also[^t]` with `t` a source: `t.refs` has only the body refs); a native `render/footnotes.rs` case asserting every `#fnref-…` back-ref href has a matching `id=` in the HTML; `src/lib/ipc/fake/render.test.ts` cases for the mark example above, a heading ref and a `javascript:` resource
-- [ ] All four gates green, after `bun run build:wasm`
+- [x] `sources::source_list` leaves out of `refs` every reference on a hidden source-definition line (a definition whose label is a `sources[].id`, to the end of that line), the same span `footnotes_to_sentinels` drops; the fake gets this through wasm `sourceList`
+- [x] The fake renders a footnote inside a CriticMarkup mark the way the native render does (as a reference, with its `fnref` id), so every ref `source_list` counts carries an id
+- [x] The fake's heading path never drops a line's footnotes: heading refs are located without the `indexOf` fallback that returns `[]`
+- [x] The script-URL check (`is_script_url`) moves into `sunstone-shared` and is exported through wasm; the fake's `sourceLinkAttrs` gives such a resource no `href`, in the reference and the Sources entry, as the native render does
+- [x] Tests: a `sources.rs` golden (`[^s]: see also[^t]` with `t` a source: `t.refs` has only the body refs); a native `render/footnotes.rs` case asserting every `#fnref-…` back-ref href has a matching `id=` in the HTML; `src/lib/ipc/fake/render.test.ts` cases for the mark example above, a heading ref and a `javascript:` resource
+- [x] All four gates green, after `bun run build:wasm`
 
 ## Grounding
 
@@ -72,3 +72,15 @@ Found in the 2026-10-09 nightly review:
   ticket if anyone notices it.
 - Script URLs → shared predicate over wasm (ADR 0006), not a TS regex in the
   fake.
+
+## Comments
+
+- 2026-10-15 (nightly): Done. Beyond the ticket, `source_list` also leaves out a
+  ref inside a CriticMarkup comment: the native render turns the comment into
+  plain text (`critic_to_sentinels`), so such a ref never got an id either. As
+  decided, `num` is unchanged: an entry still takes the scanner's number even
+  when its only ref is on a hidden line or in a comment. `is_script_url` now
+  reads the scheme the way a browser does (it skips leading controls and
+  ignores tabs and newlines), because the fake writes the raw resource into
+  `href`. The fake's heading path takes the text offset as the hashes plus the
+  whitespace after them.
