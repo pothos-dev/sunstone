@@ -26,7 +26,7 @@ On desktop the store is a single JSON file holding app-level state (the theme pr
 The desktop `BundleState` (session store `src/lib/state/session.svelte.ts`) carries:
 
 - `lastOpenConcept` — bundle-relative path reopened on launch.
-- `expandedFolders` — expanded Explorer tree folders.
+- `expandedFolders` — expanded Explorer tree folders. A folder holding the open Concept is also shown expanded, without being added here: that override follows the open Concept, and while it is the only reason the folder is open ("pinned") the folder's twisty is painted in the accent colour. Clicking the twisty records the folder in this set.
 - `recentFiles` — most-recent-first, deduped, capped at 15; feeds the quick-nav palette.
 - `leftSidebarOpen`, `rightSidebarOpen` — whole-Sidebar collapse.
 - `leftSidebarWidth`, `rightSidebarWidth` — each Sidebar's dragged width (clamped on read; set from the [Sidebar edge](/interface/sidebars.md)).
