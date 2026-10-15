@@ -224,9 +224,69 @@ describe('renderConcept footnotes', () => {
     expect(html).toContain('<a class="footnote-def" title="A">1</a> two');
   });
 
-  test('a footnote inside a CriticMarkup mark stays text', () => {
-    const { html } = renderConcept('a {++b[^1]++} c[^2]\n');
-    expect(html).toContain('<ins class="critic-add">b[^1]</ins>');
+  test('a footnote inside a CriticMarkup mark renders as a reference, as in Rust', () => {
+    const { html } = renderConcept('a {++b[^1]++} c[^2] {>>see[^3]<<}\n');
+    expect(html).toContain('<ins class="critic-add">b<sup class="footnote-ref broken" title="1">1</sup></ins>');
     expect(html).toContain('c<sup class="footnote-ref broken" title="2">2</sup>');
+    // A comment's note is plain text.
+    expect(html).toContain('<span class="critic-comment-text">see[^3]</span>');
+  });
+
+  test('both halves of a substitution render their footnotes', () => {
+    const { html } = renderConcept('{~~a[^1]~>b[^2]~~}\n');
+    expect(html).toContain(
+      '<del class="critic-del">a<sup class="footnote-ref broken" title="1">1</sup></del>' +
+        '<ins class="critic-add">b<sup class="footnote-ref broken" title="2">2</sup></ins>',
+    );
+  });
+});
+
+// ov-23: each Sources back-ref lands on an id the body renders.
+describe('renderConcept Sources back-refs', () => {
+  const SRC = '---\ntype: N\nsources:\n  - id: s\n    resource: https://s\n  - id: t\n    resource: https://t\n---\n\n';
+
+  /** Every `href="#fnref-…"` has exactly one matching `id=`. */
+  function expectBackrefsResolve(html: string) {
+    const ids = [...html.matchAll(/href="#(fnref-[^"]+)"/g)].map((m) => m[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) expect(html.split(`id="${id}"`).length - 1).toBe(1);
+  }
+
+  test('a source ref inside a mark carries its id, in order', () => {
+    const { html } = renderConcept(`${SRC}a {++b[^s]++} c[^s]\n`);
+    expect(html).toContain('<ins class="critic-add">b<sup id="fnref-s-1" class="footnote-ref source"');
+    expect(html).toContain('c<sup id="fnref-s-2" class="footnote-ref source"');
+    expectBackrefsResolve(html);
+  });
+
+  test('a source ref inside a comment is not counted', () => {
+    const { html } = renderConcept(`${SRC}a {>>see[^s]<<} c[^s]\n`);
+    expect(html).toContain('c<sup id="fnref-s-1"');
+    expect(html).not.toContain('fnref-s-2');
+    expectBackrefsResolve(html);
+  });
+
+  test('a source ref on a hidden definition line is not counted', () => {
+    const { html } = renderConcept(`${SRC}Claim[^s] and[^t].\n\n[^s]: see also[^t]\n`);
+    expect(html).not.toContain('fnref-t-2');
+    expectBackrefsResolve(html);
+  });
+
+  test('a source ref in a heading carries its id', () => {
+    const { html } = renderConcept(`${SRC}##   Title[^s] ##\n\nBody[^s]\n`);
+    expect(html).toMatch(/<h2 id="[^"]*">Title<sup id="fnref-s-1" class="footnote-ref source"/);
+    expect(html).toContain('Body<sup id="fnref-s-2"');
+    expectBackrefsResolve(html);
+  });
+
+  test('a script-URL resource gets no href, on the reference or the entry', () => {
+    const { html } = renderConcept(
+      '---\ntype: N\nsources:\n  - id: x\n    resource: "javascript:alert(1)"\n    title: X\n---\n\nClaim[^x]\n',
+    );
+    expect(html).not.toContain('href="javascript');
+    expect(html).toContain('<sup id="fnref-x-1" class="footnote-ref source"');
+    expect(html).toMatch(/class="footnote-ref source" data-source="[^"]*"><a >1<\/a><\/sup>/);
+    expect(html).toContain('<a  data-source=');
+    expect(html).toContain('<span class="source-resource">javascript:alert(1)</span>');
   });
 });

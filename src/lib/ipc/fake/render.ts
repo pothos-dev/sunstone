@@ -24,6 +24,7 @@ import {
   scanFootnotes,
   sourceList,
   computationSection,
+  isScriptUrl,
   type CriticMark,
   type Footnote,
   type Source,
@@ -85,9 +86,11 @@ export function renderConcept(content: string): RenderPayload {
     if (hidden.has(i)) continue;
     const h = byLine.get(i);
     if (h) {
-      // The heading text sits inside its line; shift the line's footnotes to it.
-      const at = line.indexOf(h.text);
-      const notes = at < 0 ? [] : shift(lineNotes[i], at, at + h.text.length);
+      // The heading text starts after the hashes and the whitespace after them
+      // (the shared ATX scan slices it there); shift the line's footnotes to it.
+      const rest = line.slice(h.level);
+      const at = h.level + rest.length - rest.trimStart().length;
+      const notes = shift(lineNotes[i], at, at + h.text.length);
       htmlParts.push(`<h${h.level} id="${h.slug}">${renderInline(h.text, notes)}</h${h.level}>`);
       continue;
     }
@@ -132,8 +135,10 @@ function shift(notes: Footnote[], from: number, to: number): Footnote[] {
  * Render one line of inline text: CriticMarkup marks become their `critic-*`
  * HTML; text between marks is HTML-escaped. Marks are found with the shared
  * pure scanner so the fake and the editor agree on what a mark is. `notes` are
- * the footnotes of `text` (from the whole-body scan); one inside a mark stays
- * text, as the mark's content is escaped whole.
+ * the footnotes of `text` (from the whole-body scan). As in Rust, whose
+ * `critic_to_sentinels` swaps only the delimiters, a footnote inside an
+ * insertion, deletion, highlight or substitution renders as a reference; one
+ * inside a comment stays text (the note is plain text there too).
  */
 function renderInline(text: string, notes: Footnote[], lineStart = false): string {
   const marks = parseCriticMarks(text);
@@ -141,7 +146,7 @@ function renderInline(text: string, notes: Footnote[], lineStart = false): strin
   let pos = 0;
   for (const mark of marks) {
     out += renderTextWithFootnotes(text.slice(pos, mark.from), shift(notes, pos, mark.from), lineStart && pos === 0);
-    out += renderMark(mark);
+    out += renderMark(mark, (from, to) => renderTextWithFootnotes(text.slice(from, to), shift(notes, from, to), false));
     pos = mark.to;
   }
   out += renderTextWithFootnotes(text.slice(pos), shift(notes, pos, text.length), lineStart && pos === 0);
@@ -157,10 +162,11 @@ let cited = new Map<string, number>();
 
 /**
  * The anchor attributes for a source's resource. The fake does not resolve
- * links (see the header), so the resource stays the raw `href`.
+ * links (see the header), so the resource stays the raw `href`, except that a
+ * script URL (`javascript:`, `data:`, …) gets none, as Rust's `link_attrs`.
  */
 function sourceLinkAttrs(s: Source): string {
-  return `href="${attr(s.resource)}"`;
+  return isScriptUrl(s.resource) ? '' : `href="${attr(s.resource)}"`;
 }
 
 /** `data-source="…"`: the entry as JSON for the hover card (Rust's `source_data`). */
@@ -294,20 +300,28 @@ function renderTextWithCitations(seg: string, atLineStart: boolean): string {
   return out;
 }
 
-/** One CriticMarkup mark → the exact HTML the Rust renderer emits. */
-function renderMark(mark: CriticMark): string {
+/**
+ * One CriticMarkup mark → the exact HTML the Rust renderer emits. `inner`
+ * renders a span of the line (offsets into it) with its footnotes and
+ * citations; a comment's text is escaped as is.
+ */
+function renderMark(mark: CriticMark, inner: (from: number, to: number) => string): string {
+  // Rendered once per span: it numbers source references as it goes.
+  const content = () => inner(mark.contentFrom, mark.contentTo);
   switch (mark.kind) {
     case 'addition':
-      return `<ins class="critic-add">${escapeHtml(mark.text ?? '')}</ins>`;
+      return `<ins class="critic-add">${content()}</ins>`;
     case 'deletion':
-      return `<del class="critic-del">${escapeHtml(mark.text ?? '')}</del>`;
+      return `<del class="critic-del">${content()}</del>`;
     case 'highlight':
-      return `<mark class="critic-highlight">${escapeHtml(mark.text ?? '')}</mark>`;
+      return `<mark class="critic-highlight">${content()}</mark>`;
     case 'substitution': {
-      const deleted = `<del class="critic-del">${escapeHtml(mark.deleted ?? '')}</del>`;
+      // The first `~>` splits old/new, as in the shared parse.
+      const split = mark.contentFrom + (mark.deleted ?? '').length;
+      const deleted = `<del class="critic-del">${inner(mark.contentFrom, split)}</del>`;
       // No `~>` (empty inserted) renders as a plain deletion, matching Rust.
       const inserted = mark.inserted
-        ? `<ins class="critic-add">${escapeHtml(mark.inserted)}</ins>`
+        ? `<ins class="critic-add">${inner(split + 2, mark.contentTo)}</ins>`
         : '';
       return deleted + inserted;
     }
