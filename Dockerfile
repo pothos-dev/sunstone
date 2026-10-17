@@ -70,7 +70,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # config-load path throws `virtualModule.require is not a function`. Real Node
 # runs vite exactly as it does on a dev host, so the build matches local.
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm AS web-build
+# Built on the BUILD platform, not per target: its output is plain JavaScript,
+# identical for amd64 and arm64, and running vite under QEMU for arm64 took
+# hours once the D2 worker chunk (~8 MB) joined the bundle (v0.27.0).
+FROM --platform=$BUILDPLATFORM node:22-bookworm AS web-build
 WORKDIR /app
 
 # bun is a single self-contained binary; copy it from the official image.
@@ -96,12 +99,19 @@ COPY --from=rust-build /app/wasm-pkg ./src/lib/wasm/pkg
 # SUNSTONE_TARGET=web selects adapter-node (see svelte.config.js); output -> build/.
 RUN SUNSTONE_TARGET=web bun run build
 
-# Prune to a PRODUCTION-only node_modules for the runtime image. adapter-node
-# bundles the app but leaves externalized deps (e.g. `yaml`) to be resolved from
-# node_modules at runtime.
+# ---------------------------------------------------------------------------
+# Stage 2b — PRODUCTION-only node_modules for the runtime image, installed per
+# TARGET platform so a runtime dependency with a native module gets the right
+# binary. adapter-node bundles the app but leaves externalized deps (e.g.
+# `yaml`) to be resolved from node_modules at runtime.
+# ---------------------------------------------------------------------------
+FROM node:22-bookworm AS web-deps
+WORKDIR /app
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+COPY package.json bun.lock ./
+COPY patches ./patches
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    rm -rf node_modules \
- && bun install --frozen-lockfile --production
+    bun install --frozen-lockfile --production
 
 # ---------------------------------------------------------------------------
 # Stage 3 — Runtime: slim node image running both processes.
@@ -128,7 +138,7 @@ RUN apt-get update \
 # Rust API binary + the adapter-node build + its production node_modules.
 COPY --from=rust-build /usr/local/bin/sunstone-server /usr/local/bin/sunstone-server
 COPY --from=web-build /app/build ./build
-COPY --from=web-build /app/node_modules ./node_modules
+COPY --from=web-deps /app/node_modules ./node_modules
 COPY --from=web-build /app/package.json ./package.json
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
