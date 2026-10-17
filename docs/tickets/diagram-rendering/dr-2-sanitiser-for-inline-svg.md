@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 3
 ---
 
@@ -37,20 +37,20 @@ That exception exists for D2, which embeds its three fonts as `@font-face` data 
 35 KB per small diagram). Stripping them would fall back to the app font and change the
 diagram's metrics.
 
-- [ ] `sanitiseSvg(svg: string): string` (or a DOM-returning sibling, if the callers prefer it)
+- [x] `sanitiseSvg(svg: string): string` (or a DOM-returning sibling, if the callers prefer it)
       in a plain `.ts` module, with no dependency on CodeMirror or Svelte
-- [ ] `dompurify` is a direct dependency in `package.json`
-- [ ] Each stripped construct above has a unit test with a hostile fixture that asserts it is
+- [x] `dompurify` is a direct dependency in `package.json`
+- [x] Each stripped construct above has a unit test with a hostile fixture that asserts it is
       gone from the output
-- [ ] A test asserts `<style>` survives with its ordinary rules and its `@font-face` data
+- [x] A test asserts `<style>` survives with its ordinary rules and its `@font-face` data
       fonts, minus any `@import` and external `url()`
-- [ ] A test asserts `#fragment` references (gradients, markers, `<use href="#id">`) survive
-- [ ] A real D2 output (checked in as a fixture) passes through visually unchanged apart from
+- [x] A test asserts `#fragment` references (gradients, markers, `<use href="#id">`) survive
+- [x] A real D2 output (checked in as a fixture) passes through visually unchanged apart from
       stripped external icons
-- [ ] Tests run under `bun test src/lib`; DOMPurify needs a DOM, so the test supplies one the
+- [x] Tests run under `bun test src/lib`; DOMPurify needs a DOM, so the test supplies one the
       same way other DOM-touching unit tests in `src/lib` do, or the ticket adds the smallest
       one that works
-- [ ] All four gates green
+- [x] All four gates green
 
 ## Decisions
 
@@ -61,3 +61,17 @@ diagram's metrics.
   and af-2 already owns it. This ticket ships the sanitiser alone.
 - **Ids are not namespaced here.** Per-diagram id uniqueness is the caller's job: D2 has
   `salt`, mermaid generates its own ids, and af-2 specifies its own namespacing.
+
+## Comments
+
+- Done. `sanitiseSvg(svg, win?)` is in `src/lib/svg/sanitiseSvg.ts`, and the CSS half
+  (`<style>` text and `style` attributes) is in `src/lib/svg/sanitiseCss.ts`. When there is
+  no window, or DOMPurify reports itself unsupported, it throws instead of passing the input
+  through. Beyond the listed constructs it also drops SMIL animation (`<set>`/`<animate*>`
+  can rewrite an href after sanitising), the image functions that take a bare string as a URL
+  (`image-set()`, `image()`, `cross-fade()`, `element()`), and any `<use>`/`<image>`/`<feImage>`
+  left without a local href. CSS with a backslash escape, or with a `url(` it cannot parse,
+  is emptied instead of guessed at. The tests pass in a jsdom window explicitly (jsdom is a
+  devDependency). I tried happy-dom first: DOMPurify kept `onerror` under it. The D2 fixture
+  (`src/lib/svg/fixtures/d2-diagram.svg`) comes out identical element for element and
+  attribute for attribute, except for the icon `<image>` and the link's hrefs.
