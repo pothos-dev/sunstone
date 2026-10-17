@@ -380,6 +380,18 @@
     align-self: flex-start;
     background: #fff;
     color: #111;
+    /* The sheet is light paper in either app theme, so content that reads the
+       palette tokens (D2 Diagrams, code wells, table rules) gets the light
+       palette on screen as well, matching what `@media print` forces below. */
+    --bg: #fff;
+    --bg-elevated: #fff;
+    --bg-sunken: #f2f2f2;
+    --text: #111;
+    --text-muted: #444;
+    --text-faint: #777;
+    --border: #ccc;
+    --border-strong: #999;
+    --accent: #1a3a6b;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
     box-sizing: border-box;
   }
@@ -419,7 +431,9 @@
       --bg-sunken: #f2f2f2;
       --text: #111;
       --text-muted: #444;
+      --text-faint: #777;
       --border: #ccc;
+      --border-strong: #999;
       --accent: #1a3a6b;
       color: #111;
       print-color-adjust: exact;
