@@ -243,6 +243,78 @@ test('mermaid diagrams hydrate, and a malformed one degrades gracefully', async 
 });
 
 /**
+ * D2 Diagrams (dr-3). Same island as mermaid: the server leaves ```d2 fences
+ * inert and the browser renders them from D2's WASM build in a worker. The
+ * palette comes from a stylesheet, so the reader's theme toggle recolours a
+ * rendered diagram without re-rendering it; icons are stripped, never fetched.
+ * Saves tests/screenshots/web-d2.png.
+ */
+test('d2 diagrams hydrate in the app palette, follow the theme toggle, and degrade gracefully', async ({
+  page,
+}) => {
+  const iconRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('icons.terrastruct.com')) iconRequests.push(request.url());
+  });
+  await page.goto('/diagram');
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Diagram Concept');
+
+  const svg = page.locator('[data-testid="rendered"] .web-d2-render svg.d2-svg');
+  await expect(svg).toBeVisible({ timeout: 30_000 });
+  await expect(svg.locator('text', { hasText: 'API gateway' })).toBeVisible();
+  await expect(page.locator('[data-testid="rendered"] .web-d2 image')).toHaveCount(0);
+
+  // The malformed one shows D2's own diagnostic in the shared error panel.
+  const error = page.getByTestId('d2-error');
+  await expect(error).toBeVisible({ timeout: 30_000 });
+  await expect(error).toContainText('maps must be terminated with }');
+  await expect(page.getByTestId('rendered')).toContainText('stays intact');
+
+  /** Computed fill of the top-level shape, and the resolved `--bg-elevated`. */
+  const fills = () =>
+    svg.evaluate((el) => {
+      const probe = document.createElement('div');
+      probe.style.color = 'var(--bg-elevated)';
+      el.closest('.web-d2')!.appendChild(probe);
+      const surface = getComputedStyle(probe).color;
+      probe.remove();
+      return { shape: getComputedStyle(el.querySelector('rect.fill-B6')!).fill, surface };
+    });
+  const before = await fills();
+  expect(before.shape).toBe(before.surface);
+  const scopeClass = await svg.getAttribute('class');
+
+  await page.getByTestId('theme-toggle').click();
+  await expect.poll(async () => (await fills()).surface).not.toBe(before.surface);
+  const after = await fills();
+  expect(after.shape).toBe(after.surface);
+  // Same SVG (same salted scope class): recoloured, not re-rendered.
+  expect(await svg.getAttribute('class')).toBe(scopeClass);
+
+  expect(iconRequests).toEqual([]);
+  await page.screenshot({ path: 'tests/screenshots/web-d2.png', fullPage: true });
+});
+
+/**
+ * Print/PDF renders D2 on light paper whatever the app theme (dr-3), the way
+ * `PrintView` forces mermaid light: the sheet carries the light palette.
+ */
+test('d2 diagrams print in the light palette from a dark app', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.print = () => {};
+  });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(`/?print=${encodeURIComponent('diagram.md')}&toolbar=1`);
+  const svg = page.getByTestId('print-body').locator('.web-d2-render svg.d2-svg');
+  await expect(svg).toBeVisible({ timeout: 30_000 });
+  const paint = await svg.evaluate((el) => ({
+    shape: getComputedStyle(el.querySelector('rect.fill-B6')!).fill,
+    label: getComputedStyle(el.querySelector('text.fill-N1')!).fill,
+  }));
+  expect(paint).toEqual({ shape: 'rgb(255, 255, 255)', label: 'rgb(17, 17, 17)' });
+});
+
+/**
  * Desktop parity pass (follow-up): dark-by-default theme (follows the OS, no
  * manual toggle — matching the desktop shell), an icon-less collapsible Explorer
  * with implicit index, and collapsible Accordion Sidebars. Saves a DARK-mode

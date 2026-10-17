@@ -820,4 +820,20 @@ mod tests {
         // A fenced code block is not a heading → excluded from the outline.
         assert!(p.outline.is_empty());
     }
+
+    #[test]
+    fn d2_fence_emits_language_class_and_is_left_inert() {
+        // A ```d2 fence (dr-3) is inert code on the server, like mermaid: the web
+        // island renders it client-side from D2's WASM build. The source must
+        // survive verbatim (HTML-escaped) for the island to read it back.
+        let p = render(
+            "```d2\napi -> db: SQL\ndb: { shape: cylinder }\n```\n",
+            "a.md",
+            &["a.md"],
+        );
+        assert!(p.html.contains(r#"<pre><code class="language-d2">"#));
+        assert!(p.html.contains("api -&gt; db: SQL"));
+        assert!(!p.html.contains("<svg"));
+        assert!(p.outline.is_empty());
+    }
 }
