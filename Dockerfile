@@ -18,6 +18,11 @@
 # ---------------------------------------------------------------------------
 FROM rust:1-bookworm AS rust-build
 WORKDIR /app
+# The amd64 and arm64 legs build concurrently. Cache mounts are shared across
+# them by default: the cargo registry is locked (concurrent unpacking raced in
+# v0.27.1: "failed to unpack flate2 … File exists"), and each arch gets its own
+# target dir so one leg can never copy the other's sunstone-server binary.
+ARG TARGETARCH
 
 # Workspace manifests + lockfile first (with the crate sources) so the build
 # resolves the pinned dependency graph. src-tauri is copied for workspace
@@ -42,8 +47,8 @@ RUN mkdir -p src-tauri/src \
 # declared here, after the dependency-heavy steps, so a new commit only
 # rebuilds the server crate itself.
 ARG SUNSTONE_COMMIT=
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/app/target,id=sunstone-target-$TARGETARCH,sharing=locked \
     cargo build --release -p sunstone-server \
  && cp target/release/sunstone-server /usr/local/bin/sunstone-server
 
@@ -54,10 +59,10 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # `pkg/` to the web stage via COPY. `--out-dir` is absolute so it lands OUTSIDE
 # the (non-persisted) /app/target cache mount and survives the layer.
 RUN rustup target add wasm32-unknown-unknown
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo install wasm-pack --locked --version 0.15.0
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/app/target,id=sunstone-target-$TARGETARCH,sharing=locked \
     wasm-pack build crates/sunstone-wasm --target web --out-dir /app/wasm-pkg
 
 # ---------------------------------------------------------------------------
@@ -87,7 +92,7 @@ COPY --from=bun-build /usr/local/bin/bun /usr/local/bin/bun
 # patches/ is applied by bun during install, so copy it before installing.
 COPY package.json bun.lock ./
 COPY patches ./patches
-RUN --mount=type=cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile
 
 # Frontend sources (node_modules is excluded via .dockerignore, so the layer
@@ -114,7 +119,7 @@ WORKDIR /app
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 COPY package.json bun.lock ./
 COPY patches ./patches
-RUN --mount=type=cache,target=/root/.bun/install/cache \
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --production
 
 # ---------------------------------------------------------------------------
