@@ -9,8 +9,8 @@
 // (for the web island) a `data-testid` on the error panel.
 
 import {
-  diagramCacheKey,
   diagramClasses,
+  languageCacheKey,
   rendererFor,
   type CssVarReader,
   type DiagramLanguage,
@@ -25,7 +25,7 @@ let renderSeq = 0;
  * Module-level `(language, source, theme) → SVG` cache (render caching,
  * ADR-0005 option 9a), SHARED between the desktop widget and the web island. An
  * identical diagram paints instantly from memory rather than re-rendering.
- * Holds post-`sanitise` SVG. Keyed by `diagramCacheKey`.
+ * Holds post-`sanitise` SVG. Keyed by `languageCacheKey`.
  */
 const svgCache = new Map<string, string>();
 
@@ -127,7 +127,7 @@ export async function renderDiagram(
 
   ensureStylesheet(language);
 
-  const key = diagramCacheKey(language.id, source, theme);
+  const key = languageCacheKey(language, source, theme);
 
   // Cache hit: an identical diagram was rendered before — paint synchronously
   // from memory, no fresh render.

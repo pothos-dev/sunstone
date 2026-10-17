@@ -83,6 +83,14 @@ export interface DiagramLanguage {
    * CSS custom properties instead of a re-render.
    */
   readonly stylesheet?: string;
+  /**
+   * True when the rendered SVG does not depend on the theme because the
+   * language's `stylesheet` colours it through CSS custom properties (D2). The
+   * render cache then holds one entry for both themes, so a light/dark flip
+   * repaints the cached SVG and the stylesheet recolours it, with no re-render.
+   * Omit for a language that bakes colours in at render time (mermaid).
+   */
+  readonly themedByStylesheet?: boolean;
 }
 
 /** The no-op `sanitise` for a language whose engine emits safe SVG itself. */
@@ -110,6 +118,18 @@ export function findDiagramLanguage(
  */
 export function diagramCacheKey(language: string, source: string, theme: ResolvedTheme): string {
   return `${language} ${theme} ${source}`;
+}
+
+/**
+ * The cache key for one diagram in `language`: `diagramCacheKey`, with the
+ * theme dropped (pinned to `light`) for a language themed by its stylesheet.
+ */
+export function languageCacheKey(
+  language: DiagramLanguage,
+  source: string,
+  theme: ResolvedTheme,
+): string {
+  return diagramCacheKey(language.id, source, language.themedByStylesheet ? 'light' : theme);
 }
 
 const rendererPromises = new Map<string, Promise<DiagramRenderer>>();

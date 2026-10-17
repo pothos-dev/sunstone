@@ -3,6 +3,7 @@
 // viewer and on paper — all three read this one list.
 
 import type { DiagramLanguage } from './diagramLanguage';
+import { d2Language } from './d2Language';
 import { mermaidLanguage } from './mermaidLanguage';
 
-export const DIAGRAM_LANGUAGES: readonly DiagramLanguage[] = [mermaidLanguage];
+export const DIAGRAM_LANGUAGES: readonly DiagramLanguage[] = [mermaidLanguage, d2Language];

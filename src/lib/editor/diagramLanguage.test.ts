@@ -7,6 +7,7 @@ import {
   diagramClasses,
   findDiagramLanguage,
   identity,
+  languageCacheKey,
   rendererFor,
   type DiagramLanguage,
   type DiagramRenderer,
@@ -47,6 +48,14 @@ describe('findDiagramLanguage', () => {
   test('mermaid is registered', () => {
     expect(findDiagramLanguage(DIAGRAM_LANGUAGES, 'mermaid')?.id).toBe('mermaid');
   });
+
+  test('d2 is registered, sanitised and themed by its stylesheet', () => {
+    const d2 = findDiagramLanguage(DIAGRAM_LANGUAGES, 'D2');
+    expect(d2?.id).toBe('d2');
+    expect(d2?.sanitise).not.toBe(identity);
+    expect(d2?.themedByStylesheet).toBe(true);
+    expect(d2?.stylesheet).toContain('.fill-N1');
+  });
 });
 
 describe('diagramCacheKey', () => {
@@ -72,6 +81,20 @@ describe('diagramCacheKey', () => {
     expect(diagramCacheKey('d2', 'light x', 'dark')).not.toBe(
       diagramCacheKey('d2', 'x', 'light'),
     );
+  });
+});
+
+describe('languageCacheKey', () => {
+  test('a language that bakes its theme keys on the theme', () => {
+    const lang = fakeLanguage('baked');
+    expect(languageCacheKey(lang, 'x', 'light')).toBe(diagramCacheKey('baked', 'x', 'light'));
+    expect(languageCacheKey(lang, 'x', 'dark')).toBe(diagramCacheKey('baked', 'x', 'dark'));
+  });
+
+  test('a stylesheet-themed language shares one entry across themes', () => {
+    const lang = { ...fakeLanguage('styled'), themedByStylesheet: true };
+    expect(languageCacheKey(lang, 'x', 'dark')).toBe(languageCacheKey(lang, 'x', 'light'));
+    expect(languageCacheKey(lang, 'y', 'dark')).not.toBe(languageCacheKey(lang, 'x', 'dark'));
   });
 });
 
