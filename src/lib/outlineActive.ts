@@ -11,7 +11,7 @@
 // heading in the last screenful can never reach the probe and would never light
 // up — not even when its own Outline entry is clicked. Rather than pad the
 // document (CodeMirror's `scrollPastEnd()`, and an equivalent hand-rolled
-// spacer, both break the mermaid extension's render loop), the editor reports
+// spacer, both break the diagram extension's render loop), the editor reports
 // the line at the viewport BOTTOM once it is scrolled to the end. The rule stays
 // "the last heading at or above the reported line", so the final heading in view
 // wins — which is what "you are at the end of the Concept" should look like.

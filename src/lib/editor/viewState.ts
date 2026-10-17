@@ -1,12 +1,12 @@
 import { Compartment } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import type { BuildEditorOptions, EditorMode } from './cm';
-import type { ResolvedTheme } from './mermaidBlocks';
+import type { ResolvedTheme } from './diagramLanguage';
 
 /**
  * Per-`EditorView` "session state" that used to live as five parallel WeakMaps
  * (`viewOptions`, `viewPath`, `viewWikiCompartment`, `viewLivePreviewCompartment`,
- * `viewMode`, `viewMermaidTheme`) keyed separately by the same `view`. Centralized
+ * `viewMode`, `viewDiagramTheme`) keyed separately by the same `view`. Centralized
  * here as one record behind one WeakMap so callers get/set a single entry instead
  * of touching five maps with repeated `.get(view) ?? default` boilerplate.
  */
@@ -16,7 +16,7 @@ interface ViewSession {
   wikiCompartment?: Compartment;
   livePreviewCompartment?: Compartment;
   mode?: EditorMode;
-  mermaidTheme?: ResolvedTheme;
+  diagramTheme?: ResolvedTheme;
 }
 
 const sessions = new WeakMap<EditorView, ViewSession>();
@@ -37,7 +37,7 @@ export function initViewSession(
   wikiCompartment: Compartment,
   livePreviewCompartment: Compartment,
   mode: EditorMode,
-  mermaidTheme: ResolvedTheme,
+  diagramTheme: ResolvedTheme,
 ): void {
   sessions.set(view, {
     options,
@@ -45,7 +45,7 @@ export function initViewSession(
     wikiCompartment,
     livePreviewCompartment,
     mode,
-    mermaidTheme,
+    diagramTheme,
   });
 }
 
@@ -91,10 +91,10 @@ export function setViewMode(view: EditorView, mode: EditorMode): void {
   session(view).mode = mode;
 }
 
-export function getViewMermaidTheme(view: EditorView): ResolvedTheme | undefined {
-  return sessions.get(view)?.mermaidTheme;
+export function getViewDiagramTheme(view: EditorView): ResolvedTheme | undefined {
+  return sessions.get(view)?.diagramTheme;
 }
 
-export function setViewMermaidTheme(view: EditorView, theme: ResolvedTheme): void {
-  session(view).mermaidTheme = theme;
+export function setViewDiagramTheme(view: EditorView, theme: ResolvedTheme): void {
+  session(view).diagramTheme = theme;
 }

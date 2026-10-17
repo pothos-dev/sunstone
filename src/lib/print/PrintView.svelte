@@ -4,7 +4,7 @@
   import { loadAppearance } from '$lib/state/theme.svelte';
   import { createLatestGuard } from '$lib/asyncGuard';
   import type { RenderPayload } from '$lib/types';
-  import { hydrateMermaid } from '$lib/web/webMermaid';
+  import { hydrateDiagrams } from '$lib/web/webDiagram';
   import { wireRemoteEmbeds } from '$lib/web/remoteEmbed';
   import { conceptTitle } from '$lib/web/conceptUrl';
   import { trustHtml } from '$lib/trust';
@@ -108,8 +108,8 @@
         if (h1) h1.insertAdjacentHTML('afterend', trustHtml(payload.trust));
         else bodyEl.insertAdjacentHTML('afterbegin', trustHtml(payload.trust));
       }
-      // Force light Mermaid — dark diagrams read wrong / waste ink on paper.
-      await hydrateMermaid(bodyEl, 'light');
+      // Force light Diagrams — dark diagrams read wrong / waste ink on paper.
+      await hydrateDiagrams(bodyEl, 'light');
       await appearanceLoaded;
       await document.fonts?.ready;
       if (!renderGuard.isLatest(token)) return;
@@ -457,7 +457,7 @@
 
     .print-page :global(pre),
     .print-page :global(table),
-    .print-page :global(.web-mermaid) {
+    .print-page :global(.web-diagram) {
       break-inside: avoid;
     }
 

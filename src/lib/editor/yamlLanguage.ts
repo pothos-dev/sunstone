@@ -4,7 +4,7 @@
 // Everything in this module is behind a dynamic `import()` in
 // `frontmatterEditor.ts`, so none of it — grammar, parser tables, lint panel —
 // is fetched while the Frontmatter Region is collapsed, which is its default
-// state. Same shape as `hydrateMermaid`: the surface renders first, the heavy
+// state. Same shape as `hydrateDiagrams`: the surface renders first, the heavy
 // language support lands a tick later.
 
 import { yaml as yamlLanguage } from '@codemirror/lang-yaml';

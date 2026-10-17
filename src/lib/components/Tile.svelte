@@ -4,7 +4,7 @@
   // header, the live-preview view mode, autosave, undo/redo, the review-diff
   // toggle + history stepper, PDF export, the formatting context menu +
   // annotation popup, link / wikilink click navigation (within THIS Tile, pushing
-  // THIS Tile's history), broken-link decorations, mermaid theme-sync, and the
+  // THIS Tile's history), broken-link decorations, diagram theme-sync, and the
   // Frontmatter Region (rendered inline in EVERY visible tile when the global
   // `session.frontmatterShown` toggle is on, showing THIS tile's Concept's
   // frontmatter as YAML; only the ACTIVE tile's is wired to the 'frontmatter'
@@ -34,7 +34,7 @@
     buildEditor,
     setEditorConcept,
     setEditorMode,
-    setEditorMermaidTheme,
+    setEditorDiagramTheme,
     refreshBrokenLinkDecorations,
     reconfigureWikiLinks,
     scrollToLine,
@@ -119,7 +119,7 @@
   let editorParent = $state<HTMLDivElement | null>(null);
   // `view` itself is deliberately NOT reactive (it is built once and mutated
   // through CodeMirror's own API). Making it `$state` would make every effect
-  // that null-checks it (mode, links, theme, mermaid) re-run once on build.
+  // that null-checks it (mode, links, theme, diagrams) re-run once on build.
   // The template reads it only through `viewReady`, which IS reactive: the
   // Frontmatter Region needs to re-read `view` the moment it exists, because
   // the YAML editor hangs off the body editor's state (ADR 0008).
@@ -669,10 +669,10 @@
     review.syncTheme(resolved);
   });
 
-  // Mermaid theme-sync (ADR-0005).
+  // Diagram theme-sync (ADR-0005/0014).
   $effect(() => {
     const resolved = theme.resolved;
-    if (view) setEditorMermaidTheme(view, resolved);
+    if (view) setEditorDiagramTheme(view, resolved);
   });
 
   onDestroy(() => {

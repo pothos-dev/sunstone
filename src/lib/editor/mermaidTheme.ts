@@ -1,19 +1,14 @@
 // Mermaid Diagram theming — PURE, DOM- and CodeMirror-free.
 //
-// Extracted from `mermaidBlocks.ts` so BOTH consumers can share the exact same
-// token→mermaid-variable mapping without dragging CodeMirror into their bundle:
-//   - the desktop editor's mermaid StateField (`editor/mermaid.ts`), and
-//   - the web viewer's client-side mermaid island (`web/webMermaid.ts`).
-// `mermaidBlocks.ts` re-exports these so its existing importers are unchanged.
+// Mermaid's renderer input: the token→mermaid-variable mapping that themes a
+// Diagram with the app palette. Used by the mermaid language
+// (`mermaidLanguage.ts`) on every surface the diagram seam renders on (the
+// editor field and the web/print island). `ResolvedTheme` / `CssVarReader`
+// are the seam's own types, re-exported here for existing importers.
 
-/**
- * The app's resolved colour scheme (mirrors `state/theme.svelte.ts`'s
- * `ResolvedTheme`). Kept dependency-free so this module stays pure.
- */
-export type ResolvedTheme = 'light' | 'dark';
+import type { CssVarReader, ResolvedTheme } from './diagramLanguage';
 
-/** Reads a resolved CSS custom-property value, e.g. `read('--bg')`. */
-export type CssVarReader = (name: string) => string;
+export type { CssVarReader, ResolvedTheme } from './diagramLanguage';
 
 /** The mermaid init config (subset) that themes a Diagram with the app palette. */
 export interface MermaidThemeConfig {
@@ -91,11 +86,12 @@ export function mermaidThemeConfig(read: CssVarReader, resolved: ResolvedTheme):
 }
 
 /**
- * The cache/identity key for a rendered diagram (render-caching, ADR-0005): a
- * baked SVG depends on BOTH the source and the resolved theme (mermaid bakes
- * colours in at render time), so any `source→SVG` cache must key on exactly that
- * pair. The theme is a fixed `'light'|'dark'` token with no spaces, so a
- * space-delimited prefix can never collide with source text.
+ * Mermaid's `(source, theme)` identity: a baked mermaid SVG depends on BOTH the
+ * source and the resolved theme (mermaid bakes colours in at render time). The
+ * seam's render cache keys on `diagramCacheKey` (`diagramLanguage.ts`), which
+ * adds the language in front of this same pair. The theme is a fixed
+ * `'light'|'dark'` token with no spaces, so a space-delimited prefix can never
+ * collide with source text.
  */
 export function mermaidCacheKey(source: string, theme: ResolvedTheme): string {
   return `${theme} ${source}`;

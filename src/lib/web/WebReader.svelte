@@ -19,7 +19,7 @@
   import WebTags from './WebTags.svelte';
   import WebOutline from './WebOutline.svelte';
   import WebBacklinks from './WebBacklinks.svelte';
-  import { hydrateMermaid } from './webMermaid';
+  import { hydrateDiagrams } from './webDiagram';
   import { wireRemoteEmbeds } from './remoteEmbed';
   import { loadUiState, saveUiState } from './uiState';
   import { snapshotWebViewerUiState, restoreWebViewerUiState } from './webViewerUiState';
@@ -217,13 +217,13 @@
     document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // --- Mermaid Diagrams (themed by `theme.resolved`) ---
+  // --- Diagrams (themed by `theme.resolved`) ---
   let articleEl = $state<HTMLElement | null>(null);
   $effect(() => {
     void data.rendered?.html;
     const resolved = theme.resolved;
     const el = articleEl;
-    if (el) void hydrateMermaid(el, resolved);
+    if (el) void hydrateDiagrams(el, resolved);
   });
 
   // --- Remote Embeds: click-to-load (af-1) ---
@@ -1151,7 +1151,7 @@
   }
 
   /* Rendered-body content styles (prose typography, links, broken-link,
-     CriticMarkup marks + light/dark variants, Mermaid) live in the shared
+     CriticMarkup marks + light/dark variants, Diagrams) live in the shared
      global stylesheet `src/lib/rendered.css`, so the print/PDF preview
      (`PrintView`) styles the SAME server-rendered HTML identically. Printing is
      now handled by the dedicated chrome-free print tab (`/?print=<path>`), not

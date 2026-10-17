@@ -9,7 +9,7 @@ import {
   frontmatterField,
   fencesField,
 } from './frontmatter-field';
-import type { ResolvedTheme } from './mermaidBlocks';
+import type { ResolvedTheme } from './diagramLanguage';
 import { wikiLinksExtension } from './wiki-links';
 import {
   programmatic,
@@ -30,8 +30,8 @@ import {
   ensureLivePreviewCompartment,
   getViewMode,
   setViewMode,
-  getViewMermaidTheme,
-  setViewMermaidTheme,
+  getViewDiagramTheme,
+  setViewDiagramTheme,
 } from './viewState';
 
 // The editor's public surface is re-exported here so consumers keep importing
@@ -135,7 +135,7 @@ function inheritedTheme(parent: HTMLElement): 'light' | 'dark' {
 
 /**
  * Per-view session state (build options, Concept path, the wikilink/mode
- * Compartments, the current mode, and the mermaid theme) lives in `viewState.ts`
+ * Compartments, the current mode, and the diagram theme) lives in `viewState.ts`
  * as one record per `EditorView`, keyed there rather than via five separate
  * WeakMaps here — see `initViewSession` and its `getView*`/`setView*` accessors.
  */
@@ -312,14 +312,14 @@ export function reconfigureWikiLinks(view: EditorView): void {
  * does NOT reconcile block-widget DOM for an in-place decoration change, so a
  * StateEffect would leave existing diagrams stale. Instead we RECONFIGURE the
  * mode Compartment with the new theme — a full rebuild of the mode slice that
- * re-runs every diagram's `toDOM`, re-rendering it in the new scheme. App.svelte
+ * re-runs every diagram's `toDOM`, re-rendering it in the new scheme. Tile.svelte
  * calls this from the `$effect` mirroring `theme.resolved`. No-op when the theme
  * is unchanged or before the compartment exists.
  */
-export function setEditorMermaidTheme(view: EditorView, resolved: ResolvedTheme): void {
+export function setEditorDiagramTheme(view: EditorView, resolved: ResolvedTheme): void {
   const compartment = getLivePreviewCompartment(view);
-  if (!compartment || getViewMermaidTheme(view) === resolved) return;
-  setViewMermaidTheme(view, resolved);
+  if (!compartment || getViewDiagramTheme(view) === resolved) return;
+  setViewDiagramTheme(view, resolved);
   reconfigureMode(view, compartment);
 }
 
@@ -330,13 +330,13 @@ function getEditorMode(view: EditorView): EditorMode {
 
 /** The view's diagram theme (`light` until one has been set). */
 function viewTheme(view: EditorView): ResolvedTheme {
-  return getViewMermaidTheme(view) ?? 'light';
+  return getViewDiagramTheme(view) ?? 'light';
 }
 
 /**
  * Rebuild the mode Compartment from the view's CURRENT remembered mode + theme
  * and its build options — the shared tail of `setEditorMode` and
- * `setEditorMermaidTheme`, which record the new value first.
+ * `setEditorDiagramTheme`, which record the new value first.
  */
 function reconfigureMode(view: EditorView, compartment: Compartment): void {
   view.dispatch({

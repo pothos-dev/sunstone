@@ -36,7 +36,7 @@ import {
 //     block decorations), and one field serves the inline case too.
 //
 // The placement/render decisions are all in the pure, unit-tested `embedPlan.ts`
-// (the `mermaidBlocks.ts` / `mermaid.ts` split). This module is the CM/DOM shell
+// (the `diagramBlocks.ts` / `diagram.ts` split). This module is the CM/DOM shell
 // only: the field, the widget, the `dimensionCache`, the click gestures and the
 // `cm-embed-*` styling. The `<img>` itself and the two placeholders use the
 // SHARED class names (`embed-image` / `embed-broken` / `embed-remote`) and the

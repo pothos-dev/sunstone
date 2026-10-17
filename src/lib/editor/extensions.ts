@@ -36,9 +36,9 @@ import {
   frontmatterUndo,
 } from './frontmatter-field';
 import { brokenLinks, brokenLinkTheme, type BrokenLinkContext } from './broken-links';
-import { mermaidBlocks } from './mermaid';
+import { diagramBlocks } from './diagram';
 import { embedBlocks } from './embeds';
-import type { ResolvedTheme } from './mermaidBlocks';
+import type { ResolvedTheme } from './diagramLanguage';
 import { wikiLinksExtension, wikiLinkTheme, type WikiLinkContext } from './wiki-links';
 import { citations, citationTheme } from './citations';
 import { footnotes, footnoteTheme } from './footnotes';
@@ -253,10 +253,11 @@ export function modeExtensions(
     // the Embed is alone on its line, inline in flow otherwise — over the source
     // `inlinePreview` hides, so it must come BEFORE `inlinePreview` below.
     embedBlocks(reading, currentPath ?? (() => '')),
-    // Render ` ```mermaid ` fences as Diagrams (ADR-0005). `reading` (read):
+    // Render diagram fences (` ```mermaid `, every language registered in
+    // `diagramLanguages.ts`) as Diagrams (ADR-0005/0014). `reading` (read):
     // always rendered; `editing`: cursor inside reveals the raw fence.
     // `theme` bakes the diagram colours; a flip reconfigures this Compartment.
-    mermaidBlocks(reading, theme),
+    diagramBlocks(reading, theme),
     inlinePreview({ onLinkClick, alwaysRender: reading }),
     // Citation references: inline `[n]` following a word render as superscript
     // links that jump to the `[n] …` row of the citation table (citation-
