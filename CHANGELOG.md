@@ -4,6 +4,21 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-10-17
+
+### Added
+
+- D2 diagrams. A ```d2 code block renders as a diagram in editing
+  and read mode, the web viewer and the PDF export. It is drawn in the
+  app's colours and follows a theme switch; colours you set in the
+  diagram are kept. D2 loads only when a Concept contains a D2 block,
+  and external icons are never fetched.
+
+### Fixed
+
+- The print preview uses the light colours it prints with, also when
+  the app is in dark mode.
+
 ## [0.26.0] - 2026-10-15
 
 ### Added
