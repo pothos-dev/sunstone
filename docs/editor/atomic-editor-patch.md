@@ -11,7 +11,7 @@ timestamp: 2026-07-23
 
 Sunstone applies a single local patch to its live-preview dependency, `patches/@atomic-editor%2Feditor@0.4.3.patch`, referenced from `package.json` under the `patchedDependencies`-style `"@atomic-editor/editor@0.4.3"` key so Bun re-applies it on every install. It patches the package's built `dist/` output (the package ships compiled JS/`.d.ts`, no source). This is the "custom patches we have written" to the [atomic-editor](/editor/atomic-editor.md) dependency; Sunstone's own from-scratch extensions live in [custom CodeMirror extensions](/editor/custom-extensions.md) instead.
 
-The patch is preferred over a fork because the changes are small and additive, and [ADR-0001](/adr/0001-codemirror-hybrid-live-preview.md) already anticipates vendoring pieces of a young, single-maintainer dependency. Where a change would be too invasive (rendering multi-line fenced bodies as widgets), Sunstone writes a sibling extension instead — see [mermaid rendering](/editor/custom-extensions.md) and [ADR-0005](/adr/0005-mermaid-block-rendering.md).
+The patch is preferred over a fork because the changes are small and additive, and [ADR-0001](/adr/0001-codemirror-hybrid-live-preview.md) already anticipates vendoring pieces of a young, single-maintainer dependency. Where a change would be too invasive (rendering multi-line fenced bodies as widgets), Sunstone writes a sibling extension instead — see [diagram rendering](/editor/custom-extensions.md) and [ADR-0005](/adr/0005-mermaid-block-rendering.md).
 
 ## What the patch changes
 
@@ -37,7 +37,7 @@ The table-widget cell parser (`parseCellInline` / `matchCellMarkAt`) gained a `c
 
 ### 6. Re-export `treeGrowthEffect` / `treeProgressPlugin` from the package root
 
-The package's budgeted-parse signals live in a `./tree-progress` module that isn't exposed via the package's export map. The patch re-exports `treeGrowthEffect` and `treeProgressPlugin` from `dist/index.js` (and `index.d.ts`) so [`mermaidBlocks`](/editor/custom-extensions.md) can subscribe to them and re-render fences that were parsed _after_ the initial 200ms parse window (relevant for long documents).
+The package's budgeted-parse signals live in a `./tree-progress` module that isn't exposed via the package's export map. The patch re-exports `treeGrowthEffect` and `treeProgressPlugin` from `dist/index.js` (and `index.d.ts`) so [`diagramBlocks`](/editor/custom-extensions.md) can subscribe to them and re-render fences that were parsed _after_ the initial 200ms parse window (relevant for long documents).
 
 ## Upgrading atomic-editor
 

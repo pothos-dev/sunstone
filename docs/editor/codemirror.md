@@ -34,7 +34,7 @@ The keystone module is **`src/lib/editor/cm.ts`** — the editor _builder_. It o
 ```mermaid
 flowchart TD
   P["GFM parser + atomic syntax + atomic theme<br/>(livePreviewBase — every mode)"]
-  M["mode Compartment<br/>tables · embedBlocks · mermaidBlocks · inlinePreview ·<br/>citations · criticMarkup · readOnly/editable"]
+  M["mode Compartment<br/>tables · embedBlocks · diagramBlocks · inlinePreview ·<br/>citations · criticMarkup · readOnly/editable"]
   F["find panel + keymap"]
   B["brokenLinks (conditional)"]
   W["wikilink Compartment (conditional)"]
@@ -53,7 +53,7 @@ The `frontmatterField` / `fencesField` (see [custom-extensions](/editor/custom-e
 
 Two [CodeMirror `Compartment`s](https://codemirror.net/docs/ref/#state.Compartment) let the host change behaviour on a live view without tearing it down (so document, history and selection all survive):
 
-- **The mode Compartment** (`livePreviewCompartment`) holds the mode-dependent slice — which decoration extensions apply and the `readOnly`/`editable` facets. `setEditorMode(view, 'edit' | 'hybrid' | 'view')` reconfigures it. This same compartment is _also_ how the mermaid theme flips: `setEditorMermaidTheme` reconfigures it to re-run every diagram's `toDOM` in the new scheme, because CodeMirror does not reconcile block-widget DOM for an in-place decoration change (see [ADR-0005](/adr/0005-mermaid-block-rendering.md)).
+- **The mode Compartment** (`livePreviewCompartment`) holds the mode-dependent slice — which decoration extensions apply and the `readOnly`/`editable` facets. `setEditorMode(view, 'edit' | 'hybrid' | 'view')` reconfigures it. This same compartment is _also_ how the diagram theme flips: `setEditorDiagramTheme` reconfigures it to re-run every diagram's `toDOM` in the new scheme, because CodeMirror does not reconcile block-widget DOM for an in-place decoration change (see [ADR-0005](/adr/0005-mermaid-block-rendering.md)).
 - **The wikilink Compartment** (`wikiCompartment`) wraps atomic-editor's `wikiLinks` extension. atomic-editor's resolve-cache has no invalidation API, so `reconfigureWikiLinks` recreates the extension (and thus its `StateField` and cache) when the Bundle index changes. See [ADR-0004](/adr/0004-wikilinks-optional-secondary-name-based.md).
 
 ## View modes
@@ -66,7 +66,7 @@ Two [CodeMirror `Compartment`s](https://codemirror.net/docs/ref/#state.Compartme
 
 ## Per-view state (WeakMaps)
 
-Because the imperative API operates on a bare `EditorView`, `cm.ts` keeps its side-band state in module-level `WeakMap`s keyed by the view (auto-collected when the view is GC'd): `viewOptions` (the original `BuildEditorOptions`, so a rebuild reuses the same listeners), `viewPath` (Concept-switch detection), `viewWikiCompartment` / `viewLivePreviewCompartment` (the two compartment instances), `viewMode`, and `viewMermaidTheme` (so mode and theme survive a state rebuild).
+Because the imperative API operates on a bare `EditorView`, `cm.ts` keeps its side-band state in module-level `WeakMap`s keyed by the view (auto-collected when the view is GC'd): `viewOptions` (the original `BuildEditorOptions`, so a rebuild reuses the same listeners), `viewPath` (Concept-switch detection), `viewWikiCompartment` / `viewLivePreviewCompartment` (the two compartment instances), `viewMode`, and `viewDiagramTheme` (so mode and theme survive a state rebuild).
 
 ## Concept switch vs in-place reload
 

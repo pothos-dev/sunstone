@@ -26,13 +26,13 @@ All are imported in `src/lib/editor/cm.ts` from `@atomic-editor/editor`:
 | `atomicEditorTheme` | The base editor theme (reads `data-theme` on the CM root for light/dark). |
 | `wikiLinks` | `[[name]]` rendering — enabled as an _optional secondary_ format ([ADR-0004](/adr/0004-wikilinks-optional-secondary-name-based.md)), wrapped by [Sunstone's adapter](/editor/custom-extensions.md). |
 | `ATOMIC_CODE_LANGUAGES` (`@atomic-editor/editor/code-languages`) | Lazy-loaded fenced-code grammars — each entry's `load()` is a dynamic `import('@codemirror/lang-*')`, so grammars split into their own chunks and only load per language actually used. |
-| `treeGrowthEffect`, `treeProgressPlugin` | Signal that budgeted parsing has advanced; used by [`mermaidBlocks`](/editor/custom-extensions.md) to re-render fences parsed after the initial parse window. **Only reachable via the [patch](/editor/atomic-editor-patch.md)** — upstream doesn't export them from the root. |
+| `treeGrowthEffect`, `treeProgressPlugin` | Signal that budgeted parsing has advanced; used by [`diagramBlocks`](/editor/custom-extensions.md) to re-render fences parsed after the initial parse window. **Only reachable via the [patch](/editor/atomic-editor-patch.md)** — upstream doesn't export them from the root. |
 
 The GFM parser wiring — `markdown({ base: markdownLanguage, codeLanguages: ATOMIC_CODE_LANGUAGES })` — is the keystone: without `base: markdownLanguage` the parser is pure CommonMark and inline-preview never sees Task/Table nodes; without `codeLanguages` fenced blocks have no grammar to highlight.
 
 ## What Sunstone does NOT take from atomic-editor
 
 - **Primary link resolution.** OKF uses standard markdown links (`/abs.md`, `./rel.md`), resolved by path; Sunstone writes its own [broken-link](/editor/custom-extensions.md) styling and OKF navigation rather than atomic-editor's link model. `wikiLinks` is the deliberate exception, and only for the secondary name-based format.
-- **A generic block-renderer seam.** atomic-editor exposes no generic block extension point — each block type (`tables`, `imageBlocks`) is a dedicated field — so [mermaid rendering](/editor/custom-extensions.md) is written as a _sibling_ `StateField` alongside them, not on top of them ([ADR-0005](/adr/0005-mermaid-block-rendering.md)).
+- **A generic block-renderer seam.** atomic-editor exposes no generic block extension point — each block type (`tables`, `imageBlocks`) is a dedicated field — so [diagram rendering](/editor/custom-extensions.md) is written as a _sibling_ `StateField` alongside them, not on top of them ([ADR-0005](/adr/0005-mermaid-block-rendering.md), [ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md)).
 
 Sunstone's own extensions that layer on top of this base are documented in [custom CodeMirror extensions](/editor/custom-extensions.md); the local modifications to this package are in the [vendored patch](/editor/atomic-editor-patch.md).

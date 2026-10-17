@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Sunstone's own CodeMirror extensions
-description: The CodeMirror 6 extensions Sunstone writes itself on top of atomic-editor — mermaid, wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
-tags: [editor, codemirror, extensions, decorations, criticmarkup, mermaid]
+description: The CodeMirror 6 extensions Sunstone writes itself on top of atomic-editor — diagrams (mermaid), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
+tags: [editor, codemirror, extensions, decorations, criticmarkup, mermaid, diagrams]
 timestamp: 2026-07-23
 ---
 
@@ -10,11 +10,11 @@ timestamp: 2026-07-23
 
 On top of the [atomic-editor](/editor/atomic-editor.md) live-preview base, Sunstone writes its own CodeMirror 6 extensions for OKF-specific concerns. They all live in `src/lib/editor/` and are assembled by the [`cm.ts` builder](/editor/codemirror.md).
 
-They follow one house rule (also the repo-wide convention): **pure logic lives in a plain `.ts` module** so it can be unit-tested over strings, and a **thin CM shell** wires it into `StateField`/`ViewPlugin`/`Decoration`. `criticMarkup.ts` (pure) vs `criticMarkupView.ts` (CM wiring), and `mermaidBlocks.ts` (pure detection) vs `mermaid.ts` (CM widget) are the clearest examples; `textFormat.ts`, `review.ts` and `reviewStepper.ts` are pure and imported by command wiring in `cm.ts`/`App.svelte`.
+They follow one house rule (also the repo-wide convention): **pure logic lives in a plain `.ts` module** so it can be unit-tested over strings, and a **thin CM shell** wires it into `StateField`/`ViewPlugin`/`Decoration`. `criticMarkup.ts` (pure) vs `criticMarkupView.ts` (CM wiring), and `diagramBlocks.ts` (pure detection) vs `diagram.ts` (CM widget) are the clearest examples; `textFormat.ts`, `review.ts` and `reviewStepper.ts` are pure and imported by command wiring in `cm.ts`/`App.svelte`.
 
 | Extension | File(s) | CM primitive | Purpose |
 | --- | --- | --- | --- |
-| Mermaid diagrams | `mermaid.ts`, `mermaidBlocks.ts`, `mermaidTheme.ts` | `StateField` + block-replace `WidgetType` | Render ` ```mermaid ` fences as SVG |
+| Diagrams | `diagram.ts`, `diagramBlocks.ts`, `diagramRender.ts`, `diagramLanguage.ts`, `diagramLanguages.ts`; mermaid in `mermaidLanguage.ts`, `mermaidTheme.ts` | `StateField` + block-replace `WidgetType` | Render diagram fences (` ```mermaid `) as SVG |
 | Embedded images | `embeds.ts`, `embedPlan.ts`, `embedLightbox.ts` | `StateField` + point `WidgetType` | Render an Embed's Attachment as an `<img>` |
 | Wikilinks | `wiki-links.ts` | atomic `wikiLinks` + overlay `ViewPlugin` | `[[name]]` rendering / navigation |
 | Broken links | `broken-links.ts` | `ViewPlugin` + `StateEffect` | Dashed-red styling of unresolved `[](…)` |
@@ -31,11 +31,24 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | Formatting | `textFormat.ts` | pure transforms → `cm.ts` commands | Bold/italic/heading/link toggles |
 | Review toggle | `review.ts`, `reviewStepper.ts` | pure decision/index logic | Enable + drive the git-diff review view |
 
-## Mermaid diagrams
+## Diagrams
 
-`mermaidBlocks(reading, theme)` renders ` ```mermaid ` fences as SVG. `mermaidBlocks.ts` is the pure detection layer: it walks the syntax tree (`ensureSyntaxTree` with a 200ms parse budget) for `FencedCode` nodes whose info string is `mermaid`, returning each fence's body and document range; `selectionTouches` decides the hybrid-mode reveal. `mermaid.ts` is the CM shell: a `StateField<DecorationSet>` providing `Decoration.replace({ block: true })` over each fence, driven by a `MermaidWidget` `WidgetType`. atomic-editor exposes no generic block-renderer seam, so this is a _sibling_ field, not a plugin on top of `imageBlocks`/`tables` ([ADR-0005](/adr/0005-mermaid-block-rendering.md)). Notable techniques: mermaid is lazy-loaded (`import('mermaid')`, `securityLevel: 'strict'`) only when the doc has a diagram; a module-level `source→SVG` cache plus a per-host generation token keep repaints cheap and discard stale async renders; `WidgetType.eq()` is keyed on `(source, theme, reading)`; and theme flips go through a [Compartment reconfigure](/editor/codemirror.md) because CM won't reconcile block-widget DOM in place. `mermaidTheme.ts` is CM-free (shared with the web viewer) and maps app CSS variables to concrete mermaid `themeVariables` — concrete values, because mermaid bakes colours into the SVG. It depends on the [patched](/editor/atomic-editor-patch.md) `treeGrowthEffect` re-export to re-render fences parsed after the initial budget.
+`diagramBlocks(reading, theme)` (`diagram.ts`) renders diagram fences as SVG, for every language registered in `diagramLanguages.ts`; ` ```mermaid ` is the first ([ADR-0005](/adr/0005-mermaid-block-rendering.md), amended by [ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md)). The pipeline is split into a language-agnostic seam and one small module per language:
 
-[ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md) generalises this field into one renderer for every diagram language, with mermaid as the first and D2 as the second ([diagram-rendering](/tickets/diagram-rendering/README.md)). Until dr-1 lands, the description above is the code.
+| File | Role |
+| --- | --- |
+| `diagramLanguage.ts` | Pure, CM- and DOM-free. The `DiagramLanguage` contract, `findDiagramLanguage` (info string → language), `diagramCacheKey(language, source, theme)`, the `rendererFor` lazy-loader memo, `diagramClasses` |
+| `diagramLanguages.ts` | The registry: `DIAGRAM_LANGUAGES`, one line per language. Editor, web viewer and print all read it |
+| `diagramBlocks.ts` | Pure detection over the CM tree: `findDiagramBlocks` (`ensureSyntaxTree`, 200ms budget) returns each fence's language, body and range; `selectionTouches` decides the reveal while `editing` |
+| `diagramRender.ts` | The DOM render engine shared by the editor and the web island: placeholder, error panel, `(language, source, theme) → SVG` cache, per-host generation token, the `sanitise` hook, the language stylesheet |
+| `diagram.ts` | The CM shell: a `StateField<DecorationSet>` providing `Decoration.replace({ block: true })` over each fence, a `DiagramWidget` with the double-click / hover-hint edit affordance, and the shared `cm-diagram-*` styles |
+| `mermaidLanguage.ts` | Mermaid: the only module that imports `mermaid` or sets `securityLevel: 'strict'` |
+| `mermaidTheme.ts` | Mermaid's renderer input: app CSS variables → concrete mermaid `themeVariables` (concrete, because mermaid bakes colours into the SVG) |
+| `mermaidBlocks.ts` | Mermaid-only views (`findMermaidBlocks`, `hasMermaidBlock`) over the generic detection |
+
+A language is a `DiagramLanguage` object: `id` (the fence info string, lower-case; it also names the language's CSS classes and the web error panel's `data-testid`, `<id>-error`), `load()` (a dynamic `import()` of the engine that resolves to a `DiagramRenderer`, `({ source, theme, read, renderId }) => Promise<svg>`, rejecting with the message the error panel shows), `sanitise(svg)` (required; dr-2's sanitiser plugs in here, mermaid passes `identity`), and an optional scoped `stylesheet` injected once. `renderId` is unique per render, usable as a DOM id (mermaid) or an id salt. Adding a language is that module plus a line in `diagramLanguages.ts`.
+
+Every element the seam creates carries a generic class (styled once) and the language's own: `cm-diagram cm-mermaid`, `cm-diagram-error cm-mermaid-error`, on the web `web-diagram-render web-mermaid-render`. atomic-editor exposes no generic block-renderer seam, so the field is a _sibling_ of `imageBlocks`/`tables`, not a plugin on top of them. Notable techniques: a language's engine loads only when a fence in it renders; the module-level cache plus the per-host generation token keep repaints cheap and discard stale async renders; `WidgetType.eq()` is keyed on `(language, source, theme, reading)`; and theme flips (`setEditorDiagramTheme`) go through a [Compartment reconfigure](/editor/codemirror.md) because CM won't reconcile block-widget DOM in place. The field depends on the [patched](/editor/atomic-editor-patch.md) `treeGrowthEffect` re-export to re-render fences parsed after the initial budget. The web viewer and the print path hydrate the server's inert `<pre><code class="language-<id>">` blocks through `web/webDiagram.ts` (`hydrateDiagrams`), over the same engine and registry; print forces the light theme.
 
 ## Embedded images
 
