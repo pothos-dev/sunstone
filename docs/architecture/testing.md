@@ -30,6 +30,8 @@ bun test src/lib/ipc/http.test.ts      # a single file
 
 This covers, among others: path/tree helpers and the `frontmatter.ts` YAML text helpers, the `fake` backend's own modules (`src/lib/ipc/fake/*.test.ts`), `http.ts` SSE-payload parsing (`src/lib/ipc/http.test.ts`), and the **wasm seam** — the JS↔wasm marshalling contract and `BundleIndex` `.free()` lifecycle, byte-loading the shipping `--target web` `pkg/` (tested = shipped, [ADR 0006](/adr/0006-wasm-shared-core-for-frontend-logic.md) §7). The pure algorithms themselves are *not* re-tested here — their goldens are `cargo test`.
 
+`bun test` has no DOM. A test that needs one builds a jsdom window itself and passes it in, as `src/lib/svg/sanitiseSvg.test.ts` does for DOMPurify; nothing registers a global DOM. Use jsdom, not happy-dom: DOMPurify reports itself supported under happy-dom and then keeps `onerror` attributes.
+
 ### Build the wasm before the frontend gates
 
 `bun test src/lib` and `bun run check` need `src/lib/wasm/pkg` on disk. Build it first (or run the `:ci` scripts that chain it in):
