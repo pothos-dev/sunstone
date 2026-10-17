@@ -73,11 +73,15 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # Built on the BUILD platform, not per target: its output is plain JavaScript,
 # identical for amd64 and arm64, and running vite under QEMU for arm64 took
 # hours once the D2 worker chunk (~8 MB) joined the bundle (v0.27.0).
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS bun-build
 FROM --platform=$BUILDPLATFORM node:22-bookworm AS web-build
 WORKDIR /app
 
-# bun is a single self-contained binary; copy it from the official image.
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
+# bun is a single self-contained binary; copy it from the official image. A bare
+# `COPY --from=oven/bun:1` resolves to the TARGET platform's image, which hands
+# this build-platform stage an arm64 bun it cannot run (v0.27.1), hence the
+# build-platform `bun-build` alias.
+COPY --from=bun-build /usr/local/bin/bun /usr/local/bin/bun
 
 # Install ALL deps (build needs vite/svelte-kit/adapters). The patch in
 # patches/ is applied by bun during install, so copy it before installing.
