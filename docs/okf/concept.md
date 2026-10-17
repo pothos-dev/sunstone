@@ -135,6 +135,7 @@ The `# Computation` conventional heading ([§4.2](/okf/spec.md#42-body), [§10.3
 | Attested Computation ([§10](/okf/spec.md#10-attested-computations-concept)) | Consumers execute and attest; display unspecified | **Displayed only** as a contract card above the body (never written); nothing is run or verified. A path-valued field to a non-Concept file is marked broken, like any markdown link to it |
 | `# Computation` ([§4.2](/okf/spec.md#42-body)) | Conventional heading; level unspecified | Set apart at **any** ATX level, first occurrence only, and only in an Attested Computation |
 | Mermaid | Just fenced code | **Rendered** as diagrams ([ADR 0005](/adr/0005-mermaid-block-rendering.md)) |
+| D2 | Just fenced code | **Rendered** as diagrams in the app palette, through the same block renderer as mermaid (planned: [diagram-rendering](/tickets/diagram-rendering/README.md), [ADR 0014](/adr/0014-diagram-languages-share-one-block-renderer.md)) |
 | Citations | `# Citations` links, superseded in v0.2 by `sources` ([§5.1](/okf/spec.md#51-provenance-sources), [§13.1](/okf/spec.md#131-breaking-changes)) | Still reads the `# Citations` list and inline `[n]` superscript refs, both **deprecated** ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |
 | Per-claim attribution ([§5.1](/okf/spec.md#51-provenance-sources)) | A footnote whose label is a `sources[].id`; consumers resolve through the entry | Shows a **sequential number** by first use, not the label; renders `sources` as a virtual **Sources** section after the body; hides a body definition for a `sources` id and shows its text on the entry ([ADR 0013](/adr/0013-per-claim-attribution-by-source-id.md)) |
 | `usage_window` ([§5.1](/okf/spec.md#51-provenance-sources)) | `{ from, to }` datetimes | Bounds shown **as written**; a half-open window is shown with `…` rather than rejected |
@@ -145,6 +146,6 @@ The `# Computation` conventional heading ([§4.2](/okf/spec.md#42-body), [§10.3
 - [Bundle](/okf/bundle.md) — the directory tree of Concepts, its root detection, indexes, and git write path.
 - [OKF Specification](/okf/spec.md) — the vendored spec, §4 (concepts), §5 (provenance/trust/lifecycle), §11 (conformance).
 - [ADR 0002](/adr/0002-flat-frontmatter-model.md) · [ADR 0003](/adr/0003-structured-frontmatter-reserialization.md) · [ADR 0008](/adr/0008-raw-yaml-frontmatter-editing.md) — the frontmatter model, and why it ended up as text.
-- [ADR 0005](/adr/0005-mermaid-block-rendering.md) — mermaid rendering.
+- [ADR 0005](/adr/0005-mermaid-block-rendering.md) — mermaid rendering, amended by [ADR 0014](/adr/0014-diagram-languages-share-one-block-renderer.md) for D2.
 - [Linking](/okf/linking.md) — wikilinks, citations, anchors, backlinks.
 - [Editor](/editor/index.md) — the CodeMirror integration hosting the body.

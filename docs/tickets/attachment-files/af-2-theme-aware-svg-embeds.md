@@ -41,3 +41,7 @@ Theme changes re-render, following mermaid's theme-sync: the resolved `'light' |
 - Adding a CSP has its own breakage surface — mermaid's injected SVG, `{@html}` in
   `WebViewer.svelte` and `PrintView.svelte`, and Vite's dev-time inline scripts. Expect the
   policy itself to need iteration; that is the cost being accepted here rather than deferred.
+
+## Comments
+
+- The client-side SVG sanitiser this ticket needs is [dr-2](/tickets/diagram-rendering/dr-2-sanitiser-for-inline-svg.md), built for D2 diagrams. Reuse it for the inlined-SVG path rather than writing a second one. The server-side sanitising for the SSR output and the desktop CSP stay here.

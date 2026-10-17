@@ -1,5 +1,9 @@
 # Mermaid diagram rendering as a parallel block-replace extension
 
+> Amended by [ADR-0014](0014-diagram-languages-share-one-block-renderer.md): the field
+> described here becomes one renderer shared by every diagram language, with mermaid as the
+> first language registered on it.
+
 We render ` ```mermaid ` fenced blocks as diagrams via our **own CodeMirror `StateField`
 extension** (`mermaidBlocks()`, in `src/lib/editor/`), built alongside — not on top of —
 atomic-editor's `imageBlocks`/`tables`, because atomic-editor exposes **no generic
