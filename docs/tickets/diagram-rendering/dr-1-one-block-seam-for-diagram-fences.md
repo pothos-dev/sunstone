@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 priority: 3
 ---
 
@@ -35,26 +35,26 @@ The generic half owns:
 - The lazy gate: a language's loader runs only when the document holds a fence in that
   language.
 
-- [ ] A diagram language is a small object (info string, loader, renderer) registered on the
+- [x] A diagram language is a small object (info string, loader, renderer) registered on the
       generic field; the field, widget, cache, generation token, placeholder and error panel
       contain no language name
-- [ ] Mermaid is registered as the first language and its renderer is the only code that
+- [x] Mermaid is registered as the first language and its renderer is the only code that
       imports `mermaid` or knows about `securityLevel: 'strict'`
-- [ ] The render cache key includes the language, so the same source in two languages never
+- [x] The render cache key includes the language, so the same source in two languages never
       shares an entry
-- [ ] A language's loader is never called for a document with no fence in that language
-- [ ] The web island (`webMermaid.ts`) and the print path (`PrintView.svelte`) hydrate through
+- [x] A language's loader is never called for a document with no fence in that language
+- [x] The web island (`webMermaid.ts`) and the print path (`PrintView.svelte`) hydrate through
       the same registry, so a language registered once renders in the reader and on paper
-- [ ] Pure logic (fence detection, language lookup, cache key, cursor overlap) stays in plain
+- [x] Pure logic (fence detection, language lookup, cache key, cursor overlap) stays in plain
       `.ts` modules with unit tests
-- [ ] Every existing mermaid unit test and every mermaid Playwright spec
+- [x] Every existing mermaid unit test and every mermaid Playwright spec
       (`tests/mermaid-*.spec.ts`, the mermaid cases in `tests/web-viewer.spec.ts` and
       `tests/embed-render-caching.spec.ts`) passes unmodified; only import paths may change
-- [ ] Existing CSS class names and `data-testid`s on mermaid widgets keep working, since those
+- [x] Existing CSS class names and `data-testid`s on mermaid widgets keep working, since those
       specs select on them
-- [ ] `docs/editor/custom-extensions.md` describes the generic field and the mermaid language
+- [x] `docs/editor/custom-extensions.md` describes the generic field and the mermaid language
       in place of the mermaid-only description
-- [ ] All four gates green
+- [x] All four gates green
 
 ## Decisions
 
@@ -66,3 +66,22 @@ The generic half owns:
 - **Naming.** The generic modules take a `diagram` prefix (`diagramBlocks.ts`,
   `diagramRender.ts`, `webDiagram.ts`); mermaid-specific code keeps its `mermaid` prefix.
   `mermaidTheme.ts` stays as it is, since it is mermaid's renderer input.
+
+## Comments
+
+- Landed. The seam: `editor/diagramLanguage.ts` (the `DiagramLanguage` type, `findDiagramLanguage`,
+  `diagramCacheKey`, the `rendererFor` loader memo, `diagramClasses`), `diagramLanguages.ts` (the
+  registry), `diagramBlocks.ts` (detection), `diagramRender.ts` (engine), `diagram.ts` (CM field +
+  widget), `web/webDiagram.ts` (`hydrateDiagrams`, used by `WebReader` and `PrintView`). Mermaid is
+  `mermaidLanguage.ts`. A language is `{ id, load, sanitise, stylesheet? }`: `load()` resolves to a
+  `DiagramRenderer` (`{ source, theme, read, renderId } → Promise<svg>`, rejecting with the error
+  message); `sanitise` is required and is where dr-2 plugs in (mermaid passes `identity`);
+  `stylesheet` is optional scoped CSS injected once (mermaid's forced app font; D2's slot-class
+  palette can go there); `renderId` is unique per render and can serve as D2's `salt`. dr-3 adds
+  `d2Language.ts` and one line in `diagramLanguages.ts`. Elements carry a generic class plus the
+  language class (`cm-diagram-error cm-mermaid-error`), so existing selectors keep working.
+  `setEditorMermaidTheme` is now `setEditorDiagramTheme`. `mermaidBlocks.ts` survives as
+  mermaid-only views over the generic detection, and `mermaidCacheKey` stays as mermaid's
+  `(source, theme)` identity, because the unchanged mermaid unit tests import them. Mermaid
+  Playwright specs (desktop `mermaid-*`, `live-preview`, `embed-render-caching`; web
+  `web-viewer`) pass unchanged. No Playwright spec covers the print path.
