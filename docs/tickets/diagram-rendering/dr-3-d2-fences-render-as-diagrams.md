@@ -1,5 +1,5 @@
 ---
-status: ready
+status: active
 priority: 3
 blocked-by: [dr-1, dr-2]
 ---
