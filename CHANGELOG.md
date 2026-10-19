@@ -4,6 +4,16 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.2] - 2026-10-19
+
+### Added
+
+- Headings can have their own font. Set `fonts.heading` in `config.json`
+  (a family, and optionally font files next to the config). It applies in the
+  editor, the rendered article, the web viewer and the PDF export. If you
+  don't set it, headings use the Concept text font as before. See
+  `docs/interface/fonts.md`.
+
 ## [0.27.1] - 2026-10-17
 
 ### Fixed
