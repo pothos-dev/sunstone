@@ -63,6 +63,11 @@ fields, reserved files, and bundle structure) conforms to the OKF spec:
   step back through history. Word edits render as CriticMarkup track-changes.
 - **Tag browser.** Browse and filter the bundle by tag, with live counts.
 - **Full-text search.** Search every concept, with snippet results.
+- **Content API.** Every page URL also answers JSON or Markdown when the
+  request asks for it (`Accept: application/json` or `text/markdown`). Add
+  `?list` to list a folder's concepts, or `?q=` to search it. Works on
+  Sunstone Web and `sunstone serve`. See
+  [the server docs](docs/architecture/sunstone-server.md#content-api).
 - **Quick-nav palette.** Jump to any concept by fuzzy name match.
 - **Outline panel.** A live heading outline of the open concept.
 - **Annotations.** Select text and choose **Add comment** from the right-click

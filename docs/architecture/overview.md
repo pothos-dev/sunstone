@@ -66,7 +66,7 @@ flowchart TD
 
 ## Web path
 
-Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/_api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/_api`. Reads are open; on a write — and on the two gated history reads, `/_api/history` and `/_api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/_api/events`).
+Sunstone Web is **two processes** behind one public origin. The SvelteKit app is built with adapter-node (SSR) and run as a Node server; it owns the origin, renders the [WebViewer](/architecture/web-frontend.md), handles Auth.js sign-in, and proxies `/_api/*` to the [sunstone-server](/architecture/sunstone-server.md) Rust binary on an internal port. The frontend's `http.ts` backend talks only to that same-origin `/_api`. Reads are open; on a write — and on the two gated history reads, `/_api/history` and `/_api/file-at-rev` — the Node proxy mints a short-lived HS256 JWT from the session and forwards it, which the server verifies before committing through core's git primitive. Live updates flow server → browser over SSE (`/_api/events`). Remote callers read Concepts as JSON or Markdown from the page URLs themselves, by `Accept` (the [content API](/architecture/sunstone-server.md#content-api)); the Node hook forwards those requests to the server too.
 
 ```mermaid
 flowchart TD

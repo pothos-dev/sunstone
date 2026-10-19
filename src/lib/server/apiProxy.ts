@@ -10,6 +10,8 @@
  *   or forward with exactly these upstream headers, with or without the body.
  * - {@link responseHeaders}: the headers sent back to the browser, keeping an
  *   SSE stream un-buffered.
+ * - {@link contentApiTarget}: does a PAGE request ask for the content API
+ *   (JSON or Markdown, by `Accept`), and where upstream does it go?
  *
  * Security-relevant: this is the write enforcement chokepoint (axum verifies the
  * JWT again, but an unauthenticated write never reaches it). Keep it pure and
@@ -125,4 +127,44 @@ export function responseHeaders(upstreamContentType: string | null): Record<stri
     out['connection'] = 'keep-alive';
   }
   return out;
+}
+
+/**
+ * The content API (`crates/sunstone-server/src/routes_content.rs`): a page URL
+ * answers JSON or Markdown instead of HTML when `Accept` asks for one.
+ *
+ * True only when `application/json` or `text/markdown` is named explicitly
+ * with a higher q-value than `text/html` / `application/xhtml+xml`; wildcards
+ * never count, so browsers, a bare `curl` (`*\/*`) and a missing header get
+ * the page. The mirror of Rust `routes_content::negotiate` (which also picks
+ * JSON vs Markdown — the hook just forwards `Accept`); `apiProxy.test.ts` and
+ * the Rust tests pin the same cases.
+ */
+export function wantsContentApi(accept: string | null): boolean {
+  let html = 0;
+  let api = 0;
+  for (const range of (accept ?? '').split(',')) {
+    const [media, ...params] = range.split(';');
+    const type = media.trim().toLowerCase();
+    const qParam = params.map((p) => p.trim()).find((p) => p.startsWith('q='));
+    const parsed = qParam === undefined ? 1 : Number.parseFloat(qParam.slice(2));
+    const q = Number.isNaN(parsed) ? 1 : parsed;
+    if (type === 'text/html' || type === 'application/xhtml+xml') html = Math.max(html, q);
+    else if (type === 'application/json' || type === 'text/markdown') api = Math.max(api, q);
+  }
+  return api > 0 && api > html;
+}
+
+/**
+ * The upstream path for a page request that wants the content API, or `null`
+ * when the request is not one (a write, an `/_api/*` call, the SvelteKit
+ * `/_app/*` assets and `__data.json` loads, Auth.js `/auth/*`, or an `Accept`
+ * that {@link wantsContentApi} refuses). `pathname` stays percent-encoded;
+ * axum decodes it.
+ */
+export function contentApiTarget(method: string, pathname: string, accept: string | null): string | null {
+  if (isWrite(method)) return null;
+  if (/^\/(_api|_app|auth)(\/|$)/.test(pathname) || pathname.endsWith('/__data.json')) return null;
+  if (!wantsContentApi(accept)) return null;
+  return pathname === '/' ? '/_api/content' : `/_api/content${pathname}`;
 }

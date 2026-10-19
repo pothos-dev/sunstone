@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { handle as authHandle } from './auth';
-import { needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
+import { contentApiTarget, needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
 import { appearanceCss, httpFontUrl, inlineAppearanceStyle, isSafeColorSyntax } from '$lib/state/appearance';
 
 /**
@@ -31,6 +31,11 @@ import { appearanceCss, httpFontUrl, inlineAppearanceStyle, isSafeColorSyntax } 
  * headers go upstream and back) live in the pure, unit-tested
  * `$lib/server/apiProxy`; this hook is only the I/O around them.
  *
+ * A PAGE request that asks for JSON or Markdown in `Accept` is the content API
+ * (`contentApiTarget`): it forwards to `/_api/content/<path>` with its own
+ * `Accept`, so the Rust side picks JSON vs Markdown. Pages themselves get
+ * `Vary: Accept`, since the same URL answers both.
+ *
  * In the DEFAULT desktop build (adapter-static SPA) there is no server at
  * runtime, so this hook is never invoked — the static build is unaffected.
  */
@@ -39,7 +44,20 @@ const JWT_SECRET = process.env.SUNSTONE_JWT_SECRET ?? '';
 
 const apiProxy: Handle = async ({ event, resolve }) => {
   const { pathname, search } = event.url;
-  if (!pathname.startsWith('/_api/')) return resolve(event);
+  if (!pathname.startsWith('/_api/')) {
+    const accept = event.request.headers.get('accept');
+    const target = contentApiTarget(event.request.method, pathname, accept);
+    if (target === null) return withVaryAccept(await resolve(event));
+    const upstream = await fetch(`${API_INTERNAL}${target}${search}`, {
+      method: event.request.method,
+      headers: { accept: accept ?? 'application/json' },
+      signal: event.request.signal,
+    });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { ...responseHeaders(upstream.headers.get('content-type')), vary: 'Accept' },
+    });
+  }
 
   const method = event.request.method;
   // Resolve the session only when the request needs it (every write, plus the
@@ -69,6 +87,16 @@ const apiProxy: Handle = async ({ event, resolve }) => {
     headers: responseHeaders(upstream.headers.get('content-type')),
   });
 };
+
+/** `res` with `Vary: Accept` added — a no-op on a response with immutable headers. */
+function withVaryAccept(res: Response): Response {
+  try {
+    res.headers.append('vary', 'Accept');
+  } catch {
+    // e.g. a `fetch` Response passed through; leave it as is.
+  }
+  return res;
+}
 
 /**
  * The user's colours and fonts (`SUNSTONE_CONFIG`, served at `/_api/appearance`)

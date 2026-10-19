@@ -54,6 +54,25 @@ pub struct ConceptEntry {
     /// `okf_version` from the frontmatter (OKF v0.2 §12), if declared. Only an
     /// `index.md` carrying it is a Bundle-root marker ([`Index::okf_markers`]).
     pub okf_version: Option<String>,
+    /// `title`, `description` and `timestamp` from the frontmatter, if present:
+    /// what [`Index::summaries`] reports per Concept.
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub timestamp: Option<String>,
+}
+
+/// One Concept as the content API lists it: its path plus the frontmatter
+/// fields a caller picks a Concept by. Absent fields are `null`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConceptSummary {
+    pub path: String,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub concept_type: Option<String>,
+    pub tags: Vec<String>,
+    pub timestamp: Option<String>,
 }
 
 /// A tag and how many Concepts carry it. Matches the TS `{ tag, count }`.
@@ -104,6 +123,9 @@ impl Index {
             tags,
             keys,
             okf_version,
+            title,
+            description,
+            timestamp,
             ..
         } = parse_frontmatter(content);
         let links = extract_links(rel, content);
@@ -119,6 +141,9 @@ impl Index {
                 links,
                 wikilinks,
                 okf_version,
+                title,
+                description,
+                timestamp,
             },
         );
     }
@@ -130,30 +155,74 @@ impl Index {
         let all_paths: Vec<String> = self.concepts.keys().cloned().collect();
         let mut reverse: HashMap<String, BTreeSet<String>> = HashMap::new();
         for (source, entry) in &self.concepts {
-            // Markdown links (already resolved by path). A link to a folder
-            // opens its `index.md`, so it is a Backlink of that index — the
-            // same `folder_index_fallback` the link resolver applies. A root
-            // link with no root index, and a self-edge, contribute nothing.
-            for target in &entry.links {
-                let target =
-                    folder_index_fallback(target.clone(), &|p| self.concepts.contains_key(p));
-                if !target.is_empty() && target != *source {
-                    reverse.entry(target).or_default().insert(source.clone());
-                }
-            }
-            // Wikilinks resolve by NAME against every concept. Each resolved
-            // target feeds the same reverse map -> Backlinks works unchanged.
-            // Unresolved (`None`) wikilinks contribute no edge; a self-target
-            // (`[[#heading]]` -> source) creates no self-backlink.
-            for raw in &entry.wikilinks {
-                if let Some(target) = wikilink::resolve_wikilink(&all_paths, source, raw) {
-                    if target != *source {
-                        reverse.entry(target).or_default().insert(source.clone());
-                    }
-                }
+            for target in self.targets_of(source, entry, &all_paths) {
+                reverse.entry(target).or_default().insert(source.clone());
             }
         }
         self.reverse = reverse;
+    }
+
+    /// The Concepts `source` links to, resolved: the edges `rebuild_reverse`
+    /// records and [`Index::outbound_links`] reports. `all_paths` is every
+    /// Concept path (name-based wikilink resolution needs the whole set).
+    fn targets_of(
+        &self,
+        source: &str,
+        entry: &ConceptEntry,
+        all_paths: &[String],
+    ) -> BTreeSet<String> {
+        let mut out = BTreeSet::new();
+        // Markdown links (already resolved by path). A link to a folder opens
+        // its `index.md`, so it is a Backlink of that index — the same
+        // `folder_index_fallback` the link resolver applies. A root link with
+        // no root index, and a self-edge, contribute nothing.
+        for target in &entry.links {
+            let target = folder_index_fallback(target.clone(), &|p| self.concepts.contains_key(p));
+            if !target.is_empty() && target != source {
+                out.insert(target);
+            }
+        }
+        // Wikilinks resolve by NAME against every concept. Unresolved (`None`)
+        // wikilinks contribute no edge; a self-target (`[[#heading]]` ->
+        // source) creates no self-backlink.
+        for raw in &entry.wikilinks {
+            if let Some(target) = wikilink::resolve_wikilink(all_paths, source, raw) {
+                if target != source {
+                    out.insert(target);
+                }
+            }
+        }
+        out
+    }
+
+    /// The Concepts `path` links to (Markdown links and Wikilinks, resolved),
+    /// sorted — the forward counterpart of [`Index::backlinks`]. A target need
+    /// not exist: a broken link is still reported. Empty for an unknown path.
+    pub fn outbound_links(&self, path: &str) -> Vec<String> {
+        let Some(entry) = self.concepts.get(path) else {
+            return Vec::new();
+        };
+        let all_paths: Vec<String> = self.concepts.keys().cloned().collect();
+        self.targets_of(path, entry, &all_paths).into_iter().collect()
+    }
+
+    /// Every Concept under the folder `dir` (recursively; `""` is the whole
+    /// Bundle) as a [`ConceptSummary`], sorted by path.
+    pub fn summaries(&self, dir: &str) -> Vec<ConceptSummary> {
+        let prefix = if dir.is_empty() { String::new() } else { format!("{dir}/") };
+        let mut v: Vec<ConceptSummary> = self
+            .concepts
+            .iter()
+            .filter(|(path, _)| path.starts_with(&prefix))
+            .map(|(path, entry)| summary_of(path, entry))
+            .collect();
+        v.sort_by(|a, b| a.path.cmp(&b.path));
+        v
+    }
+
+    /// The [`ConceptSummary`] of the Concept at `path`, if indexed.
+    pub fn summary(&self, path: &str) -> Option<ConceptSummary> {
+        self.concepts.get(path).map(|entry| summary_of(path, entry))
     }
 
     /// Incrementally reindex a single Concept that was created or modified.
@@ -416,6 +485,17 @@ impl Index {
     }
 }
 
+fn summary_of(path: &str, entry: &ConceptEntry) -> ConceptSummary {
+    ConceptSummary {
+        path: path.to_string(),
+        title: entry.title.clone(),
+        description: entry.description.clone(),
+        concept_type: entry.concept_type.clone(),
+        tags: entry.tags.clone(),
+        timestamp: entry.timestamp.clone(),
+    }
+}
+
 /// Walk the Bundle and yield every **Attachment**'s bundle-relative path.
 ///
 /// Deliberately a sibling of `paths::md_files` rather than a variant of it: the
@@ -450,6 +530,44 @@ mod tests {
         assert_eq!(idx.backlinks("c.md"), vec!["a.md", "b.md"]);
         assert_eq!(idx.backlinks("b.md"), vec!["a.md"]);
         assert!(idx.backlinks("a.md").is_empty());
+    }
+
+    #[test]
+    fn outbound_links_resolve_markdown_links_and_wikilinks() {
+        let mut idx = Index::default();
+        idx.insert_concept("a.md", "[b](/b.md) [[c]] [self](#top) [gone](/gone.md)");
+        idx.insert_concept("b.md", "");
+        idx.insert_concept("sub/c.md", "");
+        idx.rebuild_reverse();
+        assert_eq!(idx.outbound_links("a.md"), vec!["b.md", "gone.md", "sub/c.md"]);
+        assert!(idx.outbound_links("b.md").is_empty());
+        assert!(idx.outbound_links("missing.md").is_empty());
+    }
+
+    #[test]
+    fn summaries_list_a_folder_recursively_with_frontmatter() {
+        let mut idx = Index::default();
+        idx.insert_concept(
+            "okf/bundle.md",
+            "---\ntype: Concept\ntitle: Bundle\ndescription: A folder.\ntags: [okf]\ntimestamp: 2026-01-01\n---\n",
+        );
+        idx.insert_concept("okf/deep/x.md", "no frontmatter");
+        idx.insert_concept("okfish.md", "");
+        let under: Vec<String> = idx.summaries("okf").into_iter().map(|s| s.path).collect();
+        assert_eq!(under, vec!["okf/bundle.md", "okf/deep/x.md"]);
+        assert_eq!(idx.summaries("").len(), 3);
+        assert_eq!(
+            idx.summary("okf/bundle.md"),
+            Some(ConceptSummary {
+                path: "okf/bundle.md".into(),
+                title: Some("Bundle".into()),
+                description: Some("A folder.".into()),
+                concept_type: Some("Concept".into()),
+                tags: vec!["okf".into()],
+                timestamp: Some("2026-01-01".into()),
+            })
+        );
+        assert_eq!(idx.summary("okf/deep/x.md").unwrap().title, None);
     }
 
     #[test]

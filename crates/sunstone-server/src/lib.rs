@@ -11,8 +11,9 @@
 //!   [`config::Shape::Local`] API plus the desktop SPA itself, on loopback
 //!   ([`local`]).
 //!
-//! Handlers live in `routes_read`, `routes_write`, `routes_asset`, `history`
-//! and `sync`. The architecture doc is `docs/architecture/sunstone-server.md`.
+//! Handlers live in `routes_read`, `routes_write`, `routes_asset`,
+//! `routes_content`, `history` and `sync`. The architecture doc is
+//! `docs/architecture/sunstone-server.md`.
 
 mod api_error;
 mod auth;
@@ -23,6 +24,7 @@ mod history;
 mod local;
 mod routes_appearance;
 mod routes_asset;
+mod routes_content;
 mod routes_read;
 mod routes_write;
 mod sync;
@@ -309,6 +311,10 @@ fn router(state: Arc<ServerState>) -> Router {
         .route("/_api/sync-status", get(sync::sync_status_handler))
         // Build identification, unauthenticated for the same reason.
         .route("/_api/version", get(routes_read::version_handler))
+        // The content API (`routes_content`): Sunstone Web's hook forwards a
+        // page request that asks for JSON or Markdown here, path and all.
+        .route("/_api/content", get(routes_content::content_root_handler))
+        .route("/_api/content/{*path}", get(routes_content::content_handler))
         // The user's colours and fonts (`SUNSTONE_CONFIG`), and the font files
         // it lists — unauthenticated: a wiki's look is as public as its Concepts.
         .route("/_api/appearance", get(routes_appearance::appearance_handler))

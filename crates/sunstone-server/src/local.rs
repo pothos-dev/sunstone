@@ -5,9 +5,11 @@
 //! ordinary [`crate::router`]) and the desktop's static SPA build, handed in by
 //! the caller as [`AppShellAssets`] (the desktop binary passes the copy Tauri
 //! embeds). Every path the API does not route falls through to [`app_shell`]:
-//! a built file is served as-is, anything else gets `index.html` (the SPA
-//! fallback), stamped with [`SERVE_MARKER`] so the frontend picks the `http`
-//! backend instead of the in-memory `fake` it would use in a plain browser.
+//! a built file is served as-is, a request asking for JSON or Markdown gets
+//! the content API ([`crate::routes_content`]), and anything else gets
+//! `index.html` (the SPA fallback), stamped with [`SERVE_MARKER`] so the
+//! frontend picks the `http` backend instead of the in-memory `fake` it would
+//! use in a plain browser.
 //!
 //! The trust model is the desktop's — the one user is the person at the
 //! machine — so the local shape drops the JWT gate. What stands in for it:
@@ -31,9 +33,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
-    extract::Request,
+    extract::{Query, Request},
     http::{
-        header::{CACHE_CONTROL, CONTENT_TYPE, HOST, ORIGIN, X_CONTENT_TYPE_OPTIONS},
+        header::{ACCEPT, CACHE_CONTROL, CONTENT_TYPE, HOST, ORIGIN, VARY, X_CONTENT_TYPE_OPTIONS},
         HeaderMap, StatusCode, Uri,
     },
     middleware::{self, Next},
@@ -43,6 +45,9 @@ use axum::{
 
 use crate::api_error::check_rel_path;
 use crate::config::Config;
+use crate::routes_content::{self, ContentQuery, Wants};
+use crate::ServerState;
+use sunstone_shared::url::percent_decode;
 
 /// Resolves a built app-shell file by its forward-slash path relative to the
 /// build root (`index.html`, `_app/immutable/…`), or `None` when there is no
@@ -109,7 +114,7 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
     // The desktop's own config, so the served app looks like the desktop one.
     cfg.appearance_config = sunstone_native::config::user_config_file();
     let (state, _watcher) = crate::start(cfg, root.clone());
-    let app = app(crate::router(state), opts.assets, opts.allowed_hosts.clone());
+    let app = app(state, opts.assets, opts.allowed_hosts.clone());
 
     match opts.bind {
         None => eprintln!("Serving {} at http://localhost:{port}/", root.display()),
@@ -139,21 +144,28 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
 }
 
 /// The API router plus the app-shell fallback, behind the host guard.
-fn app(api: Router, assets: AppShellAssets, allowed_hosts: Vec<String>) -> Router {
+fn app(state: Arc<ServerState>, assets: AppShellAssets, allowed_hosts: Vec<String>) -> Router {
     let allowed: Arc<[String]> = allowed_hosts.into();
-    api.fallback(move |uri: Uri| {
-        let assets = assets.clone();
-        async move { app_shell(&assets, uri.path()) }
-    })
-    .layer(middleware::from_fn(move |req: Request, next: Next| {
-        let allowed = allowed.clone();
-        async move { guard_host(&allowed, req, next).await }
-    }))
+    crate::router(state.clone())
+        .fallback(move |uri: Uri, headers: HeaderMap| {
+            let (assets, state) = (assets.clone(), state.clone());
+            async move { app_shell(&assets, &state, &uri, &headers) }
+        })
+        .layer(middleware::from_fn(move |req: Request, next: Next| {
+            let allowed = allowed.clone();
+            async move { guard_host(&allowed, req, next).await }
+        }))
 }
 
-/// Serve a built file, or the marked `index.html` for any route the SPA owns.
-fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
-    let rel = path.trim_start_matches('/');
+/// Serve a built file; else the content API when the request asks for JSON or
+/// Markdown; else the marked `index.html` for any route the SPA owns.
+fn app_shell(
+    assets: &AppShellAssets,
+    state: &ServerState,
+    uri: &Uri,
+    headers: &HeaderMap,
+) -> Response {
+    let rel = uri.path().trim_start_matches('/');
     // An unrouted `/_api/…` is a client bug, not a page: no SPA fallback.
     if rel == "_api" || rel.starts_with("_api/") {
         return StatusCode::NOT_FOUND.into_response();
@@ -175,18 +187,26 @@ fn app_shell(assets: &AppShellAssets, path: &str) -> Response {
             )
                 .into_response();
         }
-        // A missing *file* (it has an extension) is a 404; anything else is a
-        // route the SPA resolves client-side. A `.md` path is such a route too:
-        // a deep link naming a Concept by its Bundle path (`/guide/setup.md`).
-        if !is_spa_route(rel) {
-            return StatusCode::NOT_FOUND.into_response();
-        }
+    }
+    let wants = routes_content::negotiate(headers.get(ACCEPT).and_then(|v| v.to_str().ok()));
+    if wants != Wants::Html {
+        let query = Query::<ContentQuery>::try_from_uri(uri)
+            .map(|q| q.0)
+            .unwrap_or_default();
+        return routes_content::content(state, &percent_decode(rel), &query, wants);
+    }
+    // A missing *file* (it has an extension) is a 404; anything else is a
+    // route the SPA resolves client-side. A `.md` path is such a route too:
+    // a deep link naming a Concept by its Bundle path (`/guide/setup.md`).
+    if !rel.is_empty() && rel != "index.html" && !is_spa_route(rel) {
+        return StatusCode::NOT_FOUND.into_response();
     }
     match assets("index.html") {
         Some(bytes) => (
             [
                 (CONTENT_TYPE, "text/html; charset=utf-8"),
                 (CACHE_CONTROL, "no-cache"),
+                (VARY, "Accept"),
             ],
             inject_marker(&String::from_utf8_lossy(&bytes)),
         )
@@ -322,7 +342,7 @@ mod tests {
         let state = server_state(Config::local(seeded_bundle("local"), 0));
         assert_eq!(state.cfg.shape, crate::config::Shape::Local);
         let root = state.app.bundle_root.clone();
-        (app(crate::router(state), assets(), vec!["notes.example.com".into()]), root)
+        (app(state, assets(), vec!["notes.example.com".into()]), root)
     }
 
     async fn send(req: HttpRequest<Body>) -> (StatusCode, HeaderMap, String) {
@@ -410,6 +430,57 @@ mod tests {
             assert_eq!(headers[CONTENT_TYPE], "text/html; charset=utf-8");
             assert!(body.contains(SERVE_MARKER), "{path} should carry the marker");
         }
+    }
+
+    fn get_as(path: &str, accept: &str) -> HttpRequest<Body> {
+        HttpRequest::get(path)
+            .header(HOST, "localhost:3000")
+            .header(ACCEPT, accept)
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    /// The content API answers on the page URLs the SPA owns, by `Accept`.
+    #[tokio::test]
+    async fn json_and_markdown_requests_get_the_content_api() {
+        let (status, headers, body) = send(get_as("/note", "text/markdown")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[CONTENT_TYPE], "text/markdown; charset=utf-8");
+        assert_eq!(headers[VARY], "Accept");
+        assert_eq!(body, "# Hello\n\nbody");
+
+        let (status, headers, body) = send(get_as("/sub/deep.md", "application/json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[CONTENT_TYPE], "application/json");
+        assert!(body.contains(r#""path":"sub/deep.md""#), "{body}");
+
+        let (status, _, body) = send(get_as("/?list", "application/json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("note.md") && body.contains("sub/deep.md"), "{body}");
+
+        let (status, _, body) = send(get_as("/sub?q=DEEP", "application/json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains(r#""path":"sub/deep.md""#), "{body}");
+
+        let (status, _, body) = send(get_as("/missing", "application/json")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(body.contains("error"));
+    }
+
+    /// A browser keeps getting the page, and a built file stays a file
+    /// whatever the `Accept`.
+    #[tokio::test]
+    async fn html_requests_and_built_files_are_unaffected() {
+        let browser = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+        let (status, headers, body) = send(get_as("/note", browser)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(headers[VARY], "Accept");
+        assert!(body.contains(SERVE_MARKER));
+        let (_, _, body) = send(get_as("/note", "*/*")).await;
+        assert!(body.contains(SERVE_MARKER));
+        let (status, _, body) = send(get_as("/_app/immutable/entry.js", "application/json")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "export {}");
     }
 
     #[tokio::test]

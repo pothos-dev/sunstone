@@ -48,6 +48,13 @@ pub struct SearchHit {
 /// The query is treated as a case-insensitive literal: regex metacharacters in
 /// it are escaped, so it behaves like a plain "find this text" box.
 pub fn search(root: &Path, query: &str) -> Result<Vec<SearchHit>, String> {
+    search_in(root, "", query)
+}
+
+/// [`search`], limited to the Concepts under the folder `dir` (recursively;
+/// `""` is the whole Bundle). The cap applies to the matches inside `dir`.
+pub fn search_in(root: &Path, dir: &str, query: &str) -> Result<Vec<SearchHit>, String> {
+    let prefix = if dir.is_empty() { String::new() } else { format!("{dir}/") };
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());
@@ -60,7 +67,7 @@ pub fn search(root: &Path, query: &str) -> Result<Vec<SearchHit>, String> {
 
     let mut hits: Vec<SearchHit> = Vec::new();
 
-    'walk: for (path, rel) in md_files(root) {
+    'walk: for (path, rel) in md_files(root).filter(|(_, rel)| rel.starts_with(&prefix)) {
         let mut searcher = SearcherBuilder::new()
             .binary_detection(BinaryDetection::quit(b'\x00'))
             .line_number(true)
@@ -135,6 +142,20 @@ mod tests {
         assert!(hits[0].snippet.contains("Quick brown fox"));
         assert_eq!(hits[1].path, "sub/b.md");
         assert_eq!(hits[1].line, 2);
+    }
+
+    #[test]
+    fn search_in_keeps_to_the_folder() {
+        let root = temp_root();
+        std::fs::create_dir_all(root.join("sub")).unwrap();
+        std::fs::create_dir_all(root.join("subway")).unwrap();
+        std::fs::write(root.join("a.md"), "quick\n").unwrap();
+        std::fs::write(root.join("sub/b.md"), "quick\n").unwrap();
+        std::fs::write(root.join("subway/c.md"), "quick\n").unwrap();
+        let paths: Vec<String> =
+            search_in(&root, "sub", "quick").unwrap().into_iter().map(|h| h.path).collect();
+        assert_eq!(paths, vec!["sub/b.md"]);
+        assert_eq!(search_in(&root, "", "quick").unwrap().len(), 3);
     }
 
     #[test]

@@ -1,6 +1,14 @@
 import { describe, test, expect } from 'bun:test';
 import { createHmac } from 'node:crypto';
-import { GATED_READS, needsAuth, planProxy, responseHeaders, type PlanInput } from './apiProxy';
+import {
+  GATED_READS,
+  contentApiTarget,
+  needsAuth,
+  planProxy,
+  responseHeaders,
+  wantsContentApi,
+  type PlanInput,
+} from './apiProxy';
 
 const USER = { name: 'Ada Lovelace', email: 'ada@example.com' };
 const fakeMint = (c: { sub: string; name: string; email: string }, s: string) =>
@@ -192,5 +200,47 @@ describe('responseHeaders', () => {
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     });
+  });
+});
+
+describe('wantsContentApi', () => {
+  // The same cases as Rust `routes_content::negotiation_needs_an_explicit_api_type_over_html`.
+  test.each([
+    [null, false],
+    ['', false],
+    ['*/*', false],
+    ['text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', false],
+    ['application/json', true],
+    ['application/json, text/plain, */*', true],
+    ['Application/JSON; charset=utf-8', true],
+    ['text/markdown', true],
+    ['text/markdown, application/json', true],
+    ['text/markdown, application/json;q=0.5', true],
+    ['text/html, application/json', false],
+    ['text/html;q=0.5, application/json', true],
+    ['application/json;q=0', false],
+    ['text/*', false],
+  ] as const)('%p → %p', (accept, wants) => {
+    expect(wantsContentApi(accept)).toBe(wants);
+  });
+});
+
+describe('contentApiTarget', () => {
+  const JSON_ACCEPT = 'application/json';
+
+  test('a page URL maps onto /_api/content, encoding kept', () => {
+    expect(contentApiTarget('GET', '/', JSON_ACCEPT)).toBe('/_api/content');
+    expect(contentApiTarget('GET', '/okf/bundle', JSON_ACCEPT)).toBe('/_api/content/okf/bundle');
+    expect(contentApiTarget('HEAD', '/a%20b.md', 'text/markdown')).toBe('/_api/content/a%20b.md');
+    // A folder literally named `api` is an ordinary page URL.
+    expect(contentApiTarget('GET', '/api/notes', JSON_ACCEPT)).toBe('/_api/content/api/notes');
+  });
+
+  test('HTML requests, writes and the framework paths are left alone', () => {
+    expect(contentApiTarget('GET', '/okf', 'text/html,*/*;q=0.8')).toBeNull();
+    expect(contentApiTarget('POST', '/okf', JSON_ACCEPT)).toBeNull();
+    for (const p of ['/_api/tree', '/_api', '/_app/version.json', '/auth/session', '/okf/__data.json']) {
+      expect(contentApiTarget('GET', p, JSON_ACCEPT)).toBeNull();
+    }
   });
 });

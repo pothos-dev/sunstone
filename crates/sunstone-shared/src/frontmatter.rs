@@ -105,10 +105,14 @@ pub struct ParsedFrontmatter {
     /// marker. Parsed for every Concept; only a reserved `index.md` carrying it
     /// counts as a marker (`Index::okf_markers`).
     pub okf_version: Option<String>,
-    /// The lifecycle keys (OKF v0.2 §5.4/§5.5), raw — see [`lifecycle_scalar`].
+    /// The lifecycle keys (OKF v0.2 §5.4/§5.5), raw — see [`scalar_at`].
     /// The Explorer tree carries them so a row can mark a stale Concept.
     pub status: Option<String>,
     pub stale_after: Option<String>,
+    /// `description` and `timestamp` (OKF v0.2 §5) as written, trimmed, per
+    /// [`scalar`]. The content API's Concept list reports them.
+    pub description: Option<String>,
+    pub timestamp: Option<String>,
 }
 
 /// Strip one trailing `\r?\n` then any trailing whitespace from `line` — the
@@ -215,7 +219,9 @@ pub fn frontmatter_line_count(content: &str) -> usize {
 
 /// Parse the top-level YAML mapping of a Concept's frontmatter, or `None` when
 /// there is no valid `---` block / the block does not parse to a mapping.
-fn parse_mapping(content: &str) -> Option<serde_yaml::Mapping> {
+/// The leading frontmatter block as a YAML mapping, or `None` when there is no
+/// valid block (missing, unterminated, unparseable, or not a mapping).
+pub fn parse_mapping(content: &str) -> Option<serde_yaml::Mapping> {
     let s = split(content);
     if !s.has_frontmatter {
         return None;
@@ -267,16 +273,18 @@ pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter {
         keys,
         title,
         okf_version,
-        status: lifecycle_scalar(&map, "status"),
-        stale_after: lifecycle_scalar(&map, "stale_after"),
+        status: scalar_at(&map, "status"),
+        stale_after: scalar_at(&map, "stale_after"),
+        description: scalar_at(&map, "description"),
+        timestamp: scalar_at(&map, "timestamp"),
     }
 }
 
-/// A lifecycle key's value as written, trimmed: a string, number or bool
+/// A top-level key's value as written, trimmed: a string, number or bool
 /// scalar (the frontend validates and interprets it), else `None`. Raw on
 /// purpose — `stale_after` is compared to *now* at display time, so nothing
 /// derived from the clock is ever cached in the index.
-fn lifecycle_scalar(map: &serde_yaml::Mapping, key: &str) -> Option<String> {
+fn scalar_at(map: &serde_yaml::Mapping, key: &str) -> Option<String> {
     scalar(map.get(serde_yaml::Value::from(key))?)
 }
 
@@ -381,6 +389,17 @@ mod tests {
         assert_eq!((p.status, p.stale_after), (None, None));
         let p = parse_frontmatter("---\ntype: x\n---\n");
         assert_eq!((p.status, p.stale_after), (None, None));
+    }
+
+    #[test]
+    fn description_and_timestamp_are_raw_trimmed_scalars() {
+        let p = parse_frontmatter(
+            "---\ndescription: ' What it is. '\ntimestamp: 2026-07-26T00:00:00Z\n---\n",
+        );
+        assert_eq!(p.description.as_deref(), Some("What it is."));
+        assert_eq!(p.timestamp.as_deref(), Some("2026-07-26T00:00:00Z"));
+        let p = parse_frontmatter("---\ndescription: [a]\n---\n");
+        assert_eq!((p.description, p.timestamp), (None, None));
     }
 
     #[test]
