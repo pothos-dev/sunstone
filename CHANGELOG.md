@@ -4,6 +4,24 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0] - 2026-10-19
+
+### Added
+
+- Concepts can be read remotely as JSON or Markdown. Request any page URL
+  with `Accept: text/markdown` to get the raw file, or
+  `Accept: application/json` to get its frontmatter, body, links and
+  backlinks. Add `?list` to a folder URL to list the Concepts under it
+  (title, description, type, tags, timestamp; filter with `&type=` or
+  `&tag=`), or `?q=text` to search it. Works on Sunstone Web and under
+  `sunstone serve`; browsers still get the normal page.
+
+### Fixed
+
+- The web page title is the Concept's frontmatter `title`, or its file name
+  when it has none, matching the desktop window title. Signed in, it now
+  follows the Concept you navigate to instead of showing the bare file name.
+
 ## [0.27.2] - 2026-10-19
 
 ### Added
