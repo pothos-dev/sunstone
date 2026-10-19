@@ -237,6 +237,7 @@ html {
   --font-ui: 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
   --font-content: 'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Code', Menlo, Consolas, monospace;
+  --font-heading: var(--font-content);
   --font-ui-size: 16px;
   --font-content-size: 14px;
 
@@ -253,6 +254,17 @@ html {
 .cm-editor .cm-atomic-fenced-code,
 .cm-editor .cm-atomic-inline-code {
   font-size: calc(var(--font-code-scale, 1) * 1em);
+}
+
+/* Headings in the editor take the heading family (`fonts.heading`; unset, the
+   content family). The editor's own theme keeps their per-level sizes. */
+.cm-editor .cm-atomic-h1,
+.cm-editor .cm-atomic-h2,
+.cm-editor .cm-atomic-h3,
+.cm-editor .cm-atomic-h4,
+.cm-editor .cm-atomic-h5,
+.cm-editor .cm-atomic-h6 {
+  font-family: var(--font-heading);
 }
 
 body {

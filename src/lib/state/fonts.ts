@@ -1,18 +1,20 @@
 /**
  * User font overrides (pure logic; combined with the colours by `appearance.ts`).
  *
- * Three roles, each with an optional family, size and font files, set by hand
- * under `fonts` in `config.json` (desktop: `~/.config/sunstone/config.json`;
- * web: the file `SUNSTONE_CONFIG` names):
+ * Four roles, each with an optional family and font files, and all but
+ * `heading` with a size, set by hand under `fonts` in `config.json` (desktop:
+ * `~/.config/sunstone/config.json`; web: the file `SUNSTONE_CONFIG` names):
  *
  *   { "fonts": {
  *       "ui":      { "family": "Inter, sans-serif", "size": 15, "files": ["Inter.woff2"] },
  *       "content": { "family": "Charter, Georgia, serif", "size": 16 },
+ *       "heading": { "family": "Fraunces, Georgia, serif" },
  *       "code":    { "family": "JetBrains Mono", "size": 0.85,
  *                    "files": [{ "src": "fonts/JBM.woff2", "weight": "100 800" }] } } }
  *
  * `ui` and `content` sizes are px at 100% zoom; `code`'s is a factor of the
- * surrounding text. Files sit next to the config and are registered with
+ * surrounding text. Headings keep their per-level sizes, so `heading` has no
+ * size; unset, it follows the content family. Files sit next to the config and are registered with
  * `@font-face` under the role's private family (`'Sunstone UI'`, …), which the
  * override puts first in the role's stack — so a file wins over an installed
  * font, and a role with files but no `family` still uses them. The private name
@@ -28,9 +30,9 @@
 const SANS = "'Jost Variable', 'Jost', system-ui, -apple-system, sans-serif";
 
 /**
- * Role → its family token, size token, private `@font-face` family, size range,
- * and the default stack `app.css` declares (the fallback behind a file-backed
- * face when no `family` is set; a test keeps the two in step).
+ * Role → its family token, size token (if it has one), private `@font-face`
+ * family, size range, and the default stack `app.css` declares (the fallback
+ * behind a file-backed face when no `family` is set; a test keeps the two in step).
  */
 export const FONT_ROLES = {
   ui: { family: '--font-ui', size: '--font-ui-size', face: 'Sunstone UI', unit: 'px', min: 8, max: 32, stack: SANS },
@@ -43,6 +45,7 @@ export const FONT_ROLES = {
     max: 48,
     stack: SANS,
   },
+  heading: { family: '--font-heading', face: 'Sunstone Heading', stack: 'var(--font-content)' },
   code: {
     family: '--font-mono',
     size: '--font-code-scale',
@@ -132,8 +135,14 @@ function parseRole(raw: unknown, name: FontRoleName): FontRole | null {
   if (typeof raw.family === 'string' && isFontFamily(raw.family.trim()) && raw.family.trim() !== '') {
     role.family = raw.family.trim();
   }
-  const { min, max } = FONT_ROLES[name];
-  if (typeof raw.size === 'number' && Number.isFinite(raw.size) && raw.size >= min && raw.size <= max) {
+  const spec = FONT_ROLES[name];
+  if (
+    'size' in spec &&
+    typeof raw.size === 'number' &&
+    Number.isFinite(raw.size) &&
+    raw.size >= spec.min &&
+    raw.size <= spec.max
+  ) {
     role.size = raw.size;
   }
   if (Array.isArray(raw.files)) {
@@ -179,7 +188,7 @@ export function fontsCss(fonts: Fonts, fontUrl: (src: string) => string): string
     for (const file of role.files) faces.push(fontFace(spec.face, file, fontUrl));
     const family = role.files.length > 0 ? `'${spec.face}', ${role.family ?? spec.stack}` : role.family;
     if (family) decls.push(`  ${spec.family}: ${family};`);
-    if (role.size !== undefined) decls.push(`  ${spec.size}: ${role.size}${spec.unit};`);
+    if ('size' in spec && role.size !== undefined) decls.push(`  ${spec.size}: ${role.size}${spec.unit};`);
   }
   const root = decls.length > 0 ? `:root {\n${decls.join('\n')}\n}\n` : '';
   return faces.join('') + root;

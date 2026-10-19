@@ -525,7 +525,8 @@ relative to it:
   "colors": { "light": { "accent": "#2b7fd9" } },
   "fonts": {
     "ui": { "family": "Inter, system-ui, sans-serif", "size": 15, "files": ["fonts/Inter.woff2"] },
-    "content": { "family": "Charter, Georgia, serif", "size": 16 }
+    "content": { "family": "Charter, Georgia, serif", "size": 16 },
+    "heading": { "family": "Fraunces, Georgia, serif", "files": ["fonts/Fraunces.woff2"] }
   }
 }
 ```

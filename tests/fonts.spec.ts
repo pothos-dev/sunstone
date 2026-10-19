@@ -7,7 +7,7 @@ import { test, expect, type Page } from './fixtures';
  * The fake backend reads the config from `sunstone:fakeAppearance` and serves
  * font files at `/__fake-font/<file>`, which this spec answers with a real
  * woff2. Verifies each role's family and size reach the chrome, the editor
- * prose, the explorer and code, that a listed file is registered and loaded
+ * prose and headings, the explorer and code, that a listed file is registered and loaded
  * under the role's private face, and that zoom scales the configured sizes.
  */
 
@@ -16,6 +16,7 @@ const WOFF2 = readFileSync('node_modules/@fontsource-variable/jost/files/jost-la
 const FONTS = {
   ui: { family: 'Georgia, serif', size: 18 },
   content: { size: 20, files: ['Content.woff2'] },
+  heading: { family: 'Georgia, serif' },
   code: { family: "'Courier New', monospace", size: 0.8 },
 };
 
@@ -58,6 +59,9 @@ test('each role takes its configured family and size', async ({ page }) => {
     .poll(() => page.evaluate(() => document.fonts.check('20px "Sunstone Content"')))
     .toBe(true);
   expect(served).toContain('Content.woff2');
+
+  // Heading: its own family on heading lines, while prose keeps the content face.
+  expect((await fontOf(page, '[data-testid="editor"] .cm-atomic-h1')).family).toBe('Georgia, serif');
 
   // Code: the family; the size factor lands as a token the code rules use.
   const html = await page.locator('html').evaluate((el) => ({

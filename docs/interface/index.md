@@ -10,7 +10,7 @@ How the Sunstone window is laid out, how keyboard focus moves across it, and whi
 - [Focus model](focus-model.md) - The six-Region 3×2 grid, directional movement, and the Focused item within a Region.
 - [View state](view-state.md) - The per-user UI state restored on relaunch (last-open Concept, expanded folders, sidebar flags, tiling layout, window geometry) — never written into the Bundle.
 - [Theme colours](theme-colors.md) - The twelve base colours per scheme, the tokens derived from them, and the per-scheme overrides in `config.json`.
-- [Fonts](fonts.md) - The UI, content and code type roles, and the family, size and font-file overrides in `config.json`.
+- [Fonts](fonts.md) - The UI, content, heading and code type roles, and the family, size and font-file overrides in `config.json`.
 
 ## Related
 

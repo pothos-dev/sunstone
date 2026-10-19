@@ -25,6 +25,7 @@ test.beforeEach(() => {
       fonts: {
         ui: { family: 'Georgia, serif', size: 18 },
         content: { family: 'serif', size: 20, files: ['fonts/Reader.woff2'] },
+        heading: { family: 'Georgia, serif' },
       },
     }),
   );
@@ -49,6 +50,7 @@ test('the SSR page already carries the configured colours and fonts', async ({ p
     return { family: s.fontFamily, size: s.fontSize };
   });
   expect(reader).toEqual({ family: '"Sunstone Content", serif', size: '20px' });
+  await expect(page.locator('.rendered h1').first()).toHaveCSS('font-family', 'Georgia, serif');
   await expect
     .poll(() => page.evaluate(() => document.fonts.check('20px "Sunstone Content"')))
     .toBe(true);

@@ -69,6 +69,13 @@ describe('parseFonts', () => {
     expect(parseFonts({ code: { size: '0.9' } })).toEqual({});
   });
 
+  test('heading takes a family and files but no size', () => {
+    expect(parseFonts({ heading: { size: 20 } })).toEqual({});
+    expect(parseFonts({ heading: { family: 'Fraunces, serif', size: 20 } })).toEqual({
+      heading: { family: 'Fraunces, serif', files: [] },
+    });
+  });
+
   test('tolerates a missing or malformed value', () => {
     expect(parseFonts(null)).toEqual({});
     expect(parseFonts([])).toEqual({});
@@ -97,7 +104,14 @@ describe('fontsCss', () => {
     for (const spec of Object.values(FONT_ROLES)) {
       expect(appCss).toContain(`  ${spec.family}: ${spec.stack};\n`);
     }
-    expect(appCss).not.toMatch(/--font-(ui|content|mono):[^;]*Sunstone/);
+    expect(appCss).not.toMatch(/--font-(ui|content|heading|mono):[^;]*Sunstone/);
+  });
+
+  test('heading falls back to the content family behind its file-backed face', () => {
+    expect(fontsCss(parseFonts({ heading: { family: 'Fraunces' } }), url)).toBe(':root {\n  --font-heading: Fraunces;\n}\n');
+    expect(fontsCss(parseFonts({ heading: { files: ['h.woff2'] } }), url)).toContain(
+      "  --font-heading: 'Sunstone Heading', var(--font-content);\n",
+    );
   });
 
   test('registers each file under the role face, with its descriptors', () => {

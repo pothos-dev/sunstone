@@ -32,6 +32,15 @@
 
 .rendered h1,
 .rendered h2,
+.rendered h3,
+.rendered h4,
+.rendered h5,
+.rendered h6 {
+  font-family: var(--font-heading, inherit);
+}
+
+.rendered h1,
+.rendered h2,
 .rendered h3 {
   line-height: 1.25;
   margin: 1.4em 0 0.5em;
