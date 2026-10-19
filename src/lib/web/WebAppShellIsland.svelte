@@ -50,6 +50,8 @@
   } from './concurrency';
   import { matchesHotkey } from '$lib/matchesHotkey';
   import { basename, stripMd } from '$lib/path';
+  import { tileTitle } from '$lib/tileTitle';
+  import { splitFrontmatter } from '$lib/wasm/exports';
   import { conceptHref, urlSyncAction } from './urlSync';
   import WebConcurrencyModals from './WebConcurrencyModals.svelte';
   import type { PendingSyncNotice } from './WebConcurrencyModals.svelte';
@@ -62,14 +64,16 @@
     /** The authenticated user (for the rail's avatar / sign-out menu). */
     user: WebUser | null;
     /**
-     * Called with the active Tile's Concept whenever the shell navigates, so the
-     * host (`WebViewer`) can keep the document `<title>` in step — the SSR `load`
-     * does not re-run for the shell's shallow URL updates.
+     * Called with the document title for the active Tile's Concept (its
+     * frontmatter `title`, else its name, as the desktop window title) once the
+     * shell drives navigation, and again whenever it changes. The host
+     * (`WebViewer`) puts it in `<title>`: the SSR `load` does not re-run for the
+     * shell's shallow URL updates.
      */
-    onConcept?: (path: string | null) => void;
+    onTitle?: (title: string) => void;
   }
 
-  let { selected, user, onConcept }: Props = $props();
+  let { selected, user, onTitle }: Props = $props();
 
   // Sign out via the Auth.js client helper (does the /auth/csrf round-trip + the
   // POST /auth/signout, then a full-page redirect that re-lands on the anon read
@@ -85,6 +89,14 @@
   // nothing here is import-time heavy.
   let AppComponent = $state<Component | null>(null);
 
+  // The document title follows the active Tile, like the desktop window title
+  // (`indexStore.version` re-reads it once wasm is ready; see App.svelte).
+  $effect(() => {
+    void indexStore.version;
+    const title = tileTitle(editor.path, splitFrontmatter(editor.content).yaml, session.titlesShown);
+    if (shellSynced) onTitle?.(title === '' ? 'Sunstone Web' : title);
+  });
+
   // --- (7) URL ⇄ Concept sync (web-only; rule + rationale in `urlSync.ts`) ----
   // The address bar is a projection of the single Tile's Concept. `page.state`
   // carries the Concept path itself, so Back/Forward over our shallow entries
@@ -97,6 +109,8 @@
   let syncedConcept: string | null = null;
   /** True while a URL-driven (Back/Forward) open is loading; see `urlSyncAction`. */
   let openingFromUrl = $state(false);
+  /** True once the shell has opened a Concept or followed the URL. */
+  let shellSynced = $state(false);
 
   $effect(() => {
     // Read both sides + the in-flight flag unconditionally, so this effect tracks
@@ -109,7 +123,7 @@
     const action = urlSyncAction(syncedConcept, urlConcept, appConcept, inFlight);
     if (action.kind === 'idle') return;
     syncedConcept = action.concept;
-    onConcept?.(action.concept);
+    shellSynced = true;
 
     if (action.kind === 'stamp') {
       // An unstamped entry (the SSR one we landed on, or one whose state a real

@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 import * as wasm from '$lib/wasm/pkg';
 import type { RenderPayload } from '$lib/types';
-import { conceptTitle, urlToConceptInline } from './conceptUrl';
+import { conceptTitle, pageTitle, urlToConceptInline } from './conceptUrl';
 
 describe('urlToConceptInline', () => {
   const paths = [
@@ -105,5 +105,32 @@ describe('conceptTitle', () => {
   test('uses Sunstone Web when nothing is open or the path is the root index', () => {
     expect(conceptTitle(null, null)).toBe('Sunstone Web');
     expect(conceptTitle('index.md', render({}))).toBe('Sunstone Web');
+  });
+});
+
+describe('pageTitle', () => {
+  const render = (over: Partial<RenderPayload>): RenderPayload => ({
+    html: '',
+    frontmatter: [],
+    outline: [],
+    trust: null,
+    sourceCount: 0,
+    ...over,
+  });
+
+  test('prefers the frontmatter title', () => {
+    const r = render({ frontmatter: [{ key: 'title', values: [' Mistral AI '] }] });
+    expect(pageTitle('research/providers/mistral-ai.md', r)).toBe('Mistral AI');
+  });
+
+  test('otherwise the Concept name, never the H1', () => {
+    const r = render({ outline: [{ level: 1, text: 'Good Concept', line: 1, slug: 'good' }] });
+    expect(pageTitle('good.md', r)).toBe('good');
+    expect(pageTitle('providers/index.md', null)).toBe('index');
+    expect(pageTitle('a.md', render({ frontmatter: [{ key: 'title', values: ['  '] }] }))).toBe('a');
+  });
+
+  test('Sunstone Web when nothing is open', () => {
+    expect(pageTitle(null, null)).toBe('Sunstone Web');
   });
 });

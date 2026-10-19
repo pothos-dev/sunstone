@@ -10,12 +10,23 @@
 // and `urlToConceptInline`, the no-wasm mirror of `urlToConcept` (see below).
 
 import type { RenderPayload } from '$lib/types';
-import { stripMd } from '$lib/path';
+import { basename, stripMd } from '$lib/path';
 
 /**
- * The human title for a Concept, for the document `<title>`: its frontmatter
- * `title`, else its first H1, else a name derived from the path (a folder index
- * uses the folder name). Falls back to `Sunstone Web` when nothing is open.
+ * The document `<title>` for a Concept: its frontmatter `title`, else its name
+ * (the filename without `.md`, as the desktop window title does). `Sunstone
+ * Web` when nothing is open.
+ */
+export function pageTitle(selected: string | null, rendered: RenderPayload | null): string {
+  if (selected === null) return 'Sunstone Web';
+  const fm = rendered?.frontmatter.find((f) => f.key.toLowerCase() === 'title')?.values[0]?.trim();
+  return fm || stripMd(basename(selected));
+}
+
+/**
+ * The reader header's label for a Concept: its frontmatter `title`, else its
+ * first H1, else a name derived from the path (a folder index uses the folder
+ * name). Falls back to `Sunstone Web` when nothing is open.
  */
 export function conceptTitle(selected: string | null, rendered: RenderPayload | null): string {
   const fm = rendered?.frontmatter.find((f) => f.key.toLowerCase() === 'title')?.values[0]?.trim();

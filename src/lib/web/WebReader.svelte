@@ -80,9 +80,9 @@
   let drawer = $state<Drawer>(null);
   let menuOpen = $state(false);
 
-  // The header's title (the same name `WebViewer` puts in `<title>`) and its
-  // folder crumbs.
-  const pageTitle = $derived(conceptTitle(data.selected, data.rendered));
+  // The header's title (`conceptTitle`: a folder index is named after its
+  // folder) and its folder crumbs.
+  const headerTitle = $derived(conceptTitle(data.selected, data.rendered));
   const headerCrumbs = $derived(readerCrumbs(data.selected, data.tree));
 
   // A header crumb opens its folder's index.md (if it has one) and shows the
@@ -451,7 +451,7 @@
          drawer and an overflow menu after the controls (the rails are hidden). -->
     <TileHeader
       readOnly
-      title={data.selected ? pageTitle : ''}
+      title={data.selected ? headerTitle : ''}
       meta={conceptMeta}
       onViewSources={viewSources}
       crumbs={headerCrumbs}

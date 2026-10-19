@@ -7,7 +7,7 @@
   import WebReader from './WebReader.svelte';
   import { loadUiState } from './uiState';
   import { restoreWebViewerUiState } from './webViewerUiState';
-  import { conceptTitle } from './conceptUrl';
+  import { pageTitle } from './conceptUrl';
 
   interface Props {
     /** SSR'd data from `+page.ts`'s `load` (talks to the Rust server). */
@@ -34,18 +34,12 @@
   // `data.user`). Web editing happens only in that App shell.
   let showApp = $derived(data.user !== null);
 
-  // The Concept the App shell has open, once it starts driving navigation itself
-  // (its URL updates are shallow, so the route `load` — and `data` — stay put).
-  let appConcept = $state<string | null>(null);
+  // The title the App shell reports once it drives navigation itself (its URL
+  // updates are shallow, so the route `load`, and `data`, stay put).
+  let appTitle = $state<string | null>(null);
 
-  // The document title is the open Concept's name (frontmatter title / H1 / path).
-  // The SSR `rendered` payload only describes the SSR-selected Concept, so once
-  // the shell has navigated elsewhere the title is derived from the path alone.
-  const pageTitle = $derived(
-    appConcept !== null && appConcept !== data.selected
-      ? conceptTitle(appConcept, null)
-      : conceptTitle(data.selected, data.rendered),
-  );
+  // The document title: the open Concept's frontmatter `title`, else its name.
+  const title = $derived(appTitle ?? pageTitle(data.selected, data.rendered));
 
   // The App shell keeps the theme mode chosen on the anonymous reader (its
   // light/dark toggle persists it in `sunstone:webUI`). The reader restores its
@@ -58,7 +52,7 @@
 </script>
 
 <svelte:head>
-  <title>{pageTitle}</title>
+  <title>{title}</title>
 </svelte:head>
 
 {#if showApp}
@@ -66,7 +60,7 @@
   <WebAppShellIsland
     selected={data.selected}
     user={data.user}
-    onConcept={(path) => (appConcept = path)}
+    onTitle={(t) => (appTitle = t)}
   />
 {:else}
   <WebReader {data} />

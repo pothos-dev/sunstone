@@ -6,7 +6,7 @@
   import type { RenderPayload } from '$lib/types';
   import { hydrateDiagrams } from '$lib/web/webDiagram';
   import { wireRemoteEmbeds } from '$lib/web/remoteEmbed';
-  import { conceptTitle } from '$lib/web/conceptUrl';
+  import { pageTitle } from '$lib/web/conceptUrl';
   import { trustHtml } from '$lib/trust';
   import { ensureWasm } from '$lib/wasm';
 
@@ -115,7 +115,7 @@
       if (!renderGuard.isLatest(token)) return;
       if (surfaceEl) surfaceEl.scrollTop = 0; // a followed link starts at the top
       // Name the window/tab after the Concept so the saved PDF is sensibly named.
-      document.title = conceptTitle(p, payload);
+      document.title = pageTitle(p, payload);
       ready = true;
       // Web tab: hand straight to the browser's print → Save-as-PDF preview
       // (initial load only — not on every in-preview navigation).
