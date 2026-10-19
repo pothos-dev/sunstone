@@ -55,7 +55,7 @@ Prepend a new section to `CHANGELOG.md` (Keep a Changelog style), using today's 
 - ...
 ```
 
-Show the user the drafted section and ask for confirmation/edits before committing. Edits often happen here — be ready to revise.
+Always print the drafted section **verbatim** as a message to the user (in a fenced `markdown` block, exactly as it will land in `CHANGELOG.md`) *before* asking whether to ship. Do this every time, even when the user already chose the bump or said to just release: the question alone, or a paraphrase or summary of the entries, is not enough. Only then ask for confirmation/edits, and after any edit print the revised section verbatim again before asking once more. Edits often happen here, so be ready to revise.
 
 ## Phase 3 — Bump, commit, tag
 
