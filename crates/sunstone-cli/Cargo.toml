@@ -1,6 +1,6 @@
 [package]
 name = "sunstone-cli"
-version = "0.28.0"
+version = "0.29.0"
 description = "Headless `sunstone serve`: the editor in a browser, without the Tauri shell — the binary the npm package ships"
 authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"

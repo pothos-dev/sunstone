@@ -4,6 +4,11 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2026-10-23
+
+### Added
+- Run Sunstone without installing anything: `npx sunstone-md ./docs` serves the editor to your browser at http://localhost:3000/, just like `sunstone serve`. It takes the same `--port`, `--bind` and `--allow-host` options and runs on Linux, macOS and Windows.
+
 ## [0.28.0] - 2026-10-19
 
 ### Added
