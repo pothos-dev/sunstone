@@ -24,6 +24,7 @@ pub(crate) fn run(opts: ServeOptions, context: tauri::Context<tauri::Wry>) {
         port: opts.port,
         bind: opts.bind,
         allowed_hosts: opts.allowed_hosts,
+        open_browser: opts.open_browser,
         assets: app_shell_assets(context),
     });
     if let Err(e) = tauri::async_runtime::block_on(served) {

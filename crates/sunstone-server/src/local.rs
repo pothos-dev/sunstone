@@ -72,6 +72,8 @@ pub struct LocalServeOptions {
     pub allowed_hosts: Vec<String>,
     /// The desktop SPA build.
     pub assets: AppShellAssets,
+    /// Open the editor in the default browser once the listener is bound.
+    pub open_browser: bool,
 }
 
 /// Injected into every `index.html` this mode serves. `src/lib/ipc/index.ts`
@@ -132,6 +134,17 @@ pub(crate) async fn serve(opts: LocalServeOptions) -> Result<(), String> {
         eprintln!("Also answering as: {}", opts.allowed_hosts.join(", "));
     }
     eprintln!("Press Ctrl+C to stop.");
+    if opts.open_browser {
+        // Loopback unless bound to a specific address; a wildcard bind
+        // (0.0.0.0, ::) is still reachable as localhost.
+        let host = match opts.bind {
+            Some(ip) if !ip.is_unspecified() && !ip.is_loopback() => {
+                SocketAddr::new(ip, port).to_string()
+            }
+            _ => format!("localhost:{port}"),
+        };
+        open_in_browser(&format!("http://{host}/"));
+    }
     let served = match v6 {
         Some(v6) => tokio::try_join!(
             axum::serve(main, app.clone()).into_future(),
@@ -318,6 +331,28 @@ fn is_trusted_authority(authority: &str, allowed: &[String]) -> bool {
     let host = host.to_ascii_lowercase();
     matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
         || (!host.is_empty() && allowed.iter().any(|a| *a == host))
+}
+
+/// Hand `url` to the platform's opener. Failure only warns: the URL is printed.
+fn open_in_browser(url: &str) {
+    let mut cmd = if cfg!(target_os = "macos") {
+        std::process::Command::new("open")
+    } else if cfg!(windows) {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", "start", ""]);
+        c
+    } else {
+        std::process::Command::new("xdg-open")
+    };
+    let spawned = cmd
+        .arg(url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    if let Err(e) = spawned {
+        eprintln!("warning: could not open a browser ({e}); open {url} yourself");
+    }
 }
 
 #[cfg(test)]

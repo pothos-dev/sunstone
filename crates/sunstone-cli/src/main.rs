@@ -40,6 +40,7 @@ fn main() {
         port: opts.port,
         bind: opts.bind,
         allowed_hosts: opts.allowed_hosts,
+        open_browser: opts.open_browser,
         assets,
     });
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
@@ -67,13 +68,14 @@ sunstone {version}
 Serve the Sunstone markdown editor to your browser at http://localhost:PORT/.
 
 Usage:
-  sunstone [BUNDLE] [--port PORT] [--bind ADDR] [--allow-host NAME]...
+  sunstone [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
 
 Arguments:
   BUNDLE              Folder to open as a Bundle (default: current directory).
                       Edits save to disk.
 
 Options:
+  -b, --browser       Open the editor in your default browser
   -p, --port PORT     Port to listen on (default {port})
   --bind ADDR         Listen on ADDR instead of 127.0.0.1 (e.g. 0.0.0.0).
                       There is no sign-in: whoever reaches it can edit.

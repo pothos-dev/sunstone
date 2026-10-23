@@ -21,6 +21,8 @@ pub struct ServeOptions {
     /// `--allow-host NAME` (repeatable): host names to answer besides
     /// localhost, lowercased — the public name a reverse proxy forwards under.
     pub allowed_hosts: Vec<String>,
+    /// `-b`/`--browser`: open the editor in the default browser once listening.
+    pub open_browser: bool,
 }
 
 /// What a `serve` command line asks for.
@@ -36,7 +38,7 @@ pub enum ServeArgs {
 }
 
 /// Parse `serve`'s arguments (program name and subcommand already stripped):
-/// one optional positional Bundle path plus `-p`/`--port N`, `--bind ADDR` and
+/// one optional positional Bundle path plus `-b`/`--browser`, `-p`/`--port N`, `--bind ADDR` and
 /// `--allow-host NAME` (each also as `--flag=VALUE`).
 pub fn parse_serve_args<I, S>(args: I) -> ServeArgs
 where
@@ -48,6 +50,7 @@ where
         port: DEFAULT_SERVE_PORT,
         bind: None,
         allowed_hosts: Vec::new(),
+        open_browser: false,
     };
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
@@ -55,6 +58,10 @@ where
         match a {
             "-h" | "--help" => return ServeArgs::Help,
             "-V" | "--version" => return ServeArgs::Version,
+            "-b" | "--browser" => {
+                opts.open_browser = true;
+                continue;
+            }
             _ => {}
         }
         let (flag, inline) = match a.split_once('=') {
@@ -120,6 +127,7 @@ mod tests {
             port,
             bind: None,
             allowed_hosts: Vec::new(),
+            open_browser: false,
         })
     }
 
@@ -167,6 +175,7 @@ mod tests {
             port: 3001,
             bind: Some("0.0.0.0".parse().unwrap()),
             allowed_hosts: vec!["notes.example.com".into(), "wiki.lan".into()],
+            open_browser: false,
         });
         assert_eq!(
             parse_serve_args([
@@ -183,6 +192,18 @@ mod tests {
         match parse_serve_args(["--bind=::"]) {
             ServeArgs::Serve(o) => assert_eq!(o.bind, Some("::".parse().unwrap())),
             other => panic!("expected Serve, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn browser_flag_opens_the_browser() {
+        for flag in ["-b", "--browser"] {
+            match parse_serve_args(["./docs", flag]) {
+                ServeArgs::Serve(o) => {
+                    assert!(o.open_browser && o.bundle.as_deref() == Some("./docs"))
+                }
+                other => panic!("expected Serve, got {other:?}"),
+            }
         }
     }
 

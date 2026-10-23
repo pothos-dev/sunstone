@@ -107,7 +107,7 @@ A CLI-launched markdown editor with first-class Open Knowledge Format support.
 
 Usage:
   {name} [BUNDLE [DOCUMENT[#HEADING]]]
-  {name} serve [BUNDLE] [--port PORT] [--bind ADDR] [--allow-host NAME]...
+  {name} serve [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
@@ -125,6 +125,7 @@ Serve:
   Instead of opening a window, serve the editor to your browser at
   http://localhost:PORT/ (localhost only unless --bind, no sign-in). BUNDLE
   defaults to the current directory. Edits save to disk as in the app.
+  -b, --browser       Open it in your default browser
   -p, --port PORT     Port to listen on (default {port})
   --bind ADDR         Listen on ADDR instead of 127.0.0.1 (e.g. 0.0.0.0).
                       There is no sign-in: whoever reaches it can edit.
@@ -236,6 +237,7 @@ mod tests {
             port,
             bind: None,
             allowed_hosts: Vec::new(),
+            open_browser: false,
         })
     }
 
