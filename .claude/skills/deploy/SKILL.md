@@ -70,7 +70,7 @@ After the CHANGELOG is approved, set the new version in **all eight** places (us
 7. `crates/sunstone-cli/Cargo.toml` — `[package] version` (what `npx sunstone-md --version` prints)
 8. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-cli"`
 
-Keep all eight in lockstep. The npm packages need no bump: `release.yml` stamps them with the tag's version — a mismatch makes `tauri-action` produce wrongly-named artifacts. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
+Keep all eight in lockstep — a mismatch makes `tauri-action` produce wrongly-named artifacts. The npm packages need no bump: `release.yml` stamps them with the tag's version. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
 
 Then:
 
