@@ -193,10 +193,10 @@ jobs:
           for d in bins/cli-*; do mv "$d" "bins/${d#bins/cli-}"; done
           node npm/stage.mjs "${GITHUB_REF_NAME#v}" bins npm-out
           launcher=$(node -p 'require("./npm/sunstone/package.json").name')
-          for dir in npm-out/*; do
-            [ "$dir" = "npm-out/$launcher" ] || npm publish --access public "$dir"
+          for dir in ./npm-out/*; do
+            [ "$dir" = "./npm-out/$launcher" ] || npm publish --access public "$dir"
           done
-          npm publish --access public "npm-out/$launcher"
+          npm publish --access public "./npm-out/$launcher"
 
   publish-release:
     needs: [create-release, build-tauri]
