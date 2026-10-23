@@ -1,0 +1,12 @@
+{
+  "name": "sunstone-md",
+  "version": "0.0.0",
+  "description": "Sunstone, the markdown editor with first-class Open Knowledge Format support, served to your browser: npx sunstone-md ./docs",
+  "keywords": ["markdown", "editor", "okf", "knowledge-base", "wiki"],
+  "homepage": "https://github.com/pothos-dev/sunstone",
+  "repository": { "type": "git", "url": "git+https://github.com/pothos-dev/sunstone.git" },
+  "license": "MIT",
+  "bin": { "sunstone": "bin/sunstone.js", "sunstone-md": "bin/sunstone.js" },
+  "files": ["bin"],
+  "engines": { "node": ">=18" }
+}

@@ -5,6 +5,7 @@ members = [
   "crates/sunstone-native",
   "crates/sunstone-wasm",
   "crates/sunstone-server",
+  "crates/sunstone-cli",
   "src-tauri",
 ]
 

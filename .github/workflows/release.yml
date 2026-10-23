@@ -121,6 +121,83 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
 
+  # The headless `sunstone-cli` binary (`sunstone serve` without Tauri) for the
+  # npm package — `npx sunstone-md ./docs`. Linux builds are static musl so
+  # they run on any distro.
+  build-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-22.04, target: x86_64-unknown-linux-musl, npm: linux-x64, exe: sunstone-cli }
+          - { runner: ubuntu-22.04-arm, target: aarch64-unknown-linux-musl, npm: linux-arm64, exe: sunstone-cli }
+          - { runner: macos-latest, target: x86_64-apple-darwin, npm: darwin-x64, exe: sunstone-cli }
+          - { runner: macos-latest, target: aarch64-apple-darwin, npm: darwin-arm64, exe: sunstone-cli }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc, npm: win32-x64, exe: sunstone-cli.exe }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }},wasm32-unknown-unknown
+
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      # The static SPA the binary embeds (`build/`); needs the wasm module first,
+      # as in build-tauri.
+      - name: Build the frontend
+        shell: bash
+        run: |
+          bun install
+          cargo install wasm-pack --locked --version 0.15.0
+          bun run build:wasm
+          bun run build
+
+      - name: Build sunstone-cli
+        run: cargo build --release --locked -p sunstone-cli --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.npm }}
+          path: target/${{ matrix.target }}/release/${{ matrix.exe }}
+          if-no-files-found: error
+
+  # Platform packages first, so the launcher never points at a version that is
+  # not on the registry yet.
+  publish-npm:
+    needs: build-cli
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: bins
+
+      - name: Stage and publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for d in bins/cli-*; do mv "$d" "bins/${d#bins/cli-}"; done
+          node npm/stage.mjs "${GITHUB_REF_NAME#v}" bins npm-out
+          launcher=$(node -p 'require("./npm/sunstone/package.json").name')
+          for dir in npm-out/*; do
+            [ "$dir" = "npm-out/$launcher" ] || npm publish --access public "$dir"
+          done
+          npm publish --access public "npm-out/$launcher"
+
   publish-release:
     needs: [create-release, build-tauri]
     permissions:

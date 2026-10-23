@@ -59,7 +59,7 @@ Always print the drafted section **verbatim** as a message to the user (in a fen
 
 ## Phase 3 — Bump, commit, tag
 
-After the CHANGELOG is approved, set the new version in **all six** places (use `Edit`, not version-bump tooling, so the diff stays predictable):
+After the CHANGELOG is approved, set the new version in **all eight** places (use `Edit`, not version-bump tooling, so the diff stays predictable):
 
 1. `package.json` — `.version`
 2. `src-tauri/tauri.conf.json` — `.version`
@@ -67,8 +67,10 @@ After the CHANGELOG is approved, set the new version in **all six** places (use 
 4. `crates/sunstone-server/Cargo.toml` — `[package] version` (reported by the web server's `GET /_api/version`)
 5. `Cargo.lock` — the `version` under `[[package]] name = "sunstone"`
 6. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-server"`
+7. `crates/sunstone-cli/Cargo.toml` — `[package] version` (what `npx sunstone-md --version` prints)
+8. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-cli"`
 
-Keep all six in lockstep — a mismatch makes `tauri-action` produce wrongly-named artifacts. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
+Keep all eight in lockstep. The npm packages need no bump: `release.yml` stamps them with the tag's version — a mismatch makes `tauri-action` produce wrongly-named artifacts. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
 
 Then:
 

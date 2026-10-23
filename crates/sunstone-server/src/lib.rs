@@ -27,6 +27,7 @@ mod routes_asset;
 mod routes_content;
 mod routes_read;
 mod routes_write;
+pub mod serve_args;
 mod sync;
 #[cfg(test)]
 mod testutil;
