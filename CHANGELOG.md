@@ -4,6 +4,17 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2026-10-27
+
+### Added
+- PlantUML diagrams. A ```plantuml code block renders as a diagram in editing
+  and read mode, in the web viewer and in print/PDF, in the app's colours for
+  light and dark. A block without `@startuml` works too. Colours you write in
+  the diagram are kept. PlantUML loads only when a Concept contains a PlantUML
+  block, and it renders entirely on your machine: nothing is sent to a server,
+  and the diagram never fetches anything from the network. Including from
+  PlantUML's standard library (`!include <C4/…>`) is not supported yet.
+
 ## [0.29.2] - 2026-10-27
 
 ### Added
