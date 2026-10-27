@@ -4237,7 +4237,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "sunstone"
-version = "0.29.1"
+version = "0.29.2"
 dependencies = [
  "block2",
  "comrak",
@@ -4262,7 +4262,7 @@ dependencies = [
 
 [[package]]
 name = "sunstone-cli"
-version = "0.29.1"
+version = "0.29.2"
 dependencies = [
  "rust-embed",
  "sunstone-server",
@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "sunstone-server"
-version = "0.29.1"
+version = "0.29.2"
 dependencies = [
  "axum",
  "base64 0.22.1",
