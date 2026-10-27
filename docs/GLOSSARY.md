@@ -97,7 +97,7 @@ Tile's view mode is a boolean (`editing` vs read-only `read`, default `read`), t
 **Edit** in the **Concept header** — see [ADR-0001](/adr/0001-codemirror-hybrid-live-preview.md).
 
 **Diagram**:
-The rendered output of a diagram fenced code block, ` ```mermaid ` or ` ```d2 `
+The rendered output of a diagram fenced code block, ` ```mermaid `, ` ```d2 ` or ` ```plantuml `
 ([ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md)). In source it is an ordinary fenced
 code block (so it is excluded from the **Outline**, like all fenced code); under **Live preview**
 it renders as a diagram on inactive lines and reveals its raw source when the cursor enters it.

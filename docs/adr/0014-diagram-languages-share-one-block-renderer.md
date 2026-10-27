@@ -1,5 +1,8 @@
 # Diagram languages share one block renderer; D2 renders from its WASM build
 
+> Amended by [ADR-0016](0016-plantuml-renders-in-the-browser-from-its-teavm-build.md):
+> PlantUML is the third language, rendered from its TeaVM build on the main thread.
+
 A **[Diagram](/GLOSSARY.md)** is rendered by **one** CodeMirror block field and **one** web
 island, whatever language its fence is in. A diagram language plugs in as a small object: the
 fence info string, a lazy loader, and a renderer that turns source plus resolved theme into an

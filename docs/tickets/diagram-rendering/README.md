@@ -17,6 +17,9 @@ Three tickets:
   reuses it for SVG Embeds.
 - **[dr-3](dr-3-d2-fences-render-as-diagrams.md)** registers D2 on dr-1's seam, sends its
   output through dr-2, and themes it with the app palette.
+- **[dr-4](dr-4-plantuml-fences-render-as-diagrams.md)** adds PlantUML the same way, from
+  `@plantuml/core` ([ADR-0016](/adr/0016-plantuml-renders-in-the-browser-from-its-teavm-build.md)).
+  It came after the effort's first scope, on request.
 
 Decisions that bind the whole effort:
 
@@ -41,7 +44,7 @@ Decisions that bind the whole effort:
   of its built-in themes are replaced by the app's CSS custom properties. Explicit colours an
   author wrote on a shape stay as written, the rule af-2 uses for SVG Embeds.
 
-Out of scope for the effort: other diagram languages (PlantUML, Graphviz and the like; dr-1
-makes them possible, nothing here adds them), D2's interactive features (links, tooltips,
+Out of scope for the effort: other diagram languages (Graphviz and the like; dr-1 makes them
+possible, and only dr-4's PlantUML was added), D2's interactive features (links, tooltips,
 animations, layers, scenarios), a UI toggle for sketch mode, rendering D2 on the server, and
 editing aids for D2 such as a grammar, completion or an LSP.

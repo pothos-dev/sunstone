@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Sunstone's own CodeMirror extensions
-description: The CodeMirror 6 extensions Sunstone writes itself on top of atomic-editor — diagrams (mermaid, D2), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
-tags: [editor, codemirror, extensions, decorations, criticmarkup, mermaid, d2, diagrams]
+description: The CodeMirror 6 extensions Sunstone writes itself on top of atomic-editor — diagrams (mermaid, D2, PlantUML), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
+tags: [editor, codemirror, extensions, decorations, criticmarkup, mermaid, d2, plantuml, diagrams]
 timestamp: 2026-07-23
 ---
 
@@ -14,7 +14,7 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 
 | Extension | File(s) | CM primitive | Purpose |
 | --- | --- | --- | --- |
-| Diagrams | `diagram.ts`, `diagramBlocks.ts`, `diagramRender.ts`, `diagramLanguage.ts`, `diagramLanguages.ts`; mermaid in `mermaidLanguage.ts`, `mermaidTheme.ts`; D2 in `d2Language.ts`, `d2Worker.ts`, `d2Engine.ts`, `d2Theme.ts` | `StateField` + block-replace `WidgetType` | Render diagram fences (` ```mermaid `, ` ```d2 `) as SVG |
+| Diagrams | `diagram.ts`, `diagramBlocks.ts`, `diagramRender.ts`, `diagramLanguage.ts`, `diagramLanguages.ts`; mermaid in `mermaidLanguage.ts`, `mermaidTheme.ts`; D2 in `d2Language.ts`, `d2Worker.ts`, `d2Engine.ts`, `d2Theme.ts`; PlantUML in `plantumlLanguage.ts`, `plantumlEngine.ts`, `plantumlTheme.ts` | `StateField` + block-replace `WidgetType` | Render diagram fences (` ```mermaid `, ` ```d2 `, ` ```plantuml `) as SVG |
 | Embedded images | `embeds.ts`, `embedPlan.ts`, `embedLightbox.ts` | `StateField` + point `WidgetType` | Render an Embed's Attachment as an `<img>` |
 | Wikilinks | `wiki-links.ts` | atomic `wikiLinks` + overlay `ViewPlugin` | `[[name]]` rendering / navigation |
 | Broken links | `broken-links.ts` | `ViewPlugin` + `StateEffect` | Dashed-red styling of unresolved `[](…)` |
@@ -33,7 +33,7 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 
 ## Diagrams
 
-`diagramBlocks(reading, theme)` (`diagram.ts`) renders diagram fences as SVG, for every language registered in `diagramLanguages.ts`: ` ```mermaid ` and ` ```d2 ` ([ADR-0005](/adr/0005-mermaid-block-rendering.md), amended by [ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md)). The pipeline is split into a language-agnostic seam and one small module per language:
+`diagramBlocks(reading, theme)` (`diagram.ts`) renders diagram fences as SVG, for every language registered in `diagramLanguages.ts`: ` ```mermaid `, ` ```d2 ` and ` ```plantuml ` ([ADR-0005](/adr/0005-mermaid-block-rendering.md), amended by [ADR-0014](/adr/0014-diagram-languages-share-one-block-renderer.md)). The pipeline is split into a language-agnostic seam and one small module per language:
 
 | File | Role |
 | --- | --- |
@@ -47,12 +47,16 @@ They follow one house rule (also the repo-wide convention): **pure logic lives i
 | `mermaidBlocks.ts` | Mermaid-only views (`findMermaidBlocks`, `hasMermaidBlock`) over the generic detection |
 | `d2Language.ts` | D2: spawns `d2Worker.ts` on the first ` ```d2 ` render, sends it `{ id, source, salt }`, sanitises the result with `svg/sanitiseSvg.ts` |
 | `d2Worker.ts` | The Web Worker around `@terrastruct/d2`'s browser build (which inlines `d2.wasm` and starts a nested worker of its own); its own build chunk, fetched only on demand |
-| `d2Engine.ts` | Pure: the render options forced on every D2 diagram (theme 0, per-render `salt`, `scale: 1`, small `pad`), D2 error-message cleanup, a one-at-a-time call queue |
+| `d2Engine.ts` | Pure: the render options forced on every D2 diagram (theme 0, per-render `salt`, `scale: 1`, small `pad`), D2 error-message cleanup |
+| `plantumlLanguage.ts` | PlantUML: dynamic-imports `@plantuml/core` and viz.js on the first ` ```plantuml ` render (main thread; the engine needs a DOM), switches off the engine's `<script>` loader, imports the icon table (and the emoji table only when a source uses one), renders one at a time, sanitises with `svg/sanitiseSvg.ts` |
+| `plantumlEngine.ts` | Pure: wraps a bare body in `@startuml`, inserts the palette preamble after the `@start…` line, turns the engine's error pictures into `line N: message` (N in the fence) |
+| `plantumlTheme.ts` | Pure: app CSS variables → a PlantUML `<style>` block with concrete `#RRGGBB` colours (translucent tokens composited over the surface) |
+| `serialQueue.ts` | A one-at-a-time call queue for engines with shared state (D2, PlantUML) |
 | `d2Theme.ts` | Pure: D2's colour-slot classes (`fill-N1`, `stroke-B1`, …) → app CSS variables, emitted as one scoped stylesheet that out-ranks D2's embedded `<style>` |
 
 A language is a `DiagramLanguage` object: `id` (the fence info string, lower-case; it also names the language's CSS classes and the web error panel's `data-testid`, `<id>-error`), `load()` (a dynamic `import()` of the engine that resolves to a `DiagramRenderer`, `({ source, theme, read, renderId }) => Promise<svg>`, rejecting with the message the error panel shows), `sanitise(svg)` (required; dr-2's sanitiser plugs in here, mermaid passes `identity`), an optional scoped `stylesheet` injected once, and an optional `themedByStylesheet` flag for a language whose SVG is theme-independent because the stylesheet colours it (D2): its cache entry is shared by both themes, so a theme flip repaints from the cache and never re-renders. `renderId` is unique per render, usable as a DOM id (mermaid) or an id salt. Adding a language is that module plus a line in `diagramLanguages.ts`.
 
-Every element the seam creates carries a generic class (styled once) and the language's own: `cm-diagram cm-mermaid`, `cm-diagram-error cm-mermaid-error`, on the web `web-diagram-render web-mermaid-render`. atomic-editor exposes no generic block-renderer seam, so the field is a _sibling_ of `imageBlocks`/`tables`, not a plugin on top of them. Notable techniques: a language's engine loads only when a fence in it renders; the module-level cache plus the per-host generation token keep repaints cheap and discard stale async renders; `WidgetType.eq()` is keyed on `(language, source, theme, reading)`; and theme flips (`setEditorDiagramTheme`) go through a [Compartment reconfigure](/editor/codemirror.md) because CM won't reconcile block-widget DOM in place. The field depends on the [patched](/editor/atomic-editor-patch.md) `treeGrowthEffect` re-export to re-render fences parsed after the initial budget. The web viewer and the print path hydrate the server's inert `<pre><code class="language-<id>">` blocks through `web/webDiagram.ts` (`hydrateDiagrams`), over the same engine and registry; print forces the light theme (mermaid renders with `light`; D2 reads the light palette the print sheet declares).
+Every element the seam creates carries a generic class (styled once) and the language's own: `cm-diagram cm-mermaid`, `cm-diagram-error cm-mermaid-error`, on the web `web-diagram-render web-mermaid-render`. atomic-editor exposes no generic block-renderer seam, so the field is a _sibling_ of `imageBlocks`/`tables`, not a plugin on top of them. Notable techniques: a language's engine loads only when a fence in it renders; the module-level cache plus the per-host generation token keep repaints cheap and discard stale async renders; `WidgetType.eq()` is keyed on `(language, source, theme, reading)`; and theme flips (`setEditorDiagramTheme`) go through a [Compartment reconfigure](/editor/codemirror.md) because CM won't reconcile block-widget DOM in place. The field depends on the [patched](/editor/atomic-editor-patch.md) `treeGrowthEffect` re-export to re-render fences parsed after the initial budget. The web viewer and the print path hydrate the server's inert `<pre><code class="language-<id>">` blocks through `web/webDiagram.ts` (`hydrateDiagrams`), over the same engine and registry; print forces the light theme (mermaid and PlantUML render with `light` and read the light palette the print sheet declares; D2's stylesheet reads it at paint time).
 
 ## Embedded images
 

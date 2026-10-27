@@ -7,7 +7,7 @@ How Sunstone's markdown editor is built on CodeMirror 6. Start with the integrat
 - [CodeMirror integration](codemirror.md) - How `cm.ts` assembles the `EditorView`, and switches modes/themes/Concepts without a rebuild.
 - [atomic-editor](atomic-editor.md) - The `@atomic-editor/editor` dependency that supplies the live-preview decoration layer, and which of its extensions Sunstone consumes.
 - [The vendored atomic-editor patch](atomic-editor-patch.md) - The local patch to `@atomic-editor/editor@0.4.3` and why each change exists.
-- [Sunstone's own CodeMirror extensions](custom-extensions.md) - Diagrams (mermaid, D2), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
+- [Sunstone's own CodeMirror extensions](custom-extensions.md) - Diagrams (mermaid, D2, PlantUML), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
 
 ## Related
 
