@@ -56,6 +56,13 @@ describe('findDiagramLanguage', () => {
     expect(d2?.themedByStylesheet).toBe(true);
     expect(d2?.stylesheet).toContain('.fill-N1');
   });
+
+  test('plantuml is registered, sanitised, and themed at render time', () => {
+    const plantuml = findDiagramLanguage(DIAGRAM_LANGUAGES, 'PlantUML');
+    expect(plantuml?.id).toBe('plantuml');
+    expect(plantuml?.sanitise).not.toBe(identity);
+    expect(plantuml?.themedByStylesheet).toBeFalsy();
+  });
 });
 
 describe('diagramCacheKey', () => {
