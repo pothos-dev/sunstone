@@ -5,7 +5,6 @@ import {
   compileAndRender,
   d2RenderOptions,
   formatD2Error,
-  serialQueue,
   type D2Like,
   type D2RenderOptions,
 } from './d2Engine';
@@ -81,30 +80,5 @@ describe('compileAndRender', () => {
   test('rejects with the formatted compile error', async () => {
     const d2 = stubD2(JSON.stringify([{ errmsg: 'index:1:6: boom' }]));
     await expect(compileAndRender(d2, 'a -> {', 's')).rejects.toThrow('index:1:6: boom');
-  });
-});
-
-describe('serialQueue', () => {
-  test('runs tasks one at a time, in order, past a failure', async () => {
-    const enqueue = serialQueue();
-    const log: string[] = [];
-    let running = 0;
-    const task = (name: string, fail = false) => async () => {
-      running++;
-      expect(running).toBe(1);
-      log.push(`start ${name}`);
-      await new Promise((r) => setTimeout(r, 5));
-      log.push(`end ${name}`);
-      running--;
-      if (fail) throw new Error(name);
-      return name;
-    };
-    const results = await Promise.allSettled([
-      enqueue(task('a')),
-      enqueue(task('b', true)),
-      enqueue(task('c')),
-    ]);
-    expect(log).toEqual(['start a', 'end a', 'start b', 'end b', 'start c', 'end c']);
-    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected', 'fulfilled']);
   });
 });

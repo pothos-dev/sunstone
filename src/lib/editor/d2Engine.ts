@@ -2,8 +2,8 @@
 //
 // Runs inside the D2 Web Worker (`d2Worker.ts`) against `@terrastruct/d2`'s
 // `D2` class, and under `bun test` against a stub. Owns the render options we
-// force on every diagram, the error-message cleanup, and the queue that keeps
-// calls into one `D2` instance strictly one at a time.
+// force on every diagram and the error-message cleanup. The queue that keeps
+// calls into one `D2` instance strictly one at a time is `serialQueue.ts`.
 
 /** The slice of `@terrastruct/d2`'s `D2` class we use. */
 export interface D2Like {
@@ -93,19 +93,4 @@ export async function compileAndRender(d2: D2Like, source: string, salt: string)
   } catch (err) {
     throw new Error(formatD2Error(err instanceof Error ? err.message : String(err)));
   }
-}
-
-/**
- * A one-at-a-time queue. `@terrastruct/d2` keeps a single pending
- * resolve/reject per instance, so two overlapping calls would cross their
- * results; every call goes through here instead. A failed task does not stall
- * the ones behind it.
- */
-export function serialQueue(): <T>(task: () => Promise<T>) => Promise<T> {
-  let tail: Promise<unknown> = Promise.resolve();
-  return <T>(task: () => Promise<T>): Promise<T> => {
-    const run = tail.then(task, task);
-    tail = run.catch(() => undefined);
-    return run;
-  };
 }

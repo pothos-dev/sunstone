@@ -16,7 +16,8 @@
 // start-up, then one `{ id, svg }` or `{ id, error }` per `{ id, source, salt }`.
 
 import { D2 } from '@terrastruct/d2';
-import { compileAndRender, serialQueue, type D2Like } from './d2Engine';
+import { compileAndRender, type D2Like } from './d2Engine';
+import { serialQueue } from './serialQueue';
 
 /** A render request from the main thread. */
 export interface D2WorkerRequest {
