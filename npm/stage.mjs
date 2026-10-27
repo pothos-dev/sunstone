@@ -16,7 +16,9 @@ const PLATFORMS = {
   "linux-arm64": "sunstone-cli",
   "darwin-x64": "sunstone-cli",
   "darwin-arm64": "sunstone-cli",
-  "win32-x64": "sunstone-cli.exe",
+  // Blocked by npm's spam filter (support ticket #4896497); restore once the
+  // name `sunstone-md-win32-x64` is allowed. CI still builds the binary.
+  // "win32-x64": "sunstone-cli.exe",
 };
 
 const [version, binDir, outDir] = process.argv.slice(2);
