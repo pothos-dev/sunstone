@@ -35,4 +35,22 @@ A malformed D2 diagram:
 a -> {
 ```
 
+A PlantUML Diagram, a bare body with no `@startuml`:
+
+```plantuml
+actor Reader
+participant "API gateway" as Api
+Reader -> Api : GET /concepts
+Api --> Reader : 200 OK
+```
+
+A malformed PlantUML diagram:
+
+```plantuml
+@startuml
+Reader -> Api : fine
+foo bar baz (((
+@enduml
+```
+
 Body text after the diagrams so the page clearly stays intact.

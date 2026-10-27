@@ -315,6 +315,66 @@ test('d2 diagrams print in the light palette from a dark app', async ({ page }) 
 });
 
 /**
+ * PlantUML Diagrams (dr-4). Same island as mermaid and D2: the server leaves
+ * ```plantuml fences inert and the browser renders them with `@plantuml/core`.
+ * The palette is baked in at render time, so the reader's theme toggle
+ * re-renders a diagram in the new palette. Saves tests/screenshots/web-plantuml.png.
+ */
+test('plantuml diagrams hydrate in the app palette, follow the theme toggle, and degrade gracefully', async ({
+  page,
+}) => {
+  await page.goto('/diagram');
+  await expect(page.getByTestId('rendered').locator('h1')).toContainText('Diagram Concept');
+
+  const svg = page.locator('[data-testid="rendered"] .web-plantuml-render svg');
+  await expect(svg).toHaveCount(1, { timeout: 30_000 });
+  await expect(svg.locator('text', { hasText: 'API gateway' }).first()).toBeVisible();
+
+  // The malformed one shows PlantUML's message, at its line in the fence.
+  const error = page.getByTestId('plantuml-error');
+  await expect(error).toBeVisible({ timeout: 30_000 });
+  await expect(error).toContainText('line 3: Syntax Error?');
+  await expect(page.getByTestId('rendered')).toContainText('stays intact');
+
+  /** Computed fill of a participant label, and the resolved `--text`. */
+  const fills = () =>
+    svg.evaluate((el) => {
+      const probe = document.createElement('div');
+      probe.style.color = 'var(--text)';
+      el.closest('.web-plantuml')!.appendChild(probe);
+      const text = getComputedStyle(probe).color;
+      probe.remove();
+      const label = Array.from(el.querySelectorAll('text')).find((t) => t.textContent === 'API gateway')!;
+      return { label: getComputedStyle(label).fill, text };
+    });
+  const before = await fills();
+  expect(before.label).toBe(before.text);
+
+  await page.getByTestId('theme-toggle').click();
+  await expect.poll(async () => (await fills()).text).not.toBe(before.text);
+  // Re-rendered in the new palette.
+  await expect.poll(async () => (await fills()).label, { timeout: 30_000 }).toBe((await fills()).text);
+
+  await page.screenshot({ path: 'tests/screenshots/web-plantuml.png', fullPage: true });
+});
+
+/** Print/PDF renders PlantUML on light paper whatever the app theme (dr-4). */
+test('plantuml diagrams print in the light palette from a dark app', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.print = () => {};
+  });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(`/?print=${encodeURIComponent('diagram.md')}&toolbar=1`);
+  const svg = page.getByTestId('print-body').locator('.web-plantuml-render svg');
+  await expect(svg).toBeVisible({ timeout: 30_000 });
+  const label = await svg.evaluate((el) => {
+    const text = Array.from(el.querySelectorAll('text')).find((t) => t.textContent === 'API gateway')!;
+    return getComputedStyle(text).fill;
+  });
+  expect(label).toBe('rgb(17, 17, 17)');
+});
+
+/**
  * Desktop parity pass (follow-up): dark-by-default theme (follows the OS, no
  * manual toggle — matching the desktop shell), an icon-less collapsible Explorer
  * with implicit index, and collapsible Accordion Sidebars. Saves a DARK-mode

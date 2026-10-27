@@ -836,4 +836,19 @@ mod tests {
         assert!(!p.html.contains("<svg"));
         assert!(p.outline.is_empty());
     }
+
+    #[test]
+    fn plantuml_fence_emits_language_class_and_is_left_inert() {
+        // A ```plantuml fence (dr-4) is inert code on the server, like mermaid
+        // and d2: the web island renders it client-side with @plantuml/core.
+        let p = render(
+            "```plantuml\n@startuml\nAlice -> Bob : <b>hi</b>\n@enduml\n```\n",
+            "a.md",
+            &["a.md"],
+        );
+        assert!(p.html.contains(r#"<pre><code class="language-plantuml">"#));
+        assert!(p.html.contains("Alice -&gt; Bob : &lt;b&gt;hi&lt;/b&gt;"));
+        assert!(!p.html.contains("<svg"));
+        assert!(p.outline.is_empty());
+    }
 }
