@@ -285,6 +285,11 @@ describe('what survives', () => {
 		expect(all(root, 'marker')).toHaveLength(1);
 		expect(all(root, 'symbol')).toHaveLength(1);
 	});
+
+	test('dominant-baseline, which PlantUML centres text with', () => {
+		const { root } = clean(svg('<text id="t" x="5" y="5" dominant-baseline="central">C</text>'));
+		expect(root.querySelector('#t')?.getAttribute('dominant-baseline')).toBe('central');
+	});
 });
 
 describe('a real D2 diagram', () => {

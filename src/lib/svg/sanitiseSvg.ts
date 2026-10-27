@@ -1,7 +1,7 @@
 /**
  * The sanitiser for author-controlled inline SVG (dr-2). Diagram SVG from D2
- * (dr-3) and embedded `.svg` files (af-2) pass through here before they are
- * inserted into the app document.
+ * (dr-3) and PlantUML (dr-4), and embedded `.svg` files (af-2), pass through
+ * here before they are inserted into the app document.
  *
  * Built on DOMPurify's SVG profile, which removes `<script>`, `on*`
  * attributes, `<foreignObject>`, `<iframe>`/`<embed>`/`<object>` and the
@@ -27,6 +27,9 @@ const PURIFY_CONFIG: Config = {
 	// DOMPurify drops `<use>` by default; it is how diagrams reuse a shape, and
 	// its href is held to a `#fragment` below.
 	ADD_TAGS: ['use'],
+	// A keyword-only presentation attribute missing from DOMPurify's list.
+	// PlantUML centres the letter in a class's stereotype circle with it.
+	ADD_ATTR: ['dominant-baseline'],
 	// Lower-case: DOMPurify compares lower-cased names in an HTML document.
 	FORBID_TAGS: [
 		'script',
