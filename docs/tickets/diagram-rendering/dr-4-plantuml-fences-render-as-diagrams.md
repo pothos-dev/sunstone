@@ -1,5 +1,5 @@
 ---
-status: review
+status: done
 priority: 2
 blocked-by: [dr-1, dr-2]
 ---
@@ -65,3 +65,5 @@ TeaVM, plus Graphviz from viz.js. See [ADR-0016](/adr/0016-plantuml-renders-in-t
   thread is worth feeling once on a slow machine.
 - The engine logs a dozen `console.log` lines per render (`[PSystemBuilder2] …`). Harmless,
   noisy in devtools; there is no switch for it.
+- Signed off from the screenshots (2026-10-27): the look is accepted as is, hollow start
+  circles and untinted class circles included.
