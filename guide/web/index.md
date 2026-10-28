@@ -1,3 +1,7 @@
+---
+title: Sunstone Web
+---
+
 # Sunstone Web
 
 - [Sunstone Web](sunstone-web.md) - Serve a Bundle in any browser from a Docker image: read-only for visitors, the full editor for signed-in users.

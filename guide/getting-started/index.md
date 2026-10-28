@@ -1,3 +1,7 @@
+---
+title: Getting started
+---
+
 # Getting started
 
 - [Install](install.md) - Desktop installers for macOS, Windows and Linux, and how Sunstone keeps itself up to date.

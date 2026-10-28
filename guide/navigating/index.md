@@ -1,3 +1,7 @@
+---
+title: Navigating
+---
+
 # Navigating
 
 - [Explorer](explorer.md) - The folder tree: titles or filenames, keyboard control, drag and drop, and the Bundle root.

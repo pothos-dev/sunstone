@@ -1,3 +1,7 @@
+---
+title: Editing
+---
+
 # Editing
 
 - [Live preview](live-preview.md) - Source, Live and Read modes, formatting shortcuts and in-file find and replace.

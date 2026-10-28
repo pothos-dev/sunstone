@@ -1,3 +1,7 @@
+---
+title: Git
+---
+
 # Git
 
 A Bundle is just a git repository. Sunstone doesn't sync anything itself: you commit, push and pull as usual, and Sunstone shows the result.

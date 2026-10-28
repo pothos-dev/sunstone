@@ -1,3 +1,7 @@
+---
+title: Customizing
+---
+
 # Customizing
 
 Both settings live in one `config.json`: `~/.config/sunstone/config.json` on the desktop (and under `sunstone serve`), or the file named by `SUNSTONE_CONFIG` on Sunstone Web. Sunstone reads it and never writes it.
