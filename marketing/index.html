@@ -181,6 +181,13 @@
     font-size: 0.9rem;
     color: var(--text-muted);
   }
+  .release {
+    margin-top: 14px;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+  }
+  .release a { color: var(--text-muted); }
+  .more { margin-top: 30px; text-align: center; }
   .cli-hint code {
     background: var(--bg-sunken);
     border: 1px solid var(--border);
@@ -293,6 +300,8 @@
   .final h2 { font-size: clamp(1.9rem, 4vw, 2.8rem); font-weight: 700; margin-bottom: 14px; letter-spacing: -0.015em; }
   .final p { font-size: 1.15rem; opacity: 0.92; margin-bottom: 30px; max-width: 48ch; margin-left: auto; margin-right: auto; }
   .final .btn-primary { background: var(--accent-contrast); color: var(--accent-deep); box-shadow: 0 10px 30px -8px rgba(0,0,0,0.35); }
+  .final p.try { font-size: 0.95rem; margin: 26px auto 0; max-width: none; }
+  .final p.try code { font-family: var(--font-mono); background: rgba(0,0,0,0.16); padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
   .final .btn-ghost { background: rgba(255,255,255,0.14); color: var(--accent-contrast); border-color: rgba(255,255,255,0.4); }
 
   /* ---- Footer ---- */
@@ -326,6 +335,7 @@
       <a href="#git" class="hide-sm">Git</a>
       <a href="#okf" class="hide-sm">Open Knowledge Format</a>
       <a href="#web" class="hide-sm">Sunstone Web</a>
+      <a href="https://wiki.sunstone.pothos.dev/" class="hide-sm">Guide</a>
       <a href="https://github.com/pothos-dev/sunstone" aria-label="Sunstone on GitHub" title="GitHub" style="display:inline-flex">
         <svg viewBox="0 0 16 16" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       </a>
@@ -340,7 +350,7 @@
     <span class="eyebrow">☀ A slimmed-down Obsidian</span>
     <h1>The markdown editor for <span class="grad">git users</span>.</h1>
     <p class="lead">
-      Live preview, wikilinks, backlinks, properties, and full-text search over
+      Live preview, wikilinks, backlinks, diagrams, and full-text search over
       plain <code style="font-family:var(--font-mono);font-size:0.9em">.md</code>
       files in your repo. Diff your edits against HEAD, step through history,
       collaborate through commits. No sync service.
@@ -351,6 +361,7 @@
       </a>
       <a class="btn btn-ghost" href="#features">See what's inside</a>
     </div>
+    <p class="release" data-release>Latest release: <a href="https://github.com/pothos-dev/sunstone/releases/tag/v0.30.2">v0.30.2</a></p>
     <p class="cli-hint">Launch it from anywhere: <code>sunstone ./my-notes</code></p>
   </div>
 </div>
@@ -401,6 +412,11 @@
           <code>cat</code> a file you can read it; if you can
           <code>git clone</code> you can ship it. Nothing to migrate.
         </p>
+        <p>
+          Sunstone checks your frontmatter against OKF v0.2 and shows each
+          concept's trust, lifecycle and sources at a glance.
+          <a href="https://wiki.sunstone.pothos.dev/okf/okf-support">More in the guide</a>.
+        </p>
       </div>
     </div>
   </div>
@@ -430,9 +446,9 @@
       </div>
 
       <div class="feature">
-        <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="14" y2="17"/></svg></div>
-        <h4>Properties panel</h4>
-        <p>Edit frontmatter as typed fields: scalars, lists, tags. Complex YAML round-trips verbatim.</p>
+        <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="6" rx="1"/><rect x="14" y="15" width="7" height="6" rx="1"/><path d="M6.5 9v4a2 2 0 0 0 2 2h5.5"/></svg></div>
+        <h4>Diagrams</h4>
+        <p>Mermaid, D2 and PlantUML code blocks render as diagrams in the app's colours. Rendered on your machine, nothing sent to a server.</p>
       </div>
 
       <div class="feature">
@@ -462,15 +478,18 @@
       <div class="feature">
         <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
         <h4>Export as PDF</h4>
-        <p>Render the open concept to a print preview and save it as PDF on macOS and Windows.</p>
+        <p>Print preview of the open concept, diagrams included, with a direct Save as PDF on macOS and Windows.</p>
       </div>
 
       <div class="feature">
-        <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
-        <h4>Light + dark theming</h4>
-        <p>A warm amber palette that follows the OS color scheme. An outline panel and tag browser keep large bundles navigable.</p>
+        <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+        <h4>No install needed</h4>
+        <p><code>npx sunstone-md ./docs</code> runs the full editor in your browser. Installed copies update themselves.</p>
       </div>
 
+    </div>
+    <div class="more">
+      <a class="btn btn-ghost" href="https://wiki.sunstone.pothos.dev/">Every feature in the guide</a>
     </div>
   </div>
 </section>
@@ -556,8 +575,14 @@
         a team works on one bundle and reconciles through git. External pushes
         reach every open browser over SSE.
       </p>
+      <p>
+        Every page URL is also an API: ask for <code>text/markdown</code> or
+        <code>application/json</code> and agents get the concept as data. It
+        works on phones too.
+      </p>
       <div class="cta-row" style="margin-top:26px">
-        <a class="btn btn-primary" href="https://github.com/pothos-dev/sunstone/blob/main/docs/architecture/sunstone-server.md">Read the deploy docs</a>
+        <a class="btn btn-primary" href="https://wiki.sunstone.pothos.dev/">See it live: the guide runs on it</a>
+        <a class="btn btn-ghost" href="https://github.com/pothos-dev/sunstone/blob/main/docker/README.md">Read the deploy docs</a>
       </div>
     </div>
   </div>
@@ -573,6 +598,7 @@
         <a class="btn btn-primary" href="https://github.com/pothos-dev/sunstone/releases/latest">Download Sunstone</a>
         <a class="btn btn-ghost" href="https://github.com/pothos-dev/sunstone">View on GitHub</a>
       </div>
+      <p class="try">Or try it without installing: <code>npx sunstone-md ./docs</code></p>
       <div class="badges">
         <span class="badge">macOS</span>
         <span class="badge">Windows</span>
@@ -588,6 +614,7 @@
     <div class="brand"><img src="assets/logo.svg" alt="" style="width:22px;height:22px;border-radius:6px" /> Sunstone</div>
     <div>The markdown editor for git users. OKF built in.</div>
     <div>
+      <a href="https://wiki.sunstone.pothos.dev/">Guide</a> ·
       <a href="https://github.com/pothos-dev/sunstone">GitHub</a> ·
       <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md">OKF Spec</a>
     </div>

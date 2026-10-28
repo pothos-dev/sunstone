@@ -12,6 +12,8 @@ then read the deeper docs:
   desktop shell, `sunstone-server`, the SvelteKit web frontend) and how they
   interact; start with [`overview.md`](docs/architecture/overview.md).
 - **`docs/adr/`** — architecture decisions.
+- **`guide/`** — the user-facing feature guide (an OKF Bundle), published read-only at
+  https://wiki.sunstone.pothos.dev by `/deploy`. A user-visible feature change updates its page.
 
 ## Verifying changes
 
