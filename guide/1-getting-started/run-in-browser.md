@@ -28,7 +28,7 @@ This serves the editor at <http://localhost:3000/>. It runs on Linux, macOS and 
 sunstone serve ./docs --port 3000
 ```
 
-Same editor, same behaviour. Saves are written to disk without committing, and git history still shows in [Review](/git/review-changes.md).
+Same editor, same behaviour. Saves are written to disk without committing, and git history still shows in [Review](/4-git/review-changes.md).
 
 ## Options
 
@@ -41,8 +41,8 @@ Both commands take the same options:
 | `--bind ADDR` | Listen on an address other than localhost. |
 | `--allow-host NAME` | Accept requests for this host name, e.g. behind a reverse proxy. |
 
-There is no sign-in, so if you expose it beyond localhost, the proxy in front has to control access. For a shared, authenticated deployment, use [Sunstone Web](/web/sunstone-web.md).
+There is no sign-in, so if you expose it beyond localhost, the proxy in front has to control access. For a shared, authenticated deployment, use [Sunstone Web](/5-web/sunstone-web.md).
 
 ## Links into the editor
 
-URLs follow the open Concept. `/guide/setup#install` opens that Concept at the heading, so a copied address links straight back to what you were reading. Pages can also be fetched as [Markdown or JSON](/web/reading-api.md).
+URLs follow the open Concept. `/guide/setup#install` opens that Concept at the heading, so a copied address links straight back to what you were reading. Pages can also be fetched as [Markdown or JSON](/5-web/reading-api.md).

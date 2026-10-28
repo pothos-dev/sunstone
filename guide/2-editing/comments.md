@@ -22,4 +22,4 @@ On disk a comment is plain [CriticMarkup](https://fletcher.github.io/MultiMarkdo
 
 Comments live in the `.md` file and travel through git with it, and any tool can read them. This is handy for reviewing an agent's generated docs before its next pass.
 
-CriticMarkup is also how [Review](/git/review-changes.md) shows word-level edits.
+CriticMarkup is also how [Review](/4-git/review-changes.md) shows word-level edits.

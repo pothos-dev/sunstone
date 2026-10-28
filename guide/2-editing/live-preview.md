@@ -35,7 +35,7 @@ The mode is remembered across restarts.
 | Ctrl/Cmd+1 … 6 | Heading level 1–6 |
 | Ctrl/Cmd+0 | Paragraph |
 
-All of them toggle. Right-clicking in the editor opens a menu with the same actions, plus cut, copy, paste and [comments](/editing/comments.md). In the preview, `--` and `---` render as en and em dashes.
+All of them toggle. Right-clicking in the editor opens a menu with the same actions, plus cut, copy, paste and [comments](/2-editing/comments.md). In the preview, `--` and `---` render as en and em dashes.
 
 ## Find and replace
 

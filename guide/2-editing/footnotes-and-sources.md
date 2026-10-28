@@ -18,7 +18,7 @@ A `[^label]` reference renders as a superscript. Clicking it jumps to the matchi
 
 ## Sources
 
-A Concept can list what it is based on under `sources` in its [frontmatter](/editing/frontmatter.md), as [OKF](/okf/okf-support.md) defines:
+A Concept can list what it is based on under `sources` in its [frontmatter](/2-editing/frontmatter.md), as [OKF](/6-okf/okf-support.md) defines:
 
 ```yaml
 sources:

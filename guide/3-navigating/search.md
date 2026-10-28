@@ -24,4 +24,4 @@ A fuzzy palette that jumps to any Concept by name. It searches tags too, so you 
 
 The Tags browser lists every tag in the Bundle with the number of Concepts that use it. Nested tags expand as a tree.
 
-All three also work in [Sunstone Web](/web/sunstone-web.md).
+All three also work in [Sunstone Web](/5-web/sunstone-web.md).

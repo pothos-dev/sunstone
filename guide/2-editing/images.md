@@ -19,4 +19,4 @@ Images stored in the Bundle render inline, in the editor and on the web. Both sy
 ![Architecture](assets/diagram.png)
 ```
 
-The wikilink form is resolved by name, like [wikilinks](/editing/links.md), so you don't have to spell out the folder. An image that can't be found shows a placeholder naming the missing file. Images dropped into the folder are picked up without a restart.
+The wikilink form is resolved by name, like [wikilinks](/2-editing/links.md), so you don't have to spell out the folder. An image that can't be found shows a placeholder naming the missing file. Images dropped into the folder are picked up without a restart.

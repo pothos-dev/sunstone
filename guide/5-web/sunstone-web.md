@@ -18,7 +18,7 @@ You're using it right now: this guide is served by Sunstone Web, read-only.
 
 ## For readers
 
-Visitors get a server-rendered page with the same Explorer, [search](/navigating/search.md), tags, [outline and backlinks](/navigating/outline-and-backlinks.md) as the desktop app, plus [diagrams](/editing/diagrams.md), [images](/editing/images.md) and PDF export. Changes to the Bundle reach every open browser live.
+Visitors get a server-rendered page with the same Explorer, [search](/3-navigating/search.md), tags, [outline and backlinks](/3-navigating/outline-and-backlinks.md) as the desktop app, plus [diagrams](/2-editing/diagrams.md), [images](/2-editing/images.md) and PDF export. Changes to the Bundle reach every open browser live.
 
 It works on phones. Below 768 px the sidebars become slide-over drawers, the page takes the full width, and wide tables scroll on their own.
 
@@ -28,7 +28,7 @@ Signed-in users (through OIDC) get the full editor in the browser. Saves are exp
 
 ## Running it
 
-The image takes a folder as the Bundle, or a git remote as described in [Git-synced wiki](/web/git-synced-wiki.md). Theme colours and fonts come from the same `config.json` format as the desktop (see [Customizing](/customize/)). Setup is covered in the [deployment guide](https://github.com/pothos-dev/sunstone/blob/main/docker/README.md).
+The image takes a folder as the Bundle, or a git remote as described in [Git-synced wiki](/5-web/git-synced-wiki.md). Theme colours and fonts come from the same `config.json` format as the desktop (see [Customizing](/7-customize/)). Setup is covered in the [deployment guide](https://github.com/pothos-dev/sunstone/blob/main/docker/README.md).
 
 ```d2
 direction: right

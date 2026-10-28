@@ -12,7 +12,7 @@ sources:
 
 # Git-synced wiki
 
-A [Sunstone Web](/web/sunstone-web.md) deployment can be backed by a git remote instead of a plain folder. The server clones the repository on startup, commits every save as the signed-in user, and keeps reconciling with the remote: it fetches, rebases and pushes. Edits made in the browser and changes pushed from a clone converge on their own. Nothing runs beside it: no sidecar, no hook, no manual step.
+A [Sunstone Web](/5-web/sunstone-web.md) deployment can be backed by a git remote instead of a plain folder. The server clones the repository on startup, commits every save as the signed-in user, and keeps reconciling with the remote: it fetches, rebases and pushes. Edits made in the browser and changes pushed from a clone converge on their own. Nothing runs beside it: no sidecar, no hook, no manual step.
 
 ## Conflicts never block a save
 

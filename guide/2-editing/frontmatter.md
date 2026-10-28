@@ -28,7 +28,7 @@ Nested blocks fold, and a folded block says what it hides ("3 entries", "2 keys"
 
 ## Checks and completion
 
-In a Bundle that declares an [OKF](/okf/okf-support.md) version, the editor knows the spec. It flags missing required fields and wrongly typed values, and completes keys and values as you type. In a plain folder of markdown it only checks YAML syntax.
+In a Bundle that declares an [OKF](/6-okf/okf-support.md) version, the editor knows the spec. It flags missing required fields and wrongly typed values, and completes keys and values as you type. In a plain folder of markdown it only checks YAML syntax.
 
 ## Dates
 

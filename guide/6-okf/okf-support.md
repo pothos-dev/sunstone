@@ -18,12 +18,12 @@ Sunstone supports OKF v0.2. A Bundle opts in by declaring `okf_version` in its r
 
 ## What you get
 
-- **[Frontmatter](/editing/frontmatter.md) checks.** Missing required fields and wrongly typed values are flagged, and keys and values are completed.
+- **[Frontmatter](/2-editing/frontmatter.md) checks.** Missing required fields and wrongly typed values are flagged, and keys and values are completed.
 - **New Bundle…** in the launcher and the Bundle switcher creates a Bundle that declares `okf_version`.
 - **Trust at a glance.** A Concept's trust, lifecycle and sources show as one compact pill next to its title. Hover it to see who generated and verified the Concept and when, its status, whether it's stale, and its sources.
 - **Actors.** Authors, generators and verifiers are shown as a person, a process, or an agent with its version.
-- **Lifecycle.** `status: draft`, `status: deprecated` and an expired `stale_after` are marked in the [Explorer](/navigating/explorer.md) and the page header.
-- **Sources.** Cited sources become a numbered list with hover cards (see [Footnotes and sources](/editing/footnotes-and-sources.md)).
+- **Lifecycle.** `status: draft`, `status: deprecated` and an expired `stale_after` are marked in the [Explorer](/3-navigating/explorer.md) and the page header.
+- **Sources.** Cited sources become a numbered list with hover cards (see [Footnotes and sources](/2-editing/footnotes-and-sources.md)).
 - **Attested computations.** A Concept of type Attested Computation shows its contract (runtime, parameters, executor, attester) in a card, with its `# Computation` section set apart.
 - **Index and log files.** `index.md` and `log.md` are recognised as reserved files.
 

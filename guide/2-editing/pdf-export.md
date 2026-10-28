@@ -12,6 +12,6 @@ sources:
 
 # Export as PDF
 
-Export renders the open Concept to a print preview window, with the same formatting as Read mode, [diagrams](/editing/diagrams.md) included. From there you can print it or save it as a PDF. On macOS and Windows, a direct **Save as PDF** skips the system print dialog.
+Export renders the open Concept to a print preview window, with the same formatting as Read mode, [diagrams](/2-editing/diagrams.md) included. From there you can print it or save it as a PDF. On macOS and Windows, a direct **Save as PDF** skips the system print dialog.
 
 The preview has an optional **Page guides** toggle that marks roughly where the printed pages will break.

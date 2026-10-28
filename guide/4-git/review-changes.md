@@ -12,8 +12,8 @@ sources:
 
 # Review changes
 
-Turn on **Review** to see the open Concept's working copy compared with the last commit (`HEAD`), as inline track changes. Scattered word edits show as [CriticMarkup](/editing/comments.md) insertions and deletions.
+Turn on **Review** to see the open Concept's working copy compared with the last commit (`HEAD`), as inline track changes. Scattered word edits show as [CriticMarkup](/2-editing/comments.md) insertions and deletions.
 
 A history stepper walks back through the file's commits one revision at a time.
 
-Review works wherever the Bundle is a git repository: on the desktop, under [`sunstone serve`](/getting-started/run-in-browser.md) and, for signed-in users, on [Sunstone Web](/web/sunstone-web.md).
+Review works wherever the Bundle is a git repository: on the desktop, under [`sunstone serve`](/1-getting-started/run-in-browser.md) and, for signed-in users, on [Sunstone Web](/5-web/sunstone-web.md).

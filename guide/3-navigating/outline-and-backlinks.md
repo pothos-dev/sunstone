@@ -20,6 +20,6 @@ The Concept's headings. Click one to jump to it. The Outline highlights the sect
 
 ## Backlinks
 
-Every Concept that [links](/editing/links.md) to this one. It's the quickest way to see where a page is used.
+Every Concept that [links](/2-editing/links.md) to this one. It's the quickest way to see where a page is used.
 
 Both panels can be driven from the keyboard. Mouse back and forward buttons, and **Ctrl/Cmd+Alt+←/→**, move through the Concepts you've visited.

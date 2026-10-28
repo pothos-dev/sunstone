@@ -38,4 +38,4 @@ Sunstone sets type in four roles, and you can override each one under `fonts` in
 - `files` are font files next to `config.json` (`.woff2`, `.woff`, `.ttf`, `.otf`). With files, readers don't need the font installed, which matters on the web.
 - Zoom scales the configured sizes.
 
-The full rules are in the [font reference](https://github.com/pothos-dev/sunstone/blob/main/docs/interface/fonts.md). The same file sets the [theme colours](/customize/theme-colors.md).
+The full rules are in the [font reference](https://github.com/pothos-dev/sunstone/blob/main/docs/interface/fonts.md). The same file sets the [theme colours](/7-customize/theme-colors.md).

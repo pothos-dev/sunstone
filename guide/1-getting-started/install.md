@@ -20,7 +20,7 @@ Download the installer for your platform from the [latest release](https://githu
 | Windows | `.msi` or `.exe` |
 | Linux | `.AppImage`, `.deb` or `.rpm` |
 
-If you only want to try it, you don't need to install anything: see [Run in the browser](/getting-started/run-in-browser.md).
+If you only want to try it, you don't need to install anything: see [Run in the browser](/1-getting-started/run-in-browser.md).
 
 ## Updates
 

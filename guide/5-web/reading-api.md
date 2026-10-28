@@ -12,7 +12,7 @@ sources:
 
 # Reading API
 
-Every page URL doubles as an API. Ask for a different content type and you get the Concept as data instead of HTML. Browsers still get the normal page. This works on [Sunstone Web](/web/sunstone-web.md) and under [`sunstone serve`](/getting-started/run-in-browser.md), which makes a Bundle easy for agents and scripts to read.
+Every page URL doubles as an API. Ask for a different content type and you get the Concept as data instead of HTML. Browsers still get the normal page. This works on [Sunstone Web](/5-web/sunstone-web.md) and under [`sunstone serve`](/1-getting-started/run-in-browser.md), which makes a Bundle easy for agents and scripts to read.
 
 | Request | `Accept` | Response |
 |---------|----------|----------|
@@ -28,7 +28,7 @@ Without one of these `Accept` headers, you get the normal HTML page.
 Try it on this guide:
 
 ```sh
-curl -H 'Accept: text/markdown' https://wiki.sunstone.pothos.dev/web/reading-api
-curl -H 'Accept: application/json' https://wiki.sunstone.pothos.dev/editing/links
-curl -H 'Accept: application/json' 'https://wiki.sunstone.pothos.dev/editing?list'
+curl -H 'Accept: text/markdown' https://wiki.sunstone.pothos.dev/5-web/reading-api
+curl -H 'Accept: application/json' https://wiki.sunstone.pothos.dev/2-editing/links
+curl -H 'Accept: application/json' 'https://wiki.sunstone.pothos.dev/2-editing?list'
 ```

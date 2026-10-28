@@ -12,7 +12,7 @@ sources:
 
 # Diagrams
 
-Fenced code blocks in three diagram languages render as diagrams. They work in Live and Read mode, in [Sunstone Web](/web/sunstone-web.md) and in [PDF export](/editing/pdf-export.md).
+Fenced code blocks in three diagram languages render as diagrams. They work in Live and Read mode, in [Sunstone Web](/5-web/sunstone-web.md) and in [PDF export](/2-editing/pdf-export.md).
 
 | Language | Fence | Notes |
 |----------|-------|-------|

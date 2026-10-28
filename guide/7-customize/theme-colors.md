@@ -26,4 +26,4 @@ Sunstone has a warm amber palette and follows your system's light or dark settin
 }
 ```
 
-The full list of base colours is in the [theme colour reference](https://github.com/pothos-dev/sunstone/blob/main/docs/interface/theme-colors.md). The same file sets the [fonts](/customize/fonts.md).
+The full list of base colours is in the [theme colour reference](https://github.com/pothos-dev/sunstone/blob/main/docs/interface/theme-colors.md). The same file sets the [fonts](/7-customize/fonts.md).

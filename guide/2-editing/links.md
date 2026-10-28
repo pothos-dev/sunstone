@@ -36,6 +36,6 @@ A link whose target doesn't exist is styled as broken but stays clickable. Broke
 
 ## Backlinks
 
-The [Backlinks](/navigating/outline-and-backlinks.md) panel lists every Concept that links to the one you're reading.
+The [Backlinks](/3-navigating/outline-and-backlinks.md) panel lists every Concept that links to the one you're reading.
 
 External `http(s)`, `mailto` and `tel` links open in your default browser.
