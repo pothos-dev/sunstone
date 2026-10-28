@@ -4,6 +4,11 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.2] - 2026-10-28
+
+### Fixed
+- Pages in a folder that arrived with a git sync or pull no longer show up as broken links until a restart. When a commit added a new folder, some of the files written into it were missed, so links to them (including links to the folder's `index.md`) were marked broken.
+
 ## [0.30.1] - 2026-10-28
 
 ### Fixed
