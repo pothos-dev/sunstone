@@ -374,6 +374,20 @@ impl Index {
             || self.attachments.iter().any(|k| k.starts_with(&prefix))
     }
 
+    /// Every Concept and Attachment path under the folder `dir`, sorted.
+    pub fn paths_under(&self, dir: &str) -> Vec<String> {
+        let prefix = format!("{dir}/");
+        let mut v: Vec<String> = self
+            .concepts
+            .keys()
+            .chain(self.attachments.iter())
+            .filter(|k| k.starts_with(&prefix))
+            .cloned()
+            .collect();
+        v.sort();
+        v
+    }
+
     /// Bring everything under the folder `dir` back in line with disk: drop
     /// every Concept and Attachment indexed under it, then, if the folder
     /// still exists, re-walk it and index what it holds. A folder rename or

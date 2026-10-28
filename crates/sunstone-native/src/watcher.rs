@@ -15,7 +15,8 @@
 //! Pure-ish module logic — the host just calls `start` in setup.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
@@ -78,13 +79,19 @@ where
     F: Fn(FileChange) + Send + 'static,
 {
     let watch_root = root.clone();
+    // Shared with the settle threads below, which report a re-walk's catch.
+    let sink = Arc::new(Mutex::new(sink));
     let mut watcher = notify::recommended_watcher(
         move |res: notify::Result<notify::Event>| {
             let event = match res {
                 Ok(e) => e,
                 Err(_) => return,
             };
-            handle_event(&state, &root, &sink, event);
+            let appeared = appeared_folders(&root, &event);
+            handle_event(&state, &root, &|change| lock(&sink)(change), event);
+            for rel in appeared {
+                settle_folder(state.clone(), root.clone(), rel, sink.clone());
+            }
         },
     )
     .map_err(|e| e.to_string())?;
@@ -172,6 +179,64 @@ where
         // The watcher cannot attribute a change to a web writer — always genuine.
         origin: None,
     });
+}
+
+/// How long after a folder appears its re-walk runs again: long enough that
+/// notify has added the folder's watch, which it does right after the event
+/// batch that announced the folder.
+const FOLDER_SETTLE: Duration = Duration::from_millis(500);
+
+/// The bundle-relative folders a `Create` event reports, excluding hidden ones.
+fn appeared_folders(root: &Path, event: &notify::Event) -> Vec<String> {
+    if !matches!(event.kind, EventKind::Create(_)) {
+        return Vec::new();
+    }
+    event
+        .paths
+        .iter()
+        .filter(|abs| abs.is_dir())
+        .filter_map(|abs| to_bundle_relative(root, abs))
+        .filter(|rel| !has_hidden_component(rel))
+        .collect()
+}
+
+/// Re-walk a folder that just appeared once its watch is in place.
+///
+/// notify runs our handler for a whole batch of events BEFORE it adds the
+/// watch for a folder that batch created, so files written into the folder
+/// between `handle_event`'s re-walk and that watch fire no event at all. A
+/// `git checkout` or rebase that adds a folder writes its files in exactly that
+/// window: without this, a block of them stays out of the index (and so out of
+/// backlinks and broken-link checks) until a restart. When the late re-walk
+/// finds something new, the folder reaches the sink again so clients refresh.
+fn settle_folder<F>(state: Arc<AppState>, root: PathBuf, rel: String, sink: Arc<Mutex<F>>)
+where
+    F: Fn(FileChange) + Send + 'static,
+{
+    std::thread::spawn(move || {
+        std::thread::sleep(FOLDER_SETTLE);
+        let changed = {
+            let Ok(mut index) = state.index.write() else {
+                return;
+            };
+            let before = index.paths_under(&rel);
+            index.resync_folder(&root, &rel);
+            index.paths_under(&rel) != before
+        };
+        if changed {
+            lock(&sink)(FileChange {
+                kind: "created".to_string(),
+                paths: vec![rel],
+                origin: None,
+            });
+        }
+    });
+}
+
+/// Lock the shared sink, recovering from poisoning: a panicking sink call must
+/// not silence every later change.
+fn lock<F>(sink: &Mutex<F>) -> MutexGuard<'_, F> {
+    sink.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Apply a single Concept change to the in-memory index. Created/modified read
@@ -518,5 +583,31 @@ mod tests {
         let index = state.read_index().unwrap();
         assert_eq!(index.concept_paths(), vec!["notesy/c.md".to_string()]);
         assert!(index.attachment_paths().is_empty());
+    }
+
+    #[test]
+    fn a_folder_filled_while_it_appears_is_fully_indexed() {
+        // `git checkout` of a commit that adds a folder creates it and writes
+        // its files in one burst. notify hands us the folder's `Create` before
+        // it adds the folder's inotify watch, so the files written between our
+        // re-walk and that watch fire no event of their own.
+        let (root, state) = temp_state();
+        let _watcher = start(root.clone(), state.clone(), |_| {}).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let dir = root.join("tec/meetings");
+        std::fs::create_dir_all(&dir).unwrap();
+        for i in 0..200 {
+            std::fs::write(dir.join(format!("m{i:03}.md")), "# m\n").unwrap();
+        }
+
+        let fresh = Index::build(&root).concept_paths();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while state.read_index().unwrap().concept_paths() != fresh
+            && std::time::Instant::now() < deadline
+        {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert_eq!(state.read_index().unwrap().concept_paths(), fresh);
     }
 }
