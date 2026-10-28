@@ -2,7 +2,7 @@
 type: Feature
 title: Frontmatter
 description: "Edit a Concept's YAML frontmatter in place, with folding and OKF-aware checks."
-tags: [frontmatter, yaml, okf]
+tags: [editor, okf]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

@@ -2,7 +2,7 @@
 type: Guide
 title: Open a folder
 description: "Launch Sunstone on any directory of markdown from the command line or the launcher."
-tags: [cli, launcher, bundle]
+tags: [setup, cli]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

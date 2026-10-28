@@ -2,7 +2,7 @@
 type: Feature
 title: Outline and backlinks
 description: "The headings of the current Concept and everything that links to it."
-tags: [outline, backlinks, sidebar]
+tags: [navigation, links]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

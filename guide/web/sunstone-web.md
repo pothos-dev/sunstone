@@ -2,7 +2,7 @@
 type: Feature
 title: Sunstone Web
 description: "Serve a Bundle in any browser from a Docker image: read-only for visitors, the full editor for signed-in users."
-tags: [web, docker, server]
+tags: [web]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

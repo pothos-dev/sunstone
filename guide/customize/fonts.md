@@ -2,7 +2,7 @@
 type: Feature
 title: Fonts
 description: "Choose the fonts and sizes for the interface, text, headings and code, optionally from font files."
-tags: [fonts, typography, config]
+tags: [customization]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

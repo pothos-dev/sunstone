@@ -2,7 +2,7 @@
 type: Guide
 title: Run in the browser
 description: "Use Sunstone without installing it with npx sunstone-md, or serve the desktop editor with sunstone serve."
-tags: [cli, browser, serve, npx]
+tags: [setup, cli, web]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

@@ -2,7 +2,7 @@
 type: Guide
 title: Install
 description: "Desktop installers for macOS, Windows and Linux, and how Sunstone keeps itself up to date."
-tags: [install, update]
+tags: [setup]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

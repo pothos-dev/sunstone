@@ -2,7 +2,7 @@
 type: Feature
 title: Git-synced wiki
 description: "Back a Sunstone Web deployment with a git remote so browser edits and pushes reconcile on their own."
-tags: [web, git, collaboration, sync]
+tags: [web, git]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

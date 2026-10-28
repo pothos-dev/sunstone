@@ -2,7 +2,7 @@
 type: Feature
 title: Reading API
 description: "Fetch any page as Markdown or JSON, list a folder, or search, from scripts and agents."
-tags: [web, api, agents, json]
+tags: [web, agents]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

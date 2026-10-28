@@ -2,7 +2,7 @@
 type: Feature
 title: Review changes
 description: "Compare your edits with the last commit and step through a file's history."
-tags: [git, review, history, diff]
+tags: [git]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

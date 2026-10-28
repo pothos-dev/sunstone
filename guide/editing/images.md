@@ -2,7 +2,7 @@
 type: Feature
 title: Images
 description: "Embed images from the Bundle inline."
-tags: [images, embeds, attachments]
+tags: [editor]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

@@ -2,7 +2,7 @@
 type: Feature
 title: OKF support
 description: "What Sunstone understands about OKF bundles: validation, trust, lifecycle, sources and attested computations."
-tags: [okf, frontmatter, trust]
+tags: [okf, agents]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

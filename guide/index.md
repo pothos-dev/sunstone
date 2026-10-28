@@ -1,8 +1,9 @@
 ---
 okf_version: "0.2"
+title: Sunstone User Guide
 ---
 
-# Sunstone
+# Sunstone User Guide
 
 Sunstone is a markdown editor for git users. Point it at any folder of `.md` files and you get live preview, wikilinks, backlinks, full-text search and git review, with your files staying plain markdown on disk. It has first-class support for the [Open Knowledge Format](/okf/okf-support.md).
 

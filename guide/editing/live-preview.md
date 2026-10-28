@@ -2,7 +2,7 @@
 type: Feature
 title: Live preview
 description: "Source, Live and Read modes, formatting shortcuts and in-file find and replace."
-tags: [editor, shortcuts]
+tags: [editor]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog

@@ -2,7 +2,7 @@
 type: Feature
 title: Tiling workspace
 description: "Several Concepts side by side in columns and tiles."
-tags: [tiles, layout, workspace]
+tags: [navigation]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
 sources:
   - id: changelog
