@@ -4,6 +4,13 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.1] - 2026-10-28
+
+### Fixed
+- Scrollbars in `sunstone serve` and the web viewer are now slim, rounded and
+  theme-coloured in Chrome and other Chromium browsers, instead of the browser's
+  wide default scrollbars with arrow buttons.
+
 ## [0.30.0] - 2026-10-27
 
 ### Added
