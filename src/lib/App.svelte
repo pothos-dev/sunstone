@@ -854,10 +854,17 @@
   /* `sunstone serve`: the desktop shell in a plain browser tab. In the Tauri
      webview WebKitGTK draws native overlay scrollbars, but a browser would show
      its default fat ones — so give the served shell the same thin,
-     token-coloured scrollbars as the web build (`WebReader.svelte`). */
-  .app.served {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong, #8886) transparent;
+     token-coloured scrollbars as the web build (`WebReader.svelte`). Blink and
+     WebKit take the `::-webkit-scrollbar` rules (a rounded pill, no arrow
+     buttons); the standard properties are only for browsers without them
+     (Firefox), because setting them makes Blink ignore the pseudo-elements.
+     `scrollbar-width` is not inherited, so it goes on every descendant. */
+  @supports not selector(::-webkit-scrollbar) {
+    .app.served,
+    .app.served :global(*) {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong, #8886) transparent;
+    }
   }
   .app.served :global(*::-webkit-scrollbar) {
     width: 8px;

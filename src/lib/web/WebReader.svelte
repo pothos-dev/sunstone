@@ -716,13 +716,22 @@
     font-family: var(--font-ui, system-ui, sans-serif);
     color: var(--text, #222);
     background: var(--bg, #fff);
-    /* Thin, token-coloured scrollbars (Firefox/standard; inherited to all scroll
-       containers within). The webkit fallback is below. */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong, #8886) transparent;
   }
 
-  /* WebKit/Blink scrollbar fallback — slim, rounded, token-coloured, subtle. */
+  /* Thin, token-coloured scrollbars. Blink and WebKit take the
+     `::-webkit-scrollbar` rules below (a rounded pill, no arrow buttons); the
+     standard properties are only for browsers without them (Firefox), because
+     setting them makes Blink ignore the pseudo-elements. `scrollbar-width` is
+     not inherited, so it goes on every descendant. */
+  @supports not selector(::-webkit-scrollbar) {
+    .app,
+    .app :global(*) {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong, #8886) transparent;
+    }
+  }
+
+  /* WebKit/Blink scrollbars — slim, rounded, token-coloured, subtle. */
   .app :global(*::-webkit-scrollbar) {
     width: 8px;
     height: 8px;

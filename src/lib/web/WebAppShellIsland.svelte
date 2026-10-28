@@ -427,16 +427,22 @@
     height: 100vh;
     min-height: 0;
     min-width: 0;
-    /* Thin, token-coloured scrollbars (Firefox/standard), matching the anon
-       read surface's `.app`. The desktop App shell sets none — it relies on
-       WebKitGTK's native overlay scrollbars — but mounted in a browser here it
-       would otherwise show the browser's default fat scrollbar. This wrapper is
-       web-only (never rendered on desktop), so the desktop shell is untouched. */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong, #8886) transparent;
   }
 
-  /* WebKit/Blink scrollbar fallback — slim, rounded, token-coloured, subtle. */
+  /* Thin, token-coloured scrollbars. Blink and WebKit take the
+     `::-webkit-scrollbar` rules below (a rounded pill, no arrow buttons); the
+     standard properties are only for browsers without them (Firefox), because
+     setting them makes Blink ignore the pseudo-elements. `scrollbar-width` is
+     not inherited, so it goes on every descendant. */
+  @supports not selector(::-webkit-scrollbar) {
+    .web-app-shell,
+    .web-app-shell :global(*) {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-strong, #8886) transparent;
+    }
+  }
+
+  /* WebKit/Blink scrollbars — slim, rounded, token-coloured, subtle. */
   .web-app-shell :global(*::-webkit-scrollbar) {
     width: 8px;
     height: 8px;
