@@ -594,7 +594,7 @@
   });
 </script>
 
-<div class="app" data-testid="app-root" bind:this={appRoot}>
+<div class="app" class:served={servedDesktop} data-testid="app-root" bind:this={appRoot}>
   <ActivityRail
     side="left"
     sidebarOpen={session.leftSidebarVisible}
@@ -849,6 +849,33 @@
     /* Warm sunlit gradient behind the shell; tiles paint their own solid
        surfaces on top, so it reads through gutters and translucent chrome. */
     background: var(--bg-gradient, var(--bg));
+  }
+
+  /* `sunstone serve`: the desktop shell in a plain browser tab. In the Tauri
+     webview WebKitGTK draws native overlay scrollbars, but a browser would show
+     its default fat ones — so give the served shell the same thin,
+     token-coloured scrollbars as the web build (`WebReader.svelte`). */
+  .app.served {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong, #8886) transparent;
+  }
+  .app.served :global(*::-webkit-scrollbar) {
+    width: 8px;
+    height: 8px;
+  }
+  .app.served :global(*::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+  .app.served :global(*::-webkit-scrollbar-thumb) {
+    background: var(--border-strong, #8886);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .app.served :global(*::-webkit-scrollbar-thumb:hover) {
+    background: var(--text-faint, #999);
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   /* Active-Region affordance: a subtle brighter background on the active Region's
