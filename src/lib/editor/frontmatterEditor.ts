@@ -348,6 +348,22 @@ function yamlFolding(): Extension {
         color: 'var(--text-muted)',
         cursor: 'pointer',
       },
+      // CodeMirror's base theme paints gutters and the lint tooltip light grey,
+      // which is unreadable in the dark scheme.
+      '.cm-gutters': {
+        background: 'transparent',
+        border: 'none',
+      },
+      '.cm-tooltip.cm-tooltip-lint': {
+        background: 'var(--bg-elevated)',
+        color: 'var(--text)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: '6px',
+        boxShadow: 'var(--shadow-md)',
+      },
+      '.cm-diagnosticSource': {
+        color: 'var(--text-muted)',
+      },
     }),
   ];
 }
