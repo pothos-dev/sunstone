@@ -28,7 +28,7 @@ Without one of these `Accept` headers, you get the normal HTML page.
 Try it on this guide:
 
 ```sh
-curl -H 'Accept: text/markdown' https://wiki.sunstone.pothos.dev/5-web/reading-api
-curl -H 'Accept: application/json' https://wiki.sunstone.pothos.dev/2-editing/links
-curl -H 'Accept: application/json' 'https://wiki.sunstone.pothos.dev/2-editing?list'
+curl -H 'Accept: text/markdown' https://wiki.sunstone.md/5-web/reading-api
+curl -H 'Accept: application/json' https://wiki.sunstone.md/2-editing/links
+curl -H 'Accept: application/json' 'https://wiki.sunstone.md/2-editing?list'
 ```

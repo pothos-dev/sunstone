@@ -13,7 +13,7 @@ then read the deeper docs:
   interact; start with [`overview.md`](docs/architecture/overview.md).
 - **`docs/adr/`** — architecture decisions.
 - **`guide/`** — the user-facing feature guide (an OKF Bundle), published read-only at
-  https://wiki.sunstone.pothos.dev by `/deploy`. A user-visible feature change updates its page.
+  https://wiki.sunstone.md by `/deploy`. A user-visible feature change updates its page.
 
 ## Verifying changes
 

@@ -20,11 +20,13 @@ It isn't real-time co-editing; concurrent work reconciles through rebase. When a
 
 ## Everything is git
 
+Saves are committed as the signed-in user, with a message naming the change and the path, such as `edit concepts/rollout-plan.md via web`.
+
 ```sh
-$ git log --oneline docs/
-a41f2c9 web: edit concepts/rollout-plan.md (dana)
-7be03d1 web: edit concepts/rollout-plan.md (jonas)
-f19c884 sync: rebase onto origin/main
+$ git log --format='%h %<(6)%an %s' concepts/
+a41f2c9 Dana   edit concepts/rollout-plan.md via web
+7be03d1 Jonas  rename concepts/rollout.md → concepts/rollout-plan.md via web
+c02a7de Daniel Add rollback steps to the rollout plan
 ```
 
-Anything the wiki did, you can inspect, revert or bisect from the command line. Changes pushed to the remote reach every connected reader within one sync interval.
+Syncing adds no commits of its own: rebasing replays the browser commits on top of the remote, so history stays linear. Anything the wiki did, you can inspect, revert or bisect from the command line. Changes pushed to the remote reach every connected reader within one sync interval.

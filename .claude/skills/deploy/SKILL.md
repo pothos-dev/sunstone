@@ -1,11 +1,11 @@
 ---
 name: deploy
-description: Cut a new release of Sunstone. Bumps the version across all manifests, updates CHANGELOG.md, commits, tags, and pushes — the pushed tag triggers the GitHub Actions release workflow that builds installers for Linux, macOS, and Windows — then publishes the marketing page (sunstone.pothos.dev) and the user guide wiki (wiki.sunstone.pothos.dev) for that version. Use when the user runs /deploy or asks to release/ship/cut a new version.
+description: Cut a new release of Sunstone. Bumps the version across all manifests, updates CHANGELOG.md, commits, tags, and pushes — the pushed tag triggers the GitHub Actions release workflow that builds installers for Linux, macOS, and Windows — then publishes the marketing page (sunstone.md) and the user guide wiki (wiki.sunstone.md) for that version. Use when the user runs /deploy or asks to release/ship/cut a new version.
 ---
 
 # /deploy
 
-Cuts a new Sunstone release. The release artifacts (Linux `.deb`/`.AppImage`, macOS `.dmg`, Windows `.msi`/`.exe`) are built by `.github/workflows/release.yml`, which runs on every pushed `v*` tag via `tauri-action`. This skill's job is to bump the version, write the changelog, push the tag that triggers that build, and then publish the two public sites for the new version: the marketing page at https://sunstone.pothos.dev (`marketing/`) and the user guide at https://wiki.sunstone.pothos.dev (the `guide/` OKF bundle, served by Sunstone Web). Both are hosted on `debian.local`, the machine this skill runs on.
+Cuts a new Sunstone release. The release artifacts (Linux `.deb`/`.AppImage`, macOS `.dmg`, Windows `.msi`/`.exe`) are built by `.github/workflows/release.yml`, which runs on every pushed `v*` tag via `tauri-action`. This skill's job is to bump the version, write the changelog, push the tag that triggers that build, and then publish the two public sites for the new version: the marketing page at https://sunstone.md (`marketing/`) and the user guide at https://wiki.sunstone.md (the `guide/` OKF bundle, served by Sunstone Web). Both are hosted on `debian.local`, the machine this skill runs on.
 
 ## When to invoke
 
@@ -72,13 +72,11 @@ After the CHANGELOG is approved, set the new version in **all eight** places (us
 7. `crates/sunstone-cli/Cargo.toml` — `[package] version` (what `npx sunstone-md --version` prints)
 8. `Cargo.lock` — the `version` under `[[package]] name = "sunstone-cli"`
 
-Also update the version label on the landing page: in `marketing/index.html`, the line marked `data-release` shows the version twice (the link text and the `releases/tag/vX.Y.Z` URL). Replace both.
-
 Keep all eight in lockstep — a mismatch makes `tauri-action` produce wrongly-named artifacts. The npm packages need no bump: `release.yml` stamps them with the tag's version. Do not run `bun install` (the lockfile doesn't change for a self-version bump).
 
 Then:
 
-5. Stage the manifest files, `CHANGELOG.md`, `marketing/index.html` and any `guide/` changes.
+5. Stage the manifest files, `CHANGELOG.md` and any `marketing/` or `guide/` changes.
 6. Commit: `Release vX.Y.Z`.
 7. Tag: `git tag vX.Y.Z` (note the `v` prefix — the workflow triggers on `v*`).
 
@@ -113,7 +111,7 @@ Run these on `debian.local` right after the tag push, from the repo root.
 
    ```bash
    rsync -a --delete marketing/ /opt/docker/caddy/sites/sunstone/
-   curl -s https://sunstone.pothos.dev/ | grep -o 'releases/tag/v[0-9.]*'   # must show vX.Y.Z
+   curl -s -o /dev/null -w '%{http_code}\n' https://sunstone.md/   # must show 200
    ```
 
 2. **Guide bundle.** The read-only Sunstone Web container in `/opt/docker/sunstone-wiki` serves `./bundle`, which holds `guide/` exactly as of the release tag:
@@ -124,13 +122,13 @@ Run these on `debian.local` right after the tag push, from the repo root.
    git archive vX.Y.Z guide | tar -x --strip-components=1 -C "$B"
    ```
 
-   Then restart the container so it rebuilds its index from scratch: `cd /opt/docker/sunstone-wiki && docker compose restart`. (The file watcher would pick up most changes, but before v0.30.2 it could miss files in folders created in bulk, and a restart costs a second.) Check a page: `curl -s -o /dev/null -w '%{http_code}\n' https://wiki.sunstone.pothos.dev/`.
+   Then restart the container so it rebuilds its index from scratch: `cd /opt/docker/sunstone-wiki && docker compose restart`. (The file watcher would pick up most changes, but before v0.30.2 it could miss files in folders created in bulk, and a restart costs a second.) Check a page: `curl -s -o /dev/null -w '%{http_code}\n' https://wiki.sunstone.md/`.
 
 3. **Wiki image.** The tag also triggers `.github/workflows/publish-web-image.yml`, which pushes `ghcr.io/pothos-dev/sunstone-web:latest`. Once that run succeeds (`gh run list --workflow publish-web-image.yml --limit 1`, or `gh run watch <id>` in the background), update the container:
 
    ```bash
    cd /opt/docker/sunstone-wiki && docker compose pull && docker compose up -d
-   curl -s https://wiki.sunstone.pothos.dev/_api/version   # must show X.Y.Z
+   curl -s https://wiki.sunstone.md/_api/version   # must show X.Y.Z
    ```
 
    If the image build fails, say so; the guide content is already live on the previous image.

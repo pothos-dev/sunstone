@@ -12,7 +12,7 @@ sources:
 
 # OKF support
 
-The [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) is an open standard for markdown bundles that humans and agents read the same way: markdown with YAML frontmatter and links. If you can `cat` a file you can read it; if you can `git clone` you can ship it.
+The [Open Knowledge Format](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md) (OKF) is an open specification from Google for knowledge bundles: a folder of markdown files with YAML frontmatter and links between them. The frontmatter records what each file is (its `type`), who wrote or generated it, who verified it, its status and its sources, so people and agents can tell how far to trust it. There's no database or tooling requirement; any editor can read and write a bundle.
 
 Sunstone supports OKF v0.2. A Bundle opts in by declaring `okf_version` in its root `index.md`, as this guide does. A plain folder of markdown works too: it just doesn't get the OKF-specific help.
 
