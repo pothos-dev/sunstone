@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sunstone: a markdown editor for folders in git</title>
-<meta name="description" content="Open-source desktop markdown editor for any folder of .md files. Wikilinks, backlinks, live preview, full-text search, diff against HEAD. Plus a Docker image that serves the same editor in the browser, synced through git. MIT, Tauri + Rust." />
+<meta name="description" content="Open-source markdown editor for folders of .md files in git, with Open Knowledge Format (OKF) support: trust and status badges, frontmatter checks, sources and citations. Wikilinks, backlinks, live preview, search, diff against HEAD. Desktop app and a Docker image. MIT." />
 <link rel="icon" href="assets/logo.svg" />
 <link rel="preload" href="assets/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin />
 <style>
@@ -195,6 +195,51 @@
   @media (max-width: 820px) { .two { grid-template-columns: 1fr; } }
   .note { font-size: 0.88rem; color: var(--text-muted); margin-top: 10px; }
 
+  /* ---- Buttons ---- */
+  .cta { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 20px; border-radius: 999px; font-weight: 600; font-size: 1rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-contrast); box-shadow: 0 8px 22px -10px var(--accent); }
+  .btn-primary:hover { background: var(--accent-deep); color: var(--accent-contrast); }
+  .btn-ghost { border-color: var(--border-strong); color: var(--text); background: var(--bg-elevated); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .cta-note { font-size: 0.9rem; color: var(--text-muted); max-width: 60ch; margin-top: 12px; }
+  nav a.nav-guide { color: var(--accent-deep); font-weight: 600; }
+
+  /* ---- Figures ---- */
+  .fig a { display: block; }
+  .fig img { width: 100%; display: block; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
+  .fig .shot-dark { display: none !important; }
+  @media (prefers-color-scheme: dark) {
+    .fig .shot-light { display: none !important; }
+    .fig .shot-dark { display: block !important; }
+  }
+  .rows { display: grid; gap: 44px; }
+  .row { display: grid; grid-template-columns: 1.45fr 1fr; gap: 32px; align-items: center; }
+  .row:nth-child(even) { grid-template-columns: 1fr 1.45fr; }
+  .row:nth-child(even) .fig { order: 2; }
+  @media (max-width: 820px) {
+    .row, .row:nth-child(even) { grid-template-columns: 1fr; }
+    .row:nth-child(even) .fig { order: 0; }
+  }
+  .row h3 { margin: 0 0 8px; }
+  .row p { color: var(--text-muted); }
+  .row p + p { margin-top: 10px; }
+  .okf-optin { margin-top: 44px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 820px) { .okf-optin { grid-template-columns: 1fr; } }
+  .okf-optin p { color: var(--text-muted); }
+
+  /* ---- Guide band ---- */
+  #guide { background: var(--bg-elevated); }
+  #guide .row { grid-template-columns: 1fr 1.5fr; }
+  @media (max-width: 820px) { #guide .row { grid-template-columns: 1fr; } }
+  #guide h2 { margin-bottom: 12px; }
+  #guide p { color: var(--text-muted); }
+  #guide .cta { margin-top: 22px; }
+
   footer { border-top: 1px solid var(--border); padding: 28px 0 40px; font-size: 0.88rem; color: var(--text-muted); }
   footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-between; }
   footer a { color: var(--text-muted); }
@@ -206,11 +251,12 @@
   <div class="wrap">
     <a class="brand" href="#"><img src="assets/logo.svg" alt="" /> Sunstone</a>
     <nav>
-      <a class="opt" href="#obsidian">vs. Obsidian</a>
+      <a class="opt" href="#okf">OKF</a>
       <a class="opt" href="#features">Features</a>
+      <a class="opt" href="#obsidian">vs. Obsidian</a>
       <a class="opt" href="#web">Sunstone Web</a>
-      <a href="https://wiki.sunstone.md/">Guide</a>
       <a href="https://github.com/pothos-dev/sunstone">GitHub</a>
+      <a class="nav-guide" href="https://wiki.sunstone.md/">Guide →</a>
     </nav>
   </div>
 </header>
@@ -225,8 +271,16 @@
     and syncs with your git remote.
     <strong>MIT licensed</strong>, built with Tauri 2, SvelteKit and Rust.
   </p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://wiki.sunstone.md/">Explore the guide →</a>
+    <a class="btn btn-ghost" href="#download">Download</a>
+  </div>
+  <p class="cta-note">
+    The guide is a Sunstone bundle served by Sunstone Web, so browsing it is the
+    quickest way to try the app before installing anything.
+  </p>
 
-  <div class="install">
+  <div class="install" id="download">
     <div class="panel">
       <h2>Download</h2>
       <ul class="dl" data-downloads>
@@ -254,11 +308,95 @@
   </div>
 
   <figure class="shot">
-    <img class="shot-light" src="assets/screenshot-light.png" alt="Sunstone with the Explorer, Properties, live preview, Outline, Backlinks and Tags panels open" />
-    <img class="shot-dark" src="assets/screenshot-dark.png" alt="Sunstone in dark mode with the Explorer, Properties, live preview, Outline, Backlinks and Tags panels open" />
-    <figcaption>A concept with Explorer, Properties, live preview, Outline, Backlinks and Tags.</figcaption>
+    <a class="shot-light" href="assets/hero-light.png"><img src="assets/hero-light.png" alt="Sunstone editing a service page: Explorer, frontmatter, live preview with code and a table, Outline and Backlinks" /></a>
+    <a class="shot-dark" href="assets/hero-dark.png"><img src="assets/hero-dark.png" alt="The same service page in dark mode" /></a>
+    <figcaption>A service page in an OKF bundle: Explorer with status badges, frontmatter, live preview, Outline and Backlinks.</figcaption>
   </figure>
 </div>
+
+<section id="okf">
+  <div class="wrap">
+    <h2>Open Knowledge Format</h2>
+    <p class="sub">
+      <a href="https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md">OKF</a>
+      is an open specification from Google for knowledge bundles: markdown files whose
+      YAML frontmatter says what each file is, who wrote or generated it, who verified it,
+      whether it is still current, and what it is based on. It fits documentation that
+      agents draft and people review. Sunstone implements OKF v0.2.
+    </p>
+    <div class="rows">
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/okf-light.png"><img src="assets/okf-light.png" alt="Trust popover on a service page: human-reviewed, generated by an agent last week, verified by a person 3 days ago, status stable, 3 sources. The Explorer marks a draft, a stale and a deprecated page." /></a>
+          <a class="shot-dark" href="assets/okf-dark.png"><img src="assets/okf-dark.png" alt="The trust popover in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Trust and status next to the title</h3>
+          <p>A pill in the header shows the trust level (unverified, reviewed), the status and the number of sources. Hover it for who generated and who verified the page, and when.</p>
+          <p>The Explorer marks <code>draft</code> and <code>deprecated</code> pages, and pages whose <code>stale_after</code> date has passed.</p>
+        </div>
+      </div>
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/properties-light.png"><img src="assets/properties-light.png" alt="The frontmatter editor flags status: resolved with the message that status must be draft, stable or deprecated" /></a>
+          <a class="shot-dark" href="assets/properties-dark.png"><img src="assets/properties-dark.png" alt="The frontmatter editor's OKF check in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Frontmatter checked against the spec</h3>
+          <p>Frontmatter is edited as YAML, so what you see is what's in the file. Sunstone flags missing required fields and invalid values, and completes OKF keys as you type.</p>
+          <p>Outside an OKF bundle it only checks YAML syntax.</p>
+        </div>
+      </div>
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/footnotes-light.png"><img src="assets/footnotes-light.png" alt="A footnote's hover card showing the cited source's title and URL, with the numbered Sources list at the end of the page" /></a>
+          <a class="shot-dark" href="assets/footnotes-dark.png"><img src="assets/footnotes-dark.png" alt="Footnotes and the Sources list in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Sources and citations</h3>
+          <p>List sources under <code>sources</code> in the frontmatter and cite them with footnotes (<code>[^pg-docs]</code>). Each citation is numbered and has a hover card with the title, URL and dates.</p>
+          <p>A Sources list at the end of the page links back to every citation. It is rendered, not written into the file.</p>
+        </div>
+      </div>
+    </div>
+    <div class="okf-optin">
+      <div>
+        <h3 style="margin-top:0">Opting in</h3>
+        <p>A bundle opts in with one line in its root <code>index.md</code>. Any folder of markdown still opens; it just doesn't get the OKF checks. <strong>New Bundle…</strong> in the launcher creates an OKF bundle.</p>
+      </div>
+      <pre><span class="c"># index.md</span>
+---
+okf_version: "0.2"
+---</pre>
+    </div>
+    <p class="note">More in the guide: <a href="https://wiki.sunstone.md/6-okf/okf-support">OKF support</a>, <a href="https://wiki.sunstone.md/2-editing/footnotes-and-sources">footnotes and sources</a>, <a href="https://wiki.sunstone.md/2-editing/frontmatter">frontmatter</a>.</p>
+  </div>
+</section>
+
+<section id="guide">
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h2>Explore the guide</h2>
+        <p>
+          The user guide at <a href="https://wiki.sunstone.md/">wiki.sunstone.md</a> is an
+          OKF bundle served read-only by Sunstone Web. It has the same explorer, search,
+          tags, backlinks, properties and trust pills as the desktop app, without the
+          editing. It also works on a phone.
+        </p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://wiki.sunstone.md/">Open wiki.sunstone.md →</a>
+        </div>
+      </div>
+      <figure class="fig">
+        <a href="https://wiki.sunstone.md/6-okf/okf-support">
+          <img class="shot-light" src="assets/wiki-light.png" alt="The Sunstone user guide in the browser, showing the OKF support page with its properties, outline and backlinks" />
+          <img class="shot-dark" src="assets/wiki-dark.png" alt="The Sunstone user guide in dark mode" />
+        </a>
+      </figure>
+    </div>
+  </div>
+</section>
 
 <section id="obsidian">
   <div class="wrap">
@@ -285,19 +423,27 @@
   <div class="wrap">
     <h2>Features</h2>
     <p class="sub">All built in. Details for each are in the <a href="https://wiki.sunstone.md/">guide</a>.</p>
+    <div class="row" style="margin-bottom:36px">
+      <figure class="fig">
+        <a class="shot-light" href="assets/annotations-light.png"><img src="assets/annotations-light.png" alt="Review comments on a draft decision record: highlighted spans with a comment icon in the margin and one note open" /></a>
+        <a class="shot-dark" href="assets/annotations-dark.png"><img src="assets/annotations-dark.png" alt="Review comments in dark mode" /></a>
+      </figure>
+      <div>
+        <h3>Review comments in the file</h3>
+        <p>Select text and press <kbd>Ctrl/Cmd</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> to add a margin comment. It is stored inline as CriticMarkup, <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>, so comments travel through git and any tool can read them.</p>
+        <p>Useful for reviewing what an agent wrote before its next pass.</p>
+      </div>
+    </div>
     <div class="features">
       <div><h3>Live preview</h3><p>Lines render as formatted text; the line with the cursor shows raw markdown. GFM tables are editable as tables.</p></div>
       <div><h3>Links that follow renames</h3><p>Renaming or moving a file rewrites every link to it across the folder. Renaming a heading rewrites its anchors.</p></div>
       <div><h3>Backlinks, outline, tags</h3><p>Side panels for incoming links, the heading outline, and a tag browser with counts.</p></div>
       <div><h3>Search</h3><p>Full-text search with snippets. A fuzzy quick-nav palette opens any file by name.</p></div>
-      <div><h3>Properties</h3><p>Frontmatter edited as typed fields. YAML the panel doesn't understand is kept byte for byte.</p></div>
       <div><h3>Diagrams</h3><p>Mermaid, D2 and PlantUML code blocks render in place, locally. Nothing is sent to a server.</p></div>
       <div><h3>Review against HEAD</h3><p>Shows the working copy against the last commit as inline track changes, and steps back through a file's history.</p></div>
-      <div><h3>Comments</h3><p><kbd>Ctrl/Cmd</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> adds a margin comment, stored in the file as CriticMarkup: <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>.</p></div>
       <div><h3>Tiles</h3><p>Split the editor into columns and tiles. The layout is restored on the next start.</p></div>
       <div><h3>PDF export</h3><p>Print preview of the open file, diagrams included.</p></div>
       <div><h3>Theming</h3><p>Follows the OS light/dark setting. Colours and fonts are set in <code>config.json</code>.</p></div>
-      <div><h3>Open Knowledge Format</h3><p>Folders that declare OKF v0.2 get frontmatter validation and completion, plus status and source badges.</p></div>
     </div>
   </div>
 </section>
