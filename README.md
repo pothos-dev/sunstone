@@ -6,7 +6,7 @@
 
 **The markdown editor for git users. A slimmed-down Obsidian.**
 
-[sunstone.pothos.dev](https://sunstone.pothos.dev)
+[sunstone.md](https://sunstone.md)
 
 </div>
 
