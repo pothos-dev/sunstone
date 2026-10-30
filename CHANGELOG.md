@@ -4,6 +4,21 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2026-10-31
+
+### Added
+- A settings page in the desktop app: the gear at the bottom of the left rail, or Ctrl+, (Cmd+, on a Mac). Choose light, dark or the system setting, pick one of eight colour themes (Sunstone, Solarized, Nord, Gruvbox, Catppuccin, Rosé Pine, GitHub, Tokyo Night) and change single colours on top of it, set fonts and sizes, choose how a Bundle opens the first time, and rebind keyboard shortcuts, with a warning when keys are already taken. Changes apply at once and save straight away. Sunstone writes only the settings you change to `config.json` and leaves the rest of the file as you wrote it. The colour theme also applies under `sunstone serve` and on Sunstone Web.
+- Sunstone Web pages can be found by search engines and AI crawlers. Each page carries its `description`, a canonical URL and Open Graph tags, and is titled "Page · Site", with the site named by the root `index.md`'s `title`. The server answers `/robots.txt`, `/sitemap.xml` and `/llms.txt`, and a URL that matches no Concept now returns 404.
+
+### Changed
+- Opening a folder's `index.md` expands that folder in the Explorer, so its pages show.
+- Sunstone Web starts with a page's Frontmatter collapsed, as the desktop app does. The Frontmatter toggle shows it, and your choice is remembered.
+- `sunstone lint` no longer reports Frontmatter on an `index.md`. Sunstone treats it as the page that introduces its folder, and its `title` names the folder in the Explorer. Frontmatter on a `log.md` is still reported.
+- The Paragraph shortcut (Ctrl/Cmd+0) is gone because Reset zoom always took those keys. Bind Paragraph to other keys in the settings page.
+
+### Fixed
+- Review changes, highlights and comments inside table cells render as such instead of showing raw CriticMarkup such as `{--52--}{++38++}`.
+
 ## [0.31.0] - 2026-10-30
 
 ### Added
