@@ -14,6 +14,7 @@
    * markup / test-ids / styles. It drops the desktop `tagsNav`/`focus` keyboard
    * Region infra (editor-only), using plain clicks + a local expanded Set.
    */
+  import Twisty from '$lib/components/Twisty.svelte';
   import { backend } from '$lib/ipc';
   import { basename, stripMd } from '$lib/path';
   import { pruneToLiveTags } from '$lib/tagsNav';
@@ -101,7 +102,7 @@
               }
             }}
           >
-            <span class="twisty" class:open>▸</span>
+            <span class="twisty" class:open><Twisty /></span>
             <span class="tag-name">{tag}</span>
             <span class="count" data-testid="tag-count">{count}</span>
           </div>

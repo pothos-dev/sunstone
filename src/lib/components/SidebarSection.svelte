@@ -11,6 +11,7 @@
   // guarantee everything fits the viewport even if header heights drift from the
   // 2rem assumed by the cap formula; overflow scrolls within each body.
   import type { Snippet } from 'svelte';
+  import Twisty from './Twisty.svelte';
   import { region, type RegionParams } from '$lib/region';
   import { focus } from '$lib/state/focus.svelte';
 
@@ -68,7 +69,7 @@
       data-testid={testid ? `${testid}-header` : undefined}
       onclick={ontoggle}
     >
-      <span class="chevron" class:open={expanded} aria-hidden="true">▸</span>
+      <span class="chevron" class:open={expanded} aria-hidden="true"><Twisty /></span>
     </button>
     <button
       type="button"

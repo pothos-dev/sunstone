@@ -3,6 +3,7 @@
   import { isMarkdownName } from '$lib/path';
   import { indexChild, ordinaryChildren as ordinaryChildrenOf, treeLabel } from '$lib/treeNav';
   import Self from './WebTree.svelte';
+  import Twisty from '$lib/components/Twisty.svelte';
   import LifecycleBadge from '$lib/components/LifecycleBadge.svelte';
   import { lifecycleOfNode } from '$lib/lifecycle';
 
@@ -61,7 +62,7 @@
       aria-label={displayName}
       onclick={toggle}
     >
-      <span class="twisty" class:open={expanded}>▸</span>
+      <span class="twisty" class:open={expanded}><Twisty /></span>
     </button>
     <button type="button" class="entry name-toggle" aria-hidden="true" tabindex="-1" onclick={onNameClick}>
       <span class="name">{displayName}</span>

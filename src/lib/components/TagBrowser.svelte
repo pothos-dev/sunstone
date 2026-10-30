@@ -26,6 +26,7 @@
   // There are deliberately NO CRUD verbs here — tags derive from frontmatter.
 
   import { backend } from '$lib/ipc';
+  import Twisty from './Twisty.svelte';
   import { createCancelGuard } from '$lib/asyncGuard';
   import { stripMd } from '$lib/path';
   import type { TagCount } from '$lib/types';
@@ -193,7 +194,7 @@
               }
             }}
           >
-            <span class="twisty" class:open>▸</span>
+            <span class="twisty" class:open><Twisty /></span>
             <span class="tag-name">{tag}</span>
             <span class="count" data-testid="tag-count">{count}</span>
           </div>
