@@ -1,3 +1,11 @@
+---
+type: Decision
+title: "Structured frontmatter model with whole-block re-serialization"
+description: "Frontmatter was held as structured Property[] state and re-serialized as a whole block on every change."
+status: deprecated
+tags: [adr, decision]
+---
+
 # Structured frontmatter model with whole-block re-serialization
 
 > **Status: Superseded by [ADR-0008](0008-raw-yaml-frontmatter-editing.md).**

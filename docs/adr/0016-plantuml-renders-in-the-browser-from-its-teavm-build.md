@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "PlantUML renders in the browser from its TeaVM build, on the main thread"
+description: "PlantUML renders in the browser from its TeaVM build on the main thread, themed from the app palette."
+tags: [adr, decision]
+---
+
 # PlantUML renders in the browser from its TeaVM build, on the main thread
 
 PlantUML is the third language on the diagram seam of [ADR-0014](0014-diagram-languages-share-one-block-renderer.md).

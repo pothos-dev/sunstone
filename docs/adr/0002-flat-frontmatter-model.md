@@ -1,3 +1,11 @@
+---
+type: Decision
+title: "Flat key/value frontmatter model"
+description: "Frontmatter was edited as a flat, ordered key/value map, with anything complex kept as a read-only raw field."
+status: deprecated
+tags: [adr, decision]
+---
+
 # Flat key/value frontmatter model
 
 > **Status: Superseded by [ADR-0003](0003-structured-frontmatter-reserialization.md).**

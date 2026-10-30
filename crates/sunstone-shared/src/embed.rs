@@ -210,7 +210,7 @@ fn blank(out: &mut [u8], from: usize, to: usize) {
 /// Length-preserving by construction: only whole bytes are overwritten with
 /// ASCII spaces, so a multi-byte char inside code becomes N spaces and the
 /// result is still valid UTF-8 of the same length.
-fn mask_code(body: &str) -> String {
+pub fn mask_code(body: &str) -> String {
     let mut out = body.as_bytes().to_vec();
     walk_code(body.as_bytes(), |i, class| {
         match class {

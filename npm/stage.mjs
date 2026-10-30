@@ -5,20 +5,23 @@
 //
 // <binaries-dir> holds one subdirectory per platform key below (e.g.
 // `linux-x64/sunstone-cli`). Writes <out-dir>/<package>/ for each package,
-// ready for `npm publish`. Platform package names derive from the launcher's
-// name, so renaming the package is one edit to npm/sunstone/package.json.
+// ready for `npm publish` (a scoped package's directory is `@scope__name`).
+// Platform package names derive from the launcher's name unless PLATFORMS
+// overrides one, so renaming the package is one edit to
+// npm/sunstone/package.json.
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Node's `process.platform`-`process.arch` → what the binary is called there.
+// Node's `process.platform`-`process.arch` → what the binary is called there,
+// and optionally the package name when it isn't `<launcher>-<key>`.
 const PLATFORMS = {
-  "linux-x64": "sunstone-cli",
-  "linux-arm64": "sunstone-cli",
-  "darwin-x64": "sunstone-cli",
-  "darwin-arm64": "sunstone-cli",
-  // Blocked by npm's spam filter (support ticket #4896497); restore once the
-  // name `sunstone-md-win32-x64` is allowed. CI still builds the binary.
-  // "win32-x64": "sunstone-cli.exe",
+  "linux-x64": { exe: "sunstone-cli" },
+  "linux-arm64": { exe: "sunstone-cli" },
+  "darwin-x64": { exe: "sunstone-cli" },
+  "darwin-arm64": { exe: "sunstone-cli" },
+  // npm's spam filter blocks the unscoped `sunstone-md-win32-x64` (support
+  // ticket #4896497), so Windows lives under the owner's scope.
+  "win32-x64": { exe: "sunstone-cli.exe", pkg: "@pothos-dev/sunstone-md-win32-x64" },
 };
 
 const [version, binDir, outDir] = process.argv.slice(2);
@@ -31,12 +34,12 @@ const here = new URL(".", import.meta.url).pathname;
 const launcher = JSON.parse(readFileSync(join(here, "sunstone/package.json"), "utf8"));
 const optionalDependencies = {};
 
-for (const [key, exe] of Object.entries(PLATFORMS)) {
+for (const [key, { exe, pkg: scopedName }] of Object.entries(PLATFORMS)) {
   const src = join(binDir, key, exe);
   if (!existsSync(src)) throw new Error(`missing binary: ${src}`);
   const [os, cpu] = key.split("-");
-  const name = `${launcher.name}-${key}`;
-  const dir = join(outDir, name);
+  const name = scopedName ?? `${launcher.name}-${key}`;
+  const dir = join(outDir, name.replace("/", "__"));
   mkdirSync(join(dir, "bin"), { recursive: true });
   copyFileSync(src, join(dir, "bin", exe));
   chmodSync(join(dir, "bin", exe), 0o755);
@@ -50,7 +53,10 @@ for (const [key, exe] of Object.entries(PLATFORMS)) {
     cpu: [cpu],
     files: ["bin"],
   };
-  writeFileSync(join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({ ...pkg, ...(scopedName && { publishConfig: { access: "public" } }) }, null, 2) + "\n",
+  );
   optionalDependencies[name] = version;
 }
 

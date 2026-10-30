@@ -12,7 +12,7 @@ Concept instead of rendering the raw Embed text, and opening an entry hands the 
 OS default application (desktop) or downloads it (web). The list appears in `editing`,
 `read`, the web view and the print/PDF export.
 
-[af-1](/tickets/attachment-files/af-1-attachment-files-in-concepts.md) built everything this
+[af-1](/tickets/attachment-files/af-1-embedded-images-in-concepts.md) built everything this
 needs and restricted itself to images: the URL-returning `Backend` method, the desktop URI
 scheme, `GET /api/asset`, the separate Attachment index, the Embed parser covering both
 syntaxes, and the path confinement. This ticket is a second presentation over that seam,

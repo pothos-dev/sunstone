@@ -17,7 +17,8 @@ It exists to end the TS↔Rust twin drift documented in
 compiled to **both** the native host and **`wasm32`**, is the single source of
 truth for link/frontmatter/render-derived logic.
 
-Its dependencies are deliberately limited to `serde` / `serde_yaml` (plus the
+Its dependencies are deliberately limited to `serde` / `serde_yaml` and the pure-Rust
+`saphyr-parser` (positioned YAML for `okf_lint`), plus the
 `tsify` / `wasm-bindgen` DTO derives, gated behind the optional **`wasm` feature**
 so the native build never pulls them in). Nothing native-only — `ignore`,
 `notify`, `grep-*`, `dirs`, `comrak` — may ever land here, or the wasm build
@@ -44,6 +45,7 @@ breaks. It is a leaf: it depends on no other Sunstone crate.
 | `actor` | The OKF actor convention (§7) — `parse_actor` → `Actor { kind, id, version, raw }`, `Actor::is_human` (the trust-tier test). Never fails; unknown forms keep `raw`. |
 | `trust` | The trust family (§5.2, §5.3) — `trust` → `Trust { generated, legacy, verified, tier, last_verified, trust_keys }` (a bare `verified` mapping read as one event, a legacy `timestamp` as `generated.at`), `trust_tier` (from `verified` alone, through `Actor::is_human`), `is_iso_datetime` / `epoch_seconds` (ISO 8601 with an explicit offset). Over wasm as `trustOf` / `isIsoDatetime`. |
 | `computation` | The Attested Computation contract (§10) — `contract` → `Contract { runtime, parameters, computation, executor, attester }` (`None` unless `type` is `Attested Computation`; every key optional, wrong shapes read as absent), `Contract::path_fields` (the §6.2 path-valued fields, resolved by callers through `resolve_link` / `resolve_location`), `is_attested_computation`, `computation_section` (the body's `# Computation` section span, ov-13). Over wasm as `contractOf` / `isAttestedComputation` / `computationSection`. |
+| `okf_lint` | The Frontmatter lint ([ADR 0009](/adr/0009-marker-gated-okf-language-service.md), [ADR 0017](/adr/0017-frontmatter-lint-lives-in-rust-for-sunstone-lint.md)) — `lint_frontmatter(yaml, LintMode)` → sorted `Finding { from, to, line, severity, message, source }` (UTF-16 offsets): syntax and duplicate keys always, the OKF families (`okf`, `okf-provenance`, `okf-trust`, `okf-lifecycle`, `okf-computation`) in `LintMode::Okf`. Parses once into a positioned tree (`okf_lint::tree`, over `saphyr-parser`, YAML 1.2 core schema). Over wasm as `lintFrontmatter`; natively behind `sunstone lint`. |
 | `sources` | The `sources` Frontmatter list — `sources`, `source_list` (numbered by first citation), `resource_kind`. |
 | `url` | Concept path ↔ pretty viewer URL (`concept_url`, `url_to_concept`) plus the RFC-3986 pair `query_encode`/`percent_decode` shared by the render pipeline and the desktop shell. |
 | `scan` | The one code-aware markdown scanner (fences, CommonMark inline code spans — length-matched backtick runs, never crossing a blank line or fence, so an unmatched backtick is literal — `[[...]]`, optional markdown links) that `wikilink::replace_wikilinks`, `rewrite::rewrite_anchors_in`, the move/rename engine (`rewrite::moves`) and the Backlinks markdown-link extraction (`markdown_link_hrefs`, used by the native index) all walk — extraction and rewriting can never disagree on what counts as a link (a fenced link is neither extracted nor rewritten; a markdown link in inline code is both). |

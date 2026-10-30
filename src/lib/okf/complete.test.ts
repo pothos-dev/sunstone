@@ -74,7 +74,6 @@ describe('completeFrontmatter', () => {
   test('values come from the family that owns the key', () => {
     const status: OkfFamily = {
       id: 'lifecycle-test',
-      keys: ['status'],
       completions: [
         { path: ['status'], values: [{ label: 'draft' }, { label: 'stable' }, { label: 'deprecated' }] },
       ],

@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "The server owns the git sync loop"
+description: "sunstone-server runs the git fetch, integrate and push loop under the same write lock as web writes."
+tags: [adr, decision]
+---
+
 # The server owns the git sync loop
 
 `sunstone-server` — not a sidecar container, not a host-side hook — runs the **fetch →

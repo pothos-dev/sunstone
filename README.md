@@ -32,6 +32,14 @@ in the app. To put it behind a reverse proxy, pass the public name with
 `--allow-host notes.example.com` (and `--bind 0.0.0.0` if the proxy can't
 reach localhost). There is still no sign-in, so the proxy has to handle access.
 
+`sunstone lint ./docs` checks a Bundle from the command line and exits non-zero
+on errors, so it fits in CI. It reports broken links, anchors, Wikilinks and
+Embeds, undefined footnotes, and malformed Frontmatter; when the Bundle
+declares `okf_version`, it also checks OKF conformance, using the same rules
+the editor shows. Skip folders with `--exclude` (gitignore syntax, e.g.
+`--exclude tickets/`); links into them still resolve. Add `--json` for
+machine-readable output.
+
 ## Built for the Google Open Knowledge Format
 
 Sunstone implements the

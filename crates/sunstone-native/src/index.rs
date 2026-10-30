@@ -516,7 +516,7 @@ fn summary_of(path: &str, entry: &ConceptEntry) -> ConceptSummary {
 /// two corpora are separate by design (see the Attachment section of `Index`),
 /// and sharing `bundle_walker` is what keeps the hidden/gitignore rules — hence
 /// bundle membership — identical for Concepts and Attachments.
-fn attachment_files(root: &Path) -> impl Iterator<Item = String> + '_ {
+pub(crate) fn attachment_files(root: &Path) -> impl Iterator<Item = String> + '_ {
     bundle_walker(root).build().filter_map(move |result| {
         let entry = result.ok()?;
         if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {

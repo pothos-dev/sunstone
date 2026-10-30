@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Runs the native `sunstone-cli` binary from the platform package npm installed
-// alongside this one (an optionalDependency named `<this package>-<os>-<cpu>`,
+// alongside this one (the optionalDependency whose name ends in `-<os>-<cpu>`,
 // filtered by its `os`/`cpu` fields), passing the arguments through.
 "use strict";
 
 const { spawnSync } = require("node:child_process");
-const { name } = require("../package.json");
+const { optionalDependencies = {} } = require("../package.json");
 
-const platformPkg = `${name}-${process.platform}-${process.arch}`;
+const suffix = `-${process.platform}-${process.arch}`;
+const platformPkg = Object.keys(optionalDependencies).find((dep) => dep.endsWith(suffix));
 const exe = process.platform === "win32" ? "sunstone-cli.exe" : "sunstone-cli";
 
 let binary;
@@ -15,8 +16,10 @@ try {
   binary = require.resolve(`${platformPkg}/bin/${exe}`);
 } catch {
   console.error(
-    `sunstone: no prebuilt binary for ${process.platform}-${process.arch} (${platformPkg} is not installed).\n` +
-      "If your package manager skipped optional dependencies, reinstall without --no-optional / --omit=optional.",
+    platformPkg
+      ? `sunstone: ${platformPkg} is not installed.\n` +
+          "If your package manager skipped optional dependencies, reinstall without --no-optional / --omit=optional."
+      : `sunstone: there is no prebuilt binary for ${process.platform}-${process.arch}.`,
   );
   process.exit(1);
 }

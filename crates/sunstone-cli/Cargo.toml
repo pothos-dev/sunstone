@@ -1,6 +1,6 @@
 [package]
 name = "sunstone-cli"
-version = "0.30.2"
+version = "0.30.4"
 description = "Headless `sunstone serve`: the editor in a browser, without the Tauri shell — the binary the npm package ships"
 authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 sunstone-server = { path = "../sunstone-server" }
+# `sunstone lint` (the Bundle health check).
+sunstone-native = { path = "../sunstone-native" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 # The static SPA build (`bun run build` → `build/`), compiled into release
 # binaries. Debug builds read it from disk instead, so `cargo check` and

@@ -4,6 +4,22 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `sunstone lint [BUNDLE]` checks a Bundle's health from the command line: broken links, anchors, Wikilinks and Embeds, undefined footnotes, malformed Frontmatter and, in an OKF Bundle, conformance (missing `type`, Frontmatter on `index.md`/`log.md`, Concepts missing from their `index.md`, sources pointing at nothing). It exits non-zero on errors, `--exclude PATTERN` skips folders or files (gitignore syntax, e.g. `--exclude tickets/`), and `--json` prints machine-readable output. The Frontmatter checks are the editor's own, so the two always agree.
+- The Frontmatter editor notes a legacy v0.1 `timestamp` and suggests `generated: { by, at }`.
+
+## [0.30.4] - 2026-10-30
+
+### Fixed
+- Releases build on macOS again. 0.30.0–0.30.3 never finished building, so this is the first 0.30 release you can install; it includes all of their changes.
+
+## [0.30.3] - 2026-10-30
+
+### Added
+- `npx sunstone-md` now works on Windows too.
+
 ## [0.30.2] - 2026-10-28
 
 ### Fixed

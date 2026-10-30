@@ -26,6 +26,10 @@ Every change must keep these four gates green:
 | `cargo test` | Rust unit tests across the workspace (`#[cfg(test)]` in each module) |
 | `cargo check` | Rust typecheck |
 
+When you touch `docs/`, keep `bun run lint:docs` (`sunstone lint`) free of errors.
+`docs/tickets/` is excluded because a ticket's `status` follows the ticket
+lifecycle, not OKF's `draft | stable | deprecated`.
+
 Playwright is the primary behavioural test for components, split across **three**
 suites: a desktop suite (static SPA + fake backend), a web e2e suite (real
 `sunstone-server` + SSR build), and a serve suite (`sunstone serve`: the desktop

@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "The content API answers on page URLs, chosen by `Accept`"
+description: "The content API answers on page URLs and picks JSON or Markdown by the Accept header."
+tags: [adr, decision]
+---
+
 # The content API answers on page URLs, chosen by `Accept`
 
 Remote callers (agents, scripts, a GraphQL layer in front of a wiki) need to list, read and

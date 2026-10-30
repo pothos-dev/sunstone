@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Wikilinks as an optional, name-based secondary link format"
+description: "Wikilinks are an optional, secondary link format that resolves by name, beside path-based markdown links."
+tags: [adr, decision]
+---
+
 # Wikilinks as an optional, name-based secondary link format
 
 Sunstone supports `[[wikilink]]` syntax as an **optional, secondary** link format **in

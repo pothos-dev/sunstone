@@ -100,6 +100,15 @@ Print this to the user, verbatim, with the version and repo filled in:
 > Watch the run: https://github.com/pothos-dev/sunstone/actions
 >
 > The workflow builds all platforms, uploads them to a draft, then **auto-publishes** the release once every build succeeds — with the CHANGELOG section for this version as the release notes. It'll appear at https://github.com/pothos-dev/sunstone/releases when the run finishes. If any platform build fails, it stays a draft.
+>
+> The `stage-npm` job **stages** the npm packages (`npx sunstone-md`); they go live only once you approve them with 2FA. When the run finishes:
+>
+> ```sh
+> npm stage list sunstone-md
+> npm stage approve <stage-id>
+> ```
+>
+> Approve each platform package (`sunstone-md-linux-x64`, `-linux-arm64`, `-darwin-x64`, `-darwin-arm64`, `@pothos-dev/sunstone-md-win32-x64`) before the `sunstone-md` launcher. List them with `npm stage list <package>`.
 
 The workflow (`.github/workflows/release.yml`) runs three jobs: `create-release` opens a draft whose body is this version's `CHANGELOG.md` section, `build-tauri` uploads each platform's installers to that draft, and `publish-release` flips it to published once all builds pass. Assets land on the draft first, so a failed platform never leaves a partially-populated public release. Each build also signs its updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret and merges itself into the release's `latest.json`, the feed installed copies poll to update themselves silently. Publishing is what makes it live: `releases/latest` only ever points at a published release. No manual publish step is needed — but this is also why the CHANGELOG section (Phase 2) must be correct before tagging: it becomes the public release notes verbatim.
 

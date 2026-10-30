@@ -5,7 +5,8 @@
 //! (`sunstone ./docs guide/setup.md#install`), the conventional `--help`/`--version` flags, and
 //! `--detached`/`-d` (run detached from the spawning console); or the `serve`
 //! subcommand (`sunstone serve ./docs --port 3000`), which serves the editor to
-//! a browser on localhost instead of opening a window. We hand-roll the
+//! a browser on localhost instead of opening a window; or the `lint` subcommand
+//! (`sunstone lint ./docs`), which checks a Bundle and exits. We hand-roll the
 //! parse (no `clap`) to keep the dependency surface small; the grammar is tiny
 //! and the logic is pure so it can be unit-tested.
 
@@ -34,6 +35,9 @@ pub enum CliAction {
     Run(RunOptions),
     /// Serve the editor to a browser on localhost (`sunstone serve`).
     Serve(ServeOptions),
+    /// Check a Bundle (`sunstone lint`): the arguments after `lint`, parsed by
+    /// `sunstone_native::lint::cli`.
+    Lint(Vec<String>),
     /// Print version information to stdout and exit successfully.
     Version,
     /// Print usage help to stdout and exit successfully.
@@ -50,14 +54,19 @@ pub enum CliAction {
 /// `-V`/`--version` and `-d`/`--detached`. `--help`/`--version` take precedence
 /// wherever they appear. Any unrecognised flag, or a third positional
 /// argument, is rejected. A first argument of `serve` selects the subcommand
-/// instead (see [`sunstone_server::serve_args`]); a folder literally named `serve` is
-/// still reachable as `./serve`.
+/// instead (see [`sunstone_server::serve_args`]), and `lint` likewise
+/// (`sunstone_native::lint::cli`); a folder literally named `serve` or `lint` is
+/// still reachable as `./serve` / `./lint`.
 pub fn parse_args<I, S>(args: I) -> CliAction
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
     let mut args = args.into_iter().peekable();
+    if args.peek().is_some_and(|a| a.as_ref() == "lint") {
+        args.next();
+        return CliAction::Lint(args.map(|a| a.as_ref().to_string()).collect());
+    }
     if args.peek().is_some_and(|a| a.as_ref() == "serve") {
         args.next();
         return match parse_serve_args(args) {
@@ -108,6 +117,7 @@ A CLI-launched markdown editor with first-class Open Knowledge Format support.
 Usage:
   {name} [BUNDLE [DOCUMENT[#HEADING]]]
   {name} serve [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
+  {name} lint [BUNDLE] [--exclude PATTERN]... [--json]
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
@@ -132,6 +142,11 @@ Serve:
                       Requests must still name localhost or an --allow-host.
   --allow-host NAME   Also answer requests for host NAME, e.g. the public
                       name of a reverse proxy in front (repeatable)
+
+Lint:
+  Check a Bundle's Frontmatter, links, anchors, embeds and footnotes (plus OKF
+  conformance when its root index.md declares okf_version) and exit non-zero
+  on errors. See '{name} lint --help'.
 ",
         name = env!("CARGO_PKG_NAME"),
         version = env!("CARGO_PKG_VERSION"),
@@ -252,6 +267,13 @@ mod tests {
         assert_eq!(parse_args(["./serve"]), run(Some("./serve"), false));
         assert!(matches!(parse_args(["-d", "serve"]), CliAction::Run(_)));
         assert_eq!(parse_args(["serve", "--help"]), CliAction::Help);
+    }
+
+    #[test]
+    fn lint_hands_the_rest_of_the_line_to_the_lint_parser() {
+        assert_eq!(parse_args(["lint", "docs", "--json"]), CliAction::Lint(vec!["docs".into(), "--json".into()]));
+        assert_eq!(parse_args(["lint"]), CliAction::Lint(vec![]));
+        assert_eq!(parse_args(["./lint"]), run(Some("./lint"), false));
     }
 
     #[test]

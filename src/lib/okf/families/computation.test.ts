@@ -1,12 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { lintFrontmatter } from '../lint';
 import { completeFrontmatter } from '../complete';
-import { OKF_FAMILIES } from './index';
 import { computation } from './computation';
 
 /** Computation findings as `[severity, marked text]`. */
 function marks(yaml: string) {
-  return lintFrontmatter(yaml, 'okf', [computation]).map((f) => [f.severity, yaml.slice(f.from, f.to)]);
+  return lintFrontmatter(yaml, 'okf')
+    .filter((f) => f.source === 'okf-computation')
+    .map((f) => [f.severity, yaml.slice(f.from, f.to)]);
 }
 
 const lines = (...ls: string[]) => ls.join('\n') + '\n';
@@ -28,7 +29,7 @@ describe('computation lint (§10.2)', () => {
     );
     expect(marks(yaml)).toEqual([]);
     // And with the whole language service, not just this family.
-    expect(lintFrontmatter(yaml, 'okf', OKF_FAMILIES)).toEqual([]);
+    expect(lintFrontmatter(yaml, 'okf')).toEqual([]);
   });
 
   test('`runtime` is REQUIRED for the type: an error, on `type` when missing', () => {

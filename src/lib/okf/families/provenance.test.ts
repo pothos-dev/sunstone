@@ -5,7 +5,9 @@ import { provenance } from './provenance';
 
 /** Provenance findings as `[severity, marked text]`. */
 function marks(yaml: string) {
-  return lintFrontmatter(yaml, 'okf', [provenance]).map((f) => [f.severity, yaml.slice(f.from, f.to)]);
+  return lintFrontmatter(yaml, 'okf')
+    .filter((f) => f.source === 'okf-provenance')
+    .map((f) => [f.severity, yaml.slice(f.from, f.to)]);
 }
 
 const lines = (...ls: string[]) => ls.join('\n') + '\n';

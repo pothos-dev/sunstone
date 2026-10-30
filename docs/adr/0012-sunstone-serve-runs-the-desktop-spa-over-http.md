@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "`sunstone serve` runs the desktop SPA over the HTTP API, trusted on loopback"
+description: "sunstone serve runs the desktop SPA over the HTTP API on loopback, without sign-in."
+tags: [adr, decision]
+---
+
 # `sunstone serve` runs the desktop SPA over the HTTP API, trusted on loopback
 
 `sunstone serve [BUNDLE] [--port PORT]` serves the editor to a browser at

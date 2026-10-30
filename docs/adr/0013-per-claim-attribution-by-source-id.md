@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Per-claim attribution joins `[^id]` to `sources`; `[n]` stays, deprecated"
+description: "Per-claim attribution joins [^id] footnotes to sources; v0.1 [n] citations are still read but deprecated."
+tags: [adr, decision]
+---
+
 # Per-claim attribution joins `[^id]` to `sources`; `[n]` stays, deprecated
 
 OKF v0.2 moves provenance out of the body and into the `sources` Frontmatter list

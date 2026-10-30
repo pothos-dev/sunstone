@@ -1,10 +1,9 @@
-// The registered OKF key families: the language service's ONLY list of them.
+// The registered OKF key families: completion's ONLY list of them.
 //
-// To extend a family (ov-9 trust, ov-10 provenance, ov-11 lifecycle): edit its
-// own module here, adding `rules`, `required` keys or `completions`. To add one
-// (ov-12's computation contract): write `./<family>.ts` exporting an
-// `OkfFamily` (see `../family.ts`) and append it below. Neither the lint nor
-// the completion engine changes.
+// To extend a family's completions, edit its own module here. To add a family,
+// write `./<family>.ts` exporting an `OkfFamily` (see `../family.ts`) and
+// append it below; its lint rules go in `sunstone_shared::okf_lint` (Rust),
+// under the same id.
 
 import type { OkfFamily } from '../family';
 import { computation } from './computation';
