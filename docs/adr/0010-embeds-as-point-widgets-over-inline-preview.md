@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Embeds render as point widgets layered over `inlinePreview`"
+description: "Embeds render as point widgets layered over atomic-editor's inlinePreview, never as replace decorations."
+tags: [adr, decision]
+---
+
 # Embeds render as point widgets layered over `inlinePreview`
 
 An **[Embed](/GLOSSARY.md)** renders through our own CodeMirror `StateField`

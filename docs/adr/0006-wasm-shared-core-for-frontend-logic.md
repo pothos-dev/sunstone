@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "WebAssembly-shared core for frontend logic"
+description: "Pure algorithms are compiled once from Rust into a WebAssembly module the frontend calls, replacing the TS twins."
+tags: [adr, decision]
+---
+
 # WebAssembly-shared core for frontend logic
 
 We compile the **pure algorithms** that today exist as drifting TS↔Rust twins into a

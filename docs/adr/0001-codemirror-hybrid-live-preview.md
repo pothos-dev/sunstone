@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "CodeMirror 6 hybrid live preview via atomic-editor"
+description: "The editor is CodeMirror 6 with Obsidian-style hybrid live preview from atomic-editor, not a true-WYSIWYG ProseMirror editor."
+tags: [adr, decision]
+---
+
 # CodeMirror 6 hybrid live preview via atomic-editor
 
 We build the editor on **CodeMirror 6 with Obsidian-style hybrid live preview** (markdown

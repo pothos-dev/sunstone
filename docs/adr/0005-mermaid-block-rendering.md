@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Mermaid diagram rendering as a parallel block-replace extension"
+description: "Mermaid fences render as diagrams through Sunstone's own block-replace CodeMirror field, rendering only."
+tags: [adr, decision]
+---
+
 # Mermaid diagram rendering as a parallel block-replace extension
 
 > Amended by [ADR-0014](0014-diagram-languages-share-one-block-renderer.md): the field

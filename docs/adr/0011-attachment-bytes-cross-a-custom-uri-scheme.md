@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Attachment bytes cross the seam on a custom URI scheme"
+description: "Attachment bytes are reached as URLs on a custom scheme confined to the Bundle root, never sent over IPC."
+tags: [adr, decision]
+---
+
 # Attachment bytes cross the seam on a custom URI scheme
 
 An **[Attachment](/GLOSSARY.md)** is reached as a **URL**, never as bytes over the IPC

@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "The Frontmatter lint lives in Rust, so `sunstone lint` and the editor share it"
+description: "The Frontmatter lint lives in Rust and reaches the editor over wasm, so sunstone lint and the editor apply the same rules."
+tags: [adr, decision]
+---
+
 # The Frontmatter lint lives in Rust, so `sunstone lint` and the editor share it
 
 `sunstone lint [BUNDLE]` checks a whole Bundle from the command line: Frontmatter, links,

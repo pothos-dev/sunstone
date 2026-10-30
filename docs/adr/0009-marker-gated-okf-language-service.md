@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "OKF linting and completion are gated on the `okf_version` marker"
+description: "OKF lint and completion are active only when the Bundle root declares okf_version; YAML well-formedness is always linted."
+tags: [adr, decision]
+---
+
 # OKF linting and completion are gated on the `okf_version` marker
 
 > Amended by [ADR-0017](0017-frontmatter-lint-lives-in-rust-for-sunstone-lint.md): the lint

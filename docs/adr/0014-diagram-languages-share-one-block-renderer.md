@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Diagram languages share one block renderer; D2 renders from its WASM build"
+description: "Every diagram language shares one block renderer, and D2 renders from its WASM build."
+tags: [adr, decision]
+---
+
 # Diagram languages share one block renderer; D2 renders from its WASM build
 
 > Amended by [ADR-0016](0016-plantuml-renders-in-the-browser-from-its-teavm-build.md):

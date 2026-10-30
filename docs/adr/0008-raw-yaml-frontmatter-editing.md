@@ -1,3 +1,10 @@
+---
+type: Decision
+title: "Raw YAML frontmatter editing"
+description: "Frontmatter is edited as YAML text in a dedicated CodeMirror editor, so it round-trips byte-for-byte."
+tags: [adr, decision]
+---
+
 # Raw YAML frontmatter editing
 
 **Supersedes:** [ADR-0003](0003-structured-frontmatter-reserialization.md)
