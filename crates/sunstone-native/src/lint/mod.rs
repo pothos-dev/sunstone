@@ -20,6 +20,10 @@
 //! the past (§5.5) and a v0.1 `# Citations` list (§13.1) — the last two info
 //! only: staleness is advisory, and v0.1 forms still read.
 //!
+//! [`Exclude`] patterns (gitignore syntax, `--exclude`) take files out of the
+//! check: nothing is reported in them, and an index is not asked to list them.
+//! They stay in the Bundle, so a link INTO an excluded folder still resolves.
+//!
 //! The checks are pure over a [`Snapshot`] of the Bundle; [`lint_bundle`] is
 //! the thin filesystem half.
 
@@ -64,6 +68,8 @@ pub struct Diagnostic {
 pub struct Report {
     /// How many `.md` files were checked.
     pub files: usize,
+    /// How many `.md` files the exclude patterns skipped.
+    pub excluded: usize,
     /// The `okf_version` the Bundle root declares; `None` means no OKF checks ran.
     pub okf_version: Option<String>,
     /// The Bundle root within the opened folder (`""` = the folder itself).
@@ -75,6 +81,30 @@ pub struct Report {
 impl Report {
     pub fn count(&self, severity: Severity) -> usize {
         self.diagnostics.iter().filter(|d| d.severity == severity).count()
+    }
+}
+
+/// Files kept out of the lint: gitignore-style patterns, relative to the
+/// opened folder (`tickets/`, `/drafts`, `adr/*.md`, `**/scratch`).
+#[derive(Default)]
+pub struct Exclude(Option<ignore::gitignore::Gitignore>);
+
+impl Exclude {
+    /// Compile `patterns`; an invalid one is an error naming it.
+    pub fn new(patterns: &[String]) -> Result<Exclude, String> {
+        if patterns.is_empty() {
+            return Ok(Exclude(None));
+        }
+        let mut b = ignore::gitignore::GitignoreBuilder::new("");
+        for p in patterns {
+            b.add_line(None, p).map_err(|e| format!("invalid --exclude pattern '{p}': {e}"))?;
+        }
+        b.build().map(|g| Exclude(Some(g))).map_err(|e| e.to_string())
+    }
+
+    /// Whether the bundle-relative file `path`, or a folder above it, is excluded.
+    pub fn matches(&self, path: &str) -> bool {
+        self.0.as_ref().is_some_and(|g| g.matched_path_or_any_parents(path, false).is_ignore())
     }
 }
 
@@ -91,10 +121,12 @@ pub struct Snapshot {
     pub git_prefix: Option<String>,
     /// Now, as Unix seconds (for `stale_after`).
     pub now: i64,
+    /// Files not to check (they still count as link targets).
+    pub exclude: Exclude,
 }
 
 /// Lint the Bundle at `root`.
-pub fn lint_bundle(root: &Path) -> Report {
+pub fn lint_bundle(root: &Path, exclude: Exclude) -> Report {
     let concepts = md_files(root)
         .map(|(path, rel)| (rel, std::fs::read_to_string(path).unwrap_or_default()))
         .collect();
@@ -107,6 +139,7 @@ pub fn lint_bundle(root: &Path) -> Report {
         now: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs() as i64),
+        exclude,
     };
     lint_snapshot(&snapshot)
 }
@@ -126,7 +159,12 @@ pub fn lint_snapshot(s: &Snapshot) -> Report {
     let ctx = Ctx { s, paths: &paths, root: &root };
 
     let mut out = Vec::new();
+    let mut excluded = 0;
     for (path, content) in &s.concepts {
+        if s.exclude.matches(path) {
+            excluded += 1;
+            continue;
+        }
         ctx.check_file(path, content, &mut out);
     }
     if root.okf_version.is_some() {
@@ -134,7 +172,8 @@ pub fn lint_snapshot(s: &Snapshot) -> Report {
     }
     out.sort_by(|a, b| (&a.path, a.line, &a.code).cmp(&(&b.path, b.line, &b.code)));
     Report {
-        files: s.concepts.len(),
+        files: s.concepts.len() - excluded,
+        excluded,
         okf_version: root.okf_version.clone(),
         bundle_root: root.dir.clone(),
         diagnostics: out,
@@ -419,7 +458,7 @@ impl Ctx<'_> {
     /// Every Concept should be listed in its directory's `index.md` (OKF §8).
     fn check_indexes(&self, out: &mut Vec<Diagnostic>) {
         for (index, content) in &self.s.concepts {
-            if wikilink::basename(index) != "index.md" || !self.okf_scope(index) {
+            if wikilink::basename(index) != "index.md" || !self.okf_scope(index) || self.s.exclude.matches(index) {
                 continue;
             }
             let dir = &index[..index.len() - "index.md".len()];
@@ -435,7 +474,7 @@ impl Ctx<'_> {
             }
             for path in self.s.concepts.keys() {
                 let Some(name) = path.strip_prefix(dir) else { continue };
-                if name.contains('/') || is_reserved(path) || listed.contains(path) {
+                if name.contains('/') || is_reserved(path) || listed.contains(path) || self.s.exclude.matches(path) {
                     continue;
                 }
                 out.push(diag(index, 1, Severity::Warning, "index-unlisted", format!("`{name}` is not listed in this index (OKF §8)")));

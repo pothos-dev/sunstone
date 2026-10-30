@@ -36,7 +36,10 @@ pub fn render_text(report: &Report, prefix: &str, color: bool) -> String {
             "note: the Bundle root's index.md declares no `okf_version`, so OKF checks were skipped\n",
         ));
     }
-    let files = plural(report.files, "file");
+    let mut files = plural(report.files, "file");
+    if report.excluded > 0 {
+        files.push_str(&format!(" ({} excluded)", report.excluded));
+    }
     if report.diagnostics.is_empty() {
         out.push_str(&paint("32", &format!("✓ {files} checked, no problems\n")));
     } else {

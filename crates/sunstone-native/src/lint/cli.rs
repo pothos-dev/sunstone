@@ -20,6 +20,8 @@ pub struct LintOptions {
     pub bundle: Option<String>,
     /// Print the report as JSON instead of text.
     pub json: bool,
+    /// `--exclude` patterns (gitignore syntax), in order.
+    pub exclude: Vec<String>,
 }
 
 /// Parse the arguments AFTER `lint`.
@@ -29,10 +31,16 @@ where
     S: AsRef<str>,
 {
     let mut opts = LintOptions::default();
-    for arg in args {
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
         match arg.as_ref() {
             "-h" | "--help" => return LintArgs::Help,
             "--json" => opts.json = true,
+            "-x" | "--exclude" => match args.next() {
+                Some(p) => opts.exclude.push(p.as_ref().to_string()),
+                None => return LintArgs::Error("--exclude needs a PATTERN\n\nTry 'sunstone lint --help' for usage.".into()),
+            },
+            a if a.starts_with("--exclude=") => opts.exclude.push(a["--exclude=".len()..].to_string()),
             a if a.starts_with('-') && a != "-" => {
                 return LintArgs::Error(format!("unknown option '{a}'\n\nTry 'sunstone lint --help' for usage."));
             }
@@ -52,13 +60,17 @@ Check a Bundle's health: Frontmatter, links, anchors, embeds, footnotes and,
 when the Bundle root's index.md declares okf_version, OKF conformance.
 
 Usage:
-  sunstone lint [BUNDLE] [--json]
+  sunstone lint [BUNDLE] [--exclude PATTERN]... [--json]
 
 Arguments:
   BUNDLE        Folder to check (default: $SUNSTONE_BUNDLE, else the current
                 directory)
 
 Options:
+  -x, --exclude PATTERN
+                Skip matching files: nothing is reported in them, but links
+                into them still resolve. Gitignore syntax, relative to BUNDLE
+                (`tickets/`, `/drafts`, `adr/*.md`, `**/scratch`). Repeatable
   --json        Print the report as JSON
   -h, --help    Print this help and exit
 
@@ -92,7 +104,14 @@ where
         eprintln!("error: not a folder: {shown}");
         return 2;
     }
-    let report = super::lint_bundle(&root);
+    let exclude = match super::Exclude::new(&opts.exclude) {
+        Ok(exclude) => exclude,
+        Err(msg) => {
+            eprintln!("error: {msg}");
+            return 2;
+        }
+    };
+    let report = super::lint_bundle(&root, exclude);
     if opts.json {
         print!("{}", super::render_json(&report));
     } else {
@@ -111,8 +130,17 @@ mod tests {
         assert_eq!(parse_lint_args(Vec::<String>::new()), LintArgs::Lint(LintOptions::default()));
         assert_eq!(
             parse_lint_args(["docs", "--json"]),
-            LintArgs::Lint(LintOptions { bundle: Some("docs".into()), json: true })
+            LintArgs::Lint(LintOptions { bundle: Some("docs".into()), json: true, exclude: vec![] })
         );
+        assert_eq!(
+            parse_lint_args(["-x", "tickets/", "docs", "--exclude=adr/*.md"]),
+            LintArgs::Lint(LintOptions {
+                bundle: Some("docs".into()),
+                json: false,
+                exclude: vec!["tickets/".into(), "adr/*.md".into()],
+            })
+        );
+        assert!(matches!(parse_lint_args(["--exclude"]), LintArgs::Error(_)));
         assert_eq!(parse_lint_args(["--help", "docs"]), LintArgs::Help);
         assert!(matches!(parse_lint_args(["--fix"]), LintArgs::Error(_)));
         assert!(matches!(parse_lint_args(["a", "b"]), LintArgs::Error(_)));

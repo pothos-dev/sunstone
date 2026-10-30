@@ -11,6 +11,7 @@ fn snapshot(files: &[(&str, &str)], extra: &[&'static str]) -> Snapshot {
         exists: Box::new(move |p: &str| extra.contains(&p)),
         git_prefix: None,
         now: 1_800_000_000, // 2027-01-15
+        exclude: Exclude::default(),
     }
 }
 
@@ -168,4 +169,28 @@ fn text_report_is_compiler_style_with_a_summary() {
     let clean = lint_snapshot(&snapshot(&[OKF_ROOT, ("a.md", "---\ntype: x\n---\n")], &[]));
     assert_eq!(render_text(&clean, ".", false), "✓ 2 files checked, no problems\n");
     assert!(render_json(&report).contains("\"code\": \"broken-link\""));
+}
+
+#[test]
+fn excluded_files_are_not_checked_but_stay_link_targets() {
+    let a = "---\ntype: x\n---\n[t](tickets/t1.md) [gone](gone.md)\n";
+    let ticket = "no frontmatter, [broken](nowhere.md)\n";
+    let draft = "---\nstatus: wip\n---\n";
+    let files = [OKF_ROOT, ("a.md", a), ("tickets/t1.md", ticket), ("notes/draft.md", draft), ("draft.md", draft)];
+    let mut s = snapshot(&files, &[]);
+    s.exclude = Exclude::new(&["tickets/".into(), "**/draft.md".into()]).unwrap();
+    let report = lint_snapshot(&s);
+    let found: Vec<_> = report.diagnostics.iter().map(|d| (d.path.as_str(), d.code.as_str())).collect();
+    // Only `a.md`'s own broken link; the root index is not asked to list `draft.md`.
+    assert_eq!(found, vec![("a.md", "broken-link")]);
+    assert_eq!((report.files, report.excluded), (2, 3));
+    assert!(render_text(&report, ".", false).ends_with("1 error in 2 files (3 excluded)\n"));
+}
+
+#[test]
+fn an_anchored_pattern_matches_only_at_the_root() {
+    let ex = Exclude::new(&["/drafts".into()]).unwrap();
+    assert!(ex.matches("drafts/a.md"));
+    assert!(!ex.matches("sub/drafts/a.md"));
+    assert!(Exclude::new(&["{a".into()]).is_err());
 }

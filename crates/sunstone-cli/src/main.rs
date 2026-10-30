@@ -75,7 +75,7 @@ Serve the Sunstone markdown editor to your browser at http://localhost:PORT/.
 
 Usage:
   sunstone [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
-  sunstone lint [BUNDLE] [--json]
+  sunstone lint [BUNDLE] [--exclude PATTERN]... [--json]
 
 Arguments:
   BUNDLE              Folder to open as a Bundle (default: current directory).

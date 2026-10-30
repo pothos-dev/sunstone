@@ -117,7 +117,7 @@ A CLI-launched markdown editor with first-class Open Knowledge Format support.
 Usage:
   {name} [BUNDLE [DOCUMENT[#HEADING]]]
   {name} serve [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
-  {name} lint [BUNDLE] [--json]
+  {name} lint [BUNDLE] [--exclude PATTERN]... [--json]
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
