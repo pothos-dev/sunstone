@@ -173,9 +173,14 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ matrix.exe }}
           if-no-files-found: error
 
-  # Platform packages first, so the launcher never points at a version that is
-  # not on the registry yet.
-  publish-npm:
+  # Stages the npm packages for 2FA approval rather than publishing them:
+  # NPM_TOKEN is a stage-only token. A maintainer then runs `npm stage list`
+  # and `npm stage approve <id>` for each (platform packages before the
+  # launcher). Staging needs npm >= 11.15, and a package must already exist on
+  # the registry to be staged, so a brand-new platform package needs one
+  # manual `npm publish` first. One package failing to stage doesn't stop the
+  # others; the job fails at the end so it shows.
+  stage-npm:
     needs: build-cli
     runs-on: ubuntu-22.04
     steps:
@@ -186,22 +191,31 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Install an npm that can stage
+        run: npm install -g npm@^11.15.0
+
       - uses: actions/download-artifact@v4
         with:
           pattern: cli-*
           path: bins
 
-      - name: Stage and publish
+      - name: Stage the packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for d in bins/cli-*; do mv "$d" "bins/${d#bins/cli-}"; done
           node npm/stage.mjs "${GITHUB_REF_NAME#v}" bins npm-out
           launcher=$(node -p 'require("./npm/sunstone/package.json").name')
+          failed=""
+          stage() { (cd "$1" && npm stage publish) || failed="$failed $(basename "$1")"; }
           for dir in ./npm-out/*; do
-            [ "$dir" = "./npm-out/$launcher" ] || npm publish --access public "$dir"
+            [ "$dir" = "./npm-out/$launcher" ] || stage "$dir"
           done
-          npm publish --access public "./npm-out/$launcher"
+          stage "./npm-out/$launcher"
+          if [ -n "$failed" ]; then
+            echo "::error::could not stage:$failed"
+            exit 1
+          fi
 
   publish-release:
     needs: [create-release, build-tauri]
