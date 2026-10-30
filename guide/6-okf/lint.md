@@ -23,9 +23,11 @@ It reports:
 - broken links, anchors, Wikilinks and Embeds
 - footnotes that are referenced but never defined
 - malformed [Frontmatter](/2-editing/frontmatter.md)
-- in a Bundle that declares `okf_version`, OKF conformance: a Concept without a `type`, Frontmatter on `index.md` or `log.md`, a Concept its folder's `index.md` doesn't list, and sources that point at nothing
+- in a Bundle that declares `okf_version`, OKF conformance: a Concept without a `type`, Frontmatter on a `log.md`, a Concept its folder's `index.md` doesn't list, and sources that point at nothing
 
 The Frontmatter checks are the ones the editor shows, so the command line and the app always agree.
+
+An `index.md` may carry Frontmatter even though the OKF spec says it shouldn't. Sunstone treats it as the page that introduces its folder, so its `title` names the folder in the [Explorer](/3-navigating/explorer.md).
 
 Without a folder argument it checks `$SUNSTONE_BUNDLE`, or else the current directory.
 

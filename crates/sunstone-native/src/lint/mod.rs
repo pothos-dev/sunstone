@@ -14,8 +14,8 @@
 //!
 //! OKF checks are gated exactly like the editor's (ADR 0009): only when the
 //! Bundle root's `index.md` declares `okf_version`, and only for files inside
-//! that root. They add: a Concept with no Frontmatter block (§11), a reserved
-//! file carrying one (§8), path-valued fields pointing at nothing (§6.2), a
+//! that root. They add: a Concept with no Frontmatter block (§11), a `log.md`
+//! carrying one (§9; an `index.md` may, ADR 0018), path-valued fields pointing at nothing (§6.2), a
 //! Concept missing from its directory's `index.md` (§8), a `stale_after` in
 //! the past (§5.5) and a v0.1 `# Citations` list (§13.1) — the last two info
 //! only: staleness is advisory, and v0.1 forms still read.
@@ -249,18 +249,10 @@ impl Ctx<'_> {
         let reserved = is_reserved(path);
 
         self.check_frontmatter(&file, &split, okf && !reserved, out);
-        if okf && reserved && split.has_frontmatter {
-            let root_index = path == frontmatter_root_index(&self.root.dir);
-            let version_only = frontmatter::parse_mapping(content)
-                .is_some_and(|m| m.keys().all(|k| k.as_str() == Some("okf_version")));
-            if !(root_index && version_only) {
-                let what = if root_index {
-                    "The root `index.md` Frontmatter may only carry `okf_version` (OKF §8)"
-                } else {
-                    "A reserved file carries no Frontmatter (OKF §8, §9)"
-                };
-                out.push(diag(path, 1, Severity::Error, "reserved-frontmatter", what.into()));
-            }
+        // An `index.md` is its folder's lead Concept and may carry Frontmatter,
+        // a deliberate deviation from OKF §8 (ADR 0018); a `log.md` may not (§9).
+        if okf && reserved && split.has_frontmatter && wikilink::basename(path).eq_ignore_ascii_case("log.md") {
+            out.push(diag(path, 1, Severity::Error, "reserved-frontmatter", "A `log.md` carries no Frontmatter (OKF §9)".into()));
         }
         self.check_links(&file, out);
         self.check_wikilinks(&file, out);
@@ -527,15 +519,6 @@ fn is_citation_row(line: &str) -> bool {
     let Some(rest) = rest.strip_prefix('[') else { return false };
     let digits = rest.chars().take_while(char::is_ascii_digit).count();
     digits > 0 && rest[digits..].starts_with(']')
-}
-
-/// The root `index.md` path for a Bundle root directory.
-fn frontmatter_root_index(dir: &str) -> String {
-    if dir.is_empty() {
-        "index.md".into()
-    } else {
-        format!("{dir}/index.md")
-    }
 }
 
 /// Whether `content` has a heading whose slug is `anchor`.

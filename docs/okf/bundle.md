@@ -86,7 +86,7 @@ The link/backlink logic is implemented **once**, in [sunstone-shared](/architect
 
 ### Reserved files
 
-`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and are kept out of the Explorer's ordinary leaves. **Deviation:** the spec says index files carry no frontmatter (the sole exception being a bundle-root `index.md`'s `okf_version`), but Sunstone tolerates and uses it — a folder's `index.md` `title` names that folder in the Explorer and Tile header — so the [Frontmatter Region](/okf/concept.md#frontmatter) shows for reserved files as for any Concept. Hiding it would leave that `title` in effect but invisible. The one Frontmatter key the spec does sanction there, the root `index.md`'s `okf_version`, shows in that same Region and is the only key Sunstone itself ever writes into an `index.md` (see "Sunstone writes the marker too" above).
+`index.md` and `log.md` are recognised as reserved and treated as **not Concepts**: they are exempt from the required-`type` check and are kept out of the Explorer's ordinary leaves. **Deviation ([ADR 0018](/adr/0018-index-md-is-its-folders-lead-concept.md)):** the spec says index files carry no frontmatter (the sole exception being a bundle-root `index.md`'s `okf_version`). In Sunstone an `index.md` is its folder's **lead Concept**, the page that introduces the folder rather than only a list of links, so it may carry Frontmatter with any keys. A folder's `index.md` `title` names that folder in the Explorer and Tile header, and `sunstone lint` does not report the block (it still reports one on a `log.md`). The [Frontmatter Region](/okf/concept.md#frontmatter) shows for reserved files as for any Concept. The one Frontmatter key the spec does sanction there, the root `index.md`'s `okf_version`, shows in that same Region and is the only key Sunstone itself ever writes into an `index.md` (see "Sunstone writes the marker too" above).
 
 ### The Bundle is git-committed content
 
@@ -104,6 +104,7 @@ Per-user UI state — last-open Concept, expanded folders, sidebar flags, window
 | Link forms | Standard markdown links only ([§6](/okf/spec.md#6-cross-linking-and-paths)) | Adds name-based **[Wikilinks](/GLOSSARY.md)** as an optional secondary form ([ADR 0004](/adr/0004-wikilinks-optional-secondary-name-based.md)) |
 | Indexes | Consumer _may_ synthesize | Always synthesizes path/name/backlink/tag indexes, kept live under the watcher |
 | Distribution | git is _recommended_ | git is **operationalised** — the web editor commits into the Bundle repo (`git/`) |
+| `index.md` Frontmatter | None, except `okf_version` in the root `index.md` ([§8](/okf/spec.md#8-index-files)) | Any `index.md` may carry Frontmatter: it is its folder's lead Concept, and its `title` names the folder ([ADR 0018](/adr/0018-index-md-is-its-folders-lead-concept.md)) |
 | `okf_version` | May be declared in root `index.md` | Read from **any** `index.md` as a root declaration (the outermost wins, so an inner one marks a nested Bundle); not required, and its absence is no evidence there is no Bundle. **New Bundle…** writes it into the root `index.md` (`"0.2"`), never over an existing declaration |
 
 ## Related

@@ -74,7 +74,8 @@ fn frontmatter_findings_come_from_the_shared_lint_on_file_lines() {
 #[test]
 fn okf_conformance_missing_frontmatter_and_reserved_files() {
     let log = "---\ntitle: x\n---\n# Log\n";
-    let sub_index = "---\ntype: x\n---\n* [b](b.md)\n";
+    // An `index.md` is its folder's lead Concept: Frontmatter is fine (ADR 0018).
+    let sub_index = "---\ntitle: Sub\ndescription: The sub folder.\n---\n* [b](b.md)\n";
     assert_eq!(
         found(
             &[
@@ -86,7 +87,7 @@ fn okf_conformance_missing_frontmatter_and_reserved_files() {
             ],
             &[]
         ),
-        vec![d("a.md", 1, "frontmatter-missing"), d("log.md", 1, "reserved-frontmatter"), d("sub/index.md", 1, "reserved-frontmatter")]
+        vec![d("a.md", 1, "frontmatter-missing"), d("log.md", 1, "reserved-frontmatter")]
     );
 }
 
