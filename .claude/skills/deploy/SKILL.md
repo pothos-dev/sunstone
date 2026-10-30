@@ -55,7 +55,7 @@ Prepend a new section to `CHANGELOG.md` (Keep a Changelog style), using today's 
 - ...
 ```
 
-**Check the guide and the landing page.** For each `### Added` entry, check that `guide/` covers it: grep for it, and if no page describes it, add or extend a page (follow the `/llm-wiki` conventions: one feature per page, link it from its folder's `index.md`, update `generated`, then `bun ~/.claude/skills/llm-wiki/scripts/lint.ts guide`). Changed or removed behaviour must be corrected in the guide too. When an entry is a big-ticket feature, propose a line or card for `marketing/index.html` as well; the landing page stays short and defers detail to the guide, so don't add minor features there. Show the guide and landing changes alongside the changelog draft; they ship in the release commit.
+**Check the guide and the landing page.** For each `### Added` entry, check that `guide/` covers it: grep for it, and if no page describes it, add or extend a page (follow the `/llm-wiki` conventions: one feature per page, link it from its folder's `index.md`, update `generated`, then `bun ~/.claude/skills/llm-wiki/scripts/lint.ts guide`). Changed or removed behaviour must be corrected in the guide too. When an entry is a big-ticket feature, propose a line or card for `marketing/index.html` as well; the landing page stays short and defers detail to the guide, so don't add minor features there. If the release visibly changes something the landing page screenshots show (editor chrome, the trust pill, frontmatter editor, footnotes, comments, Sunstone Web), regenerate them with `bunx playwright test tests/marketing-feature-shots.spec.ts` (writes `marketing/assets/*.png`; the wiki shots read the live guide) and look at them before staging. Show the guide and landing changes alongside the changelog draft; they ship in the release commit.
 
 Always print the drafted section **verbatim** as a message to the user (in a fenced `markdown` block, exactly as it will land in `CHANGELOG.md`) *before* asking whether to ship. Do this every time, even when the user already chose the bump or said to just release: the question alone, or a paraphrase or summary of the entries, is not enough. Then ask for confirmation/edits **in plain text at the end of that same message and end your turn** — do **not** use `AskUserQuestion` for this step: its dialog hides the message text above it, so the user never sees the notes. Wait for the reply. After any edit, print the revised section verbatim again and ask the same way. Edits often happen here, so be ready to revise.
 
@@ -116,12 +116,24 @@ The workflow (`.github/workflows/release.yml`) runs three jobs: `create-release`
 
 Run these on `debian.local` right after the tag push, from the repo root.
 
-1. **Marketing page.** Caddy serves `/opt/docker/caddy/sites/sunstone/` as static files (`/opt/docker/caddy/Caddyfile`):
+1. **Marketing page.** Caddy serves `/opt/docker/caddy/sites/sunstone/` as static files (`/opt/docker/caddy/Caddyfile`). Publish `marketing/` exactly as of the release tag, so nothing uncommitted in the checkout goes live, then check the live page is the one just published:
 
    ```bash
-   rsync -a --delete marketing/ /opt/docker/caddy/sites/sunstone/
-   curl -s -o /dev/null -w '%{http_code}\n' https://sunstone.md/   # must show 200
+   M=$(mktemp -d)
+   git archive vX.Y.Z marketing | tar -x --strip-components=1 -C "$M"
+   rsync -a --delete "$M"/ /opt/docker/caddy/sites/sunstone/
+   diff -r "$M" /opt/docker/caddy/sites/sunstone && rm -rf "$M"
+   curl -s https://sunstone.md/ | cmp - marketing/index.html && echo "landing page live"
    ```
+
+   The download links and the version line fill themselves in from GitHub's latest *published* release, so there is no version to bump on the page. The live copy is tracked in the `/opt/docker` repo; commit only that folder there and push:
+
+   ```bash
+   git -C /opt/docker add caddy/sites/sunstone
+   git -C /opt/docker commit -m "sunstone: publish landing page for vX.Y.Z" && git -C /opt/docker push
+   ```
+
+   (`git commit` exits non-zero when nothing changed; that's fine, there's nothing to push then.)
 
 2. **Guide bundle.** The read-only Sunstone Web container in `/opt/docker/sunstone-wiki` serves `./bundle`, which holds `guide/` exactly as of the release tag:
 
