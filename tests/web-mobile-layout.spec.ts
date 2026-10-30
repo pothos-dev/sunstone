@@ -38,7 +38,7 @@ test('phone layout gives the Concept the full width and uses drawers', async ({ 
   // Gate on hydration before tapping: the Tags Section renders from a
   // client-side fetch in the same cycle that wires the click handlers (it sits
   // in the closed drawer, so attached — not visible).
-  await expect(page.getByTestId('tag-browser')).toBeAttached();
+  await expect(page.getByTestId('tags-section')).toBeAttached();
 
   // ☰ → Explorer drawer; opening a Concept navigates and closes it.
   await page.getByTestId('drawer-toggle-left').tap();
@@ -78,7 +78,7 @@ test('phone layout gives the Concept the full width and uses drawers', async ({ 
   // A crumb with an index opens it (and the drawer stays closed).
   await page.goto('/guide/topic');
   await expect(rendered.locator('h1')).toContainText('Topic');
-  await expect(page.getByTestId('tag-browser')).toBeAttached();
+  await expect(page.getByTestId('tags-section')).toBeAttached();
   await page.getByTestId('tile-crumb').tap();
   await expect(page).toHaveURL(/\/guide$/);
   await expect(left).toBeHidden();

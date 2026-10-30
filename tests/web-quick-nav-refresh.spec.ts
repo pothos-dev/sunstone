@@ -23,7 +23,7 @@ test('quick-nav: a Concept created after the first open is listed after live rel
   await expect(page.getByTestId('web-viewer')).toBeVisible();
   // Gate on hydration (the Tags Section renders from a client-side fetch in
   // the same cycle that installs the key listeners).
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   // First open: the palette loads (and caches) the Concept list.
   await page.keyboard.press('Control+k');

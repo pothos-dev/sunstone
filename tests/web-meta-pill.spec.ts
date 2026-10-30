@@ -23,7 +23,7 @@ test('hovering the pill opens the popover', async ({ page }) => {
   await page.clock.setFixedTime(NOW);
   await page.goto('/cited');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Cited Concept');
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   const pill = page.getByTestId('tile-header').getByTestId('meta-pill');
   await expect(pill.getByTestId('meta-pill-trust')).toHaveText('Reviewed');

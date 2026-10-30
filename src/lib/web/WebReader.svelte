@@ -191,10 +191,10 @@
   // — no server-side bundle state) together with the theme mode and
   // `expandedFolders`. Seeded to the defaults so the SSR render matches the
   // first client render; onMount then applies the persisted (validated,
-  // clamped) values.
+  // clamped) values. Tags starts collapsed, as on the desktop.
   const ui = $state({
     explorerOpen: true,
-    tagsOpen: true,
+    tagsOpen: false,
     outlineOpen: true,
     backlinksOpen: true,
     leftSidebarOpen: true,

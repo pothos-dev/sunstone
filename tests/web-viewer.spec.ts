@@ -131,7 +131,7 @@ test('full-text search: Ctrl+Shift+F lists hits and opens a Concept', async ({ p
   // Gate on hydration: the Tags Section renders from its onMount fetch, which
   // runs in the same hydration cycle as the viewer's Ctrl+Shift+F key listener,
   // so its presence means the listener is registered.
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   // Open the Search modal.
   await page.keyboard.press('Control+Shift+F');
@@ -180,7 +180,9 @@ test('index-backed sidebars: backlinks, tags, and outline', async ({ page }) => 
   await outline.getByTestId('outline-entry').filter({ hasText: 'Details' }).click();
   await expect(page.locator('[data-testid="rendered"] h2#details')).toBeInViewport();
 
-  // Tags lists bundle tags with counts; expanding one reveals its Concepts.
+  // Tags (collapsed by default) lists bundle tags with counts; expanding one
+  // reveals its Concepts.
+  await page.getByTestId('tags-section-header').click();
   const tags = page.getByTestId('tag-browser');
   await expect(tags).toBeVisible();
   const demo = tags.getByTestId('tag').filter({ hasText: 'demo' });
@@ -213,7 +215,7 @@ test('tags section is hidden when the bundle has no tags', async ({ page }) => {
   );
   await page.goto('/');
   await expect(page.getByTestId('web-viewer')).toBeVisible();
-  await expect(page.getByTestId('tag-browser')).toHaveCount(0);
+  await expect(page.getByTestId('tags-section')).toHaveCount(0);
 });
 
 /**
@@ -437,7 +439,7 @@ test('quick-nav: Ctrl+K opens a fuzzy palette that navigates client-side', async
   await expect(page.getByTestId('web-viewer')).toBeVisible();
   // Gate on hydration: the Tags Section renders from its onMount fetch, which
   // runs in the same hydration cycle as the viewer's key listeners.
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   // Ctrl+K opens the palette; with an empty query it browses all Concepts.
   await page.keyboard.press('Control+k');
@@ -491,7 +493,7 @@ test('layout parity: rail, real sign-in, Tile header, theme toggle, edge resize 
   await page.goto('/good');
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
   // Gate on hydration before clicking the rail (see the quick-nav spec).
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   // The far-left activity rail carries quick-nav + search + a bottom theme
   // toggle + a user slot; the menu stub is gone.
@@ -619,25 +621,28 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await page.goto('/good');
   // Gate on hydration before clicking (the Tags Section renders from a
   // client-side fetch in the same cycle that wires the tree's click handlers).
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
   // The guide folder holds an index.md, so it defaults COLLAPSED. EXPAND it (a
-  // non-default folder state), and collapse the Tags Section and Properties, so
-  // the reload below proves all three UI choices round-trip through localStorage.
+  // non-default folder state), expand the (default-collapsed) Tags Section and
+  // collapse Properties, so the reload below proves all three UI choices
+  // round-trip through localStorage.
   const guideDir = page.getByTestId('tree-dir').filter({ hasText: 'guide' });
   const topic = page.locator('[data-testid="tree-concept"][data-path="guide/topic.md"]');
   await expect(topic).toHaveCount(0);
   await guideDir.getByRole('button', { name: 'guide' }).click();
   await expect(topic).toBeVisible();
-  await page.getByTestId('tags-section-header').click();
   await expect(page.getByTestId('tag-browser')).toHaveCount(0);
+  await page.getByTestId('tags-section-header').click();
+  await expect(page.getByTestId('tag-browser')).toBeVisible();
   await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
-  // The expanded folder and the two collapses were restored from localStorage.
+  // The expanded folder and Tags, and the collapsed Properties, were restored
+  // from localStorage.
   await expect(topic).toBeVisible();
-  await expect(page.getByTestId('tag-browser')).toHaveCount(0);
+  await expect(page.getByTestId('tag-browser')).toBeVisible();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
   // Sidebar-collapse also persists.
