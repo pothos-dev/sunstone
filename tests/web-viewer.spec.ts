@@ -49,7 +49,10 @@ test('web viewer renders a Concept read-only with resolved + broken links', asyn
   await expect(page).toHaveTitle('Web Bundle Home');
   await expect(rendered.locator('p').first()).toBeVisible();
 
-  // Read-only Properties view from frontmatter.
+  // Read-only Properties view from frontmatter: collapsed by default, shown
+  // by the Frontmatter toggle.
+  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toContainText('Web Bundle Home');
 
   // A broken in-Bundle link is present but visually distinct.
@@ -598,12 +601,14 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await page.getByTestId('rail-toggle-right').click();
   await expect(page.getByTestId('right-side-bar')).toBeVisible();
 
-  // Properties collapses (body removed) and re-expands.
+  // Properties starts collapsed, expands, and collapses again (body removed).
+  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toHaveCount(0);
 
-  // Screenshot the DARK parity view with Properties re-expanded.
+  // Screenshot the DARK parity view with Properties expanded.
   await page.getByTestId('frontmatter-toggle').click();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.screenshot({ path: 'tests/screenshots/web-parity-dark.png', fullPage: true });
@@ -624,9 +629,9 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   // client-side fetch in the same cycle that wires the tree's click handlers).
   await expect(page.getByTestId('tags-section')).toBeVisible();
   // The guide folder holds an index.md, so it defaults COLLAPSED. EXPAND it (a
-  // non-default folder state), expand the (default-collapsed) Tags Section and
-  // collapse Properties, so the reload below proves all three UI choices
-  // round-trip through localStorage.
+  // non-default folder state) and expand the (default-collapsed) Tags Section;
+  // Properties is still expanded from above (also non-default), so the reload
+  // below proves all three UI choices round-trip through localStorage.
   const guideDir = page.getByTestId('tree-dir').filter({ hasText: 'guide' });
   const topic = page.locator('[data-testid="tree-concept"][data-path="guide/topic.md"]');
   await expect(topic).toHaveCount(0);
@@ -635,16 +640,14 @@ test('polish: edge collapse/strip-nav, Properties collapse, and persistence', as
   await expect(page.getByTestId('tag-browser')).toHaveCount(0);
   await page.getByTestId('tags-section-header').click();
   await expect(page.getByTestId('tag-browser')).toBeVisible();
-  await page.getByTestId('frontmatter-toggle').click();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('properties')).toBeVisible();
 
   await page.reload();
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
-  // The expanded folder and Tags, and the collapsed Properties, were restored
-  // from localStorage.
+  // The expanded folder, Tags and Properties were restored from localStorage.
   await expect(topic).toBeVisible();
   await expect(page.getByTestId('tag-browser')).toBeVisible();
-  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await expect(page.getByTestId('properties')).toBeVisible();
 
   // Sidebar-collapse also persists.
   await page.getByTestId('rail-toggle-left').click();

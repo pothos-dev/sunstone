@@ -192,7 +192,7 @@
   // — no server-side bundle state) together with the theme mode and
   // `expandedFolders`. Seeded to the defaults so the SSR render matches the
   // first client render; onMount then applies the persisted (validated,
-  // clamped) values. Tags starts collapsed, as on the desktop.
+  // clamped) values. Tags and the Frontmatter start collapsed, as on the desktop.
   const ui = $state({
     explorerOpen: true,
     tagsOpen: false,
@@ -200,7 +200,7 @@
     backlinksOpen: true,
     leftSidebarOpen: true,
     rightSidebarOpen: true,
-    propertiesOpen: true,
+    propertiesOpen: false,
     leftSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     rightSidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   });

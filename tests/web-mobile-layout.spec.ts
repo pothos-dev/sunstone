@@ -56,7 +56,10 @@ test('phone layout gives the Concept the full width and uses drawers', async ({ 
   await page.getByTestId('drawer-scrim').tap({ position: { x: 20, y: 400 } });
   await expect(right).toBeHidden();
 
-  // ⋯ menu: Properties toggle, Escape closes the menu.
+  // ⋯ menu: Properties toggle (collapsed by default), Escape closes the menu.
+  await expect(page.getByTestId('properties')).toHaveCount(0);
+  await page.getByTestId('strip-menu').tap();
+  await page.getByTestId('menu-properties').tap();
   await expect(page.getByTestId('properties')).toBeVisible();
   await page.getByTestId('strip-menu').tap();
   await page.getByTestId('menu-properties').tap();
