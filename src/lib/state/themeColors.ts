@@ -3,8 +3,8 @@
  *
  * The palette in `app.css` rests on twelve BASE colours per scheme; every other
  * colour token is derived from them with `color-mix()`. The user can override
- * any base colour, per scheme, by hand in the desktop config file
- * (`~/.config/sunstone/config.json`, which Sunstone never writes):
+ * any base colour, per scheme, in the desktop config file
+ * (`~/.config/sunstone/config.json`, by hand or from the settings page):
  *
  *   { "colors": {
  *       "light": { "accent": "#2b7fd9", "bg": "#f4f7fb" },

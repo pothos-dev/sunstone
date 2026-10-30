@@ -5,6 +5,7 @@ import { DEFAULT_EDITOR_MODE, type EditorMode } from '$lib/editor/cm';
 import type { StoredLayout } from '$lib/state/layoutPersist';
 import { bundleStateFromSession, sessionFromBundleState } from '$lib/state/sessionState';
 import type { BundleState } from '$lib/types';
+import type { PanelDefaults } from '$lib/settings/panelDefaults';
 import type { RegionId } from '$lib/regionGrid';
 import { flagsToClearOnEnter } from '$lib/transientReveal';
 import { clampSidebarWidth, DEFAULT_SIDEBAR_WIDTH } from '$lib/sidebarResize';
@@ -172,11 +173,12 @@ class SessionStore {
 
   /**
    * Load persisted state from the backend. Defaults on a missing/corrupt store;
-   * the per-field defaults + legacy migrations are `sessionFromBundleState`.
+   * the per-field defaults + legacy migrations are `sessionFromBundleState`,
+   * with `defaults` (the settings page's) for whatever this Bundle never stored.
    */
-  async load(): Promise<void> {
+  async load(defaults?: PanelDefaults): Promise<void> {
     try {
-      const s = sessionFromBundleState(await backend.loadBundleState());
+      const s = sessionFromBundleState(await backend.loadBundleState(), defaults);
       this.lastOpenConcept = s.lastOpenConcept;
       this.expandedFolders = s.expandedFolders;
       this.recentFiles = s.recentFiles;

@@ -33,9 +33,8 @@ The mode is remembered across restarts.
 | Ctrl/Cmd+E | Inline code |
 | Ctrl/Cmd+Shift+M | Strikethrough |
 | Ctrl/Cmd+1 … 6 | Heading level 1–6 |
-| Ctrl/Cmd+0 | Paragraph |
 
-All of them toggle. Right-clicking in the editor opens a menu with the same actions, plus cut, copy, paste and [comments](/2-editing/comments.md). In the preview, `--` and `---` render as en and em dashes.
+All of them toggle: pressing a heading's own shortcut again turns it back into a paragraph. You can change any of them, or give Paragraph a shortcut of its own, under [Settings](/7-customize/settings.md) → Keyboard. Right-clicking in the editor opens a menu with the same actions, plus cut, copy, paste and [comments](/2-editing/comments.md). In the preview, `--` and `---` render as en and em dashes.
 
 ## Find and replace
 

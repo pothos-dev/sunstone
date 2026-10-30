@@ -27,6 +27,7 @@ import type {
   KnownBundle,
   StartupDocument,
   SyncNotice,
+  ConfigEdit,
 } from '$lib/types';
 
 /**
@@ -52,6 +53,9 @@ import type {
 /** The web serves ONE fixed Bundle and has no launcher, so folder switching is
  * inapplicable (writing Concepts, by contrast, is now supported — see below). */
 const NO_LAUNCHER = 'the web serves a single fixed Bundle: no folder switching';
+
+/** Settings are desktop-only: the web and `sunstone serve` have no settings page. */
+const NO_SETTINGS = 'settings can only be changed in the Sunstone desktop app';
 
 /**
  * `localStorage` key for the per-Bundle View state. A web deployment serves a
@@ -347,6 +351,12 @@ export const httpBackend: Backend = {
   // `SUNSTONE_CONFIG` on the web, the desktop config under `sunstone serve`.
   loadAppearance(): Promise<unknown> {
     return getJson<unknown>('/_api/appearance');
+  },
+  loadConfig(): Promise<unknown> {
+    return Promise.resolve(null);
+  },
+  saveConfigEdits(_edits: ConfigEdit[]): Promise<void> {
+    return Promise.reject(new Error(NO_SETTINGS));
   },
   fontUrl: httpFontUrl,
   forgetBundle(_path: string): Promise<void> {

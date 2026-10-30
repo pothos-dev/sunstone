@@ -1,5 +1,5 @@
-//! The user's **appearance** config: the `colors` and `fonts` values of a
-//! hand-written `config.json`, plus the font files it names.
+//! The user's **appearance** config: the `colorTheme`, `colors` and `fonts`
+//! values of `config.json`, plus the font files it names.
 //!
 //! One file format, two places it lives: the desktop reads
 //! `~/.config/sunstone/config.json` ([`crate::config::user_config_file`]),
@@ -28,9 +28,11 @@ use serde_json::{Map, Value};
 
 use crate::bundle;
 
-/// The `colors` and `fonts` values of the config at `path`, verbatim, as
-/// `{ "colors"?: …, "fonts"?: … }` — or `None` when the file is missing, sets
-/// neither, or is not valid JSON (a warning is logged; the file is left alone).
+/// The `colorTheme`, `colors` and `fonts` values of the config at `path`,
+/// verbatim, as `{ "colorTheme"?: …, "colors"?: …, "fonts"?: … }` — or `None`
+/// when the file is missing, sets none of them, or is not valid JSON (a
+/// warning is logged; the file is left alone). The frontend folds the
+/// `colorTheme` preset under `colors` (`src/lib/state/appearance.ts`).
 pub fn load(path: &Path) -> Option<Value> {
     let text = std::fs::read_to_string(path).ok()?;
     let appearance = from_config(&text);
@@ -41,11 +43,11 @@ pub fn load(path: &Path) -> Option<Value> {
 }
 
 /// The appearance part of a `config.json` document; `Err` when it does not
-/// parse, `Ok(None)` when it sets no (non-null) `colors` or `fonts`.
+/// parse, `Ok(None)` when it sets no (non-null) `colorTheme`, `colors` or `fonts`.
 fn from_config(text: &str) -> Result<Option<Value>, serde_json::Error> {
     let mut config: Value = serde_json::from_str(text)?;
     let mut out = Map::new();
-    for key in ["colors", "fonts"] {
+    for key in ["colorTheme", "colors", "fonts"] {
         if let Some(value) = config.get_mut(key).map(Value::take).filter(|v| !v.is_null()) {
             out.insert(key.to_string(), value);
         }
@@ -157,6 +159,13 @@ mod tests {
         assert_eq!(a["colors"]["light"]["typo"], 1);
         assert_eq!(a["fonts"]["ui"]["size"], 15);
         assert!(a.get("other").is_none());
+    }
+
+    #[test]
+    fn the_color_theme_comes_along() {
+        let a = from_config(r#"{ "colorTheme": "nord", "theme": "dark" }"#).unwrap().unwrap();
+        assert_eq!(a["colorTheme"], "nord");
+        assert!(a.get("theme").is_none());
     }
 
     #[test]

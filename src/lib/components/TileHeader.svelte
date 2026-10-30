@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { settings } from '$lib/state/settings.svelte';
+  import { withShortcut } from '$lib/settings/keybindings';
   import type { IndexedCrumb } from '$lib/tileTitle';
   import type { ConceptMeta } from '$lib/metaPill';
   import MetaPill from '$lib/components/MetaPill.svelte';
@@ -155,7 +157,7 @@
         type="button"
         class="icon-btn"
         data-testid="nav-back"
-        title="Back (Ctrl+Alt+Left)"
+        title={withShortcut('Back', settings.keybindings.back)}
         aria-label="Back"
         disabled={!canGoBack}
         onclick={onBack}>←</button
@@ -164,7 +166,7 @@
         type="button"
         class="icon-btn"
         data-testid="nav-forward"
-        title="Forward (Ctrl+Alt+Right)"
+        title={withShortcut('Forward', settings.keybindings.forward)}
         aria-label="Forward"
         disabled={!canGoForward}
         onclick={onForward}>→</button

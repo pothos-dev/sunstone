@@ -19,4 +19,5 @@ pub mod paths;
 pub mod render;
 pub mod rewrite;
 pub mod search;
+pub mod settings;
 pub mod watcher;

@@ -20,6 +20,7 @@ import type {
   StartupDocument,
   UpdateNotice,
   ReleaseNotes,
+  ConfigEdit,
 } from '$lib/types';
 
 /** Tauri event name emitted by the Rust watcher (matches watcher.rs). */
@@ -87,6 +88,14 @@ export const tauriBackend: Backend = {
 
   loadAppearance(): Promise<unknown> {
     return invoke<unknown>('load_appearance');
+  },
+
+  loadConfig(): Promise<unknown> {
+    return invoke<unknown>('load_config');
+  },
+
+  saveConfigEdits(edits: ConfigEdit[]): Promise<void> {
+    return invoke<void>('save_config_edits', { edits });
   },
 
   fontUrl(src: string): string {

@@ -51,7 +51,7 @@ Set any role under `fonts` in the same `config.json` that holds the [colour over
 
 ## How it is applied
 
-1. Rust returns `colors` and `fonts` from the config verbatim (`sunstone_native::appearance::load`): through the `load_appearance` command on the desktop, and `GET /_api/appearance` from [sunstone-server](/architecture/sunstone-server.md).
+1. Rust returns `colorTheme`, `colors` and `fonts` from the config verbatim (`sunstone_native::appearance::load`): through the `load_appearance` command on the desktop, and `GET /_api/appearance` from [sunstone-server](/architecture/sunstone-server.md).
 2. `appearanceCss` (`src/lib/state/appearance.ts`) validates them (`parseFonts` in `state/fonts.ts`, `parseThemeColors` in `state/themeColors.ts`) and builds one stylesheet: an `@font-face` per file under the role's private name, then a `:root` rule re-declaring the overridden tokens. `loadAppearance` (`state/theme.svelte.ts`) installs it as `<style id="sunstone-appearance">` after `app.css`.
 3. On the web, `hooks.server.ts` already inlines that stylesheet into the SSR `<head>`, so the first paint has the configured fonts and colours. The client replaces it after mounting, this time checking colours with `CSS.supports`.
 4. Each shell serves the font files itself: the desktop over the `sunstone-font://` scheme (`src-tauri/src/font.rs`), the web at `GET /_api/appearance/font?file=` (`Backend.fontUrl`). Both go through `appearance::font_file`, which serves a file only if the current config lists it, it has a font extension, and it resolves inside the config's directory.

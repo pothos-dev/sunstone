@@ -7,8 +7,9 @@
  * reads the inherited `data-theme`) are themed consistently.
  *
  * `mode: 'system'` follows `prefers-color-scheme` and tracks live changes; an
- * explicit `'light'`/`'dark'` forces a scheme. The user's colour and font
- * overrides from the config file are applied separately by `loadAppearance` below.
+ * explicit `'light'`/`'dark'` forces a scheme (the desktop sets it from the
+ * settings store). The user's colour and font overrides from the config file
+ * are applied separately by `loadAppearance` / `installAppearance` below.
  */
 
 import type { Backend } from '$lib/ipc/backend';
@@ -29,7 +30,7 @@ function osPrefersDark(): boolean {
 }
 
 class ThemeStore {
-  /** User/app preference. Only `'system'` ships now; the field is future-proof. */
+  /** User preference: the settings page's `theme` (desktop); `'system'` elsewhere. */
   mode = $state<ThemeMode>('system');
   /** OS preference, tracked live via matchMedia. */
   #osDark = $state<boolean>(osPrefersDark());
@@ -95,6 +96,16 @@ export async function loadAppearance(backend: Backend): Promise<void> {
   } catch {
     return;
   }
+  installAppearance(raw, backend);
+}
+
+/**
+ * Install (or replace, or remove) the override `<style>` for the raw
+ * `{ colorTheme?, colors?, fonts? }` value. The desktop calls this from an
+ * `$effect` over the settings store, so a change on the settings page shows at once.
+ */
+export function installAppearance(raw: unknown, backend: Backend): void {
+  if (typeof document === 'undefined') return;
   const css = appearanceCss(raw, {
     isColor: (v) => CSS.supports('color', v),
     fontUrl: (src) => backend.fontUrl(src),

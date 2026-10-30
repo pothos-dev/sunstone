@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { routeAppHotkey, type AppHotkeyContext, type AppHotkeyIntent } from './appHotkeys';
+import { DEFAULT_KEYBINDINGS, resolveKeybindings } from './settings/keybindings';
 
 function keydown(over: Partial<KeyboardEvent>): KeyboardEvent {
   return {
@@ -22,6 +23,7 @@ function ctx(over: Partial<AppHotkeyContext> = {}): AppHotkeyContext {
     quickNavOpen: false,
     quickNavTagActive: false,
     bundleSwitcher: true,
+    keybindings: DEFAULT_KEYBINDINGS,
     ...over,
   };
 }
@@ -218,5 +220,45 @@ describe('routeAppHotkey', () => {
   test('unmodified ordinary keys route nothing', () => {
     expect(routeAppHotkey(keydown({ key: 'a' }), ctx())).toBeNull();
     expect(routeAppHotkey(keydown({ key: 'ArrowLeft' }), ctx())).toBeNull();
+  });
+
+  test('Ctrl+, / Cmd+, toggles settings', () => {
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: ',' }), ctx())).toEqual({ kind: 'toggle-settings' });
+    expect(routeAppHotkey(keydown({ metaKey: true, key: ',' }), ctx({ conceptOpen: false }))).toEqual({
+      kind: 'toggle-settings',
+    });
+  });
+
+  test('a rebound command fires on its new key and no longer on the old one', () => {
+    const keybindings = resolveKeybindings({ quickNav: 'Mod-Shift-p' });
+    expect(routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'P' }), ctx({ keybindings }))).toEqual({
+      kind: 'toggle-quicknav',
+    });
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: 'k' }), ctx({ keybindings }))).toBeNull();
+    // Rebinding one command leaves the others on their defaults.
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: 'p' }), ctx({ keybindings }))).toEqual({ kind: 'print' });
+  });
+
+  test('an unbound command no longer fires', () => {
+    const keybindings = resolveKeybindings({ search: null, back: null });
+    expect(routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'f' }), ctx({ keybindings }))).toBeNull();
+    expect(
+      routeAppHotkey(keydown({ ctrlKey: true, altKey: true, key: 'ArrowLeft' }), ctx({ keybindings })),
+    ).toBeNull();
+  });
+
+  test('rebound print still needs an open Concept; zoom keys stay fixed', () => {
+    const keybindings = resolveKeybindings({ print: 'Mod-Shift-e', quickNav: 'Mod-0' });
+    expect(routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'e' }), ctx({ keybindings }))).toEqual({
+      kind: 'print',
+    });
+    expect(
+      routeAppHotkey(keydown({ ctrlKey: true, shiftKey: true, key: 'e' }), ctx({ keybindings, conceptOpen: false })),
+    ).toBeNull();
+    // Zoom is routed first, so a command bound to Mod-0 can never take it.
+    expect(routeAppHotkey(keydown({ ctrlKey: true, key: '0' }), ctx({ keybindings }))).toEqual({
+      kind: 'zoom',
+      step: 'reset',
+    });
   });
 });

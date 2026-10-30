@@ -15,6 +15,7 @@ import type {
   SyncNotice,
   UpdateNotice,
   ReleaseNotes,
+  ConfigEdit,
 } from '$lib/types';
 
 /**
@@ -77,6 +78,22 @@ export interface Backend {
    * are set. Never rejects for a missing/corrupt config.
    */
   loadAppearance(): Promise<unknown>;
+
+  /**
+   * The whole user `config.json` as parsed JSON, for the settings page, or
+   * `null` when it is missing or not valid JSON. Desktop only: the web and
+   * `sunstone serve` have no settings page and resolve `null`.
+   */
+  loadConfig(): Promise<unknown>;
+
+  /**
+   * Write `edits` into `config.json`, changing only those paths: every other
+   * key, value and the key order survive. Only the settings keys
+   * (`SETTINGS_KEYS` in `settings/configEdits.ts`) may be edited. Rejects
+   * without writing when the file exists but is not valid JSON, and on the web
+   * and `sunstone serve`, which have no settings page.
+   */
+  saveConfigEdits(edits: ConfigEdit[]): Promise<void>;
 
   /**
    * The URL a font file listed in the config (`fonts.<role>.files`, relative to

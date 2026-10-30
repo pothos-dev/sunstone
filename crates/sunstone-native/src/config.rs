@@ -5,8 +5,10 @@
 //! OS config directory, `dirs::config_dir()/sunstone/` (e.g. `~/.config/sunstone/`
 //! on Linux):
 //!
-//!   - `config.json` — the USER's configuration (colour and font overrides).
-//!     Written by hand; Sunstone only ever reads it (see [`load_appearance`]).
+//!   - `config.json` — the USER's configuration (theme, colours, fonts, panel
+//!     defaults, keybindings). Written by hand or by the settings page, which
+//!     changes only the leaves the user edited and keeps everything else
+//!     (see [`crate::settings`], [`load_config`], [`save_config_edits`]).
 //!   - `state.json` — Sunstone's own state store, rewritten on every change:
 //!     the theme preference (only the OS-driven default ships now) and
 //!     PER-BUNDLE session state keyed by the Bundle's ABSOLUTE path (the
@@ -139,14 +141,13 @@ struct Store {
 }
 
 /// App-level state (not per-Bundle): the OS-driven theme default and the
-/// version that last ran. User colours and fonts are NOT here: they live in the
-/// hand-written `config.json` ([`load_appearance`]).
+/// version that last ran. The user's settings (theme mode, colours, fonts, …)
+/// are NOT here: they live in `config.json` ([`load_config`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AppConfig {
-    /// Theme preference. `"system"` (the default) follows the OS light/dark
-    /// setting; future values (`"light"`, `"dark"`, custom theme ids) can be
-    /// honoured by the frontend theme store later.
+    /// Unused and never read: the theme mode now lives in `config.json`
+    /// (`theme`, set by the settings page). Kept so existing stores parse.
     pub theme: String,
     /// The Sunstone version that last started, so the next start can tell it
     /// was updated (see [`record_run_version`]). `None` in stores that predate it.
@@ -172,7 +173,8 @@ fn config_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-/// Path of the user-owned config file (read-only to Sunstone). Also what
+/// Path of the user-owned config file (Sunstone writes only the settings
+/// page's edits into it, [`crate::settings`]). Also what
 /// `sunstone serve` and the desktop's `sunstone-font://` scheme read fonts from.
 pub fn user_config_file() -> Option<PathBuf> {
     Some(config_dir()?.join("config.json"))
@@ -273,6 +275,19 @@ pub fn record_run_version(current: &str) -> PreviousRun {
 /// the file is missing, sets neither, or is not valid JSON.
 pub fn load_appearance() -> Option<serde_json::Value> {
     crate::appearance::load(&user_config_file()?)
+}
+
+/// The whole user `config.json`, for the settings page, or `None` when it is
+/// missing or not a JSON object.
+pub fn load_config() -> Option<serde_json::Value> {
+    crate::settings::load_config(&user_config_file()?)
+}
+
+/// Write the settings page's `edits` into the user `config.json`, changing
+/// only those paths ([`crate::settings::save_config_edits`]).
+pub fn save_config_edits(edits: &[crate::settings::ConfigEdit]) -> Result<(), String> {
+    let path = user_config_file().ok_or("no config directory")?;
+    crate::settings::save_config_edits(&path, edits)
 }
 
 /// Normalise a Bundle root path to the string key used in the store. We use the

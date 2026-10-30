@@ -130,7 +130,7 @@ Rules and completions come from **families**, never from a switch in the engine.
 
 ## Formatting commands
 
-`textFormat.ts` is pure: `toggleInlineWrap` (`**`/`*`/`` ` ``/`~~`), `insertLink`, `linkAt`, and `headingFormatEdit` (ATX levels 1–6 or plain across the touched lines) all return CM-shaped `{changes, selection}` edits. `cm.ts` wraps them in `Command`s bound in the `formattingKeymap` (`Mod-b/i/e`, `Mod-Shift-m`, `Mod-0…6`), placed before the general keymap so they win, and re-exposes them as imperative functions (`toggleBold`, `insertOrEditLink`, …) for the right-click menu. All are read-only-gated and toggle (re-applying removes) for Obsidian parity.
+`textFormat.ts` is pure: `toggleInlineWrap` (`**`/`*`/`` ` ``/`~~`), `insertLink`, `linkAt`, and `headingFormatEdit` (ATX levels 1–6 or plain across the touched lines) all return CM-shaped `{changes, selection}` edits. `commands.ts` wraps them in `Command`s that `extensions.ts` runs from a high-precedence keydown handler, by the user's rebindable shortcuts (`settings.keybindings`, see `settings/keybindings.ts`: `Mod-b/i/e`, `Mod-Shift-m`, `Mod-1…6`; Paragraph ships unbound because `Mod-0` is Reset zoom). The shortcuts are looked up at keydown time, so a rebinding applies to open editors at once. `cm.ts` re-exposes them as imperative functions (`toggleBold`, `insertOrEditLink`, …) for the right-click menu. All are read-only-gated and toggle (re-applying removes) for Obsidian parity.
 
 ## Review toggle
 

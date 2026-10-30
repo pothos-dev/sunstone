@@ -1,12 +1,13 @@
 /**
- * The user's appearance config — `colors` (`themeColors.ts`) and `fonts`
- * (`fonts.ts`) — turned into the ONE override stylesheet both shells apply
+ * The user's appearance config — `colorTheme` (`themePresets.ts`), `colors`
+ * (`themeColors.ts`) and `fonts` (`fonts.ts`) — turned into the ONE override stylesheet both shells apply
  * after `app.css` (pure logic; installed by `state/theme.svelte.ts`, and on the
  * web also inlined by the SSR hook so the first paint already has it).
  */
 
 import { fontsCss, parseFonts } from './fonts';
 import { parseThemeColors, themeColorsCss } from './themeColors';
+import { withPreset } from './themePresets';
 
 /** Id of the `<style>` element carrying the overrides (SSR and client share it). */
 export const APPEARANCE_STYLE_ID = 'sunstone-appearance';
@@ -18,11 +19,15 @@ export interface AppearanceDeps {
   fontUrl: (src: string) => string;
 }
 
-/** The override stylesheet for the raw `{ colors?, fonts? }` value, or `''`. */
+/**
+ * The override stylesheet for the raw `{ colorTheme?, colors?, fonts? }` value,
+ * or `''`. A preset's colours sit under the per-colour overrides.
+ */
 export function appearanceCss(raw: unknown, deps: AppearanceDeps): string {
   const obj = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   return (
-    fontsCss(parseFonts(obj.fonts), deps.fontUrl) + themeColorsCss(parseThemeColors(obj.colors, deps.isColor))
+    fontsCss(parseFonts(obj.fonts), deps.fontUrl) +
+    themeColorsCss(withPreset(obj.colorTheme, parseThemeColors(obj.colors, deps.isColor)))
   );
 }
 

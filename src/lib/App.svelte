@@ -9,7 +9,8 @@
   import { indexStore } from '$lib/state/index.svelte';
   import { session } from '$lib/state/session.svelte';
   import { suggestions } from '$lib/state/suggestions.svelte';
-  import { applyTheme, loadAppearance, theme } from '$lib/state/theme.svelte';
+  import { applyTheme, installAppearance, loadAppearance, theme } from '$lib/state/theme.svelte';
+  import { settings, SETTINGS_EDITABLE } from '$lib/state/settings.svelte';
   import { applyZoom, zoom } from '$lib/state/zoom.svelte';
   import { wheelZoomStep } from '$lib/zoom';
   import ExplorerPane from '$lib/components/ExplorerPane.svelte';
@@ -25,6 +26,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import TileGrid from '$lib/components/TileGrid.svelte';
+  import SettingsDialog from '$lib/components/settings/SettingsDialog.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
@@ -87,6 +89,12 @@
 
   // Quick-nav palette (Ctrl+K) + full-text search (Ctrl+Shift+F) overlays.
   let quickNavOpen = $state(false);
+  let settingsOpen = $state(false);
+  /** Open the settings, or close them the way Escape does (flush, restore focus). */
+  function toggleSettings() {
+    if (settingsOpen) focus.cancelTopOverlay();
+    else settingsOpen = true;
+  }
   // The Bundle switcher popover (ticket ui-1). Desktop only: the web shell serves
   // a single Bundle and has no known-folder list.
   let switcherOpen = $state(false);
@@ -131,7 +139,11 @@
     };
 
     const stopTheme = theme.start();
-    void loadAppearance(backend);
+    // Desktop: config.json comes in through the settings store, whose effective
+    // config (pending edits included) drives the theme and the appearance
+    // stylesheet below. Elsewhere there is no settings page; read it directly.
+    const settingsReady = settings.load(backend);
+    if (!SETTINGS_EDITABLE) void loadAppearance(backend);
     // Seed the persisted UI zoom before the first paint of the mounted app.
     zoom.load();
     const stopFocus = focus.start();
@@ -162,7 +174,8 @@
           return null;
         }),
         bundle.load(),
-        session.load(),
+        // A first-time Bundle opens with the settings page's layout defaults.
+        settingsReady.then(() => session.load(settings.panelDefaults)),
         ensureWasm(),
       ]);
 
@@ -238,10 +251,13 @@
     // otherwise drop: a scheduled autosave (desktop; web never schedules one)
     // and a scheduled session-state write.
     const offBeforeClose = backend.onBeforeClose(() =>
-      Promise.all([workspace.flushPendingWrites(), session.flushPending()]).then(() => {}),
+      Promise.all([workspace.flushPendingWrites(), session.flushPending(), settings.flush()]).then(() => {}),
     );
 
     const onKeydown = (e: KeyboardEvent) => {
+      // The settings dialog owns its keys (Escape steps back inside it, and a
+      // shortcut being recorded must not run).
+      if ((e.target as Element | null)?.closest?.('[data-settings-dialog]')) return;
       // Pure routing lives in `appHotkeys.ts`; this switch only performs the
       // side effects (and the matching preventDefault) for the routed intent.
       const intent = routeAppHotkey(e, {
@@ -255,6 +271,7 @@
         quickNavOpen,
         quickNavTagActive,
         bundleSwitcher: !__SUNSTONE_WEB__,
+        keybindings: settings.keybindings,
       });
       if (intent === null) return;
       switch (intent.kind) {
@@ -265,6 +282,11 @@
         case 'toggle-search':
           e.preventDefault();
           searchOpen = !searchOpen;
+          return;
+        case 'toggle-settings':
+          if (!SETTINGS_EDITABLE) return;
+          e.preventDefault();
+          toggleSettings();
           return;
         case 'toggle-bundle-switcher':
           e.preventDefault();
@@ -375,6 +397,14 @@
   // background + the pre-hydration paint seeded in `app.html`).
   $effect(() => {
     applyTheme(appRoot, theme.resolved);
+  });
+
+  // Desktop: the settings store is the source of the theme mode and the colour
+  // and font overrides, so a change on the settings page applies at once.
+  $effect(() => {
+    if (!SETTINGS_EDITABLE || !settings.loaded) return;
+    theme.mode = settings.themeMode;
+    installAppearance(settings.config, backend);
   });
 
   // Apply the UI zoom multiplier to <html> (root font-size + the two px-pinned
@@ -608,6 +638,7 @@
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
     user={account}
+    bottom={SETTINGS_EDITABLE ? settingsButton : undefined}
   />
 
   <Sidebar
@@ -800,6 +831,10 @@
     />
   {/if}
 
+  {#if SETTINGS_EDITABLE}
+    <SettingsDialog open={settingsOpen} onclose={() => (settingsOpen = false)} />
+  {/if}
+
   <QuickNav
     open={quickNavOpen}
     paths={conceptPaths}
@@ -833,6 +868,27 @@
     </div>
   {/if}
 </div>
+
+{#snippet settingsButton()}
+  <button
+    type="button"
+    class="settings-btn"
+    class:active={settingsOpen}
+    title="Settings"
+    aria-label="Settings"
+    aria-pressed={settingsOpen}
+    data-testid="rail-settings"
+    onclick={toggleSettings}
+  >
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3">
+      <circle cx="8" cy="8" r="2.2" />
+      <path
+        d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"
+        stroke-linecap="round"
+      />
+    </svg>
+  </button>
+{/snippet}
 
 <style>
   .app {
@@ -971,4 +1027,34 @@
     gap: 0.1rem;
   }
 
+
+  /* The rail's gear (the left rail's bottom slot). Matches ActivityRail's buttons. */
+  .settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0.85;
+    transition:
+      background 0.12s ease,
+      opacity 0.12s ease;
+  }
+  .settings-btn:hover {
+    background: var(--hover);
+    opacity: 1;
+  }
+  .settings-btn.active {
+    color: var(--accent);
+    opacity: 1;
+  }
+  .settings-btn:focus-visible {
+    outline: 2px solid var(--accent-ring);
+    outline-offset: -2px;
+  }
 </style>

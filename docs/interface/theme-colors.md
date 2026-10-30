@@ -27,9 +27,13 @@ Sunstone's palette lives in `src/app.css` as CSS custom properties, one block fo
 
 The `--atomic-editor-*` tokens the editor reads are aliases of these. What stays fixed per scheme and cannot be overridden: `--region-active` (a white wash), the shadows, the syntax-highlight colours (`--atomic-editor-hl-*`), and the CriticMarkup colours.
 
+## Colour themes
+
+A `colorTheme` key picks one of the themes in `src/lib/state/themePresets.ts` (Solarized, Nord, Gruvbox, …), each a full set of the twelve base colours for both schemes. It sits under `colors`: a colour set there still wins over the theme's. `sunstone` (or no key) is the palette above. The desktop [settings page](settings.md) writes both keys.
+
 ## Overriding colours
 
-Set any base colour, per scheme, under `colors` in `config.json`. On the desktop (and under `sunstone serve`) that is `~/.config/sunstone/config.json` in the OS config dir; on Sunstone Web it is the file named by `SUNSTONE_CONFIG` ([deployment guide](../../docker/README.md#colours-and-fonts)). The same file sets the [fonts](fonts.md). It is yours: Sunstone reads it and never writes it. Its session data lives separately in `state.json` ([View state](view-state.md)).
+Set any base colour, per scheme, under `colors` in `config.json`. On the desktop (and under `sunstone serve`) that is `~/.config/sunstone/config.json` in the OS config dir; on Sunstone Web it is the file named by `SUNSTONE_CONFIG` ([deployment guide](../../docker/README.md#colours-and-fonts)). The same file sets the [fonts](fonts.md). It is yours: Sunstone writes to it only from the desktop settings page, and then changes only the settings you edited there, leaving every other key as you wrote it. Its session data lives separately in `state.json` ([View state](view-state.md)).
 
 ```json
 {
@@ -47,4 +51,4 @@ Set any base colour, per scheme, under `colors` in `config.json`. On the desktop
 
 ## How it is applied
 
-Rust returns the `colors` and `fonts` values of `config.json` as opaque JSON (`sunstone_native::appearance::load`; the `load_appearance` command on the desktop, `GET /_api/appearance` on the web). The frontend fetches them through `Backend.loadAppearance`, and `appearanceCss` (`src/lib/state/appearance.ts`) validates the colours (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`). `loadAppearance` in `state/theme.svelte.ts` then appends a `<style id="sunstone-appearance">` after `app.css` that re-declares the overridden tokens for each scheme. On the web the SSR hook inlines the same stylesheet into the page first, with a syntax-only colour check (`isSafeColorSyntax`), and the client replaces it after mounting. See [Fonts](fonts.md#how-it-is-applied) for the shared pipeline.
+Rust returns the `colorTheme`, `colors` and `fonts` values of `config.json` as opaque JSON (`sunstone_native::appearance::load`; the `load_appearance` command on the desktop, `GET /_api/appearance` on the web). The frontend fetches them through `Backend.loadAppearance`, and `appearanceCss` (`src/lib/state/appearance.ts`) validates the colours (`parseThemeColors` in `src/lib/state/themeColors.ts`, checking values with `CSS.supports('color', …)`). `installAppearance` in `state/theme.svelte.ts` then appends a `<style id="sunstone-appearance">` after `app.css` that re-declares the overridden tokens for each scheme. The desktop instead reads the whole file through the [settings](settings.md) store (`Backend.loadConfig`), and `installAppearance` rebuilds the same stylesheet whenever a setting changes. On the web the SSR hook inlines the same stylesheet into the page first, with a syntax-only colour check (`isSafeColorSyntax`), and the client replaces it after mounting. See [Fonts](fonts.md#how-it-is-applied) for the shared pipeline.

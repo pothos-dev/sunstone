@@ -16,6 +16,7 @@ import type {
   SyncNotice,
   UpdateNotice,
   ReleaseNotes,
+  ConfigEdit,
 } from '$lib/types';
 import {
   FAKE_BUNDLE_ROOT,
@@ -42,6 +43,7 @@ import { outboundLinks, planRewrites, okfMarkers, FAKE_GIT_PREFIX } from './fake
 import { stripTagsFromFrontmatter } from './fake/frontmatter';
 import { FAKE_COMMITS, committedContentAt } from './fake/git';
 import { searchFiles } from './fake/search';
+import { loadFakeConfig, readFakeConfig, saveFakeConfigEdits } from './fake/config';
 import { declareRootIndex } from './fake/createBundle';
 import {
   isLauncherForced,
@@ -295,14 +297,18 @@ export const fakeBackend: Backend = {
     return loadKnownBundles();
   },
 
-  // Colour and font overrides: whatever a spec seeded under APPEARANCE_KEY,
+  // Colour and font overrides: whatever a spec seeded under FAKE_CONFIG_KEY,
   // standing in for the user's `config.json`. Corrupt JSON -> none.
   async loadAppearance(): Promise<unknown> {
-    try {
-      return JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? 'null');
-    } catch {
-      return null;
-    }
+    return readFakeConfig();
+  },
+
+  async loadConfig(): Promise<unknown> {
+    return loadFakeConfig();
+  },
+
+  async saveConfigEdits(edits: ConfigEdit[]): Promise<void> {
+    saveFakeConfigEdits(edits);
   },
 
   // No config dir to serve from: a spec intercepts this path with `page.route`.
@@ -620,9 +626,6 @@ export const fakeBackend: Backend = {
   },
   openExternal: openExternalTab,
 };
-
-/** localStorage key a spec seeds with a `config.json`-shaped `{ colors, fonts }`. */
-const APPEARANCE_KEY = 'sunstone:fakeAppearance';
 
 /** localStorage key for the fake Bundle's session state. */
 const BUNDLE_STATE_KEY = `sunstone:bundleState:${FAKE_BUNDLE_ROOT}`;

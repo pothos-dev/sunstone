@@ -26,4 +26,6 @@ Sunstone has a warm amber palette and follows your system's light or dark settin
 }
 ```
 
+On the desktop you can also pick a ready-made colour theme and change single colours on the [settings page](/7-customize/settings.md).
+
 The full list of base colours is in the [theme colour reference](https://github.com/pothos-dev/sunstone/blob/main/docs/interface/theme-colors.md). The same file sets the [fonts](/7-customize/fonts.md).

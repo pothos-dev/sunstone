@@ -417,3 +417,13 @@ export type Frontmatter = {
   /** unknown keys are preserved verbatim */
   [key: string]: unknown;
 };
+
+/**
+ * One change to the user's `config.json` from the settings page: set the value
+ * at `path` (object keys from the root), or remove it when `value` is absent.
+ * Only these paths change; every other key, and the order of the keys, is kept.
+ */
+export interface ConfigEdit {
+  path: string[];
+  value?: unknown;
+}

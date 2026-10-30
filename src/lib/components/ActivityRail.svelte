@@ -29,6 +29,8 @@
   // 48px width at high zoom levels.
 
   import type { Snippet } from 'svelte';
+  import { settings } from '$lib/state/settings.svelte';
+  import { withShortcut } from '$lib/settings/keybindings';
   import type { SidebarSide } from '$lib/sidebarResize';
 
   interface Props {
@@ -152,7 +154,7 @@
         class="rail-btn"
         class:active={switcherOpen}
         data-testid="rail-bundle-switcher"
-        title="Switch Bundle (Ctrl+O)"
+        title={withShortcut('Switch Bundle', settings.keybindings.switchBundle)}
         aria-label="Switch Bundle"
         aria-haspopup="dialog"
         aria-expanded={switcherOpen}
@@ -184,7 +186,7 @@
         type="button"
         class="rail-btn"
         data-testid="rail-quicknav"
-        title="Quick nav (Ctrl+K)"
+        title={withShortcut('Quick nav', settings.keybindings.quickNav)}
         aria-label="Quick nav"
         onclick={onQuickNav}
       >
@@ -200,7 +202,7 @@
         type="button"
         class="rail-btn"
         data-testid="rail-search"
-        title="Search (Ctrl+Shift+F)"
+        title={withShortcut('Search', settings.keybindings.search)}
         aria-label="Search"
         onclick={onSearch}
       >

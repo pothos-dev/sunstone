@@ -13,7 +13,9 @@ members = [
 # `dep = { workspace = true }`. Tauri-only deps stay in `src-tauri/Cargo.toml`.
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `preserve_order`: the settings page rewrites the user's config.json and must
+# keep their key order (see sunstone-native/src/settings.rs).
+serde_json = { version = "1", features = ["preserve_order"] }
 ignore = "0.4"
 notify = "6"
 grep-searcher = "0.1"

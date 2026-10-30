@@ -76,6 +76,20 @@ pub(crate) fn load_appearance() -> Option<serde_json::Value> {
     config::load_appearance()
 }
 
+/// The whole user `config.json`, for the settings page (`null` when missing
+/// or not a JSON object).
+#[tauri::command]
+pub(crate) fn load_config() -> Option<serde_json::Value> {
+    config::load_config()
+}
+
+/// Write the settings page's edits into `config.json`, changing only those
+/// paths; refuses a file that does not parse and paths outside the settings keys.
+#[tauri::command]
+pub(crate) fn save_config_edits(edits: Vec<sunstone_native::settings::ConfigEdit>) -> Result<(), String> {
+    config::save_config_edits(&edits)
+}
+
 /// Forget a known folder: drop its persisted per-Bundle config so the launcher
 /// list (and the on-disk store) does not grow forever. `path` is the entry's
 /// `path` (its store key).

@@ -5,8 +5,8 @@
 // original inline chain exactly — it is load-bearing (e.g. Ctrl+Shift+F must
 // win over Ctrl+F, review-Escape over the unified peel).
 
-import { matchesHotkey } from './matchesHotkey';
 import { directionForKey, type Direction } from './regionGrid';
+import { commandForEvent, type Keybindings } from './settings/keybindings';
 
 /** The context flags the router consults (all read synchronously by App at
  *  keydown time; none are stored). */
@@ -28,12 +28,16 @@ export interface AppHotkeyContext {
   quickNavTagActive: boolean;
   /** The Bundle switcher exists in this shell (desktop only, never on web). */
   bundleSwitcher: boolean;
+  /** The effective shortcuts (`settings.keybindings`): the rebindable app
+   *  commands route by these, not by fixed keys. */
+  keybindings: Keybindings;
 }
 
 export type AppHotkeyIntent =
   | { kind: 'toggle-quicknav' }
   | { kind: 'toggle-search' }
   | { kind: 'toggle-bundle-switcher' }
+  | { kind: 'toggle-settings' }
   | { kind: 'print' }
   | { kind: 'find' }
   | { kind: 'undo' }
@@ -68,33 +72,34 @@ const plainEscape = (e: KeyboardEvent): boolean =>
  */
 export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotkeyIntent | null {
   // UI zoom. Layout-independent: `+` needs Shift on most layouts and `=` does
-  // not, so Shift is allowed here (unlike `matchesHotkey`'s exact matching).
+  // not, so Shift is allowed here (unlike the keybindings' exact matching).
   // The numpad variants are accepted via `code`.
   const zoomStep = zoomStepForKey(e);
   if (zoomStep !== null) return { kind: 'zoom', step: zoomStep };
 
-  if (matchesHotkey(e, { key: 'k' })) return { kind: 'toggle-quicknav' };
-
-  if (matchesHotkey(e, { key: 'f', shift: true })) return { kind: 'toggle-search' };
-
-  // Bundle switcher: Ctrl/Cmd+O. Desktop only — on web the key stays the
-  // browser's.
-  if (matchesHotkey(e, { key: 'o' })) {
-    if (!ctx.bundleSwitcher) return null;
-    return { kind: 'toggle-bundle-switcher' };
-  }
-
-  // Export as PDF: Ctrl/Cmd+P opens the clean print/PDF preview for the active
-  // Concept. Only when a Concept is open; otherwise let the browser handle it.
-  if (matchesHotkey(e, { key: 'p' })) {
-    if (!ctx.conceptOpen) return null;
-    return { kind: 'print' };
-  }
-
-  // In-Concept Find: Ctrl/Cmd+F. NO-OP when no Concept is open.
-  if (matchesHotkey(e, { key: 'f' })) {
-    if (!ctx.conceptOpen) return null;
-    return { kind: 'find' };
+  // The rebindable commands, by the user's keybindings (`settings/keybindings.ts`).
+  // A command whose context does not hold leaves the key to the browser.
+  switch (commandForEvent(e, ctx.keybindings, 'app')) {
+    case 'quickNav':
+      return { kind: 'toggle-quicknav' };
+    case 'search':
+      return { kind: 'toggle-search' };
+    case 'settings':
+      return { kind: 'toggle-settings' };
+    // Bundle switcher: desktop only — on web the key stays the browser's.
+    case 'switchBundle':
+      return ctx.bundleSwitcher ? { kind: 'toggle-bundle-switcher' } : null;
+    // Export as PDF: the clean print/PDF preview for the active Concept.
+    case 'print':
+      return ctx.conceptOpen ? { kind: 'print' } : null;
+    // In-Concept Find.
+    case 'find':
+      return ctx.conceptOpen ? { kind: 'find' } : null;
+    // Browser-style history on the active Tile.
+    case 'back':
+      return { kind: 'history-back' };
+    case 'forward':
+      return { kind: 'history-forward' };
   }
 
   // Unified undo/redo: route Ctrl/Cmd+Z/Shift+Z/Y to the active Tile's history
@@ -107,12 +112,6 @@ export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotk
       if (ctx.inCmEditor) return null;
       return { kind: isUndo ? 'undo' : 'redo' };
     }
-  }
-
-  // Browser-style history: Ctrl+Alt+Left/Right on the active Tile.
-  if (e.ctrlKey && e.altKey && !e.metaKey && !e.shiftKey) {
-    if (e.key === 'ArrowLeft') return { kind: 'history-back' };
-    if (e.key === 'ArrowRight') return { kind: 'history-forward' };
   }
 
   // Review mode owns Escape first: exit the active Tile's review view.

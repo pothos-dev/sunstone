@@ -19,7 +19,7 @@ generated: { by: claude-code/unknown, at: 2026-10-08T19:23:54+02:00 }
 | Desktop (Tauri) | OS config dir — `dirs::config_dir()/sunstone/state.json` (e.g. `~/.config/sunstone/state.json`) | `loadBundleState` / `saveBundleState` (`crates/sunstone-native/src/config.rs`) |
 | Web | The browser — one `localStorage` key `sunstone:webUI` (`src/lib/web/uiState.ts`) | `saveBundleState` is a **no-op** server-side; state is a client-only concern |
 
-On desktop the store is a single JSON file holding app-level state (the theme preference) plus a map keyed by each Bundle's **absolute path** — so every Bundle restores its own state. It is Sunstone's to rewrite; user configuration such as [colour](theme-colors.md) and [font](fonts.md) overrides lives in a separate `config.json` next to it. Window geometry is **owned by Rust** (it manages the window APIs) and round-trips as an opaque `window` field the frontend never inspects.
+On desktop the store is a single JSON file holding app-level state (the version that last ran) plus a map keyed by each Bundle's **absolute path** — so every Bundle restores its own state. It is Sunstone's to rewrite; user configuration such as the theme mode and the [colour](theme-colors.md) and [font](fonts.md) overrides lives in a separate `config.json` next to it, which the settings page edits key by key. Window geometry is **owned by Rust** (it manages the window APIs) and round-trips as an opaque `window` field the frontend never inspects.
 
 ## What is persisted
 

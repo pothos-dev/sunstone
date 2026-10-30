@@ -3,9 +3,9 @@ import {
   keymap,
   highlightActiveLine,
   drawSelection,
-  type KeyBinding,
+  type Command,
 } from '@codemirror/view';
-import { EditorState, Annotation, Compartment, type Extension } from '@codemirror/state';
+import { EditorState, Annotation, Compartment, Prec, type Extension } from '@codemirror/state';
 import {
   history,
   historyKeymap,
@@ -51,6 +51,8 @@ import { findExtensions, findPanelTheme } from './find';
 import { readOnlyTables } from './tableReadOnly';
 import { tableMenuIcons } from './tableMenuIcons';
 import { inlineWrapCommand, headingCommand, annotateCommand } from './commands';
+import { commandForEvent } from '$lib/settings/keybindings';
+import { settings } from '$lib/state/settings.svelte';
 
 /**
  * Marks a dispatch as a programmatic document replacement (Concept switch or
@@ -295,25 +297,44 @@ export function modeExtensions(
 /**
  * Markdown formatting shortcuts (Obsidian-style; `Mod` = Cmd on macOS, Ctrl
  * elsewhere). Everything toggles. Headings follow the de-facto Word/LibreOffice
- * convention (`Mod-1`…`Mod-6`, `Mod-0` for paragraph) since Obsidian ships no
- * heading defaults. These bind keys the app's global handler and the default
- * keymaps leave free; placed ahead of the general keymap so they win.
+ * convention (`Mod-1`…`Mod-6`) since Obsidian ships no heading defaults;
+ * Paragraph ships unbound — `Mod-0` is Reset zoom, which the app's global
+ * handler always took first, and a heading key pressed on its own level already
+ * turns the line back into a paragraph.
+ *
+ * The keys are the user's (`settings.keybindings`, rebindable on the settings
+ * page), looked up at keydown time so a rebinding applies to open editors at
+ * once. A matched key is always swallowed, even when the command declines
+ * (read-only), as the old static keymap did with `preventDefault: true`.
  */
-const formattingKeymap: KeyBinding[] = [
-  { key: 'Mod-b', run: inlineWrapCommand('**'), preventDefault: true },
-  { key: 'Mod-i', run: inlineWrapCommand('*'), preventDefault: true },
-  { key: 'Mod-e', run: inlineWrapCommand('`'), preventDefault: true },
-  { key: 'Mod-Shift-m', run: inlineWrapCommand('~~'), preventDefault: true },
-  { key: 'Mod-1', run: headingCommand(1), preventDefault: true },
-  { key: 'Mod-2', run: headingCommand(2), preventDefault: true },
-  { key: 'Mod-3', run: headingCommand(3), preventDefault: true },
-  { key: 'Mod-4', run: headingCommand(4), preventDefault: true },
-  { key: 'Mod-5', run: headingCommand(5), preventDefault: true },
-  { key: 'Mod-6', run: headingCommand(6), preventDefault: true },
-  { key: 'Mod-0', run: headingCommand(0), preventDefault: true },
+const FORMATTING_COMMANDS: Record<string, Command> = {
+  bold: inlineWrapCommand('**'),
+  italic: inlineWrapCommand('*'),
+  code: inlineWrapCommand('`'),
+  strike: inlineWrapCommand('~~'),
   // Toggle a CriticMarkup highlight+comment annotation ('m' for comment/margin).
-  { key: 'Mod-Alt-m', run: annotateCommand, preventDefault: true },
-];
+  annotate: annotateCommand,
+  heading1: headingCommand(1),
+  heading2: headingCommand(2),
+  heading3: headingCommand(3),
+  heading4: headingCommand(4),
+  heading5: headingCommand(5),
+  heading6: headingCommand(6),
+  paragraph: headingCommand(0),
+};
+
+const formattingKeys = Prec.high(
+  EditorView.domEventHandlers({
+    keydown(e, view) {
+      const id = commandForEvent(e, settings.keybindings, 'editor');
+      const run = id === null ? undefined : FORMATTING_COMMANDS[id];
+      if (!run) return false;
+      e.preventDefault();
+      run(view);
+      return true;
+    },
+  }),
+);
 
 /**
  * Everything BELOW the frontmatter field in the extension list: the live-preview
@@ -419,9 +440,9 @@ export function editorExtensions(
     drawSelection(),
     indentOnInput(),
     closeBrackets(),
-    // Markdown formatting shortcuts (Ctrl/Cmd+B, +I, +E, +Shift+M, headings).
-    // Placed BEFORE the general keymap so its bindings take precedence.
-    keymap.of(formattingKeymap),
+    // Markdown formatting shortcuts (Ctrl/Cmd+B, +I, +E, +Shift+M, headings),
+    // at high precedence so they win over the general keymap.
+    formattingKeys,
     keymap.of([
       ...closeBracketsKeymap,
       ...historyKeymap,
