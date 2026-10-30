@@ -15,7 +15,7 @@ sources:
 The Explorer is the folder tree on the left.
 
 - **Titles, not filenames.** Concepts and folders are labelled by their frontmatter `title` (a folder by its `index.md`'s title). A button in the left rail switches back to filenames, remembered per Bundle.
-- **Follows you.** The folders leading to the open Concept expand while it's open and fold back when you move elsewhere.
+- **Follows you.** The folders leading to the open Concept expand while it's open and fold back when you move elsewhere. Opening a folder's index page also expands that folder, so its direct children show while its subfolders stay collapsed.
 - **Keyboard.** Arrow keys move through the tree, Enter or Space opens a Concept or toggles a folder, and keybindings create, rename and delete the focused item.
 - **Drag and drop** moves Concepts and folders. [Links](/2-editing/links.md) to them are rewritten.
 - **Context menu.** Right-click for create, rename, delete, **Set as Bundle Root**, and deleting a folder's `index.md` or `log.md`.

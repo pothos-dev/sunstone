@@ -65,9 +65,15 @@ describe('holdsPath', () => {
     expect(holdsPath('concepts', null)).toBe(false);
   });
 
-  test("a reserved file shows on its folder's row, so only the ancestors hold it", () => {
-    expect(holdsPath('concepts/editor', 'concepts/editor/index.md')).toBe(false);
+  test("an index page holds its own folder open, so the folder's children show", () => {
+    expect(holdsPath('concepts/editor', 'concepts/editor/index.md')).toBe(true);
     expect(holdsPath('concepts', 'concepts/editor/index.md')).toBe(true);
+    expect(holdsPath('concepts/editor/sub', 'concepts/editor/index.md')).toBe(false);
+  });
+
+  test("a log shows on its folder's row, so only the ancestors hold it", () => {
+    expect(holdsPath('concepts/editor', 'concepts/editor/log.md')).toBe(false);
+    expect(holdsPath('concepts', 'concepts/editor/log.md')).toBe(true);
   });
 });
 
@@ -98,6 +104,18 @@ describe('flattenVisible', () => {
     expect(rows[1]).toMatchObject({ expanded: true });
     expect(rows[1].pinned).toBeUndefined();
     expect(rows[3]).toMatchObject({ expanded: true, pinned: true });
+  });
+
+  test("an open index page shows its folder's children with subfolders collapsed", () => {
+    const rows = flattenVisible(tree, () => false, (p) => holdsPath(p, 'concepts/index.md'));
+    expect(rows.map((r) => r.path)).toEqual([
+      'readme.md',
+      'concepts',
+      'concepts/codemirror.md',
+      'concepts/editor',
+    ]);
+    expect(rows[1]).toMatchObject({ expanded: true, pinned: true });
+    expect(rows[3]).toMatchObject({ expanded: false });
   });
 
   test('descends into expanded folders, skipping reserved + non-md files', () => {

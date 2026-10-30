@@ -82,11 +82,15 @@ export function indexChild(node: TreeNode): string | null {
  * Concept, on top of the folder's own expanded state. That override is
  * temporary: it follows the open Concept and never touches the persisted
  * expanded set. A reserved file (`index.md` / `log.md`) shows on its folder's
- * own row, so it only needs that folder's ancestors.
+ * own row, so it only needs that folder's ancestors — except an open index
+ * page also holds its own folder, so the folder's next level of children shows
+ * (its subfolders stay collapsed).
  */
 export function holdsPath(folder: string, path: string | null): boolean {
   if (path === null || folder === '') return false;
-  const row = isReservedFile(path) ? dirname(path) : path;
+  if (!isReservedFile(path)) return path.startsWith(`${folder}/`);
+  const row = dirname(path);
+  if (reservedKind(path) === 'index' && row === folder) return true;
   return row.startsWith(`${folder}/`);
 }
 
