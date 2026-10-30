@@ -495,7 +495,7 @@ deployments that exist today. Everywhere, an **empty value means unset**.
 | `SUNSTONE_BUNDLE_HOST` | `./examples` | n/a | Host path bind-mounted at `/bundle` in the plain stacks (compose interpolation). |
 | `SUNSTONE_OIDC_*` | unset | n/a | `_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_NAME` — read by the SSR process (`src/auth.ts`), never by Rust. The callback is `/auth/callback/oidc`; the provider id is hardcoded `oidc`. |
 | `SUNSTONE_TEST_AUTH*` | unset | n/a | Playwright-only auth bypass, read by `src/auth.ts`. Never set in production. |
-| `ORIGIN` / `PROTOCOL_HEADER` / `HOST_HEADER` / `AUTH_SECRET` / `AUTH_TRUST_HOST` | — | n/a | Standard SvelteKit + Auth.js variables, read by the SSR process. |
+| `ORIGIN` / `PROTOCOL_HEADER` / `HOST_HEADER` / `AUTH_SECRET` / `AUTH_TRUST_HOST` | — | n/a | Standard SvelteKit + Auth.js variables, read by the SSR process. The public origin (`ORIGIN`, else `https://` plus the `Host` header) is also the base of each page's canonical URL and of the URLs in `/sitemap.xml`, `/robots.txt` and `/llms.txt`. |
 | `GHCR_NAMESPACE` / `SUNSTONE_TAG` | per compose file (`your-user` / `pothos-dev`) / `latest` | n/a | Image coordinates (`ghcr.io/<namespace>/sunstone-web`); compose interpolation only. |
 
 Volumes and paths:

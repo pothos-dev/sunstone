@@ -1,6 +1,7 @@
 ---
 okf_version: "0.2"
 title: Sunstone User Guide
+description: "The user guide for Sunstone, the open-source markdown editor for folders of .md files in git, with Open Knowledge Format support."
 ---
 
 # Sunstone User Guide

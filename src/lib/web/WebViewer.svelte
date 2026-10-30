@@ -8,6 +8,8 @@
   import { loadUiState } from './uiState';
   import { restoreWebViewerUiState } from './webViewerUiState';
   import { pageTitle } from './conceptUrl';
+  import { pageMeta, siteName } from './seo';
+  import { page } from '$app/state';
 
   interface Props {
     /** SSR'd data from `+page.ts`'s `load` (talks to the Rust server). */
@@ -38,8 +40,20 @@
   // updates are shallow, so the route `load`, and `data`, stay put).
   let appTitle = $state<string | null>(null);
 
-  // The document title: the open Concept's frontmatter `title`, else its name.
-  const title = $derived(appTitle ?? pageTitle(data.selected, data.rendered));
+  // The document title: the open Concept's frontmatter `title`, else its name,
+  // then the site name. The description, canonical URL and Open Graph tags are
+  // the route's Concept, for crawlers (`seo.ts`); the App shell's shallow
+  // navigation only retitles the tab.
+  const site = $derived(siteName(data.tree));
+  const meta = $derived(
+    pageMeta({
+      origin: page.url.origin,
+      selected: data.selected,
+      rendered: data.rendered,
+      pageTitle: appTitle ?? pageTitle(data.selected, data.rendered),
+      siteName: site,
+    }),
+  );
 
   // The App shell keeps the theme mode chosen on the anonymous reader (its
   // light/dark toggle persists it in `sunstone:webUI`). The reader restores its
@@ -52,7 +66,18 @@
 </script>
 
 <svelte:head>
-  <title>{title}</title>
+  <title>{meta.title}</title>
+  <meta property="og:title" content={meta.title} />
+  {#if site}<meta property="og:site_name" content={site} />{/if}
+  {#if meta.description}
+    <meta name="description" content={meta.description} />
+    <meta property="og:description" content={meta.description} />
+  {/if}
+  {#if meta.canonical}
+    <link rel="canonical" href={meta.canonical} />
+    <meta property="og:url" content={meta.canonical} />
+    <meta property="og:type" content="article" />
+  {/if}
 </svelte:head>
 
 {#if showApp}

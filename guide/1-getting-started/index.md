@@ -1,5 +1,6 @@
 ---
 title: Getting started
+description: "Install Sunstone, open a folder of markdown, or run it in the browser without installing."
 ---
 
 # Getting started

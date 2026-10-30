@@ -59,7 +59,7 @@ export function contentApiSpecs(): void {
     const guide = await (await request.get('/guide?list', { headers: json })).json();
     expect(guide).toEqual([
       { path: 'guide/index.md', title: 'Guide', description: null, type: 'index', tags: [], timestamp: null },
-      { path: 'guide/topic.md', title: 'Topic', description: null, type: 'concept', tags: [], timestamp: null },
+      { path: 'guide/topic.md', title: 'Topic', description: 'Lifecycle markers on a deprecated page.', type: 'concept', tags: [], timestamp: null },
     ]);
 
     const indexes = await (await request.get('/?list&type=index', { headers: json })).json();
@@ -74,7 +74,7 @@ export function contentApiSpecs(): void {
       {
         path: 'guide/topic.md',
         title: 'Topic',
-        line: 10,
+        line: 11,
         snippet: 'A guide topic Concept (an ordinary tree row inside the guide folder).',
       },
     ]);

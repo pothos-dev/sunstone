@@ -17,6 +17,8 @@ Every page of the user guide is also available as Markdown: request it with `Acc
 
 ## Docs
 
+The guide serves its own, always-current page list at https://wiki.sunstone.md/llms.txt.
+
 - [Sunstone User Guide](https://wiki.sunstone.md/)
 - [Install](https://wiki.sunstone.md/1-getting-started/install): Desktop installers for macOS, Windows and Linux, and how Sunstone keeps itself up to date.
 - [Open a folder](https://wiki.sunstone.md/1-getting-started/open-a-folder): Launch Sunstone on any directory of markdown from the command line or the launcher.

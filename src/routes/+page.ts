@@ -18,7 +18,7 @@ import { printPageData } from '$lib/print/printData';
  * compile-time `false`, so the body is dead-code-eliminated and the static SPA
  * is untouched (never hits `/_api`).
  */
-export const load: PageLoad = async ({ fetch, url }) => {
+export const load: PageLoad = async ({ fetch, url, setHeaders }) => {
   const print = printPageData(url);
   if (print) {
     return print;
@@ -26,5 +26,5 @@ export const load: PageLoad = async ({ fetch, url }) => {
   if (!__SUNSTONE_WEB__) {
     return { web: false as const };
   }
-  return loadConcept(fetch, '');
+  return loadConcept(fetch, '', setHeaders);
 };

@@ -44,7 +44,8 @@ test('web viewer renders a Concept read-only with resolved + broken links', asyn
   const rendered = page.getByTestId('rendered');
   await expect(rendered.locator('h1')).toContainText('Web Bundle Home');
 
-  // The document title is the open Concept's name (not a static fallback).
+  // The document title is the open Concept's name (not a static fallback);
+  // the root page is the site, so no ` · <site>` suffix.
   await expect(page).toHaveTitle('Web Bundle Home');
   await expect(rendered.locator('p').first()).toBeVisible();
 
@@ -63,7 +64,7 @@ test('web viewer renders a Concept read-only with resolved + broken links', asyn
   await good.click();
   await expect(page).toHaveURL(/\/good$/);
   await expect(page.getByTestId('rendered').locator('h1')).toContainText('Good Concept');
-  await expect(page).toHaveTitle('Good Concept');
+  await expect(page).toHaveTitle('Good Concept · Web Bundle Home');
 
   // No write affordances anywhere in the read-only web build.
   await expect(page.getByTestId('root-new-concept')).toHaveCount(0);

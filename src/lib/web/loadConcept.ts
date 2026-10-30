@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { RenderPayload, TreeNode } from '$lib/types';
 import { ensureWasm } from '$lib/wasm';
 import { urlToConceptInline } from './conceptUrl';
+import { NOT_FOUND_HEADER } from './seo';
 
 /** Every FILE path (bundle-relative) in the tree — the URL-resolution set. */
 function filePaths(tree: TreeNode, into: string[] = []): string[] {
@@ -96,8 +97,14 @@ async function fetchShellJson<T>(fetchFn: typeof fetch, path: string): Promise<T
  * `src/hooks.server.ts`). The pretty path is resolved to a real Concept path
  * against the tree's file set (`urlToConcept`); an unknown path keeps the shell
  * and reports `renderError` (the URL stays put — no fallback to the root).
+ * It also sets {@link NOT_FOUND_HEADER} through `setHeaders`, which the SSR hook
+ * turns into a `404`; so does a Concept the server cannot find to render.
  */
-export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promise<WebPageData> {
+export async function loadConcept(
+  fetchFn: typeof fetch,
+  urlPath: string,
+  setHeaders: (headers: Record<string, string>) => void = () => {},
+): Promise<WebPageData> {
   const [bundleRoot, tree, user] = await Promise.all([
     fetchShellJson<string>(fetchFn, '/_api/bundle-root'),
     fetchShellJson<TreeNode>(fetchFn, '/_api/tree'),
@@ -115,9 +122,11 @@ export async function loadConcept(fetchFn: typeof fetch, urlPath: string): Promi
       // Broken/missing target: keep the shell, surface the error read-only.
       const detail = (await res.text().catch(() => '')) || 'not found';
       renderError = `Cannot render ${selected}: ${res.status}: ${detail}`;
+      if (res.status === 404) setHeaders({ [NOT_FOUND_HEADER]: '1' });
     }
   } else if (urlPath !== '') {
     renderError = `Concept not found: /${urlPath}`;
+    setHeaders({ [NOT_FOUND_HEADER]: '1' });
   }
 
   return { web: true, bundleRoot, tree, selected, rendered, renderError, user };

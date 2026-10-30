@@ -1,5 +1,6 @@
 ---
 title: Sunstone Web
+description: "Sunstone Web: serve a Bundle in the browser, sync it with git, and read it as Markdown or JSON."
 ---
 
 # Sunstone Web

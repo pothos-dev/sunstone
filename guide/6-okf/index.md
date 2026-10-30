@@ -1,5 +1,6 @@
 ---
 title: Open Knowledge Format
+description: "How Sunstone supports the Open Knowledge Format, and linting a Bundle."
 ---
 
 # Open Knowledge Format

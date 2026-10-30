@@ -14,7 +14,7 @@ import { printPageData } from '$lib/print/printData';
  * which loads `index.html?print=…` (a `/index.html` pathname that matches here,
  * not the root route), so the `?print=` overlay must be detected here too.
  */
-export const load: PageLoad = async ({ fetch, url, params }) => {
+export const load: PageLoad = async ({ fetch, url, params, setHeaders }) => {
   const print = printPageData(url);
   if (print) {
     return print;
@@ -22,5 +22,5 @@ export const load: PageLoad = async ({ fetch, url, params }) => {
   if (!__SUNSTONE_WEB__) {
     return { web: false as const };
   }
-  return loadConcept(fetch, params.concept);
+  return loadConcept(fetch, params.concept, setHeaders);
 };

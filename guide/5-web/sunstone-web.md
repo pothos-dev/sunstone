@@ -22,6 +22,18 @@ Visitors get a server-rendered page with the same Explorer, [search](/3-navigati
 
 It works on phones. Below 768 px the sidebars become slide-over drawers, the page takes the full width, and wide tables scroll on their own.
 
+## Search engines and AI crawlers
+
+A Sunstone Web that is reachable from the internet is meant to be found. Each page carries its frontmatter `description` as the meta description, a canonical URL and Open Graph tags, and the browser tab reads `<page> · <site>`, where the site name is the root `index.md`'s title. A URL that names no Concept answers `404`.
+
+Three files at the root are generated from the Bundle:
+
+- `/robots.txt` allows every crawler and points at the sitemap.
+- `/sitemap.xml` lists every Concept at its page URL, dated by its `timestamp` when it has one.
+- `/llms.txt` lists every page with its description, for AI assistants, and explains how to fetch any page as Markdown (see [Reading API](/5-web/reading-api.md)).
+
+To keep a wiki private, limit who can reach it on the network.
+
 ## For editors
 
 Signed-in users (through OIDC) get the full editor in the browser. Saves are explicit, and when two people edit the same Concept, Sunstone tells you instead of overwriting someone's work. Without an auth configuration, every write is refused: a safe read-only default.

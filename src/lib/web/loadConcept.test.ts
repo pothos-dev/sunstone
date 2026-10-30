@@ -6,6 +6,7 @@ import { describe, expect, mock, test } from 'bun:test';
 mock.module('$app/environment', () => ({ browser: false }));
 
 const { loadConcept } = await import('./loadConcept');
+const { NOT_FOUND_HEADER } = await import('./seo');
 
 const TREE = {
   name: 'root',
@@ -50,6 +51,18 @@ describe('loadConcept', () => {
     expect(data.selected).toBeNull();
     expect(data.rendered).toBeNull();
     expect(data.renderError).toBe('Concept not found: /gone');
+  });
+
+  test('a missing Concept marks the response not found; a found one does not', async () => {
+    const headers: Record<string, string>[] = [];
+    const set = (h: Record<string, string>) => headers.push(h);
+    await loadConcept(fakeFetch(OK_ROUTES), 'good', set);
+    await loadConcept(fakeFetch(OK_ROUTES), '', set);
+    expect(headers).toEqual([]);
+    await loadConcept(fakeFetch(OK_ROUTES), 'gone', set);
+    const routes = { ...OK_ROUTES, '/_api/render?path=good.md': { status: 404, body: 'gone' } };
+    await loadConcept(fakeFetch(routes), 'good', set);
+    expect(headers).toEqual([{ [NOT_FOUND_HEADER]: '1' }, { [NOT_FOUND_HEADER]: '1' }]);
   });
 
   test('the root with no index.md is the empty state, not an error', async () => {

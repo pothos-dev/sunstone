@@ -1,5 +1,6 @@
 ---
 title: Customizing
+description: "Change Sunstone's theme colours and fonts."
 ---
 
 # Customizing

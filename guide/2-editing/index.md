@@ -1,5 +1,6 @@
 ---
 title: Editing
+description: "Writing in Sunstone: live preview, links, frontmatter, footnotes, comments, diagrams, images and PDF export."
 ---
 
 # Editing

@@ -1,5 +1,6 @@
 ---
 title: Navigating
+description: "Finding your way around a Bundle: the Explorer, search, outline, backlinks and the tiling workspace."
 ---
 
 # Navigating

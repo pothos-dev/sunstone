@@ -1,8 +1,9 @@
 import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { handle as authHandle } from './auth';
-import { contentApiTarget, needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
+import { contentApiTarget, isWrite, needsAuth, planProxy, responseHeaders } from '$lib/server/apiProxy';
 import { appearanceCss, httpFontUrl, inlineAppearanceStyle, isSafeColorSyntax } from '$lib/state/appearance';
+import { crawlerFile, llmsTxt, NOT_FOUND_HEADER, robotsTxt, sitemapXml, type ConceptSummary } from '$lib/web/seo';
 
 /**
  * Same-origin `/_api/*` proxy (WEB build only, adapter-node), now with the
@@ -47,7 +48,7 @@ const apiProxy: Handle = async ({ event, resolve }) => {
   if (!pathname.startsWith('/_api/')) {
     const accept = event.request.headers.get('accept');
     const target = contentApiTarget(event.request.method, pathname, accept);
-    if (target === null) return withVaryAccept(await resolve(event));
+    if (target === null) return withVaryAccept(notFoundStatus(await resolve(event)));
     const upstream = await fetch(`${API_INTERNAL}${target}${search}`, {
       method: event.request.method,
       headers: { accept: accept ?? 'application/json' },
@@ -88,6 +89,17 @@ const apiProxy: Handle = async ({ event, resolve }) => {
   });
 };
 
+/**
+ * A page whose `load` found no Concept (it set `NOT_FOUND_HEADER`) keeps its
+ * rendered shell but answers `404`, so crawlers do not index the miss.
+ */
+function notFoundStatus(res: Response): Response {
+  if (!res.headers.has(NOT_FOUND_HEADER)) return res;
+  const headers = new Headers(res.headers);
+  headers.delete(NOT_FOUND_HEADER);
+  return new Response(res.body, { status: 404, statusText: 'Not Found', headers });
+}
+
 /** `res` with `Vary: Accept` added — a no-op on a response with immutable headers. */
 function withVaryAccept(res: Response): Response {
   try {
@@ -123,7 +135,33 @@ const appearanceStyle: Handle = ({ event, resolve }) =>
     },
   });
 
+/**
+ * `/robots.txt`, `/sitemap.xml` and `/llms.txt`, built from the Bundle's
+ * Concept list (`GET /_api/content?list`) on each request (`$lib/web/seo`).
+ * Their absolute URLs use the request origin, so set `ORIGIN` behind a proxy.
+ */
+const crawlerFiles: Handle = async ({ event, resolve }) => {
+  const file = crawlerFile(event.url.pathname);
+  if (file === null || isWrite(event.request.method)) return resolve(event);
+  const origin = event.url.origin;
+  if (file === 'robots.txt') return text(robotsTxt(origin), 'text/plain');
+  const res = await fetch(`${API_INTERNAL}/_api/content?list`, {
+    headers: { accept: 'application/json' },
+    signal: event.request.signal,
+  });
+  if (!res.ok) return new Response(null, { status: 502 });
+  const concepts = (await res.json()) as ConceptSummary[];
+  return file === 'sitemap.xml'
+    ? text(sitemapXml(origin, concepts), 'application/xml')
+    : text(llmsTxt(origin, concepts), 'text/plain');
+};
+
+function text(body: string, type: string): Response {
+  return new Response(body, { headers: { 'content-type': `${type}; charset=utf-8` } });
+}
+
 // Auth.js first (populates `event.locals.auth()` + serves `/auth/*`), then the
-// `/_api` proxy which depends on the resolved session for writes. The appearance
-// hook only touches HTML responses, which the proxy never produces.
-export const handle = sequence(authHandle, apiProxy, appearanceStyle);
+// crawler files, then the `/_api` proxy which depends on the resolved session
+// for writes. The appearance hook only touches HTML responses, which the proxy
+// never produces.
+export const handle = sequence(authHandle, crawlerFiles, apiProxy, appearanceStyle);

@@ -1,5 +1,6 @@
 ---
 title: Git
+description: "Reviewing your edits against the last commit and stepping through a file's history."
 ---
 
 # Git
