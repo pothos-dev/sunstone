@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
 
+# `vite build` runs out of V8's default heap on the macOS runners (every
+# macOS job of v0.30.0–v0.30.3 died with "JavaScript heap out of memory").
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
 jobs:
   create-release:
     permissions:
