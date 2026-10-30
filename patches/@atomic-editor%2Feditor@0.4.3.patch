@@ -1,15 +1,3 @@
-diff --git a/node_modules/@atomic-editor/editor/.bun-tag-8b5ba6dc9b98f0e3 b/.bun-tag-8b5ba6dc9b98f0e3
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@atomic-editor/editor/.bun-tag-911766f951a9017e b/.bun-tag-911766f951a9017e
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@atomic-editor/editor/.bun-tag-b078cfe0b0463c9b b/.bun-tag-b078cfe0b0463c9b
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/@atomic-editor/editor/.bun-tag-fb7ae7c466f3f7e0 b/.bun-tag-fb7ae7c466f3f7e0
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/dist/index.d.ts b/dist/index.d.ts
 index 9e17e82ee7ef8a8a558dbd0444faf2ab2f8836dc..dd472ca33425b6bf1c4ff5b9ca39c5ec044ab4de 100644
 --- a/dist/index.d.ts
@@ -262,7 +250,7 @@ index 94d48d196e21fac09a774cd97b61ed5274ab48b9..398840c8a2c5fd19e624099ec20e695b
          inlinePreviewPlugin,
          freezeMousePlugin,
 diff --git a/dist/styles/inline-preview.css b/dist/styles/inline-preview.css
-index de6e2618e9b0bd8c788aea16f95d6a9181f84e67..c7898c0bcb907a5c6ee3f32db2e249bc97042cc5 100644
+index de6e2618e9b0bd8c788aea16f95d6a9181f84e67..6c741a0b7f36fe0a20d58116e0b7e39b7586d30e 100644
 --- a/dist/styles/inline-preview.css
 +++ b/dist/styles/inline-preview.css
 @@ -195,6 +195,14 @@
@@ -280,19 +268,20 @@ index de6e2618e9b0bd8c788aea16f95d6a9181f84e67..c7898c0bcb907a5c6ee3f32db2e249bc
  /* External-link icon. In prose it's a `::after` pseudo-element; inside
   * table cells it's a real `.cm-atomic-link-icon` element (a pseudo can't
   * receive a click, so the in-cell icon wouldn't open the link). Both
-@@ -457,6 +465,7 @@
+@@ -457,6 +465,8 @@
  .cm-atomic-table-cell-source .cm-atomic-strong-wrap.active > .cm-atomic-mark,
  .cm-atomic-table-cell-source .cm-atomic-em-wrap.active > .cm-atomic-mark,
  .cm-atomic-table-cell-source .cm-atomic-strike-wrap.active > .cm-atomic-mark,
 +.cm-atomic-table-cell-source .cm-atomic-code-wrap.active > .cm-atomic-mark,
++.cm-atomic-table-cell-source .cm-critic-wrap.active > .cm-atomic-mark,
  .cm-atomic-table-cell-source .cm-atomic-link-wrap.active > .cm-atomic-mark {
    display: inline;
    color: var(--atomic-editor-fg-faint, #666);
 diff --git a/dist/table-widget.d.ts b/dist/table-widget.d.ts
-index 1915826e8e0122832658bdd15e8fee8649f5499f..9f10d96ce3b9ca82d668ed5884a20b218d9f4a23 100644
+index 1915826e8e0122832658bdd15e8fee8649f5499f..0ffd5cf5a764ba0388077e083e2b6b239adecebf 100644
 --- a/dist/table-widget.d.ts
 +++ b/dist/table-widget.d.ts
-@@ -19,6 +19,10 @@ type CellToken = {
+@@ -19,6 +19,16 @@ type CellToken = {
  } | {
      type: 'strike';
      children: CellToken[];
@@ -300,15 +289,91 @@ index 1915826e8e0122832658bdd15e8fee8649f5499f..9f10d96ce3b9ca82d668ed5884a20b21
 +    type: 'code';
 +    delim: string;
 +    text: string;
++} | {
++    type: 'critic';
++    kind: 'add' | 'del' | 'sub' | 'highlight' | 'comment';
++    children: CellToken[];
++    newChildren?: CellToken[];
++    note?: string | null;
  } | {
      type: 'link';
      textChildren: CellToken[];
 diff --git a/dist/table-widget.js b/dist/table-widget.js
-index 55756c13971b3d3ec582f8e8df61a1c232292cd2..bdd7fd8a2a5319128c61713c43c83a31a1bb5527 100644
+index 55756c13971b3d3ec582f8e8df61a1c232292cd2..8a2b5d85e16d98a5ea98802566a5fc7151aef875 100644
 --- a/dist/table-widget.js
 +++ b/dist/table-widget.js
-@@ -134,9 +134,21 @@ export function parseCellInline(raw) {
+@@ -132,11 +132,100 @@ export function parseCellInline(raw) {
+     flushText();
+     return tokens;
  }
++// CriticMarkup token at the start of `rest`, or null. Content is parsed
++// for nested cell marks (bold, code, links) like the other wraps.
++function matchCriticAt(rest) {
++    if (rest[0] !== '{')
++        return null;
++    let m = rest.match(/^\{\+\+([\s\S]+?)\+\+\}/);
++    if (m)
++        return { token: { type: 'critic', kind: 'add', children: parseCellInline(m[1]) }, length: m[0].length };
++    m = rest.match(/^\{--([\s\S]+?)--\}/);
++    if (m)
++        return { token: { type: 'critic', kind: 'del', children: parseCellInline(m[1]) }, length: m[0].length };
++    m = rest.match(/^\{~~([\s\S]*?)~>([\s\S]*?)~~\}/);
++    if (m)
++        return {
++            token: { type: 'critic', kind: 'sub', children: parseCellInline(m[1]), newChildren: parseCellInline(m[2]) },
++            length: m[0].length,
++        };
++    m = rest.match(/^\{==([\s\S]+?)==\}(?:\{>>([\s\S]*?)<<\})?/);
++    if (m)
++        return {
++            token: { type: 'critic', kind: 'highlight', children: parseCellInline(m[1]), note: m[2] ?? null },
++            length: m[0].length,
++        };
++    m = rest.match(/^\{>>([\s\S]*?)<<\}/);
++    if (m)
++        return { token: { type: 'critic', kind: 'comment', children: [], note: m[1] }, length: m[0].length };
++    return null;
++}
++// One wrap per CriticMarkup span; its delimiters (and any comment) are
++// faint marks, so the cell's textContent still round-trips the raw source.
++function renderCriticToken(tok) {
++    const wrap = document.createElement('span');
++    wrap.className = 'cm-critic-wrap';
++    const span = (cls, children) => {
++        const el = document.createElement('span');
++        el.className = cls;
++        el.appendChild(renderTokensTo(children));
++        return el;
++    };
++    if (tok.kind === 'add' || tok.kind === 'del') {
++        const d = tok.kind === 'add' ? '++' : '--';
++        wrap.appendChild(makeCellMark('{' + d));
++        wrap.appendChild(span(tok.kind === 'add' ? 'cm-critic-add' : 'cm-critic-del', tok.children));
++        wrap.appendChild(makeCellMark(d + '}'));
++    }
++    else if (tok.kind === 'sub') {
++        wrap.appendChild(makeCellMark('{~~'));
++        wrap.appendChild(span('cm-critic-del', tok.children));
++        wrap.appendChild(makeCellMark('~>'));
++        wrap.appendChild(span('cm-critic-add', tok.newChildren));
++        wrap.appendChild(makeCellMark('~~}'));
++    }
++    else if (tok.kind === 'highlight') {
++        wrap.appendChild(makeCellMark('{=='));
++        const inner = span('cm-critic-highlight', tok.children);
++        if (tok.note !== null)
++            inner.title = tok.note;
++        wrap.appendChild(inner);
++        wrap.appendChild(makeCellMark('==}'));
++        if (tok.note !== null)
++            wrap.appendChild(makeCellMark('{>>' + tok.note + '<<}'));
++    }
++    else {
++        // A point comment: out of the text flow, as in the editor.
++        wrap.appendChild(makeCellMark('{>>' + tok.note + '<<}'));
++    }
++    return wrap;
++}
  function matchCellMarkAt(raw, from) {
      const rest = raw.slice(from);
 +    // Inline code: a run of backticks, content, a matching-length run.
@@ -323,6 +388,15 @@ index 55756c13971b3d3ec582f8e8df61a1c232292cd2..bdd7fd8a2a5319128c61713c43c83a31
 +            end: from + m[0].length,
 +        };
 +    }
++    // CriticMarkup (Sunstone): `{++add++}`, `{--del--}`, `{~~old~>new~~}`,
++    // `{==highlight==}` optionally bound to a following `{>>note<<}`, and a
++    // standalone `{>>note<<}`. Cells are widget DOM, so the editor's
++    // CriticMarkup decorations never reach them; the cell renders the marks
++    // itself. Checked before strike so `{~~` is not read as `~~`.
++    const critic = matchCriticAt(rest);
++    if (critic) {
++        return { token: critic.token, end: from + critic.length };
++    }
      // Bold with `**` or `__` — greedy on the outside, lazy on the
      // content so we catch the nearest closer.
 -    let m = rest.match(/^\*\*([\s\S]+?)\*\*/);
@@ -330,10 +404,13 @@ index 55756c13971b3d3ec582f8e8df61a1c232292cd2..bdd7fd8a2a5319128c61713c43c83a31
      if (m) {
          return {
              token: { type: 'strong', delim: '**', children: parseCellInline(m[1]) },
-@@ -248,6 +260,21 @@ function renderCellToken(tok) {
+@@ -248,6 +337,24 @@ function renderCellToken(tok) {
          wrap.appendChild(makeCellMark('~~'));
          return wrap;
      }
++    if (tok.type === 'critic') {
++        return renderCriticToken(tok);
++    }
 +    if (tok.type === 'code') {
 +        // Inline code. The inner `.cm-atomic-inline-code` span reuses the
 +        // outer-editor's global monospace styling; the backtick delimiters
@@ -352,11 +429,12 @@ index 55756c13971b3d3ec582f8e8df61a1c232292cd2..bdd7fd8a2a5319128c61713c43c83a31
      // Link. Shape mirrors the outer-editor markup: `.cm-atomic-link` on
      // the visible text (picks up link color + external-link icon via
      // `::after`), faint marks for `[`, `]`, `(`, URL, `)`. `data-url`
-@@ -358,6 +385,7 @@ const MARK_WRAP_CLASSES = [
+@@ -358,6 +465,8 @@ const MARK_WRAP_CLASSES = [
      'cm-atomic-strong-wrap',
      'cm-atomic-em-wrap',
      'cm-atomic-strike-wrap',
 +    'cm-atomic-code-wrap',
++    'cm-critic-wrap',
      'cm-atomic-link-wrap',
  ];
  function isMarkWrap(el) {
