@@ -470,6 +470,7 @@ okf_version: "0.2"
           <tr><td class="mono">sunstone ./docs guide/setup.md#install</td><td>Open a file, scrolled to a heading.</td></tr>
           <tr><td class="mono">sunstone -d ./docs</td><td>Detach from the terminal.</td></tr>
           <tr><td class="mono">sunstone serve ./docs</td><td>Serve the editor at <code>localhost:3000</code> instead of opening a window. <code>--port</code>, <code>--bind</code>, <code>--allow-host</code> for running behind a reverse proxy. No sign-in.</td></tr>
+          <tr><td class="mono">sunstone lint ./docs</td><td>Check links, footnotes, Frontmatter and OKF conformance, then exit. Non-zero on errors, so it fits in CI. <code>--exclude</code>, <code>--json</code>.</td></tr>
           <tr><td class="mono">sunstone</td><td>Without a path: a launcher listing recently opened folders.</td></tr>
         </tbody>
       </table>

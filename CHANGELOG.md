@@ -4,11 +4,20 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.31.0] - 2026-10-30
 
 ### Added
 - `sunstone lint [BUNDLE]` checks a Bundle's health from the command line: broken links, anchors, Wikilinks and Embeds, undefined footnotes, malformed Frontmatter and, in an OKF Bundle, conformance (missing `type`, Frontmatter on `index.md`/`log.md`, Concepts missing from their `index.md`, sources pointing at nothing). It exits non-zero on errors, `--exclude PATTERN` skips folders or files (gitignore syntax, e.g. `--exclude tickets/`), and `--json` prints machine-readable output. The Frontmatter checks are the editor's own, so the two always agree.
 - The Frontmatter editor notes a legacy v0.1 `timestamp` and suggests `generated: { by, at }`.
+
+### Changed
+- Read mode shows a Concept's Frontmatter as a grid of fields and values, the same one Sunstone Web shows, instead of a read-only YAML block. Multi-line values keep their line breaks.
+- The Tags section in Sunstone Web starts collapsed, as it does in the desktop app. Opening it is remembered.
+
+### Fixed
+- The disclosure arrows in the Explorer, Tags and sidebar sections are the same size on every OS. They were oversized on Linux and tiny on macOS.
+- In the dark scheme, Frontmatter lint tooltips are readable and the Frontmatter editor's gutter is no longer a white strip.
+- A section titled "Citations" is no longer flagged as a legacy v0.1 citations list unless it actually holds `[n] …` rows.
 
 ## [0.30.4] - 2026-10-30
 

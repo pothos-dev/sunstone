@@ -3,7 +3,7 @@ type: Feature
 title: OKF support
 description: "What Sunstone understands about OKF bundles: validation, trust, lifecycle, sources and attested computations."
 tags: [okf, agents]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-30T15:00:00+01:00 }
 sources:
   - id: changelog
     resource: https://github.com/pothos-dev/sunstone/blob/main/CHANGELOG.md
@@ -19,6 +19,7 @@ Sunstone supports OKF v0.2. A Bundle opts in by declaring `okf_version` in its r
 ## What you get
 
 - **[Frontmatter](/2-editing/frontmatter.md) checks.** Missing required fields and wrongly typed values are flagged, and keys and values are completed.
+- **[`sunstone lint`](/6-okf/lint.md)** runs the same checks over a whole Bundle from the command line.
 - **New Bundle…** in the launcher and the Bundle switcher creates a Bundle that declares `okf_version`.
 - **Trust at a glance.** A Concept's trust, lifecycle and sources show as one compact pill next to its title. Hover it to see who generated and verified the Concept and when, its status, whether it's stale, and its sources.
 - **Actors.** Authors, generators and verifiers are shown as a person, a process, or an agent with its version.

@@ -3,7 +3,7 @@ type: Feature
 title: Frontmatter
 description: "Edit a Concept's YAML frontmatter in place, with folding and OKF-aware checks."
 tags: [editor, okf]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-30T15:00:00+01:00 }
 sources:
   - id: changelog
     resource: https://github.com/pothos-dev/sunstone/blob/main/CHANGELOG.md
@@ -12,7 +12,7 @@ sources:
 
 # Frontmatter
 
-A Concept's frontmatter is the YAML block at the top of the file. Sunstone shows it as a YAML editor above the text, so what you see is exactly what's in the file.
+A Concept's frontmatter is the YAML block at the top of the file. While you edit, Sunstone shows it as a YAML editor above the text, so what you see is exactly what's in the file. In Read mode it shows as a grid of fields and values instead, the same one [Sunstone Web](/5-web/sunstone-web.md) shows.
 
 ```yaml
 ---
