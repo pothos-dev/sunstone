@@ -3,7 +3,7 @@ type: Concept
 title: Linking — how Concepts connect
 description: The link model in Sunstone — path-based markdown links, name-based Wikilink fallback, anchors/slugs, citations, backlinks, and rename-rewrite, with the pure-logic seam living once in sunstone-shared.
 tags: [linking, wikilink, citation, backlinks, anchor, slug, rewrite]
-timestamp: 2026-07-22
+generated: { by: claude-code/unknown, at: 2026-10-14T18:15:57+02:00 }
 ---
 
 # Linking

@@ -3,7 +3,7 @@ type: Concept
 title: Architecture overview — the packages and how they interact
 description: How Sunstone's packages (a pure leaf crate compiled to native + wasm, the native IO crate, desktop shell, server, web frontend) compose into a desktop app and a web viewer over one shared domain core.
 tags: [architecture, overview, packages, topology]
-timestamp: 2026-07-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-19T11:15:02+02:00 }
 ---
 
 # Architecture overview

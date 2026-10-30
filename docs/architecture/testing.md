@@ -3,7 +3,7 @@ type: Reference
 title: Testing Sunstone
 description: The four green gates plus the two Playwright suites, and which package owns which test.
 tags: [testing, playwright, cargo, gates, ci]
-timestamp: 2026-09-29T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-17T10:32:21+02:00 }
 ---
 
 # Testing Sunstone

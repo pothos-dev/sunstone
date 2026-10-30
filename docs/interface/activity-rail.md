@@ -3,7 +3,7 @@ type: Concept
 title: Activity Rail and Concept header — where the controls live
 description: The two control surfaces that replaced the deleted global nav bar — the left and right Activity Rails for application-global controls, and the per-Tile Concept header for concept-scoped controls.
 tags: [interface, activity-rail, concept-header, toolbar, chrome]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-14T18:15:57+02:00 }
 ---
 
 # Activity Rail and Concept header

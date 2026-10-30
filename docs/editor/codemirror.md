@@ -4,7 +4,12 @@ title: CodeMirror integration — the editor builder
 description: How Sunstone assembles a CodeMirror 6 EditorView from atomic-editor and its own extensions, and switches modes/themes/Concepts without rebuilding the view.
 resource: src/lib/editor/cm.ts
 tags: [editor, codemirror, live-preview, atomic-editor]
-timestamp: 2026-07-23
+sources:
+  - resource: https://codemirror.net/docs/ref/
+    title: CodeMirror 6 reference manual
+  - resource: /adr/0001-codemirror-hybrid-live-preview.md
+    title: ADR-0001 — CodeMirror 6 hybrid live preview via atomic-editor
+generated: { by: claude-code/unknown, at: 2026-10-17T10:30:11+02:00 }
 ---
 
 # CodeMirror integration
@@ -82,9 +87,3 @@ An `EditorView.updateListener` fires `onChange` (debounced by the store) on any 
 ## Review buffers
 
 `buildReviewEditor` / `setReviewText` build a read-only `view`-mode buffer over an in-memory [CriticMarkup](/editor/custom-extensions.md) diff (HEAD ↔ working tree), wired with **no** `onChange`/`onBlur` so the diff text can never reach autosave. A programmatic dispatch still applies (read-only blocks only user input), so the history-stepper can swap the diff text in place. See [review / reviewStepper in custom-extensions](/editor/custom-extensions.md).
-
-# Citations
-
-[1] [CodeMirror 6 reference manual](https://codemirror.net/docs/ref/)
-
-[2] [ADR-0001 — CodeMirror 6 hybrid live preview via atomic-editor](/adr/0001-codemirror-hybrid-live-preview.md)

@@ -3,7 +3,7 @@ type: Concept
 title: Sunstone's own CodeMirror extensions
 description: The CodeMirror 6 extensions Sunstone writes itself on top of atomic-editor — diagrams (mermaid, D2, PlantUML), wikilinks, broken links, citations, CriticMarkup, anchor tracking, frontmatter, find and formatting.
 tags: [editor, codemirror, extensions, decorations, criticmarkup, mermaid, d2, plantuml, diagrams]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-30T13:40:47+01:00 }
 ---
 
 # Sunstone's own CodeMirror extensions

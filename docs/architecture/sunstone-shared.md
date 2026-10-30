@@ -4,7 +4,7 @@ title: sunstone-shared — the pure leaf crate (native + wasm)
 description: The dependency-light Rust crate holding Sunstone's pure frontend-shared algorithms — link resolution, wikilink/slug, anchor rewrite, frontmatter parse, outline/CriticMarkup/citation scanners — compiled to both the native host and wasm32 so one source runs everywhere.
 resource: crates/sunstone-shared
 tags: [architecture, rust, crate, wasm, shared, domain]
-timestamp: 2026-07-24T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-30T13:40:47+01:00 }
 ---
 
 # sunstone-shared

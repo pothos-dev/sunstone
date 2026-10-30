@@ -4,7 +4,7 @@ title: sunstone-server — the Sunstone Web HTTP backend
 description: The axum binary that exposes one Bundle over sunstone-native as a JSON/SSE API — open reads, JWT-gated git-backed writes, and the git sync loop — for the server-rendered web viewer.
 resource: crates/sunstone-server
 tags: [architecture, rust, axum, server, web, http, git-sync]
-timestamp: 2026-07-26T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-23T08:56:51+02:00 }
 ---
 
 # sunstone-server

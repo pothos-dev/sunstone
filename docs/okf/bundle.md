@@ -3,7 +3,7 @@ type: Concept
 title: Bundle — how Sunstone treats an OKF bundle
 description: What OKF says a Bundle is, and how Sunstone opens, indexes, roots, and commits one — including where it extends the pure spec.
 tags: [okf, bundle, index, backlinks, git, bundle-root]
-timestamp: 2026-07-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-09T03:18:18+02:00 }
 ---
 
 # Bundle

@@ -3,7 +3,7 @@ type: Concept
 title: Fonts — the four type roles and user overrides
 description: The UI, content, heading and code type roles, their default families and sizes, and how a user overrides each one, with optional font files, in config.json on the desktop and on Sunstone Web.
 tags: [interface, theme, fonts, typography, config]
-timestamp: 2026-10-19
+generated: { by: claude-code/unknown, at: 2026-10-19T09:16:31+02:00 }
 ---
 
 # Fonts
