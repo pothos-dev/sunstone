@@ -377,20 +377,9 @@
           <a class="shot-dark" href="assets/fields-dark.png"><img src="assets/fields-dark.png" width="1100" height="513" loading="lazy" decoding="async" alt="The frontmatter field grid in dark mode" /></a>
         </figure>
         <div>
-          <h3>Frontmatter as fields</h3>
-          <p>In reading mode the frontmatter is a grid of fields, with tags and sources as lists. Sunstone Web shows the same grid.</p>
-          <p>Toggle it with the frontmatter button in the page header.</p>
-        </div>
-      </div>
-      <div class="row">
-        <figure class="fig">
-          <a class="shot-light" href="assets/properties-light.png"><img src="assets/properties-light.png" width="1100" height="360" loading="lazy" decoding="async" alt="The frontmatter editor flags status: resolved with the message that status must be draft, stable or deprecated" /></a>
-          <a class="shot-dark" href="assets/properties-dark.png"><img src="assets/properties-dark.png" width="1100" height="360" loading="lazy" decoding="async" alt="The frontmatter editor's OKF check in dark mode" /></a>
-        </figure>
-        <div>
-          <h3>Frontmatter checked against the spec</h3>
-          <p>In edit mode the frontmatter is the YAML itself, so what you see is what's in the file. Sunstone flags missing required fields and invalid values, and completes OKF keys as you type.</p>
-          <p>Outside an OKF bundle it only checks YAML syntax.</p>
+          <h3>Frontmatter in YAML, checked against the spec</h3>
+          <p>Frontmatter is plain YAML at the top of the file, with the keys OKF defines: <code>type</code>, <code>status</code>, <code>generated</code>, <code>verified</code>, <code>sources</code> and the rest. Reading mode shows it as a grid of fields.</p>
+          <p>In edit mode you type the YAML itself. Sunstone completes OKF keys and flags missing fields and values the spec doesn't allow. <code>sunstone lint</code> runs the same checks from the command line and exits non-zero on errors, so CI can gate a bundle on it.</p>
         </div>
       </div>
       <div class="row">
@@ -416,6 +405,64 @@ okf_version: "0.2"
 ---</pre>
     </div>
     <p class="note">More in the guide: <a href="https://wiki.sunstone.md/6-okf/okf-support">OKF support</a>, <a href="https://wiki.sunstone.md/2-editing/footnotes-and-sources">footnotes and sources</a>, <a href="https://wiki.sunstone.md/2-editing/frontmatter">frontmatter</a>.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="sub">All built in, no plugins to install.</p>
+    <div class="rows">
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/annotations-light.png"><img src="assets/annotations-light.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments on a draft decision record: highlighted spans with a comment icon in the margin and one note open" /></a>
+          <a class="shot-dark" href="assets/annotations-dark.png"><img src="assets/annotations-dark.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Review comments in the file</h3>
+          <p>Select text and press <kbd>Ctrl/Cmd</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> to add a margin comment. It is stored inline as CriticMarkup, <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>, so comments travel through git and any tool can read them.</p>
+          <p>Useful for reviewing what an agent wrote before its next pass.</p>
+        </div>
+      </div>
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/git-light.png"><img src="assets/git-light.png" width="1100" height="600" loading="lazy" decoding="async" alt="Review mode on a service page: the paragraphs as of the last commit in red, the edited versions in green" /></a>
+          <a class="shot-dark" href="assets/git-dark.png"><img src="assets/git-dark.png" width="1100" height="600" loading="lazy" decoding="async" alt="Review mode in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Git is the data store</h3>
+          <p>There is no database and no sync service. A bundle is a folder of markdown files in a git repository, and its history is the git history. You commit, push and pull with the tools you already use.</p>
+          <p><strong>Review</strong> shows the open file against the last commit as inline track changes. Step back through the file's history one commit at a time.</p>
+        </div>
+      </div>
+      <div class="row">
+        <figure class="fig">
+          <a class="shot-light" href="assets/d2-light.png"><img src="assets/d2-light.png" width="1100" height="523" loading="lazy" decoding="async" alt="A D2 diagram of a payments platform rendered in the page: a merchant, the payments API, ledger service and payouts in a container, Postgres, the PSP and the bank" /></a>
+          <a class="shot-dark" href="assets/d2-dark.png"><img src="assets/d2-dark.png" width="1100" height="523" loading="lazy" decoding="async" alt="The D2 diagram in dark mode" /></a>
+        </figure>
+        <div>
+          <h3>Diagrams from code blocks</h3>
+          <p>Fenced blocks in <a href="https://mermaid.js.org/">Mermaid</a>, <a href="https://d2lang.com/">D2</a> and <a href="https://plantuml.com/">PlantUML</a> render as diagrams in place, in the app's colours, and follow the switch between light and dark. Double-click one to edit its source; a syntax error shows inline.</p>
+          <p>Everything renders on your machine, nothing is sent to a server. Diagrams also render in Sunstone Web and in PDF export.</p>
+        </div>
+      </div>
+    </div>
+    <div class="prose" style="margin-top:44px">
+      <h3 style="margin-top:0">Standalone or as a shared wiki</h3>
+      <p>Install the desktop app and open a folder: no account, no server, nothing to host. Or run the same editor as a <a href="#web">Docker image</a> and share a bundle with your team as a wiki. Visitors read it in the browser. Editors sign in through OAuth with any OpenID Connect provider, and the server commits each save under their name and pushes it to your git remote. Setup is in the guide: <a href="https://wiki.sunstone.md/5-web/sunstone-web">Sunstone Web</a>, <a href="https://wiki.sunstone.md/5-web/git-synced-wiki">git-synced wiki</a>.</p>
+    </div>
+    <h3 style="margin-top:44px">And also</h3>
+    <div class="features">
+      <div><h3>Live preview</h3><p>Lines render as formatted text; the line with the cursor shows raw markdown. GFM tables are editable as tables.</p></div>
+      <div><h3>Links that follow renames</h3><p>Renaming or moving a file rewrites every link to it across the folder. Renaming a heading rewrites its anchors.</p></div>
+      <div><h3>Backlinks, outline, tags</h3><p>Side panels for incoming links, the heading outline, and a tag browser with counts.</p></div>
+      <div><h3>Search</h3><p>Full-text search with snippets. A fuzzy quick-nav palette opens any file by name.</p></div>
+      <div><h3>Images</h3><p>Images in the folder render inline, as <code>![[diagram.png]]</code> or a markdown image. Found by name, like wikilinks.</p></div>
+      <div><h3>Tiles</h3><p>Split the editor into columns and tiles. The layout is restored on the next start.</p></div>
+      <div><h3>PDF export</h3><p>Print preview of the open file, diagrams included.</p></div>
+      <div><h3>Theming</h3><p>Follows the OS light/dark setting. Colours and fonts are set in <code>config.json</code>.</p></div>
+      <div><h3>Updates itself</h3><p>The AppImage, macOS and Windows builds install new releases on their own. <code>SUNSTONE_NO_UPDATE</code> turns it off.</p></div>
+    </div>
   </div>
 </section>
 
@@ -461,35 +508,6 @@ okf_version: "0.2"
           <tr><td>License</td><td>Proprietary</td><td>MIT</td></tr>
         </tbody>
       </table>
-    </div>
-  </div>
-</section>
-
-<section id="features">
-  <div class="wrap">
-    <h2>Features</h2>
-    <p class="sub">All built in. Details for each are in the <a href="https://wiki.sunstone.md/">guide</a>.</p>
-    <div class="row" style="margin-bottom:36px">
-      <figure class="fig">
-        <a class="shot-light" href="assets/annotations-light.png"><img src="assets/annotations-light.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments on a draft decision record: highlighted spans with a comment icon in the margin and one note open" /></a>
-        <a class="shot-dark" href="assets/annotations-dark.png"><img src="assets/annotations-dark.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments in dark mode" /></a>
-      </figure>
-      <div>
-        <h3>Review comments in the file</h3>
-        <p>Select text and press <kbd>Ctrl/Cmd</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> to add a margin comment. It is stored inline as CriticMarkup, <code>{==text==}{&gt;&gt;note&lt;&lt;}</code>, so comments travel through git and any tool can read them.</p>
-        <p>Useful for reviewing what an agent wrote before its next pass.</p>
-      </div>
-    </div>
-    <div class="features">
-      <div><h3>Live preview</h3><p>Lines render as formatted text; the line with the cursor shows raw markdown. GFM tables are editable as tables.</p></div>
-      <div><h3>Links that follow renames</h3><p>Renaming or moving a file rewrites every link to it across the folder. Renaming a heading rewrites its anchors.</p></div>
-      <div><h3>Backlinks, outline, tags</h3><p>Side panels for incoming links, the heading outline, and a tag browser with counts.</p></div>
-      <div><h3>Search</h3><p>Full-text search with snippets. A fuzzy quick-nav palette opens any file by name.</p></div>
-      <div><h3>Diagrams</h3><p>Mermaid, D2 and PlantUML code blocks render in place, locally. Nothing is sent to a server.</p></div>
-      <div><h3>Review against HEAD</h3><p>Shows the working copy against the last commit as inline track changes, and steps back through a file's history.</p></div>
-      <div><h3>Tiles</h3><p>Split the editor into columns and tiles. The layout is restored on the next start.</p></div>
-      <div><h3>PDF export</h3><p>Print preview of the open file, diagrams included.</p></div>
-      <div><h3>Theming</h3><p>Follows the OS light/dark setting. Colours and fonts are set in <code>config.json</code>.</p></div>
     </div>
   </div>
 </section>

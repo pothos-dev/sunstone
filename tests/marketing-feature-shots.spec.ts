@@ -14,7 +14,9 @@ import { mkdirSync } from 'node:fs';
  *  - footnotes:  footnotes citing frontmatter `sources`, the Sources list and a
  *                source hover card
  *  - annotations: review comments in the margin (CriticMarkup in the file)
- *  - properties: the frontmatter editor flagging a value OKF doesn't allow
+ *  - git:        Review against HEAD, the ledger service's last edits as track
+ *                changes (the fake's git history is swapped for a realistic one)
+ *  - d2:         a D2 architecture diagram rendered in read mode
  *
  *  - wiki:       the live guide at wiki.sunstone.md (Sunstone Web; needs network)
  *
@@ -33,6 +35,10 @@ type FakeWindow = Window & {
   __sunstoneFake: {
     simulateExternalChange: (kind: string, path: string, content?: string) => void;
     files: Record<string, string>;
+  };
+  __sunstoneBackend: {
+    fileHistory: (path: string) => Promise<unknown>;
+    fileAtRev: (path: string, rev: string) => Promise<unknown>;
   };
 };
 
@@ -192,6 +198,48 @@ Superseded by the refunds API.
 
 const SERVICE = 'services/ledger-service.md';
 
+/** The ledger service as of the last commit: the git shot diffs the working copy against it. */
+const SERVICE_AT_HEAD = BUNDLE[SERVICE].replace(
+  'Postings run in a single `SERIALIZABLE` transaction, so two captures for the same account can\'t interleave.[^pg-docs] Each request carries an idempotency key; a retry with the same key returns the original posting instead of writing a second one.[^incident-2291]',
+  'Postings run in a `REPEATABLE READ` transaction and are retried on conflict.[^pg-docs]',
+)
+  .replace('[[payment-flow|payment]], refund and payout', '[[payment-flow|payment]] and refund')
+  .replace('- [ ] Partition `entries` by month\n', '');
+
+const SERVICE_COMMITS = [
+  { hash: 'e41c09a', subject: 'Ledger: document posting limits', author: 'Maja Kovacs', date: daysAgo(3), relativeDate: '3 days ago' },
+  { hash: '7b2f6d1', subject: 'Generate service pages from the catalog', author: 'claude-code', date: daysAgo(8), relativeDate: '8 days ago' },
+];
+
+/** A D2 diagram of the payments platform, for the diagrams shot. */
+const ARCHITECTURE = `---
+type: Architecture
+title: Payments platform
+status: stable
+---
+
+# Payments platform
+
+\`\`\`d2
+direction: right
+merchant: Merchant { shape: person }
+platform: Payments platform {
+  api: Payments API
+  ledger: Ledger service
+  payouts: Payouts
+  api -> ledger: post capture
+  payouts -> ledger: read balances
+}
+psp: PSP
+db: Postgres { shape: cylinder }
+bank: Bank { shape: cloud }
+merchant -> platform.api: checkout
+platform.api -> psp: authorise
+platform.ledger -> db: SQL
+platform.payouts -> bank: transfers
+\`\`\`
+`;
+
 /** Replace the fake fixture Bundle with BUNDLE and open the service Concept. */
 async function openDemo(page: Page) {
   // Open the folders the shots show; the fake Bundle's own state is discarded.
@@ -317,22 +365,53 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.screenshot({ path: `${ASSET_DIR}/annotations-${scheme}.png`, clip: { x: 0, y: 0, width: 1100, height: 470 } });
     });
 
-    test('properties', async ({ page }) => {
-      const { tree } = await openDemo(page);
-      await tree.locator('[data-path="incidents/2291-duplicate-captures.md"]').click();
+    test('git', async ({ page }) => {
+      await page.setViewportSize({ width: 1100, height: 600 });
+      const { tree, editor } = await openDemo(page);
+      // The demo Bundle is written at runtime, so the fake reports it untracked;
+      // give the service page a history and a HEAD version.
+      await page.evaluate(
+        ([path, head, commits]) => {
+          const backend = (window as unknown as FakeWindow).__sunstoneBackend;
+          backend.fileHistory = async (p) => (p === path ? { status: 'ok', commits } : { status: 'untracked' });
+          backend.fileAtRev = async (p) => (p === path ? { status: 'ok', content: head } : { status: 'notFound' });
+        },
+        [SERVICE, SERVICE_AT_HEAD, SERVICE_COMMITS] as const,
+      );
+      // History loads when a page opens: reopen the service page.
+      await tree.locator('[data-path="services/payment-flow.md"]').click();
+      await expect(editor).toContainText('Checkout creates an intent');
+      await tree.locator(`[data-path="${SERVICE}"]`).click();
+      await expect(editor).toContainText('source of truth for balances');
       await hideLeftSidebar(page);
-      await page.getByTestId('frontmatter-toggle').click();
-      // The YAML editor, and its lint, exist in editing mode only.
-      await page.getByTestId('edit-toggle').click();
-      const region = page.getByTestId('frontmatter');
-      await expect(region.locator('.cm-content')).toContainText('status: resolved');
-      // OKF-aware checks: `status` is one of draft / stable / deprecated.
-      const error = region.locator('.cm-lintRange-error');
-      await expect(error).toHaveCount(1);
-      await error.hover();
-      await expect(page.locator('.cm-tooltip-lint')).toBeVisible();
+      const toggle = page.getByTestId('review-toggle');
+      await expect(toggle).toBeEnabled();
+      await toggle.click();
+      const review = page.getByTestId('review-editor');
+      // Skip the frontmatter: scroll the body's heading to the top of the review.
+      const heading = review.locator('.cm-line', { hasText: /^Ledger service$/ });
+      await expect(heading).toBeVisible();
+      await review.locator('.cm-scroller').evaluate((el, y) => (el.scrollTop += y - 96), (await heading.boundingBox())!.y);
+      await expect(review.locator('.cm-critic-del').first()).toBeVisible();
+      await expect(review.locator('.cm-critic-add').first()).toBeVisible();
       await page.waitForTimeout(300);
-      await page.screenshot({ path: `${ASSET_DIR}/properties-${scheme}.png`, clip: { x: 0, y: 0, width: 1100, height: 360 } });
+      await page.screenshot({ path: `${ASSET_DIR}/git-${scheme}.png` });
+    });
+
+    test('d2', async ({ page }) => {
+      const { tree, editor } = await openDemo(page);
+      await page.evaluate(
+        (content) => (window as unknown as FakeWindow).__sunstoneFake.simulateExternalChange('created', 'services/payments-platform.md', content),
+        ARCHITECTURE,
+      );
+      await tree.locator('[data-path="services/payments-platform.md"]').click();
+      await hideLeftSidebar(page);
+      const diagram = editor.locator('.cm-d2 svg.d2-svg');
+      await expect(diagram).toBeVisible({ timeout: 30_000 });
+      await expect(diagram.locator('text', { hasText: 'Ledger service' })).toBeVisible();
+      await page.waitForTimeout(500);
+      const box = (await diagram.boundingBox())!;
+      await page.screenshot({ path: `${ASSET_DIR}/d2-${scheme}.png`, clip: { x: 0, y: 0, width: 1100, height: Math.min(640, box.y + box.height + 32) } });
     });
   });
 }
