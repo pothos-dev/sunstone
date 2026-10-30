@@ -1,6 +1,6 @@
 // Wait for the release workflow to stage a version's npm packages (and npm to
 // finish validating them), check them,
-// and print the `npm stage approve` command for the user to run (approving
+// and print the `npm stage approve` command (fish syntax) for the user to run (approving
 // needs their 2FA, so this script never approves anything itself).
 //
 //   node .claude/skills/deploy/scripts/npm-approve.mjs <X.Y.Z> [--timeout-min N]
@@ -107,8 +107,8 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(`\n✓ All ${expected.length} packages staged and checked. Run this to approve them (2FA per package):\n`);
-// A subshell with `set -e`: stops at the first failed approval, and is safe to paste.
-console.log("(set -e");
-for (const p of expected) console.log(`  npx -y npm@^11.15.0 stage approve ${found.get(p).id}  # ${p}@${version}`);
-console.log(")");
+console.log(`\n✓ All ${expected.length} packages staged and checked. Run this in fish to approve them (2FA per package):\n`);
+// fish: each `and` line runs only if the previous approval succeeded.
+expected.forEach((p, i) =>
+  console.log(`${i ? "and " : ""}npx -y npm@^11.15.0 stage approve ${found.get(p).id}  # ${p}@${version}`),
+);

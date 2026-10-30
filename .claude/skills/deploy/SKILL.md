@@ -159,7 +159,7 @@ node .claude/skills/deploy/scripts/npm-approve.mjs X.Y.Z
 
 It polls `npm stage list` every 30 s (via `npx npm@^11.15.0`, since `npm stage` needs npm ≥ 11.15) until every package in `npm/packages.mjs` has one staged `X.Y.Z` entry that npm has finished validating (`validating` → `staged` can take 10+ minutes for a binary package). It checks that each one was staged by the logged-in npm user under the `latest` tag, and that the staged launcher's `optionalDependencies` are exactly the platform packages at `X.Y.Z`. Other staged versions are listed and left alone. It stops with an error if a check fails, if the release run finishes with packages still unstaged, or after 60 minutes (`--timeout-min N`).
 
-When it succeeds, it prints a `(set -e …)` block of `npm stage approve <id>` lines, platform packages first and the launcher last. Give that block to the user verbatim, in a fenced `sh` block. If it fails, report its error and don't build an approve command by hand.
+When it succeeds, it prints a block of `npm stage approve <id>` lines for the user's shell, fish, chained with `and` so it stops at the first failure: platform packages first, the launcher last. Give that block to the user verbatim, in a fenced `fish` block. If it fails, report its error and don't build an approve command by hand.
 
 ## Failure handling
 
