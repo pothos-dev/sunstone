@@ -146,6 +146,9 @@ fn a_past_stale_after_is_info() {
 fn a_legacy_citations_list_is_info() {
     let a = "---\ntype: x\n---\n# A\n\n## Citations\n\n[1] x\n";
     assert_eq!(found(&[OKF_ROOT, ("a.md", a)], &[]), vec![d("a.md", 6, "legacy-citations")]);
+    // A section about citations, with examples only in code, is not a list.
+    let about = "---\ntype: x\n---\n## Citations\n\nWrite `[1]` rows:\n\n```\n[1] x\n```\n## Next\n\n[1] not in the section\n";
+    assert_eq!(found(&[OKF_ROOT, ("a.md", about)], &[]), vec![]);
 }
 
 #[test]
