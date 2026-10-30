@@ -3,7 +3,7 @@ type: Concept
 title: Editor layout — the tiling model
 description: How the Editor pane tiles Concepts into a grid of Columns and Tiles, with a single active Tile over a shared buffer.
 tags: [editor, tiling, layout, tile, column]
-timestamp: 2026-07-22
+generated: { by: claude-code/unknown, at: 2026-09-29T14:11:45+02:00 }
 ---
 
 # Editor layout

@@ -3,7 +3,7 @@ type: Concept
 title: Theme colours — the palette and user overrides
 description: The twelve base colours each scheme is built from, the tokens derived from them, and how a user overrides any base colour per scheme in config.json, on the desktop and on Sunstone Web.
 tags: [interface, theme, colours, config]
-timestamp: 2026-10-08
+generated: { by: claude-code/unknown, at: 2026-10-08T14:20:05+02:00 }
 ---
 
 # Theme colours

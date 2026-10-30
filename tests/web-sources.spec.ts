@@ -13,7 +13,7 @@ test('source footnotes show their card and open the source', async ({ page }) =>
   await expect(rendered.locator('h1')).toContainText('Cited Concept');
   // Gate on hydration: the Tags Section renders from an onMount fetch in the
   // same cycle that binds the source cards (see web-viewer.spec.ts).
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
 
   const refs = rendered.locator('sup.footnote-ref.source');
   await expect(refs).toHaveCount(2);

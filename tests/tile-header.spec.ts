@@ -149,14 +149,14 @@ test('no NavBar: Frontmatter toggle moved to the header; sidebars toggle from th
   const propsToggle = header.getByTestId('frontmatter-toggle');
   await expect(propsToggle).toBeVisible();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('properties')).toHaveCount(0);
   // Toggling it ON reveals the tile's frontmatter inline; OFF hides it again.
   await propsToggle.click();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
+  await expect(page.getByTestId('properties')).toBeVisible();
   await propsToggle.click();
   await expect(propsToggle).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('properties')).toHaveCount(0);
 
   // The sidebar collapse/expand affordances are the toggle button at the top of
   // each activity rail — it reflects the open state via aria-pressed.

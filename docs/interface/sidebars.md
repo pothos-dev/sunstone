@@ -3,7 +3,7 @@ type: Concept
 title: Sidebars and Sections
 description: The left and right Sidebars, their collapsible Sections and Accordion height-sharing, and how a collapsed Section is transiently revealed by keyboard focus.
 tags: [interface, sidebar, section, accordion, navigation]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-09-15T10:00:20+02:00 }
 ---
 
 # Sidebars and Sections

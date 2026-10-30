@@ -3,7 +3,7 @@ type: Reference
 title: Sunstone Glossary
 description: The canonical domain language for Sunstone — the terms to use and the synonyms to avoid.
 tags: [glossary, domain, ubiquitous-language]
-timestamp: 2026-07-26
+generated: { by: claude-code/unknown, at: 2026-10-27T09:48:23+01:00 }
 ---
 
 # Glossary

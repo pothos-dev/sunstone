@@ -3,7 +3,7 @@ type: Concept
 title: Focus model — Regions and the Focused item
 description: How keyboard focus works in Sunstone — the six-Region grid, directional movement, and the item focused within a Region.
 tags: [focus, keyboard, region, navigation]
-timestamp: 2026-07-22
+generated: { by: claude-code/unknown, at: 2026-09-16T16:54:29+02:00 }
 ---
 
 # Focus model

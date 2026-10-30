@@ -140,11 +140,12 @@ test('Frontmatter: Escape peels EXACTLY one layer per press (YAML editing → Re
 }) => {
   await freshLoad(page);
   await page.getByTestId('tree').locator('[data-path="concepts/codemirror.md"]').click();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
   const editor = page.getByTestId('editor');
   await expect(editor).toContainText('CodeMirror 6 is the editor core');
-  // Read is the default; enter editing so the Editor takes click focus.
+  // Read is the default; enter editing so the Editor takes click focus and the
+  // Region holds the YAML editor (read mode shows the key → value grid).
   await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
   await editor.locator('.cm-content').click();
   await expectActive(page, 'editor');
 

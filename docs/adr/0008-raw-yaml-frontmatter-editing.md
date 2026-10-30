@@ -77,8 +77,11 @@ when the step carried a `setFrontmatter`; into the body otherwise.
   empty editor that materialises the block on first save.
 - The Region is **collapsed by default** in both read and edit mode (`propertiesShown` already
   defaults to `false`), and the highlighting code is **lazy-loaded on expand**, following the
-  `hydrateMermaid` precedent. Read mode shows the same YAML **verbatim**, highlighted — never
-  re-formatted, so what is read matches what is on disk.
+  `hydrateMermaid` precedent. ~~Read mode shows the same YAML **verbatim**, highlighted — never
+  re-formatted, so what is read matches what is on disk.~~ *(Amended)* Read mode shows the
+  frontmatter as a key → value grid (`FrontmatterFields.svelte`, fields from
+  `sunstone_shared::frontmatter::frontmatter_fields`), the same view the web reader renders, so
+  both shells read alike. The YAML editor is built only in edit mode.
 - **Escape peels two layers**: YAML editing → Region focus → body editor, keeping the
   one-layer-per-press contract uniform across Regions.
 - **Clearing the YAML removes the block.** Frontmatter that is empty or whitespace-only writes a

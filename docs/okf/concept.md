@@ -3,7 +3,7 @@ type: Concept
 title: Concept — how Sunstone treats an OKF concept
 description: What OKF says a Concept is, and how Sunstone models its frontmatter and body — the raw-YAML frontmatter editor, the stripped body document, and the body affordances that go beyond the spec.
 tags: [okf, concept, frontmatter, body, mermaid, d2, plantuml, sources, citations]
-timestamp: 2026-07-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-27T09:48:23+01:00 }
 ---
 
 # Concept

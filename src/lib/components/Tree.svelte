@@ -17,6 +17,7 @@
   } from '$lib/treeNav';
   import ReservedFileButton from './ReservedFileButton.svelte';
   import Self from './Tree.svelte';
+  import Twisty from './Twisty.svelte';
   import LifecycleBadge from './LifecycleBadge.svelte';
   import { lifecycleOfNode } from '$lib/lifecycle';
 
@@ -222,7 +223,7 @@
       aria-expanded={expanded}
       aria-label={displayName}
     >
-      <span class="twisty" class:open={expanded} class:pinned>▸</span>
+      <span class="twisty" class:open={expanded} class:pinned><Twisty /></span>
     </button>
     <button
       class="entry dir-toggle name-toggle"

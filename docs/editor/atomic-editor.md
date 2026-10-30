@@ -4,7 +4,7 @@ title: atomic-editor — the live-preview dependency
 description: The @atomic-editor/editor package that supplies Sunstone's CodeMirror live-preview decoration layer, and which of its extensions Sunstone consumes.
 resource: https://www.npmjs.com/package/@atomic-editor/editor
 tags: [editor, codemirror, atomic-editor, dependency, live-preview]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-17T10:30:11+02:00 }
 ---
 
 # atomic-editor

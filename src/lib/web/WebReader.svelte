@@ -31,6 +31,7 @@
   import { readerCrumbAction, readerCrumbs } from './readerHeader';
   import type { ConceptMeta } from '$lib/metaPill';
   import { refreshFrontmatterTimes } from '$lib/frontmatterTime';
+  import FrontmatterFields from '$lib/components/FrontmatterFields.svelte';
   import { clock } from '$lib/state/clock.svelte';
   import { printUrl } from '$lib/print/printData';
   import { conceptToUrl } from '$lib/wasm/exports';
@@ -191,10 +192,10 @@
   // — no server-side bundle state) together with the theme mode and
   // `expandedFolders`. Seeded to the defaults so the SSR render matches the
   // first client render; onMount then applies the persisted (validated,
-  // clamped) values.
+  // clamped) values. Tags starts collapsed, as on the desktop.
   const ui = $state({
     explorerOpen: true,
-    tagsOpen: true,
+    tagsOpen: false,
     outlineOpen: true,
     backlinksOpen: true,
     leftSidebarOpen: true,
@@ -594,20 +595,7 @@
         {#if data.rendered.frontmatter.length > 0 && ui.propertiesOpen}
           <!-- Read-only Properties (frontmatter); shown/hidden via the concept
                strip's Properties toggle (mirrors the desktop global toggle). -->
-          <dl class="properties" data-testid="properties">
-            {#each data.rendered.frontmatter as field (field.key)}
-              <dt>{field.key}</dt>
-              <dd>
-                {#if field.values.length > 1}
-                  <ul class="prop-list">
-                    {#each field.values as v, i (i)}<li>{v}</li>{/each}
-                  </ul>
-                {:else}
-                  {field.values[0] ?? ''}
-                {/if}
-              </dd>
-            {/each}
-          </dl>
+          <FrontmatterFields fields={data.rendered.frontmatter} />
         {/if}
 
         <!-- Server-rendered body HTML. Links resolve to viewer nav / broken
@@ -945,34 +933,6 @@
     padding: 1rem 1.5rem 4rem;
     min-width: 0;
     min-height: 0;
-  }
-
-  /* Read-only Properties: a metadata grid (frontmatter key → value), shown/hidden
-     via the Tile header's Frontmatter toggle (desktop parity). */
-  .properties {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    gap: 0.15rem 0.75rem;
-    margin: 0 0 1.25rem;
-    padding: 0.6rem 0.8rem;
-    border: 1px solid var(--border, #e2e2e2);
-    border-radius: var(--radius-sm, 6px);
-    background: var(--bg-elevated, rgba(127, 127, 127, 0.06));
-    font-size: 0.82rem;
-  }
-
-  .properties dt {
-    font-weight: 600;
-    color: var(--text-muted, #666);
-  }
-
-  .properties dd {
-    margin: 0;
-  }
-
-  .prop-list {
-    margin: 0;
-    padding-left: 1rem;
   }
 
   .status {

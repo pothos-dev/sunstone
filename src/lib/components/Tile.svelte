@@ -55,6 +55,7 @@
   import { DEFAULT_FENCES } from '$lib/frontmatter';
   import {
     splitFrontmatter,
+    parseFrontmatterFields,
     frontmatterLineCount,
     findHeadingLine,
     sourceList,
@@ -72,6 +73,7 @@
   import { region } from '$lib/region';
   import TileHeader from '$lib/components/TileHeader.svelte';
   import Frontmatter from '$lib/components/Frontmatter.svelte';
+  import FrontmatterFields from '$lib/components/FrontmatterFields.svelte';
   import ContextMenu from '$lib/components/ContextMenu.svelte';
   import AnnotationPopup from '$lib/components/AnnotationPopup.svelte';
   import ReviewStepper from '$lib/components/ReviewStepper.svelte';
@@ -164,6 +166,11 @@
   // Whether the editor is in live-editing mode (vs read-only reading), for the
   // header's Edit toggle. Reflects + drives the shared `session.editorMode`.
   const editing = $derived(session.editorMode === 'editing');
+  // Read mode shows the frontmatter as the web reader's key → value grid; the
+  // YAML editor is only built while editing.
+  const frontmatterFields = $derived(
+    editing ? [] : parseFrontmatterFields(`---\n${frontmatterYaml}\n---\n`),
+  );
 
   // WEB (ticket 08 §4): the explicit Save button shows only while editing with
   // unsaved changes; its presence IS the dirty indicator (no separate dot).
@@ -308,7 +315,8 @@
       return;
     }
     session.setFrontmatterShown(true);
-    focusFrontmatterPending = 'yaml';
+    // Read mode has no YAML editor to focus; the grid already reflects the step.
+    if (editing) focusFrontmatterPending = 'yaml';
   }
 
   // New Concept just scaffolded: show the Frontmatter and land the author on
@@ -799,7 +807,8 @@
          rebuild this tile's YAML editor (losing the caret) every time.
 
          In the active tile, Alt-in lands in the YAML, Escape peels back to this
-         container and Enter re-enters — the two layers of the unified peel. -->
+         container and Enter re-enters — the two layers of the unified peel.
+         Read mode renders the key → value grid instead (no YAML editor). -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       class="region-host frontmatter-host"
@@ -815,18 +824,24 @@
         isVisible: () => session.frontmatterShown && tile.activePath !== null,
       }}
     >
-      <Frontmatter
-        bind:this={frontmatterRef}
-        host={viewReady ? view : null}
-        yaml={frontmatterYaml}
-        concept={frontmatterConcept}
-        readOnly={!editing}
-        mode={lintMode}
-        onEscape={escapeFrontmatter}
-        onBlur={() => {
-          if (!__SUNSTONE_WEB__) void tile.flush();
-        }}
-      />
+      {#if editing}
+        <Frontmatter
+          bind:this={frontmatterRef}
+          host={viewReady ? view : null}
+          yaml={frontmatterYaml}
+          concept={frontmatterConcept}
+          readOnly={false}
+          mode={lintMode}
+          onEscape={escapeFrontmatter}
+          onBlur={() => {
+            if (!__SUNSTONE_WEB__) void tile.flush();
+          }}
+        />
+      {:else if frontmatterFields.length > 0}
+        <div class="frontmatter-fields">
+          <FrontmatterFields fields={frontmatterFields} />
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -889,6 +904,13 @@
 
   .region-host {
     display: block;
+  }
+
+  /* Read-mode frontmatter grid, aligned with the body's reading column. */
+  .frontmatter-fields {
+    max-width: var(--reader-max-width, 48rem);
+    margin-inline: auto;
+    padding: 0.75rem 1.5rem 0;
   }
 
   .region-host:focus,

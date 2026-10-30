@@ -4,7 +4,7 @@ title: Web frontend — the SvelteKit + Svelte 5 UI
 description: The SvelteKit (Svelte 5 runes) app under src/ — one codebase that serves both the desktop SPA and the server-rendered web viewer, decoupled from the backend by the IPC seam.
 resource: src
 tags: [architecture, sveltekit, svelte, frontend, ipc, web]
-timestamp: 2026-09-28T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-27T09:48:23+01:00 }
 ---
 
 # Web frontend (`src/`)

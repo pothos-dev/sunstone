@@ -4,7 +4,7 @@ title: The vendored atomic-editor patch
 description: The local patch to @atomic-editor/editor@0.4.3 — what it changes in inline-preview and the table widget, and why each change exists.
 resource: patches/@atomic-editor%2Feditor@0.4.3.patch
 tags: [editor, codemirror, atomic-editor, patch, live-preview]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-17T10:30:11+02:00 }
 ---
 
 # The vendored atomic-editor patch

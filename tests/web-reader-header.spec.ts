@@ -31,7 +31,7 @@ test('read-only controls only', async ({ page }) => {
 test('a crumb with an index.md opens it and reveals the folder', async ({ page }) => {
   await page.goto('/guide/topic');
   // Gate on hydration (the Tags Section renders from an onMount fetch).
-  await expect(page.getByTestId('tag-browser')).toBeVisible();
+  await expect(page.getByTestId('tags-section')).toBeVisible();
   const crumb = page.getByTestId('tile-crumb');
   await expect(crumb).toHaveText('Guide');
   await crumb.click();
@@ -50,7 +50,7 @@ test('a crumb without an index.md only reveals the folder', async ({ page }) => 
       await page.goto('/loose/leaf');
       await expect(page.getByTestId('rendered').locator('h1')).toContainText('Leaf', { timeout: 1000 });
     }).toPass({ timeout: 15_000 });
-    await expect(page.getByTestId('tag-browser')).toBeVisible();
+    await expect(page.getByTestId('tags-section')).toBeVisible();
     const leafRow = page.locator('[data-testid="tree-concept"][data-path="loose/leaf.md"]');
     await expect(leafRow).toHaveCount(0);
     await page.getByTestId('tile-crumb').click();

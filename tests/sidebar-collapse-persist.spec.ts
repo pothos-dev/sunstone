@@ -110,7 +110,7 @@ test('global Frontmatter show/hide flag persists across reload', async ({ page }
   // proves persistence.
   const toggle = page.getByTestId('frontmatter-toggle');
   await toggle.click();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
+  await expect(page.getByTestId('properties')).toBeVisible();
 
   // The debounced save flushes `frontmatterShown: true` to localStorage.
   await expect
@@ -126,7 +126,7 @@ test('global Frontmatter show/hide flag persists across reload', async ({ page }
   // RELOAD: the last Concept reopens and the Frontmatter Region stays SHOWN.
   await page.reload();
   await expect(page.getByTestId('tree')).toBeVisible();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
+  await expect(page.getByTestId('properties')).toBeVisible();
 });
 
 /**

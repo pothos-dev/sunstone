@@ -440,10 +440,20 @@ impl Ctx<'_> {
         }
     }
 
-    /// A v0.1 `# Citations` body list: v0.2 moved provenance to `sources`.
+    /// A v0.1 `# Citations` body list: a `Citations` heading whose section
+    /// holds `[n] …` rows (outside code). A section merely ABOUT citations, with
+    /// no rows, is not one.
     fn check_citations_heading(&self, f: &File, out: &mut Vec<Diagnostic>) {
-        for h in scan_headings(f.content) {
-            if h.text.eq_ignore_ascii_case("citations") {
+        let masked = embed::mask_code(f.content);
+        let lines: Vec<&str> = masked.lines().collect();
+        let headings = scan_headings(f.content);
+        for (i, h) in headings.iter().enumerate() {
+            if !h.text.eq_ignore_ascii_case("citations") {
+                continue;
+            }
+            let end = headings[i + 1..].iter().find(|n| n.level <= h.level).map_or(lines.len(), |n| n.line - 1);
+            let section = lines.get(h.line..end.max(h.line)).unwrap_or(&[]);
+            if section.iter().any(|l| is_citation_row(l)) {
                 out.push(diag(
                     f.path,
                     h.line,
@@ -509,6 +519,14 @@ fn escaping_path(from: &str, href: &str) -> Option<String> {
         }
     }
     (up > 0).then(|| format!("{}{}", "../".repeat(up), segs.join("/")))
+}
+
+/// A v0.1 citation row: `[n]` at the start of a line, then text.
+fn is_citation_row(line: &str) -> bool {
+    let rest = line.trim_start();
+    let Some(rest) = rest.strip_prefix('[') else { return false };
+    let digits = rest.chars().take_while(char::is_ascii_digit).count();
+    digits > 0 && rest[digits..].starts_with(']')
 }
 
 /// The root `index.md` path for a Bundle root directory.

@@ -4,7 +4,7 @@ title: sunstone-native — the shared domain crate
 description: The host-agnostic Rust crate holding all Bundle logic — filesystem, index, links, rewrite, search, render, git, watcher, config — reused verbatim by both the desktop shell and the web server.
 resource: crates/sunstone-native
 tags: [architecture, rust, crate, core, domain]
-timestamp: 2026-07-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-30T14:01:45+01:00 }
 ---
 
 # sunstone-native

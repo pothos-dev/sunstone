@@ -48,7 +48,7 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   await expect(explorerTitle).toHaveText('Knowledge Base');
   await explorerTitle.click();
   // It opens with its Frontmatter Region, like any Concept.
-  await expect(page.getByTestId('frontmatter')).toContainText('title: Knowledge Base');
+  await expect(page.getByTestId('properties')).toContainText('Knowledge Base');
   await expect(page.getByTestId('editor')).toContainText('Knowledge Base');
   // A second header click, with the root index already open, collapses the
   // Explorer; a third (index still open) expands it again.
@@ -62,7 +62,7 @@ test('reserved files: stripped from leaves, opened via folder affordances', asyn
   // body-only, exactly like the root affordance. ---
   await expect(tree.locator('[data-reserved-path="concepts/index.md"]')).toHaveCount(0);
   await tree.locator('[data-row-path="concepts"] .name-toggle').click();
-  await expect(page.getByTestId('frontmatter')).toContainText('title: Concepts');
+  await expect(page.getByTestId('properties')).toContainText('Concepts');
   await expect(page.getByTestId('editor')).toContainText('Concepts');
 
   await page.screenshot({ path: 'tests/screenshots/reserved-files.png', fullPage: true });
@@ -119,10 +119,10 @@ test('reserved files: Frontmatter Region shows, body editing works', async ({ pa
   await page.getByTestId('root-reserved').locator('[data-reserved-path="log.md"]').click();
   const editor = page.getByTestId('editor');
   await expect(editor).toBeVisible();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Read is the default; enter editing so the body becomes editable.
   await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // The body remains fully editable and autosaves to the backend.
   const content = editor.locator('.cm-content');
@@ -184,7 +184,8 @@ test('reserved files: right-click a folder offers to create the missing one', as
 
   // Created reserved file opens with its (empty) Frontmatter Region.
   await expect(page.getByTestId('editor')).toBeVisible();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
+  // Read mode: the Region is there, with no fields to list.
+  await expect(page.locator('[data-region="frontmatter"]')).toBeAttached();
 
   // The created log.md has a minimal stub (a heading), no `type` field.
   const content = await page.evaluate(

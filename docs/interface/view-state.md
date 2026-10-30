@@ -3,7 +3,7 @@ type: Concept
 title: View state — persisted per-user UI state
 description: The per-user UI state Sunstone restores on relaunch — last-open Concept, expanded folders, sidebar flags, tiling layout, window geometry — held per user and never written into the Bundle.
 tags: [interface, persistence, view-state, session]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-08T19:23:54+02:00 }
 ---
 
 # View state

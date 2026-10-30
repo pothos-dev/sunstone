@@ -4,7 +4,7 @@ title: Desktop shell — the Tauri 2 wrapper (src-tauri)
 description: The src-tauri crate — a thin Tauri 2 wrapper that exposes sunstone-native over IPC commands, resolves the CLI-launched Bundle, watches the filesystem, and drives native PDF export.
 resource: src-tauri
 tags: [architecture, rust, tauri, desktop, ipc]
-timestamp: 2026-07-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-30T13:40:47+01:00 }
 ---
 
 # Desktop shell (`src-tauri`)

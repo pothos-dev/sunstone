@@ -3,7 +3,7 @@ type: Concept
 title: App shell — the rail-and-Panes layout
 description: The top-level layout of the Sunstone window — an Activity Rail on each outer edge, a left Sidebar, the central Editor pane, and a right Sidebar — plus the two web surfaces that reuse it.
 tags: [interface, layout, pane, sidebar, shell]
-timestamp: 2026-07-23
+generated: { by: claude-code/unknown, at: 2026-10-14T17:47:20+02:00 }
 ---
 
 # App shell

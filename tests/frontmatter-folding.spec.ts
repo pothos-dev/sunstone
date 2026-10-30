@@ -49,6 +49,8 @@ async function setup(page: Page) {
   await create(page, 'two.md', concept('two'));
   await page.locator('[data-path="one.md"]').click();
   await page.getByTestId('frontmatter-toggle').click();
+  // The YAML editor (and its folds) exists in editing mode only.
+  await page.getByTestId('edit-toggle').click();
   return page.getByTestId('frontmatter');
 }
 
@@ -88,7 +90,6 @@ test('typing keeps an unfolded block open', async ({ page }) => {
   await fm.getByTestId('frontmatter-fold').first().click();
   await expect(fm).toContainText('https://a.example/one');
 
-  await page.getByTestId('edit-toggle').click();
   const content = page.getByTestId('editor').locator('.cm-content');
   await expect(content).toHaveAttribute('contenteditable', 'true');
   await content.click();

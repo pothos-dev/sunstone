@@ -50,13 +50,14 @@ async function setMarker(page: Page, on: boolean): Promise<void> {
   await external(page, 'index.md', on ? without.replace('---\n', '---\nokf_version: "0.2"\n') : without);
 }
 
-async function openProbe(page: Page, content = PROBE_CONTENT, editing = false) {
+async function openProbe(page: Page, content = PROBE_CONTENT) {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   await created(page, PROBE, content);
   await page.getByTestId('tree').locator(`[data-path="${PROBE}"]`).click();
   await page.getByTestId('frontmatter-toggle').click();
-  if (editing) await page.getByTestId('edit-toggle').click();
+  // The YAML editor (and its lint) exists in editing mode only.
+  await page.getByTestId('edit-toggle').click();
   const region = page.getByTestId('frontmatter');
   await expect(region.locator('.cm-content')).toContainText('title: Lint probe');
   return region;
@@ -93,7 +94,7 @@ test('language service: a duplicate key is reported in any Bundle', async ({ pag
 });
 
 test('language service: key completion only in an OKF Bundle', async ({ page }) => {
-  const region = await openProbe(page, '---\ntype: Metric\ntitle: Lint probe\n---\n\nbody\n', true);
+  const region = await openProbe(page, '---\ntype: Metric\ntitle: Lint probe\n---\n\nbody\n');
   const yaml = region.locator('.cm-content');
   const popup = page.locator('.cm-tooltip-autocomplete');
 
