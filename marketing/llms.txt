@@ -1,0 +1,50 @@
+# Sunstone
+
+> Sunstone is an open-source (MIT) markdown editor for folders of .md files in git, with first-class support for the Open Knowledge Format (OKF). It runs as a desktop app on Linux, macOS and Windows, in the browser via `npx sunstone-md`, and as a self-hosted Docker image (Sunstone Web) that commits every save and syncs with a git remote.
+
+Key facts:
+
+- Opens any folder of markdown (`sunstone ./docs`); writes nothing into it except your edits. Settings live in `~/.config/sunstone/`.
+- Wikilinks (`[[Page]]`, `[[Page#Heading]]`, `[[Page|text]]`) and markdown links; renaming or moving a file rewrites every link to it.
+- Live preview, backlinks, outline, tags, full-text search, Mermaid/D2/PlantUML diagrams rendered locally, PDF export, a tiling workspace.
+- Git review: the working copy against `HEAD` as inline track changes, and a file's history.
+- Review comments stored inline as CriticMarkup (`{==text==}{>>note<<}`).
+- OKF v0.2: trust and status pill, frontmatter checked against the spec, sources cited with footnotes, `sunstone lint` for CI.
+- Compared to Obsidian: no vault or plugin API, sync and publishing through git and a self-hosted Docker image, MIT instead of proprietary, no mobile app (the web reader has a phone layout).
+- Built with Tauri 2, SvelteKit and Rust.
+
+Every page of the user guide is also available as Markdown: request it with `Accept: text/markdown`, or as JSON (frontmatter, body, links, backlinks) with `Accept: application/json`.
+
+## Docs
+
+- [Sunstone User Guide](https://wiki.sunstone.md/)
+- [Install](https://wiki.sunstone.md/1-getting-started/install): Desktop installers for macOS, Windows and Linux, and how Sunstone keeps itself up to date.
+- [Open a folder](https://wiki.sunstone.md/1-getting-started/open-a-folder): Launch Sunstone on any directory of markdown from the command line or the launcher.
+- [Run in the browser](https://wiki.sunstone.md/1-getting-started/run-in-browser): Use Sunstone without installing it with npx sunstone-md, or serve the desktop editor with sunstone serve.
+- [Comments](https://wiki.sunstone.md/2-editing/comments): Margin comments stored as CriticMarkup inside the file.
+- [Diagrams](https://wiki.sunstone.md/2-editing/diagrams): Mermaid, D2 and PlantUML code blocks rendered as diagrams.
+- [Footnotes and sources](https://wiki.sunstone.md/2-editing/footnotes-and-sources): Footnotes, cited sources and their hover cards.
+- [Frontmatter](https://wiki.sunstone.md/2-editing/frontmatter): Edit a Concept's YAML frontmatter in place, with folding and OKF-aware checks.
+- [Images](https://wiki.sunstone.md/2-editing/images): Embed images from the Bundle inline.
+- [Links](https://wiki.sunstone.md/2-editing/links): Wikilinks and markdown links, heading anchors, folder links, and links that follow a rename.
+- [Live preview](https://wiki.sunstone.md/2-editing/live-preview): Source, Live and Read modes, formatting shortcuts and in-file find and replace.
+- [Export as PDF](https://wiki.sunstone.md/2-editing/pdf-export): Print preview and PDF export of a Concept.
+- [Explorer](https://wiki.sunstone.md/3-navigating/explorer): The folder tree: titles or filenames, keyboard control, drag and drop, and the Bundle root.
+- [Outline and backlinks](https://wiki.sunstone.md/3-navigating/outline-and-backlinks): The headings of the current Concept and everything that links to it.
+- [Search](https://wiki.sunstone.md/3-navigating/search): Full-text search, quick navigation and tags.
+- [Tiling workspace](https://wiki.sunstone.md/3-navigating/tiling-workspace): Several Concepts side by side in columns and tiles.
+- [Review changes](https://wiki.sunstone.md/4-git/review-changes): Compare your edits with the last commit and step through a file's history.
+- [Git-synced wiki](https://wiki.sunstone.md/5-web/git-synced-wiki): Back a Sunstone Web deployment with a git remote so browser edits and pushes reconcile on their own.
+- [Reading API](https://wiki.sunstone.md/5-web/reading-api): Fetch any page as Markdown or JSON, list a folder, or search, from scripts and agents.
+- [Sunstone Web](https://wiki.sunstone.md/5-web/sunstone-web): Serve a Bundle in any browser from a Docker image: read-only for visitors, the full editor for signed-in users.
+- [Lint a Bundle](https://wiki.sunstone.md/6-okf/lint): Check a Bundle's links, footnotes, Frontmatter and OKF conformance from the command line with sunstone lint.
+- [OKF support](https://wiki.sunstone.md/6-okf/okf-support): What Sunstone understands about OKF bundles: validation, trust, lifecycle, sources and attested computations.
+- [Fonts](https://wiki.sunstone.md/7-customize/fonts): Choose the fonts and sizes for the interface, text, headings and code, optionally from font files.
+- [Theme colours](https://wiki.sunstone.md/7-customize/theme-colors): Override the base colours of the light and dark schemes.
+
+## Optional
+
+- [Download the latest release](https://github.com/pothos-dev/sunstone/releases/latest): .dmg, .exe, .msi, .AppImage, .deb, .rpm
+- [Source code on GitHub](https://github.com/pothos-dev/sunstone)
+- [Changelog](https://github.com/pothos-dev/sunstone/blob/main/CHANGELOG.md)
+- [Open Knowledge Format specification](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md)

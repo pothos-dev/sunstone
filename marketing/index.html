@@ -5,7 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sunstone: a markdown editor for folders in git</title>
 <meta name="description" content="Open-source markdown editor for folders of .md files in git, with Open Knowledge Format (OKF) support: trust and status badges, frontmatter checks, sources and citations. Wikilinks, backlinks, live preview, search, diff against HEAD. Desktop app and a Docker image. MIT." />
+<link rel="canonical" href="https://sunstone.md/" />
 <link rel="icon" href="assets/logo.svg" />
+<meta name="theme-color" content="#fdf3ea" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1d1511" media="(prefers-color-scheme: dark)" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Sunstone" />
+<meta property="og:url" content="https://sunstone.md/" />
+<meta property="og:title" content="Sunstone: a markdown editor for folders in git" />
+<meta property="og:description" content="Open-source markdown editor for folders of .md files in git, with Open Knowledge Format (OKF) support. Desktop app for Linux, macOS and Windows, and a Docker image." />
+<meta property="og:image" content="https://sunstone.md/assets/hero-light.png" />
+<meta property="og:image:width" content="1440" />
+<meta property="og:image:height" content="900" />
+<meta property="og:image:alt" content="Sunstone editing a markdown page with Explorer, live preview, Outline and Backlinks" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="alternate" type="text/markdown" href="https://sunstone.md/llms.txt" title="Sunstone for LLMs" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Sunstone",
+  "url": "https://sunstone.md/",
+  "description": "Open-source markdown editor for folders of .md files in git, with Open Knowledge Format (OKF) support: trust and status badges, frontmatter checks, sources and citations. Wikilinks, backlinks, live preview, full-text search and a diff against HEAD. Desktop app and a Docker image.",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Markdown editor",
+  "operatingSystem": "Linux, macOS, Windows",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "image": "https://sunstone.md/assets/hero-light.png",
+  "screenshot": "https://sunstone.md/assets/hero-light.png",
+  "downloadUrl": "https://github.com/pothos-dev/sunstone/releases/latest",
+  "softwareHelp": { "@type": "WebSite", "url": "https://wiki.sunstone.md/" },
+  "releaseNotes": "https://github.com/pothos-dev/sunstone/blob/main/CHANGELOG.md",
+  "sameAs": ["https://github.com/pothos-dev/sunstone", "https://www.npmjs.com/package/sunstone-md"]
+}
+</script>
 <link rel="preload" href="assets/fonts/jost-latin.woff2" as="font" type="font/woff2" crossorigin />
 <style>
   @font-face {
@@ -152,7 +187,7 @@
   .panel p { font-size: 0.92rem; color: var(--text-muted); }
 
   .shot { margin: 44px 0 0; }
-  .shot img { width: 100%; display: block; border-radius: var(--radius); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
+  .shot img { width: 100%; height: auto; display: block; border-radius: var(--radius); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
   .shot figcaption { margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); text-align: center; }
   .shot-dark { display: none !important; }
   @media (prefers-color-scheme: dark) {
@@ -211,7 +246,7 @@
 
   /* ---- Figures ---- */
   .fig a { display: block; }
-  .fig img { width: 100%; display: block; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
+  .fig img { width: 100%; height: auto; display: block; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
   .fig .shot-dark { display: none !important; }
   @media (prefers-color-scheme: dark) {
     .fig .shot-light { display: none !important; }
@@ -265,7 +300,7 @@
 <div class="wrap hero">
   <h1>A markdown editor for folders of <code style="font-size:0.8em">.md</code> files in git.</h1>
   <p class="lead">
-    Desktop app for Linux, macOS and Windows: wikilinks, backlinks, live preview,
+    Sunstone is a desktop app for Linux, macOS and Windows: wikilinks, backlinks, live preview,
     full-text search, and a diff of every file against <code>HEAD</code>.
     The same editor also runs as a <strong>Docker image</strong> that commits every save
     and syncs with your git remote.
@@ -308,8 +343,8 @@
   </div>
 
   <figure class="shot">
-    <a class="shot-light" href="assets/hero-light.png"><img src="assets/hero-light.png" alt="Sunstone editing a service page: Explorer, frontmatter, live preview with code and a table, Outline and Backlinks" /></a>
-    <a class="shot-dark" href="assets/hero-dark.png"><img src="assets/hero-dark.png" alt="The same service page in dark mode" /></a>
+    <a class="shot-light" href="assets/hero-light.png"><img src="assets/hero-light.png" width="1440" height="900" alt="Sunstone editing a service page: Explorer, frontmatter, live preview with code and a table, Outline and Backlinks" /></a>
+    <a class="shot-dark" href="assets/hero-dark.png"><img src="assets/hero-dark.png" width="1440" height="900" alt="The same service page in dark mode" /></a>
     <figcaption>A service page in an OKF bundle: Explorer with status badges, trust pill, live preview, Outline and Backlinks.</figcaption>
   </figure>
 </div>
@@ -327,8 +362,8 @@
     <div class="rows">
       <div class="row">
         <figure class="fig">
-          <a class="shot-light" href="assets/okf-light.png"><img src="assets/okf-light.png" alt="Trust popover on a service page: human-reviewed, generated by an agent last week, verified by a person 3 days ago, status stable, 3 sources. The Explorer marks a draft, a stale and a deprecated page." /></a>
-          <a class="shot-dark" href="assets/okf-dark.png"><img src="assets/okf-dark.png" alt="The trust popover in dark mode" /></a>
+          <a class="shot-light" href="assets/okf-light.png"><img src="assets/okf-light.png" width="1100" height="400" loading="lazy" decoding="async" alt="Trust popover on a service page: human-reviewed, generated by an agent last week, verified by a person 3 days ago, status stable, 3 sources. The Explorer marks a draft, a stale and a deprecated page." /></a>
+          <a class="shot-dark" href="assets/okf-dark.png"><img src="assets/okf-dark.png" width="1100" height="400" loading="lazy" decoding="async" alt="The trust popover in dark mode" /></a>
         </figure>
         <div>
           <h3>Trust and status next to the title</h3>
@@ -338,8 +373,8 @@
       </div>
       <div class="row">
         <figure class="fig">
-          <a class="shot-light" href="assets/fields-light.png"><img src="assets/fields-light.png" alt="The frontmatter of a service page shown as a grid of fields: type, title, description, tags, owner, status, generated, verified and sources" /></a>
-          <a class="shot-dark" href="assets/fields-dark.png"><img src="assets/fields-dark.png" alt="The frontmatter field grid in dark mode" /></a>
+          <a class="shot-light" href="assets/fields-light.png"><img src="assets/fields-light.png" width="1100" height="513" loading="lazy" decoding="async" alt="The frontmatter of a service page shown as a grid of fields: type, title, description, tags, owner, status, generated, verified and sources" /></a>
+          <a class="shot-dark" href="assets/fields-dark.png"><img src="assets/fields-dark.png" width="1100" height="513" loading="lazy" decoding="async" alt="The frontmatter field grid in dark mode" /></a>
         </figure>
         <div>
           <h3>Frontmatter as fields</h3>
@@ -349,8 +384,8 @@
       </div>
       <div class="row">
         <figure class="fig">
-          <a class="shot-light" href="assets/properties-light.png"><img src="assets/properties-light.png" alt="The frontmatter editor flags status: resolved with the message that status must be draft, stable or deprecated" /></a>
-          <a class="shot-dark" href="assets/properties-dark.png"><img src="assets/properties-dark.png" alt="The frontmatter editor's OKF check in dark mode" /></a>
+          <a class="shot-light" href="assets/properties-light.png"><img src="assets/properties-light.png" width="1100" height="360" loading="lazy" decoding="async" alt="The frontmatter editor flags status: resolved with the message that status must be draft, stable or deprecated" /></a>
+          <a class="shot-dark" href="assets/properties-dark.png"><img src="assets/properties-dark.png" width="1100" height="360" loading="lazy" decoding="async" alt="The frontmatter editor's OKF check in dark mode" /></a>
         </figure>
         <div>
           <h3>Frontmatter checked against the spec</h3>
@@ -360,8 +395,8 @@
       </div>
       <div class="row">
         <figure class="fig">
-          <a class="shot-light" href="assets/footnotes-light.png"><img src="assets/footnotes-light.png" alt="A footnote's hover card showing the cited source's title and URL, with the numbered Sources list at the end of the page" /></a>
-          <a class="shot-dark" href="assets/footnotes-dark.png"><img src="assets/footnotes-dark.png" alt="Footnotes and the Sources list in dark mode" /></a>
+          <a class="shot-light" href="assets/footnotes-light.png"><img src="assets/footnotes-light.png" width="1100" height="775" loading="lazy" decoding="async" alt="A footnote's hover card showing the cited source's title and URL, with the numbered Sources list at the end of the page" /></a>
+          <a class="shot-dark" href="assets/footnotes-dark.png"><img src="assets/footnotes-dark.png" width="1100" height="775" loading="lazy" decoding="async" alt="Footnotes and the Sources list in dark mode" /></a>
         </figure>
         <div>
           <h3>Sources and citations</h3>
@@ -401,8 +436,8 @@ okf_version: "0.2"
       </div>
       <figure class="fig">
         <a href="https://wiki.sunstone.md/6-okf/okf-support">
-          <img class="shot-light" src="assets/wiki-light.png" alt="The Sunstone user guide in the browser, showing the OKF support page with its properties, outline and backlinks" />
-          <img class="shot-dark" src="assets/wiki-dark.png" alt="The Sunstone user guide in dark mode" />
+          <img class="shot-light" src="assets/wiki-light.png" width="1280" height="760" loading="lazy" decoding="async" alt="The Sunstone user guide in the browser, showing the OKF support page with its properties, outline and backlinks" />
+          <img class="shot-dark" src="assets/wiki-dark.png" width="1280" height="760" loading="lazy" decoding="async" alt="The Sunstone user guide in dark mode" />
         </a>
       </figure>
     </div>
@@ -436,8 +471,8 @@ okf_version: "0.2"
     <p class="sub">All built in. Details for each are in the <a href="https://wiki.sunstone.md/">guide</a>.</p>
     <div class="row" style="margin-bottom:36px">
       <figure class="fig">
-        <a class="shot-light" href="assets/annotations-light.png"><img src="assets/annotations-light.png" alt="Review comments on a draft decision record: highlighted spans with a comment icon in the margin and one note open" /></a>
-        <a class="shot-dark" href="assets/annotations-dark.png"><img src="assets/annotations-dark.png" alt="Review comments in dark mode" /></a>
+        <a class="shot-light" href="assets/annotations-light.png"><img src="assets/annotations-light.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments on a draft decision record: highlighted spans with a comment icon in the margin and one note open" /></a>
+        <a class="shot-dark" href="assets/annotations-dark.png"><img src="assets/annotations-dark.png" width="1100" height="470" loading="lazy" decoding="async" alt="Review comments in dark mode" /></a>
       </figure>
       <div>
         <h3>Review comments in the file</h3>
