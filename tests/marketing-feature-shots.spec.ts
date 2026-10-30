@@ -7,8 +7,8 @@ import { mkdirSync } from 'node:fs';
  * it swaps the fake backend's fixture Bundle for a small, realistic OKF Bundle
  * (a payments team's engineering wiki) and frames one feature per shot:
  *
- *  - hero:       the service Concept with both Sidebars, Properties and the
- *                trust pill on screen
+ *  - hero:       the service Concept with both Sidebars and the trust pill
+ *  - fields:     the frontmatter as a grid of fields (read mode)
  *  - okf:        the trust pill popover, and the Explorer marking a draft and a
  *                stale Concept
  *  - footnotes:  footnotes citing frontmatter `sources`, the Sources list and a
@@ -241,7 +241,6 @@ for (const scheme of ['light', 'dark'] as const) {
     test('hero', async ({ page }) => {
       await openDemo(page);
       await expect(page.getByTestId('app-root')).toHaveAttribute('data-theme', scheme);
-      await page.getByTestId('frontmatter-toggle').click();
       await showRightSidebar(page);
       await expect(page.getByTestId('meta-pill')).toBeVisible();
       await expect(page.getByTestId('right-side-bar')).toContainText('services/payment-flow');
@@ -290,6 +289,18 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.screenshot({ path: `${ASSET_DIR}/footnotes-${scheme}.png`, clip: { x: 0, y: top, width: 1100, height: bottom - top } });
     });
 
+    test('fields', async ({ page }) => {
+      await openDemo(page);
+      await hideLeftSidebar(page);
+      await page.getByTestId('frontmatter-toggle').click();
+      // Read mode shows the frontmatter as a grid of fields.
+      const grid = page.getByTestId('properties');
+      await expect(grid).toBeVisible();
+      await page.waitForTimeout(300);
+      const box = (await grid.boundingBox())!;
+      await page.screenshot({ path: `${ASSET_DIR}/fields-${scheme}.png`, clip: { x: 0, y: 0, width: 1100, height: Math.min(640, box.y + box.height + 24) } });
+    });
+
     test('annotations', async ({ page }) => {
       const { tree, editor } = await openDemo(page);
       await tree.locator('[data-path="decisions/0007-idempotency-keys.md"]').click();
@@ -311,6 +322,8 @@ for (const scheme of ['light', 'dark'] as const) {
       await tree.locator('[data-path="incidents/2291-duplicate-captures.md"]').click();
       await hideLeftSidebar(page);
       await page.getByTestId('frontmatter-toggle').click();
+      // The YAML editor, and its lint, exist in editing mode only.
+      await page.getByTestId('edit-toggle').click();
       const region = page.getByTestId('frontmatter');
       await expect(region.locator('.cm-content')).toContainText('status: resolved');
       // OKF-aware checks: `status` is one of draft / stable / deprecated.
