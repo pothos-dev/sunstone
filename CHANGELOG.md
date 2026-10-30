@@ -4,6 +4,11 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.4] - 2026-10-30
+
+### Fixed
+- Releases build on macOS again. 0.30.0–0.30.3 never finished building, so this is the first 0.30 release you can install; it includes all of their changes.
+
 ## [0.30.3] - 2026-10-30
 
 ### Added
