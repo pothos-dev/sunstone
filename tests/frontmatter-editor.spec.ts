@@ -6,9 +6,9 @@ import { type Page } from '@playwright/test';
  * Properties panel).
  *
  * Drives the Frontmatter Region against the fake backend:
- *  - collapsed by default; the toggle shows the inner YAML (no `---` fences,
- *    trimmed) in its own editor,
- *  - read mode shows the SAME text, verbatim and not editable,
+ *  - collapsed by default; the toggle shows the frontmatter, and editing mode
+ *    holds the inner YAML (no `---` fences, trimmed) in its own editor,
+ *  - read mode shows the key → value grid the web reader renders, no YAML editor,
  *  - a NESTED value (what the old panel rendered read-only) is authorable,
  *  - a body-only edit leaves the block byte-for-byte,
  *  - the SAVE GATE: a block that does not parse holds the write, shows the error
@@ -54,11 +54,12 @@ async function openForEditing(page: Page, path: string) {
   return yaml;
 }
 
-test('frontmatter: collapsed by default; the toggle shows the inner YAML, no fences', async ({
+test('frontmatter: collapsed by default; editing shows the inner YAML, no fences', async ({
   page,
 }) => {
-  // Track script loads, to pin the "nothing extra loads while collapsed" half of
-  // the contract: the YAML grammar + linter are behind a dynamic import.
+  // Track script loads, to pin the "nothing extra loads until the YAML editor
+  // is built" half of the contract: the YAML grammar + linter are behind a
+  // dynamic import.
   const scripts: string[] = [];
   page.on('request', (r) => {
     if (r.url().endsWith('.js')) scripts.push(r.url());
@@ -74,9 +75,14 @@ test('frontmatter: collapsed by default; the toggle shows the inner YAML, no fen
 
   const toggle = page.getByTestId('frontmatter-toggle');
   await toggle.click();
-  // Expanding fetches the language chunk that the collapsed Region never did.
-  await expect.poll(() => scripts.length).toBeGreaterThan(beforeExpand);
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  // Read mode: the key → value grid, no YAML editor.
+  await expect(page.getByTestId('properties')).toBeVisible();
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+
+  // Editing builds the YAML editor, fetching the language chunk.
+  await page.getByTestId('edit-toggle').click();
+  await expect.poll(() => scripts.length).toBeGreaterThan(beforeExpand);
 
   const region = page.getByTestId('frontmatter');
   await expect(region).toBeVisible();
@@ -90,6 +96,7 @@ test('frontmatter: collapsed by default; the toggle shows the inner YAML, no fen
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('frontmatter')).toHaveCount(0);
+  await expect(page.getByTestId('properties')).toHaveCount(0);
 });
 
 test('frontmatter: a Concept with no block shows an empty editor; it materialises on save', async ({
@@ -121,19 +128,20 @@ test('frontmatter: a saved title edit relabels the Explorer row', async ({ page 
   await expect(row).toHaveText('Freshly Titled');
 });
 
-test('frontmatter: read mode shows the same YAML verbatim, not editable', async ({ page }) => {
+test('frontmatter: read mode shows the key → value grid, not the YAML', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('tree')).toBeVisible();
   await page.locator('[data-path="concepts/complex-frontmatter.md"]').click();
   await page.getByTestId('frontmatter-toggle').click();
 
-  // Read is the default mode: the YAML renders, un-reformatted, read-only.
-  const yaml = page.getByTestId('frontmatter').locator('.cm-content');
-  await expect(yaml).toHaveAttribute('contenteditable', 'false');
-  // Verbatim: the block scalar and the nested map read exactly as on disk.
-  await expect(yaml).toContainText('prose: |');
-  await expect(yaml).toContainText('author: jane');
-  // Read mode offers no Format control (nothing here can change the file).
+  // Read is the default mode: one row per top-level key, as on the web reader.
+  const grid = page.getByTestId('properties');
+  await expect(grid).toBeVisible();
+  await expect(grid.locator('dt').first()).toHaveText('type');
+  // A nested map reads as its YAML, line breaks kept.
+  await expect(grid).toContainText('author: jane');
+  // No YAML editor, so no Format control (nothing here can change the file).
+  await expect(page.getByTestId('frontmatter')).toHaveCount(0);
   await expect(page.getByTestId('frontmatter-format')).toHaveCount(0);
 });
 

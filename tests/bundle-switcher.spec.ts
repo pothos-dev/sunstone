@@ -180,5 +180,5 @@ test('"New Bundle…" declares the picked folder OKF, rooting it on its own mark
   // The root index shows its marker in the Frontmatter Region.
   await page.getByTestId('frontmatter-toggle').click();
   await page.getByTestId('explorer-section-title').click();
-  await expect(page.getByTestId('frontmatter')).toContainText('okf_version');
+  await expect(page.getByTestId('properties')).toContainText('okf_version');
 });

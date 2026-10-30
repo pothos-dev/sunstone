@@ -108,6 +108,7 @@ test('lifecycle: status is linted and completed in an OKF Bundle', async ({ page
   await created(page, 'status-probe.md', '---\ntype: Metric\ntitle: Status probe\nstatus: wip\n---\n\nbody\n');
   await row(page, 'status-probe.md').click();
   await page.getByTestId('frontmatter-toggle').click();
+  await page.getByTestId('edit-toggle').click();
   const region = page.getByTestId('frontmatter');
   const yaml = region.locator('.cm-content');
   await expect(yaml).toContainText('status: wip');
@@ -121,7 +122,6 @@ test('lifecycle: status is linted and completed in an OKF Bundle', async ({ page
   await expect(region.locator('.cm-lintRange-error')).toHaveCount(1);
 
   // Completion offers the three values.
-  await page.getByTestId('edit-toggle').click();
   await yaml.click();
   await page.keyboard.press('Control+End');
   for (const _ of 'wip') await page.keyboard.press('Backspace');

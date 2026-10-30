@@ -101,8 +101,8 @@ test('unified undo: a run of YAML keystrokes is one step, and undo lands focus o
   await expect(tree).toBeVisible();
   await page.getByTestId('frontmatter-toggle').click();
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
   await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Eight keystrokes in one run.
   await appendToTitle(page, ' Six Rev');
@@ -134,10 +134,10 @@ test('unified undo: switching Concepts resets history', async ({ page }) => {
   await expect(tree).toBeVisible();
   await page.getByTestId('frontmatter-toggle').click();
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Read is the default; enter editing (global mode, survives the switch below).
   await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Edit the frontmatter of the FIRST Concept.
   await appendToTitle(page, ' First');
@@ -173,10 +173,10 @@ test('unified undo: header buttons work and disable at stack ends', async ({ pag
   await expect(tree).toBeVisible();
   await page.getByTestId('frontmatter-toggle').click();
   await tree.locator('[data-path="concepts/codemirror.md"]').click();
-  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   // Read is the default; enter editing so the undo/redo buttons render.
   await page.getByTestId('edit-toggle').click();
+  await expect(page.getByTestId('frontmatter')).toBeVisible();
 
   const undoBtn = page.getByTestId('undo');
   const redoBtn = page.getByTestId('redo');
