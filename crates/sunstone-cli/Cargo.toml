@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 sunstone-server = { path = "../sunstone-server" }
+# `sunstone lint` (the Bundle health check).
+sunstone-native = { path = "../sunstone-native" }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 # The static SPA build (`bun run build` → `build/`), compiled into release
 # binaries. Debug builds read it from disk instead, so `cargo check` and

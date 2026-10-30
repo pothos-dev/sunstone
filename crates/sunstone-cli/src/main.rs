@@ -20,7 +20,13 @@ use sunstone_server::{AppShellAssets, LocalServeOptions};
 struct AppShell;
 
 fn main() {
-    let opts = match parse_serve_args(std::env::args().skip(1)) {
+    let mut args = std::env::args().skip(1).peekable();
+    // `sunstone lint` checks a Bundle and exits (a folder named `lint` is `./lint`).
+    if args.peek().is_some_and(|a| a == "lint") {
+        args.next();
+        std::process::exit(sunstone_native::lint::cli::run(args));
+    }
+    let opts = match parse_serve_args(args) {
         ServeArgs::Serve(opts) => opts,
         ServeArgs::Help => return print!("{}", help_string()),
         ServeArgs::Version => return println!("sunstone {}", env!("CARGO_PKG_VERSION")),
@@ -69,6 +75,7 @@ Serve the Sunstone markdown editor to your browser at http://localhost:PORT/.
 
 Usage:
   sunstone [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
+  sunstone lint [BUNDLE] [--json]
 
 Arguments:
   BUNDLE              Folder to open as a Bundle (default: current directory).
@@ -84,6 +91,11 @@ Options:
                       name of a reverse proxy in front (repeatable)
   -h, --help          Print this help and exit
   -V, --version       Print version information and exit
+
+Lint:
+  Check a Bundle's Frontmatter, links, anchors, embeds and footnotes (plus OKF
+  conformance when its root index.md declares okf_version) and exit non-zero
+  on errors. See 'sunstone lint --help'.
 
 The desktop app (with a native window) is at
 https://github.com/pothos-dev/sunstone/releases

@@ -56,6 +56,8 @@ import type {
   Embed,
   EmbedKind,
   EmbedTargetKind,
+  Finding,
+  Severity,
 } from '$lib/wasm/pkg';
 
 /** The generated wasm DTOs, surfaced for consumers (ADR 0006 §6). */
@@ -93,6 +95,8 @@ export type {
   Embed,
   EmbedKind,
   EmbedTargetKind,
+  Finding,
+  Severity,
 };
 
 /** The wasm module namespace (`BundleIndex` + the free exports). */
@@ -274,6 +278,15 @@ export function computationSection(yaml: string, body: string): ComputationSecti
  */
 export function isIsoDatetime(s: string): boolean {
   return mod ? mod.isIsoDatetime(s) : true;
+}
+
+/**
+ * The Frontmatter lint (ADR 0009, `sunstone_shared::okf_lint`): findings with
+ * UTF-16 offsets into `yaml`, sorted. `okf` adds the OKF families to the
+ * well-formedness checks. Before wasm is registered: no findings.
+ */
+export function frontmatterFindings(yaml: string, okf: boolean): Finding[] {
+  return mod ? mod.lintFrontmatter(yaml, okf) : [];
 }
 
 /** Offset of footnote `label`'s definition (`[^label]:`), or null. */

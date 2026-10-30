@@ -1,11 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { lintFrontmatter } from './lint';
 import { isParseable } from '$lib/frontmatter';
-import type { OkfFamily } from './family';
 
 /** Findings as `[severity, marked text, source]`, for compact assertions. */
-function marks(yaml: string, mode: 'yaml' | 'okf', families?: OkfFamily[]) {
-  return lintFrontmatter(yaml, mode, families).map((f) => [f.severity, yaml.slice(f.from, f.to), f.source]);
+function marks(yaml: string, mode: 'yaml' | 'okf') {
+  return lintFrontmatter(yaml, mode).map((f) => [f.severity, yaml.slice(f.from, f.to), f.source]);
 }
 
 describe('lintFrontmatter: well-formedness (every Bundle)', () => {
@@ -147,39 +146,10 @@ describe('lintFrontmatter: REQUIRED family fields are errors', () => {
   });
 });
 
-describe('lintFrontmatter: family scoping and registration', () => {
-  /** A family that complains whenever it runs. */
-  const noisy: OkfFamily = {
-    id: 'noisy',
-    keys: ['sources'],
-    rules: [(ctx) => [ctx.at([0, 1], 'info', 'ran')]],
-  };
-
-  test("a family's rules run only when one of its keys is present", () => {
-    expect(lintFrontmatter('type: x\n', 'okf', [noisy])).toEqual([]);
-    expect(marks('type: x\nsources: []\n', 'okf', [noisy])).toEqual([['info', 't', 'noisy']]);
-  });
-
-  test('a family with no keys always runs in okf mode, never in yaml mode', () => {
-    const always: OkfFamily = { ...noisy, keys: [] };
-    expect(lintFrontmatter('type: x\n', 'okf', [always])).toHaveLength(1);
-    expect(lintFrontmatter('type: x\n', 'yaml', [always])).toEqual([]);
-  });
-
+describe('lintFrontmatter: family scoping and order', () => {
   test('a Concept with no sources gets no provenance findings', () => {
     const findings = lintFrontmatter('title: no type here\n', 'okf');
     expect(findings.some((f) => f.source === 'okf-provenance')).toBe(false);
-  });
-
-  test('a family can declare required keys at any path and they become errors', () => {
-    const contract: OkfFamily = {
-      id: 'contract',
-      keys: ['executor'],
-      required: [{ path: ['executor'], key: 'resource', spec: '§10.2' }],
-    };
-    const [f] = lintFrontmatter('executor: { receipt: [a] }\n', 'okf', [contract]);
-    expect(f).toMatchObject({ severity: 'error', source: 'contract' });
-    expect(f.message).toBe('Missing required key `resource` in `executor` (OKF §10.2)');
   });
 
   test('findings come back sorted by position', () => {

@@ -20,6 +20,7 @@ pub mod embed;
 pub mod footnotes;
 pub mod frontmatter;
 pub mod links;
+pub mod okf_lint;
 pub mod okf_marker;
 pub mod outline;
 pub mod paths;

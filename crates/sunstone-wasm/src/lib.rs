@@ -21,6 +21,7 @@ use sunstone_shared::computation::{self, ComputationSection, Contract};
 use sunstone_shared::critic::{self, Annotation, CriticMark};
 use sunstone_shared::embed::{self, Embed, EmbedTargetKind};
 use sunstone_shared::footnotes::{self, Footnote};
+use sunstone_shared::okf_lint::{self, Finding, LintMode};
 use sunstone_shared::sources::{self, Source};
 use sunstone_shared::trust::{self, Trust};
 use sunstone_shared::frontmatter::{
@@ -329,6 +330,15 @@ pub fn is_attested_computation(yaml: String) -> bool {
 #[wasm_bindgen(js_name = computationSection)]
 pub fn computation_section(yaml: String, body: String) -> Option<ComputationSection> {
     computation::computation_section(&yaml, &body)
+}
+
+/// The Frontmatter lint (ADR 0009) over a YAML block (no fences): syntax and
+/// duplicate keys always, plus the OKF families when `okf` (the Bundle root
+/// declares `okf_version`). Offsets are UTF-16, sorted by position.
+#[wasm_bindgen(js_name = lintFrontmatter)]
+pub fn lint_frontmatter(yaml: String, okf: bool) -> Vec<Finding> {
+    let mode = if okf { LintMode::Okf } else { LintMode::Yaml };
+    okf_lint::lint_frontmatter(&yaml, mode)
 }
 
 /// Whether `s` is an ISO 8601 datetime with an explicit UTC offset (OKF §5).

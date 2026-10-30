@@ -1,5 +1,9 @@
 # OKF linting and completion are gated on the `okf_version` marker
 
+> Amended by [ADR-0017](0017-frontmatter-lint-lives-in-rust-for-sunstone-lint.md): the lint
+> half moved from TypeScript into `sunstone-shared` (`okf_lint`), reached over wasm, so
+> `sunstone lint` runs the same rules. The gate described here is unchanged.
+
 Now that Frontmatter is edited as YAML text ([ADR-0008](0008-raw-yaml-frontmatter-editing.md)),
 the affordances a structured panel used to provide come from a **language service**: syntax
 highlighting, diagnostics, completion and an explicit format command. Everything in that service

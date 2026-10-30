@@ -6,10 +6,13 @@ authors = ["Daniel Allmer <daniel@pothos.dev>"]
 edition = "2021"
 
 [dependencies]
-# Deliberately limited to serde/serde_yaml so this crate compiles for wasm32.
+# Deliberately limited to pure-Rust deps (serde/serde_yaml, saphyr-parser) so
+# this crate compiles for wasm32.
 # NO native-only deps (ignore/notify/grep-*/dirs) may be added here.
 serde = { workspace = true }
 serde_yaml = { workspace = true }
+# Positioned YAML events for the Frontmatter lint (`okf_lint`, ADR 0009).
+saphyr-parser = "0.3"
 # The tsify/wasm-bindgen DTO derives are OPTIONAL and gated behind the `wasm`
 # feature (ADR 0006 §6): the native build (cargo check/test) never compiles
 # them; only `sunstone-wasm` enables the feature for the browser boundary.
