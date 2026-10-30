@@ -33,6 +33,8 @@ export interface AppHotkeyContext {
 export type AppHotkeyIntent =
   | { kind: 'toggle-quicknav' }
   | { kind: 'toggle-search' }
+  /** PROTOTYPE (settings page): Ctrl/Cmd+, */
+  | { kind: 'toggle-settings' }
   | { kind: 'toggle-bundle-switcher' }
   | { kind: 'print' }
   | { kind: 'find' }
@@ -76,6 +78,8 @@ export function routeAppHotkey(e: KeyboardEvent, ctx: AppHotkeyContext): AppHotk
   if (matchesHotkey(e, { key: 'k' })) return { kind: 'toggle-quicknav' };
 
   if (matchesHotkey(e, { key: 'f', shift: true })) return { kind: 'toggle-search' };
+
+  if (matchesHotkey(e, { key: ',' })) return { kind: 'toggle-settings' };
 
   // Bundle switcher: Ctrl/Cmd+O. Desktop only — on web the key stays the
   // browser's.

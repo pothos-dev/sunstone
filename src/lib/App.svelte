@@ -25,6 +25,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import ActivityRail from '$lib/components/ActivityRail.svelte';
   import TileGrid from '$lib/components/TileGrid.svelte';
+  import SettingsPrototype from '$lib/components/settings-prototype/SettingsPrototype.svelte';
   import { treeActions } from '$lib/state/treeActions.svelte';
   import { focus } from '$lib/state/focus.svelte';
   import { explorerNav } from '$lib/state/explorerNav.svelte';
@@ -87,6 +88,8 @@
 
   // Quick-nav palette (Ctrl+K) + full-text search (Ctrl+Shift+F) overlays.
   let quickNavOpen = $state(false);
+  // PROTOTYPE (settings page): `?settings=A|B|C` reopens it on reload.
+  let settingsOpen = $state(typeof location !== 'undefined' && new URL(location.href).searchParams.has('settings'));
   // The Bundle switcher popover (ticket ui-1). Desktop only: the web shell serves
   // a single Bundle and has no known-folder list.
   let switcherOpen = $state(false);
@@ -242,6 +245,9 @@
     );
 
     const onKeydown = (e: KeyboardEvent) => {
+      // PROTOTYPE (settings page): the settings overlay owns its keys (Escape
+      // steps back, shortcut recording must not trigger the shortcut).
+      if ((e.target as Element | null)?.closest?.('[data-settings-proto]')) return;
       // Pure routing lives in `appHotkeys.ts`; this switch only performs the
       // side effects (and the matching preventDefault) for the routed intent.
       const intent = routeAppHotkey(e, {
@@ -265,6 +271,10 @@
         case 'toggle-search':
           e.preventDefault();
           searchOpen = !searchOpen;
+          return;
+        case 'toggle-settings':
+          e.preventDefault();
+          settingsOpen = !settingsOpen;
           return;
         case 'toggle-bundle-switcher':
           e.preventDefault();
@@ -608,6 +618,7 @@
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
     user={account}
+    bottom={settingsButton}
   />
 
   <Sidebar
@@ -811,6 +822,8 @@
     onclose={() => (quickNavOpen = false)}
   />
 
+  <SettingsPrototype open={settingsOpen} onclose={() => (settingsOpen = false)} />
+
   <SearchPanel
     open={searchOpen}
     onopen={(path, line) => {
@@ -833,6 +846,24 @@
     </div>
   {/if}
 </div>
+
+{#snippet settingsButton()}
+  <!-- PROTOTYPE (settings page) -->
+  <button
+    type="button"
+    class="settings-btn"
+    class:active={settingsOpen}
+    title="Settings (Ctrl+,)"
+    aria-label="Settings"
+    data-testid="rail-settings"
+    onclick={() => (settingsOpen = !settingsOpen)}
+  >
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3">
+      <circle cx="8" cy="8" r="2.2" />
+      <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke-linecap="round" />
+    </svg>
+  </button>
+{/snippet}
 
 <style>
   .app {
@@ -971,4 +1002,23 @@
     gap: 0.1rem;
   }
 
+
+  .settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .settings-btn:hover {
+    background: var(--hover);
+  }
+  .settings-btn.active {
+    color: var(--accent);
+  }
 </style>
