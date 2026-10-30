@@ -173,16 +173,24 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ matrix.exe }}
           if-no-files-found: error
 
-  # Stages the npm packages for 2FA approval rather than publishing them:
-  # NPM_TOKEN is a stage-only token. A maintainer then runs `npm stage list`
-  # and `npm stage approve <id>` for each (platform packages before the
-  # launcher). Staging needs npm >= 11.15, and a package must already exist on
-  # the registry to be staged, so a brand-new platform package needs one
-  # manual `npm publish` first. One package failing to stage doesn't stop the
-  # others; the job fails at the end so it shows.
-  stage-npm:
+  # Publishes the npm packages via trusted publishing (GitHub OIDC, no token).
+  # The platform packages publish directly; their trusted-publisher config
+  # allows `npm publish`. They do nothing until a launcher points at them (it
+  # pins exact versions) and a published version can't be replaced. The
+  # launcher is only staged (its config allows `npm stage publish` alone): a
+  # maintainer approves it with 2FA, which is what makes the release reach
+  # `npx sunstone-md`. Trusted publishing needs npm >= 11.5 and staging
+  # >= 11.15. A package must already exist on the registry to configure its
+  # trusted publisher, so a brand-new platform package needs one manual
+  # `npm publish` first. Platform versions already on the registry are skipped,
+  # so a re-run picks up where a failed run stopped; the launcher is staged
+  # only once every platform package is live.
+  publish-npm:
     needs: build-cli
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -199,23 +207,27 @@ jobs:
           pattern: cli-*
           path: bins
 
-      - name: Stage the packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish the platform packages, stage the launcher
         run: |
+          version="${GITHUB_REF_NAME#v}"
           for d in bins/cli-*; do mv "$d" "bins/${d#bins/cli-}"; done
-          node npm/stage.mjs "${GITHUB_REF_NAME#v}" bins npm-out
+          node npm/stage.mjs "$version" bins npm-out
           launcher=$(node -p 'require("./npm/sunstone/package.json").name')
           failed=""
-          stage() { (cd "$1" && npm stage publish) || failed="$failed $(basename "$1")"; }
           for dir in ./npm-out/*; do
-            [ "$dir" = "./npm-out/$launcher" ] || stage "$dir"
+            [ "$dir" = "./npm-out/$launcher" ] && continue
+            name=$(node -p "require('$dir/package.json').name")
+            if [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ]; then
+              echo "$name@$version is already published"
+            else
+              (cd "$dir" && npm publish) || failed="$failed $name"
+            fi
           done
-          stage "./npm-out/$launcher"
           if [ -n "$failed" ]; then
-            echo "::error::could not stage:$failed"
+            echo "::error::could not publish:$failed (launcher not staged)"
             exit 1
           fi
+          (cd "./npm-out/$launcher" && npm stage publish)
 
   publish-release:
     needs: [create-release, build-tauri]

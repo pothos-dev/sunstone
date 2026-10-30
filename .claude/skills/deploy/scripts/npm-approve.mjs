@@ -1,19 +1,20 @@
-// Wait for the release workflow to stage a version's npm packages (and npm to
-// finish validating them), check them,
-// and print the `npm stage approve` command (fish syntax) for the user to run (approving
-// needs their 2FA, so this script never approves anything itself).
+// Wait for the release workflow to publish a version's npm platform packages
+// and stage its launcher (and npm to finish validating it), check them, and
+// print the `npm stage approve` command (fish syntax) for the user to run.
+// Approving needs their 2FA, so this script never approves anything itself.
 //
 //   node .claude/skills/deploy/scripts/npm-approve.mjs <X.Y.Z> [--timeout-min N]
 //
-// Only the packages npm/packages.mjs defines are considered. For each one there
-// must be exactly one staged entry for <X.Y.Z>, staged by the npm user you're
-// logged in as, under the `latest` tag. The staged launcher's tarball is
-// downloaded and its optionalDependencies must be exactly the platform
-// packages at <X.Y.Z>. Anything else staged for these packages (other
-// versions) is listed and left alone. Exits non-zero if a check fails, or if
-// the release run finishes (or the timeout passes) with packages missing.
+// Only the packages npm/packages.mjs defines are considered. Every platform
+// package must be live at <X.Y.Z>. The launcher must have exactly one staged
+// entry for <X.Y.Z> under the `latest` tag, staged by the release workflow
+// (trusted publishing) or the logged-in npm user; its tarball is downloaded
+// and its optionalDependencies must be exactly the platform packages at
+// <X.Y.Z>. Other staged launcher versions are listed and left alone. Exits
+// non-zero if a check fails, or if the release run finishes (or the timeout
+// passes) with something missing.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PLATFORMS, launcher, platformPackage } from "../../../../npm/packages.mjs";
@@ -33,16 +34,22 @@ const NPM = ["-y", "npm@^11.15.0"];
 const npm = (...a) => execFileSync("npx", [...NPM, ...a], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
 const platforms = Object.keys(PLATFORMS).map(platformPackage);
-// Platforms first: the launcher must not go live pointing at unpublished packages.
-const expected = [...platforms, launcher.name];
 const fail = (msg) => {
   console.error(`✗ ${msg}`);
   process.exit(1);
 };
 
 const me = npm("whoami").trim();
-console.log(`Waiting for ${expected.length} packages @ ${version} to be staged (npm user: ${me}):`);
-for (const p of expected) console.log(`  ${p}`);
+console.log(`Waiting for ${version}: ${platforms.length} platform packages published, ${launcher.name} staged (npm user: ${me})`);
+
+/** Whether <pkg>@<version> is live on the registry. */
+function published(pkg) {
+  try {
+    return npm("view", `${pkg}@${version}`, "version").trim() === version;
+  } catch {
+    return false;
+  }
+}
 
 /** The release workflow run for this tag, or null if gh can't tell. */
 function releaseRun() {
@@ -59,43 +66,36 @@ function releaseRun() {
 }
 
 const deadline = Date.now() + timeoutMs;
-let found;
+let stage;
 for (;;) {
-  found = new Map();
-  const pending = [];
-  const others = [];
-  for (const pkg of expected) {
-    const entries = JSON.parse(npm("stage", "list", pkg, "--json"));
-    const mine = entries.filter((e) => e.version === version && (e.status === "staged" || e.status === "validating"));
-    if (mine.length > 1) fail(`${pkg}@${version} is staged ${mine.length} times (${mine.map((e) => e.id).join(", ")}); reject the extras first`);
-    // npm validates a staged package before it can be approved, which can take a while.
-    if (mine[0]?.status === "validating") pending.push(pkg);
-    else if (mine.length === 1) found.set(pkg, mine[0]);
-    others.push(...entries.filter((e) => !mine.includes(e)));
-  }
-  if (found.size === expected.length) {
-    for (const e of others) console.log(`  (ignoring ${e.packageName}@${e.version}, ${e.status}, id ${e.id})`);
+  const unpublished = platforms.filter((p) => !published(p));
+  const entries = JSON.parse(npm("stage", "list", launcher.name, "--json"));
+  const mine = entries.filter((e) => e.version === version && (e.status === "staged" || e.status === "validating"));
+  if (mine.length > 1) fail(`${launcher.name}@${version} is staged ${mine.length} times (${mine.map((e) => e.id).join(", ")}); reject the extras first`);
+  stage = mine[0];
+  if (!unpublished.length && stage?.status === "staged") {
+    for (const e of entries.filter((e) => e !== stage)) console.log(`  (ignoring ${e.packageName}@${e.version}, ${e.status}, id ${e.id})`);
     break;
   }
-  const missing = expected.filter((p) => !found.has(p) && !pending.includes(p));
-  const run = missing.length ? releaseRun() : null;
-  if (run?.status === "completed") fail(`release run finished (${run.conclusion}) but not staged: ${missing.join(", ")}\n  ${run.url}`);
-  if (Date.now() > deadline) fail(`timed out; not staged: ${missing.join(", ") || "-"}; still validating: ${pending.join(", ") || "-"}`);
-  const waiting = [...missing.map((p) => `${p} (not staged)`), ...pending.map((p) => `${p} (validating)`)];
-  console.log(`  ${found.size}/${expected.length} ready, waiting on ${waiting.join(", ")}…`);
+  // npm validates a staged package before it can be approved, which can take a while.
+  const waiting = [...unpublished.map((p) => `${p} (not published)`), `${launcher.name} (${stage ? stage.status : "not staged"})`];
+  const run = stage ? null : releaseRun();
+  if (run?.status === "completed") fail(`release run finished (${run.conclusion}), still waiting on ${waiting.join(", ")}\n  ${run.url}`);
+  if (Date.now() > deadline) fail(`timed out, still waiting on ${waiting.join(", ")}`);
+  console.log(`  waiting on ${waiting.join(", ")}…`);
   await new Promise((r) => setTimeout(r, POLL_MS));
 }
 
-for (const [pkg, e] of found) {
-  if (e.packageName !== pkg) fail(`stage ${e.id} is for ${e.packageName}, expected ${pkg}`);
-  if (e.actor !== me) fail(`${pkg}@${version} was staged by ${e.actor}, not ${me}`);
-  if (e.tag !== "latest") fail(`${pkg}@${version} is staged under tag "${e.tag}", not "latest"`);
-}
+if (stage.packageName !== launcher.name) fail(`stage ${stage.id} is for ${stage.packageName}, expected ${launcher.name}`);
+if (stage.tag !== "latest") fail(`${launcher.name}@${version} is staged under tag "${stage.tag}", not "latest"`);
+// Trusted publishing stages as the workflow, not as a user; a user other than you is suspect.
+if (stage.actorType === "user" && stage.actor !== me) fail(`${launcher.name}@${version} was staged by user ${stage.actor}, not ${me}`);
+console.log(`  ${launcher.name}@${version} staged by ${stage.actor} (${stage.actorType})`);
 
 // The launcher must point at exactly these platform packages, at this version.
 const dir = mkdtempSync(join(tmpdir(), "sunstone-npm-"));
 try {
-  execFileSync("npx", [...NPM, "stage", "download", found.get(launcher.name).id], { cwd: dir, stdio: "ignore" });
+  execFileSync("npx", [...NPM, "stage", "download", stage.id], { cwd: dir, stdio: "ignore" });
   const tgz = readdirSync(dir).find((f) => f.endsWith(".tgz"));
   const manifest = JSON.parse(execFileSync("tar", ["-xzOf", join(dir, tgz), "package/package.json"], { encoding: "utf8" }));
   if (manifest.name !== launcher.name || manifest.version !== version) fail(`launcher tarball is ${manifest.name}@${manifest.version}`);
@@ -107,8 +107,5 @@ try {
   rmSync(dir, { recursive: true, force: true });
 }
 
-console.log(`\n✓ All ${expected.length} packages staged and checked. Run this in fish to approve them (2FA per package):\n`);
-// fish: each `and` line runs only if the previous approval succeeded.
-expected.forEach((p, i) =>
-  console.log(`${i ? "and " : ""}npx -y npm@^11.15.0 stage approve ${found.get(p).id}  # ${p}@${version}`),
-);
+console.log(`\n✓ ${platforms.length} platform packages live, ${launcher.name}@${version} staged and checked. Run this to approve it (2FA):\n`);
+console.log(`npx -y npm@^11.15.0 stage approve ${stage.id}  # ${launcher.name}@${version}`);

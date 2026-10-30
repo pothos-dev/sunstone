@@ -101,7 +101,7 @@ Print this to the user, verbatim, with the version and repo filled in:
 >
 > The workflow builds all platforms, uploads them to a draft, then **auto-publishes** the release once every build succeeds — with the CHANGELOG section for this version as the release notes. It'll appear at https://github.com/pothos-dev/sunstone/releases when the run finishes. If any platform build fails, it stays a draft.
 >
-> The `stage-npm` job **stages** the npm packages (`npx sunstone-md`); they go live only once you approve them with 2FA. I'll post the approve command once they're staged and checked.
+> The `publish-npm` job publishes the npm platform packages and **stages** the `sunstone-md` launcher; `npx sunstone-md` gets the new version only once you approve the launcher with 2FA. I'll post the approve command once it's staged and checked.
 
 The workflow (`.github/workflows/release.yml`) runs three jobs: `create-release` opens a draft whose body is this version's `CHANGELOG.md` section, `build-tauri` uploads each platform's installers to that draft, and `publish-release` flips it to published once all builds pass. Assets land on the draft first, so a failed platform never leaves a partially-populated public release. Each build also signs its updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret and merges itself into the release's `latest.json`, the feed installed copies poll to update themselves silently. Publishing is what makes it live: `releases/latest` only ever points at a published release. No manual publish step is needed — but this is also why the CHANGELOG section (Phase 2) must be correct before tagging: it becomes the public release notes verbatim.
 
@@ -151,15 +151,15 @@ Add a line to the Phase 5 hand-off saying the landing page and guide are updated
 
 ## Phase 7 — Prepare the npm approval
 
-Approving staged packages needs the user's 2FA, so never approve them yourself: wait for them to be staged, check them, and hand the user the command. Run in the background right after the tag push:
+The `publish-npm` job uses npm trusted publishing (GitHub OIDC, no token): the five platform packages are published directly, and the `sunstone-md` launcher is only staged. Approving it needs the user's 2FA, so never approve it yourself: wait for it, check it, and hand the user the command. Run in the background right after the tag push:
 
 ```bash
 node .claude/skills/deploy/scripts/npm-approve.mjs X.Y.Z
 ```
 
-It polls `npm stage list` every 30 s (via `npx npm@^11.15.0`, since `npm stage` needs npm ≥ 11.15) until every package in `npm/packages.mjs` has one staged `X.Y.Z` entry that npm has finished validating (`validating` → `staged` can take 10+ minutes for a binary package). It checks that each one was staged by the logged-in npm user under the `latest` tag, and that the staged launcher's `optionalDependencies` are exactly the platform packages at `X.Y.Z`. Other staged versions are listed and left alone. It stops with an error if a check fails, if the release run finishes with packages still unstaged, or after 60 minutes (`--timeout-min N`).
+It polls every 30 s (via `npx npm@^11.15.0`, since `npm stage` needs npm ≥ 11.15) until every platform package in `npm/packages.mjs` is live at `X.Y.Z` and the launcher has one staged `X.Y.Z` entry that npm has finished validating (`validating` → `staged` can take 10+ minutes). It checks that the launcher is staged under the `latest` tag, not by some other npm user, and that its tarball's `optionalDependencies` are exactly the platform packages at `X.Y.Z`. Other staged versions are listed and left alone. It stops with an error if a check fails, if the release run finishes with something missing, or after 60 minutes (`--timeout-min N`).
 
-When it succeeds, it prints a block of `npm stage approve <id>` lines for the user's shell, fish, chained with `and` so it stops at the first failure: platform packages first, the launcher last. Give that block to the user verbatim, in a fenced `fish` block. If it fails, report its error and don't build an approve command by hand.
+When it succeeds it prints one `npm stage approve <id>` line. Give it to the user verbatim in a fenced `fish` block (their shell). If it fails, report its error and don't build an approve command by hand. If `publish-npm` failed partway, re-running the job is safe: platform versions already on the registry are skipped.
 
 ## Failure handling
 
