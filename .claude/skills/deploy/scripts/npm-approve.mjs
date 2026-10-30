@@ -39,7 +39,12 @@ const fail = (msg) => {
   process.exit(1);
 };
 
-const me = npm("whoami").trim();
+let me;
+try {
+  me = npm("whoami").trim();
+} catch {
+  fail("not logged in to npm (`npm whoami` failed); run `npx -y npm@^11.15.0 login`, then this script again");
+}
 console.log(`Waiting for ${version}: ${platforms.length} platform packages published, ${launcher.name} staged (npm user: ${me})`);
 
 /** Whether <pkg>@<version> is live on the registry. */
