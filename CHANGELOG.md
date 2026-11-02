@@ -4,6 +4,11 @@ All notable changes to Sunstone are documented in this file. The format is based
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.33.0] - 2026-11-02
+
+### Added
+- `sunstone export ./docs --out ./site` writes a Bundle as a folder of static HTML pages, one per Concept, that anyone can read with only a browser: open `index.html` from disk, or copy the folder to any web server. Pages read as they do on Sunstone Web, with Sunstone's fonts and colours, light or dark following the system. Each page has an Explorer of the whole Bundle, the folders above it, its Frontmatter (collapsed) and the pages that link to it. `--exclude` leaves files out. Diagrams show as their source for now.
+
 ## [0.32.0] - 2026-10-31
 
 ### Added
