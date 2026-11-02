@@ -4264,6 +4264,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sunstone-export",
  "sunstone-native",
  "sunstone-server",
  "sunstone-shared",
@@ -4282,9 +4283,19 @@ name = "sunstone-cli"
 version = "0.32.0"
 dependencies = [
  "rust-embed",
+ "sunstone-export",
  "sunstone-native",
  "sunstone-server",
  "tokio",
+]
+
+[[package]]
+name = "sunstone-export"
+version = "0.14.0"
+dependencies = [
+ "regex",
+ "sunstone-native",
+ "sunstone-shared",
 ]
 
 [[package]]

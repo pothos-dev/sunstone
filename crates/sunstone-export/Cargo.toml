@@ -1,0 +1,12 @@
+[package]
+name = "sunstone-export"
+version = "0.14.0"
+description = "`sunstone export`: a Bundle as a folder of static HTML pages that open from disk"
+authors = ["Daniel Allmer <daniel@pothos.dev>"]
+edition = "2021"
+
+[dependencies]
+sunstone-native = { path = "../sunstone-native" }
+sunstone-shared = { path = "../sunstone-shared" }
+regex = { workspace = true }
+

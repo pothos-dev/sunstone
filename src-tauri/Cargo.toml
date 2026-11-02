@@ -26,6 +26,8 @@ sunstone-shared = { path = "../crates/sunstone-shared" }
 # `sunstone serve`: the same HTTP API Sunstone Web runs, in its local shape,
 # serving this binary's embedded SPA to a browser on loopback.
 sunstone-server = { path = "../crates/sunstone-server" }
+# `sunstone export`: the Bundle as a folder of static HTML pages.
+sunstone-export = { path = "../crates/sunstone-export" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 # Native save-file chooser for the print window's "Save as PDF" button.

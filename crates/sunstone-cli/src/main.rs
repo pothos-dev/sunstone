@@ -26,6 +26,11 @@ fn main() {
         args.next();
         std::process::exit(sunstone_native::lint::cli::run(args));
     }
+    // `sunstone export` writes the Bundle as static HTML and exits.
+    if args.peek().is_some_and(|a| a == "export") {
+        args.next();
+        std::process::exit(sunstone_export::cli::run(args));
+    }
     let opts = match parse_serve_args(args) {
         ServeArgs::Serve(opts) => opts,
         ServeArgs::Help => return print!("{}", help_string()),
@@ -76,6 +81,7 @@ Serve the Sunstone markdown editor to your browser at http://localhost:PORT/.
 Usage:
   sunstone [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
   sunstone lint [BUNDLE] [--exclude PATTERN]... [--json]
+  sunstone export [BUNDLE] --out FOLDER [--exclude PATTERN]...
 
 Arguments:
   BUNDLE              Folder to open as a Bundle (default: current directory).
@@ -96,6 +102,10 @@ Lint:
   Check a Bundle's Frontmatter, links, anchors, embeds and footnotes (plus OKF
   conformance when its root index.md declares okf_version) and exit non-zero
   on errors. See 'sunstone lint --help'.
+
+Export:
+  Write a Bundle as a folder of static HTML pages with an Explorer, to open
+  from disk or put on any web server. See 'sunstone export --help'.
 
 The desktop app (with a native window) is at
 https://github.com/pothos-dev/sunstone/releases

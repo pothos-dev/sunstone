@@ -33,6 +33,7 @@ fn handle_cli() -> Option<Launch> {
         cli::CliAction::Run(opts) => opts,
         cli::CliAction::Serve(opts) => return Some(Launch::Serve(opts)),
         cli::CliAction::Lint(args) => std::process::exit(sunstone_native::lint::cli::run(args)),
+        cli::CliAction::Export(args) => std::process::exit(sunstone_export::cli::run(args)),
         cli::CliAction::Version => {
             println!("{}", cli::version_string());
             return None;

@@ -6,7 +6,8 @@
 //! `--detached`/`-d` (run detached from the spawning console); or the `serve`
 //! subcommand (`sunstone serve ./docs --port 3000`), which serves the editor to
 //! a browser on localhost instead of opening a window; or the `lint` subcommand
-//! (`sunstone lint ./docs`), which checks a Bundle and exits. We hand-roll the
+//! (`sunstone lint ./docs`), which checks a Bundle and exits; or the `export`
+//! subcommand (`sunstone export ./docs -o site`), which writes it as static HTML. We hand-roll the
 //! parse (no `clap`) to keep the dependency surface small; the grammar is tiny
 //! and the logic is pure so it can be unit-tested.
 
@@ -38,6 +39,9 @@ pub enum CliAction {
     /// Check a Bundle (`sunstone lint`): the arguments after `lint`, parsed by
     /// `sunstone_native::lint::cli`.
     Lint(Vec<String>),
+    /// Export a Bundle as static HTML (`sunstone export`): the arguments after
+    /// `export`, parsed by `sunstone_export::cli`.
+    Export(Vec<String>),
     /// Print version information to stdout and exit successfully.
     Version,
     /// Print usage help to stdout and exit successfully.
@@ -55,8 +59,9 @@ pub enum CliAction {
 /// wherever they appear. Any unrecognised flag, or a third positional
 /// argument, is rejected. A first argument of `serve` selects the subcommand
 /// instead (see [`sunstone_server::serve_args`]), and `lint` likewise
-/// (`sunstone_native::lint::cli`); a folder literally named `serve` or `lint` is
-/// still reachable as `./serve` / `./lint`.
+/// (`sunstone_native::lint::cli`), and `export` (`sunstone_export::cli`); a
+/// folder literally named `serve`, `lint` or `export` is still reachable as
+/// `./serve` / `./lint` / `./export`.
 pub fn parse_args<I, S>(args: I) -> CliAction
 where
     I: IntoIterator<Item = S>,
@@ -66,6 +71,10 @@ where
     if args.peek().is_some_and(|a| a.as_ref() == "lint") {
         args.next();
         return CliAction::Lint(args.map(|a| a.as_ref().to_string()).collect());
+    }
+    if args.peek().is_some_and(|a| a.as_ref() == "export") {
+        args.next();
+        return CliAction::Export(args.map(|a| a.as_ref().to_string()).collect());
     }
     if args.peek().is_some_and(|a| a.as_ref() == "serve") {
         args.next();
@@ -118,6 +127,7 @@ Usage:
   {name} [BUNDLE [DOCUMENT[#HEADING]]]
   {name} serve [BUNDLE] [--browser] [--port PORT] [--bind ADDR] [--allow-host NAME]...
   {name} lint [BUNDLE] [--exclude PATTERN]... [--json]
+  {name} export [BUNDLE] --out FOLDER [--exclude PATTERN]...
 
 Arguments:
   BUNDLE        Path to the folder to open as a Bundle. Omit to open the launcher
@@ -147,6 +157,10 @@ Lint:
   Check a Bundle's Frontmatter, links, anchors, embeds and footnotes (plus OKF
   conformance when its root index.md declares okf_version) and exit non-zero
   on errors. See '{name} lint --help'.
+
+Export:
+  Write a Bundle as a folder of static HTML pages with an Explorer, to open
+  from disk or put on any web server. See '{name} export --help'.
 ",
         name = env!("CARGO_PKG_NAME"),
         version = env!("CARGO_PKG_VERSION"),
@@ -273,6 +287,10 @@ mod tests {
     fn lint_hands_the_rest_of_the_line_to_the_lint_parser() {
         assert_eq!(parse_args(["lint", "docs", "--json"]), CliAction::Lint(vec!["docs".into(), "--json".into()]));
         assert_eq!(parse_args(["lint"]), CliAction::Lint(vec![]));
+        assert_eq!(
+            parse_args(["export", "docs", "-o", "site"]),
+            CliAction::Export(vec!["docs".into(), "-o".into(), "site".into()])
+        );
         assert_eq!(parse_args(["./lint"]), run(Some("./lint"), false));
     }
 

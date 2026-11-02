@@ -6,6 +6,7 @@ members = [
   "crates/sunstone-wasm",
   "crates/sunstone-server",
   "crates/sunstone-cli",
+  "crates/sunstone-export",
   "src-tauri",
 ]
 

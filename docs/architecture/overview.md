@@ -18,6 +18,7 @@ Sunstone is one codebase that ships two products — a **desktop editor** and a 
 | [Desktop shell](/architecture/desktop-shell.md) (`src-tauri`) | Rust | Thin Tauri 2 wrapper exposing native over IPC commands. |
 | [sunstone-server](/architecture/sunstone-server.md) | Rust | axum HTTP binary exposing native over a JSON/SSE API — and, in the git-synced deployment shape, the owner of the **git sync loop**. |
 | [Web frontend](/architecture/web-frontend.md) (`src/`) | SvelteKit | One UI that targets both hosts, decoupled by the IPC seam. |
+| `sunstone-export` | Rust | `sunstone export`: the Bundle as static HTML pages over native's renderer, with the frontend's stylesheets embedded. Linked into both CLI binaries, not the server. |
 
 ## The central idea
 
