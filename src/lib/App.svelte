@@ -4,6 +4,7 @@
   import { backend } from '$lib/ipc';
   import { servedDesktop } from '$lib/ipc/served';
   import { conceptHref } from '$lib/web/urlSync';
+  import { loadUiState, saveThemeMode } from '$lib/web/uiState';
   import { bundle } from '$lib/state/bundle.svelte';
   import { editor } from '$lib/state/editor.svelte';
   import { indexStore } from '$lib/state/index.svelte';
@@ -144,6 +145,12 @@
     // stylesheet below. Elsewhere there is no settings page; read it directly.
     const settingsReady = settings.load(backend);
     if (!SETTINGS_EDITABLE) void loadAppearance(backend);
+    // `sunstone serve` has no settings page; its rail toggle's choice is kept in
+    // the browser, under the key `app.html` reads for the first paint.
+    if (servedDesktop) {
+      const { themeMode } = loadUiState();
+      if (themeMode) theme.mode = themeMode;
+    }
     // Seed the persisted UI zoom before the first paint of the mounted app.
     zoom.load();
     const stopFocus = focus.start();
@@ -459,6 +466,13 @@
     if (session.restored) session.setLayout(snapshot);
   });
 
+  // `sunstone serve`: the rail's manual light/dark toggle (the desktop sets the
+  // mode on the settings page instead).
+  function toggleTheme() {
+    theme.mode = theme.resolved === 'dark' ? 'light' : 'dark';
+    saveThemeMode(theme.mode);
+  }
+
   function openConcept(path: string) {
     focusTypeForPath = null;
     void editor.open(path);
@@ -638,7 +652,7 @@
     titlesShown={session.titlesShown}
     onToggleTitles={() => session.setTitlesShown(!session.titlesShown)}
     user={account}
-    bottom={SETTINGS_EDITABLE ? settingsButton : undefined}
+    bottom={SETTINGS_EDITABLE ? settingsButton : servedDesktop ? themeToggle : undefined}
   />
 
   <Sidebar
@@ -869,6 +883,17 @@
   {/if}
 </div>
 
+{#snippet themeToggle()}
+  <button
+    type="button"
+    class="settings-btn"
+    title="Toggle light / dark theme"
+    aria-label="Toggle light / dark theme"
+    data-testid="theme-toggle"
+    onclick={toggleTheme}>{theme.resolved === 'dark' ? '☀' : '☾'}</button
+  >
+{/snippet}
+
 {#snippet settingsButton()}
   <button
     type="button"
@@ -1028,7 +1053,8 @@
   }
 
 
-  /* The rail's gear (the left rail's bottom slot). Matches ActivityRail's buttons. */
+  /* The rail's gear, or under `sunstone serve` its theme toggle (the left rail's
+     bottom slot). Matches ActivityRail's buttons. */
   .settings-btn {
     display: inline-flex;
     align-items: center;

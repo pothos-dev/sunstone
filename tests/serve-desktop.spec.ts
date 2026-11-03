@@ -105,3 +105,22 @@ test('View state is keyed by the Bundle root, so another Bundle never restores',
     )
     .toBe('good.md');
 });
+
+test('the rail toggles light / dark and the choice survives a reload', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const html = page.locator('html');
+  const toggle = page.getByTestId('theme-toggle');
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  // No settings page under serve: the toggle takes the gear's slot.
+  await expect(page.getByTestId('rail-settings')).toHaveCount(0);
+
+  await toggle.click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByTestId('app-root')).toHaveAttribute('data-theme', 'dark');
+
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await toggle.click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+});

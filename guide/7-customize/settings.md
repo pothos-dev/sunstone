@@ -11,7 +11,7 @@ sources:
 
 # Settings
 
-Open the settings with the gear at the bottom of the left rail, or press Ctrl+, (Cmd+, on a Mac). The settings page is part of the desktop app. Under `sunstone serve` and on Sunstone Web, the colour theme, colours and fonts from `config.json` still apply; the mode, layout defaults and shortcuts are desktop only.
+Open the settings with the gear at the bottom of the left rail, or press Ctrl+, (Cmd+, on a Mac). The settings page is part of the desktop app. Under `sunstone serve` and on Sunstone Web, the colour theme, colours and fonts from `config.json` still apply; layout defaults and shortcuts are desktop only. Under `sunstone serve` you switch light and dark with the button at the bottom of the left rail instead.
 
 Changes apply as you make them and are saved straight away. There is no Save button. Each setting you have changed has a dot next to it, and the reset arrow takes it back to the default.
 

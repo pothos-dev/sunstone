@@ -3,7 +3,7 @@ type: Guide
 title: Run in the browser
 description: "Use Sunstone without installing it with npx sunstone-md, or serve the desktop editor with sunstone serve."
 tags: [setup, cli, web]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-28T18:00:00+01:00 }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-03T12:00:00+01:00 }
 sources:
   - id: changelog
     resource: https://github.com/pothos-dev/sunstone/blob/main/CHANGELOG.md
@@ -40,6 +40,8 @@ Both commands take the same options:
 | `--browser`, `-b` | Open the editor in your default browser once it's ready. |
 | `--bind ADDR` | Listen on an address other than localhost. |
 | `--allow-host NAME` | Accept requests for this host name, e.g. behind a reverse proxy. |
+
+There is no settings page in the browser. Instead, the button at the bottom of the left rail switches between light and dark, and your browser remembers the choice. Your colour theme, colours and fonts from `config.json` still apply.
 
 There is no sign-in, so if you expose it beyond localhost, the proxy in front has to control access. For a shared, authenticated deployment, use [Sunstone Web](/5-web/sunstone-web.md).
 

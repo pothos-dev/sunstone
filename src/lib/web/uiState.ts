@@ -59,3 +59,12 @@ export function saveUiState(state: WebUiState): void {
     /* storage full / disabled — best-effort, never throw into the UI */
   }
 }
+
+/**
+ * Persist just the theme mode, keeping every other stored field. For the
+ * `sunstone serve` shell, which owns no other part of this state but shares
+ * the key with `app.html`'s pre-hydration theme snippet.
+ */
+export function saveThemeMode(themeMode: ThemeMode): void {
+  saveUiState({ ...loadUiState(), themeMode } as WebUiState);
+}
