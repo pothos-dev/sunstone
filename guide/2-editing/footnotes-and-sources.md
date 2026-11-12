@@ -31,7 +31,7 @@ A footnote whose label matches a source's `id` cites that source. Sunstone then 
 
 - a **Sources** list at the end of the page, numbered like the footnotes that cite them. Uncited sources follow without a number. The list is only displayed, never written to the file.
 - a **hover card** on each citation and each Sources entry, with the source's title, resource, author and dates. Clicking it opens the source: another Concept, or a web address.
-- for each entry: who wrote it, when it last changed, how often it was used, links back to every place in the text that cites it, and an **Edit** button that jumps to the entry in the frontmatter.
+- for each entry: links back to every place in the text that cites it, right after its title (`↑`, or `↑ a b` for several); who wrote it, when it last changed, how often it was used; and an **Edit** button that jumps to the entry in the frontmatter.
 
 This page cites its own source the same way.[^changelog]
 
