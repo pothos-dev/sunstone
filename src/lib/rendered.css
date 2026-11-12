@@ -197,6 +197,10 @@
   min-width: 0;
 }
 
+.rendered .source-head .source-backrefs {
+  margin-left: 0.5em;
+}
+
 .rendered .source-resource {
   color: var(--text-muted, #777);
   font-size: 0.85em;
@@ -204,7 +208,8 @@
 }
 
 /* Credibility signals on one line (ov-24: author · modified … · usage), a body
-   definition's text, and the jumps back to the citing claims (ov-10). Mirrors
+   definition's text, and the jumps back to the citing claims (ov-10), which
+   trail the title. Mirrors
    the editor's `.cm-source-*`. */
 .rendered .source-signals {
   font-size: 0.85em;

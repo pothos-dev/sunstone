@@ -214,7 +214,7 @@ pub(super) fn sources_section_html(list: &[Source], link: LinkAttrs) -> String {
             .unwrap_or_default();
         let (signals, backrefs) = (signals_html(s), backrefs_html(s));
         out.push_str(&format!(
-            r#"<li><span class="source-num">{num}</span><span class="source-body">{title}{resource}{signals}{note}{backrefs}</span></li>"#
+            r#"<li><span class="source-num">{num}</span><span class="source-body"><span class="source-head">{title}{backrefs}</span>{resource}{signals}{note}</span></li>"#
         ));
     }
     out.push_str("</ol></section>");
@@ -362,8 +362,8 @@ fn actor_html(raw: &str) -> String {
     )
 }
 
-/// The jumps from an entry back to each claim citing it: `↑` alone for one
-/// place, `↑ a b c` for several. `""` for an uncited entry.
+/// The jumps from an entry back to each claim citing it, shown after its
+/// title: `↑` alone for one place, `↑ a b c` for several. `""` for an uncited entry.
 fn backrefs_html(s: &Source) -> String {
     let Some(id) = s.id.as_deref() else {
         return String::new();
@@ -519,11 +519,11 @@ mod tests {
             .map(|n| section.find(n).unwrap_or_else(|| panic!("{n} in {section}")))
             .collect();
         assert!(order.windows(2).all(|w| w[0] < w[1]), "{section}");
-        assert!(section.contains(r#"<li><span class="source-num">2</span><span class="source-body"><a class="internal-link" data-path="docs/spec.md""#), "{section}");
+        assert!(section.contains(r#"<li><span class="source-num">2</span><span class="source-body"><span class="source-head"><a class="internal-link" data-path="docs/spec.md""#), "{section}");
         assert!(section.contains(r#"<span class="source-title" data-source="{&quot;id&quot;:&quot;scope&quot;"#), "{section}");
         assert!(section.contains(r#"&quot;num&quot;:3}">all queries in project X</span>"#), "{section}");
         // `../u.md` from `notes/a.md` is `u.md`, which does not exist.
-        assert!(section.contains(r#"<li><span class="source-num"></span><span class="source-body"><a class="internal-link broken" data-path="u.md""#), "{section}");
+        assert!(section.contains(r#"<li><span class="source-num"></span><span class="source-body"><span class="source-head"><a class="internal-link broken" data-path="u.md""#), "{section}");
     }
 
     #[test]

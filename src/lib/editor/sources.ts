@@ -93,6 +93,7 @@ class SourcesWidget extends WidgetType {
         });
       }
       head.append(title);
+      if (s.refs.length > 0) head.append(backrefsElement(view, s.refs));
       const onEdit = this.onEditSource;
       if (onEdit) {
         const edit = document.createElement('button');
@@ -122,7 +123,6 @@ class SourcesWidget extends WidgetType {
         note.textContent = s.note;
         body.append(note);
       }
-      if (s.refs.length > 0) body.append(backrefsElement(view, s.refs));
       li.append(num, body);
       ol.append(li);
     }
@@ -298,10 +298,9 @@ export const sourcesTheme = EditorView.theme({
     flexDirection: 'column',
     minWidth: '0',
   },
-  '.cm-source-head': {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '0.6em',
+  // Inline flow, so a long title wraps and the backrefs trail its last word.
+  '.cm-source-head > * + *': {
+    marginLeft: '0.5em',
   },
   'a.cm-source-title': {
     color: 'var(--atomic-editor-link)',

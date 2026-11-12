@@ -184,7 +184,7 @@ function renderSourcesSection(list: Source[]): string {
         ? `<span class="source-resource">${attr(s.resource)}</span>`
         : '';
     const note = s.note ? `<span class="source-note">${attr(s.note)}</span>` : '';
-    out += `<li><span class="source-num">${s.num ?? ''}</span><span class="source-body">${title}${resource}${renderSignals(s)}${note}${renderBackrefs(s)}</span></li>`;
+    out += `<li><span class="source-num">${s.num ?? ''}</span><span class="source-body"><span class="source-head">${title}${renderBackrefs(s)}</span>${resource}${renderSignals(s)}${note}</span></li>`;
   }
   return out + '</ol></section>';
 }

@@ -143,9 +143,9 @@ describe('renderConcept footnotes', () => {
     // The Sources section closes the body: cited by number, then uncited.
     expect(html).toContain(
       '<section class="sources"><div class="sources-heading">Sources</div><ol class="sources-list">' +
-        `<li><span class="source-num">2</span><span class="source-body"><a href="https://x" ${ssi}><span class="source-title">SSI</span></a><span class="source-resource">https://x</span>${back('ssi-web')}</span></li>` +
-        `<li><span class="source-num">3</span><span class="source-body"><span class="source-title" ${all}>all queries in X</span>${back('all')}</span></li>` +
-        `<li><span class="source-num"></span><span class="source-body"><a href="/u.md" ${unused}><span class="source-title">/u.md</span></a></span></li>` +
+        `<li><span class="source-num">2</span><span class="source-body"><span class="source-head"><a href="https://x" ${ssi}><span class="source-title">SSI</span></a>${back('ssi-web')}</span><span class="source-resource">https://x</span></span></li>` +
+        `<li><span class="source-num">3</span><span class="source-body"><span class="source-head"><span class="source-title" ${all}>all queries in X</span>${back('all')}</span></span></li>` +
+        `<li><span class="source-num"></span><span class="source-body"><span class="source-head"><a href="/u.md" ${unused}><span class="source-title">/u.md</span></a></span></span></li>` +
         '</ol></section>',
     );
   });
@@ -160,12 +160,14 @@ describe('renderConcept footnotes', () => {
     expect(text).not.toContain('footnote-def');
     expect(text).toContain('B<sup id="fnref-s-2" class="footnote-ref source"');
     expect(section).toContain(
+      '<span class="source-backrefs">↑ <a class="source-backref" href="#fnref-s-1" title="Jump to citation 1">a</a> <a class="source-backref" href="#fnref-s-2" title="Jump to citation 2">b</a></span></span>',
+    );
+    expect(section).toContain(
       '<span class="source-signals">' +
         '<span class="source-signal source-author"><span class="actor actor-human" title="Person: dan"><span class="actor-kind">person</span><span class="actor-id">dan</span></span></span>' +
         '<span class="source-signal source-modified">modified <time class="fm-time" datetime="2026-05-30T00:00:00Z" title="2026-05-30T00:00:00Z">2026-05-30T00:00:00Z</time></span>' +
         '<span class="source-signal source-usage">1,280× used in June 2026</span>' +
-        '</span><span class="source-note">Written by hand</span>' +
-        '<span class="source-backrefs">↑ <a class="source-backref" href="#fnref-s-1" title="Jump to citation 1">a</a> <a class="source-backref" href="#fnref-s-2" title="Jump to citation 2">b</a></span>',
+        '</span><span class="source-note">Written by hand</span>',
     );
   });
 
